@@ -1,0 +1,52 @@
+# Builds and publishes a release when a v* tag is pushed (`npm version minor && git push --follow-tags`).
+# Installers and update metadata go to the public lukaznj/manim-studio-releases repo, which is
+# where installed apps look for updates. Setup and secrets: docs/06-operations/releasing.md
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest # Apple Silicon
+            target: --mac --arm64
+          - os: windows-latest
+            target: --win --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run fetch-pixi
+      - run: npm run typecheck
+      - run: npm test
+      - name: Python runner tests
+        if: runner.os == 'macOS'
+        working-directory: python
+        run: ../resources/bin/pixi run python -m unittest discover tests
+      - run: npm run build
+
+      - name: Package and publish (macOS, signed + notarized)
+        if: runner.os == 'macOS'
+        run: npx electron-builder ${{ matrix.target }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Package and publish (Windows)
+        if: runner.os == 'Windows'
+        run: npx electron-builder ${{ matrix.target }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}

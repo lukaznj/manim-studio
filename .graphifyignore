@@ -1,0 +1,18 @@
+# Keep the graph on our source. (maturita's graph indexed dependencies and native
+# build folders: 138k nodes, mostly noise.) .gitignore is applied as well.
+node_modules/
+out/
+dist/
+resources/
+build/
+python/.pixi/
+python/pixi.lock
+package-lock.json
+docs/05-design/screenshots/
+docs/.obsidian/
+*.png
+*.ttf
+# graphify's own skill docs and boilerplate would form their own noise communities.
+.claude/skills/
+python/studio/fonts/
+docs/04-decisions/_template.md

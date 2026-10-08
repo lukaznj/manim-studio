@@ -1,0 +1,455 @@
+.timeline {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 44px 1fr;
+  /* An implicit column is content-sized: the wide track would stretch the scroller. */
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--panel);
+}
+
+/* ---- toolbar -------------------------------------------------------------------------------- */
+
+.tl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.play-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: 0 2px;
+  border-radius: 50%;
+  border: none;
+  background: var(--sun);
+  color: var(--sun-ink);
+  transition: transform 0.15s var(--ease-spring);
+}
+.play-btn:hover {
+  transform: scale(1.07);
+}
+.play-btn:active {
+  transform: scale(0.94);
+}
+.play-btn:disabled {
+  opacity: 0.35;
+}
+.play-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+.timecode {
+  margin-left: 8px;
+  font-size: 12.5px;
+  min-width: 140px;
+}
+.tl-selection {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  animation: fade-up 0.2s var(--ease-out);
+}
+.tl-selection .hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tl-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 6px;
+}
+.zoom .icon-btn {
+  width: 26px;
+  height: 26px;
+}
+.zoom input[type='range'] {
+  width: 96px;
+  accent-color: var(--sun);
+}
+
+/* ---- body ----------------------------------------------------------------------------------- */
+
+.tl-body {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+.tl-labels {
+  flex: none;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+.tl-label {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.tl-label.ruler-label {
+  height: 24px;
+}
+.tl-label.warn-label {
+  height: 8px;
+}
+.tl-label.tall {
+  height: 44px;
+}
+.tl-label.taller {
+  height: 50px;
+}
+
+.tl-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 0.012) 1px, transparent 1px) 14px 0 / 40px 100%,
+    var(--bg);
+}
+.tl-content {
+  position: relative;
+  min-height: 100%;
+  padding-bottom: 8px;
+  cursor: text;
+}
+.tl-content .ruler,
+.tl-content .lane,
+.tl-content .tl-empty {
+  position: relative;
+  margin-left: 14px;
+}
+
+.ruler {
+  height: 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  cursor: ew-resize;
+}
+.tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--line-strong);
+}
+.tick span {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.tick.minor {
+  top: 17px;
+  border-color: var(--line);
+}
+
+.lane {
+  height: 28px;
+}
+.lane-warn {
+  height: 8px;
+}
+.lane-clips {
+  height: 44px;
+}
+.lane-voice {
+  height: 50px;
+}
+.tl-empty {
+  padding: 30px 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+/* Clips glide to their new timings after each render: you see the retiming happen. */
+.lane > div {
+  position: absolute;
+  transition:
+    left 0.5s var(--ease-out),
+    width 0.5s var(--ease-out),
+    background 0.15s,
+    box-shadow 0.15s;
+}
+.zooming .lane > div,
+.lane > div.dragging {
+  transition: none;
+}
+
+.warn-bar {
+  top: 2px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--coral);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgb(255 111 89 / 0.5);
+}
+.warn-bar.overlap {
+  background: repeating-linear-gradient(90deg, var(--coral) 0 6px, transparent 6px 9px);
+  box-shadow: none;
+}
+
+.section-block {
+  top: 4px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-left: 2px solid var(--text-3);
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.05), transparent);
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--text-2);
+  overflow: hidden;
+  cursor: pointer;
+}
+.section-block span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.section-block:hover {
+  color: var(--text);
+  border-color: var(--sun);
+}
+
+.clip {
+  top: 5px;
+  bottom: 5px;
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 5px;
+  background: #1b3360;
+  box-shadow: inset 0 0 0 1px #2c4c86;
+  color: #d4e1ff;
+  font-size: 11px;
+  font-weight: 550;
+  overflow: hidden;
+  cursor: pointer;
+}
+.clip:hover {
+  background: #22407a;
+}
+.clip.wait {
+  background: repeating-linear-gradient(-45deg, #13223a 0 5px, #172a46 5px 10px);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text-3);
+}
+.clip.selected {
+  box-shadow:
+    inset 0 0 0 1.5px var(--blue),
+    0 0 0 2px var(--blue-soft);
+  color: #fff;
+}
+.clip.active::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--sun);
+  box-shadow: 0 0 8px var(--sun);
+}
+.clip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.clip-edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  border-right: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.clip:hover .clip-edge {
+  border-right-color: var(--sun);
+}
+.clip.dragging {
+  z-index: 3;
+  background: #2a4a85;
+  box-shadow: inset 0 0 0 1.5px var(--sun);
+}
+.clip.dragging .clip-edge {
+  border-right-color: var(--sun);
+}
+.drag-badge {
+  position: absolute;
+  right: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--sun);
+  color: var(--sun-ink);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.stale .clip,
+.stale .voice-block {
+  opacity: 0.55;
+}
+
+.voice-block {
+  top: 4px;
+  bottom: 4px;
+  border-radius: 5px;
+  background: var(--sea-soft);
+  box-shadow: inset 0 0 0 1px rgb(58 161 216 / 0.35);
+  overflow: hidden;
+  cursor: pointer;
+}
+.voice-block.rec {
+  background: var(--mint-soft);
+  box-shadow: inset 0 0 0 1px rgb(76 194 106 / 0.4);
+}
+.voice-block.silent {
+  background: var(--coral-soft);
+  box-shadow: inset 0 0 0 1px rgb(255 111 89 / 0.4);
+}
+.voice-block canvas {
+  position: absolute;
+  inset: 4px 0;
+  width: 100%;
+  height: calc(100% - 8px);
+  opacity: 0.85;
+}
+.voice-icon {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: rgb(7 14 25 / 0.75);
+  color: var(--sea);
+}
+.voice-block.rec .voice-icon {
+  color: var(--mint);
+}
+.voice-block.silent .voice-icon {
+  color: var(--coral);
+}
+.voice-icon svg {
+  width: 11px;
+  height: 11px;
+}
+.bookmark {
+  position: absolute;
+  bottom: 3px;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  transform: rotate(45deg);
+  background: var(--sun);
+  border: 1.5px solid var(--bg);
+}
+
+.sub-chip {
+  top: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 11px;
+  color: var(--text-2);
+  overflow: hidden;
+}
+.sub-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 14px;
+  width: 0;
+  pointer-events: none;
+  z-index: 4;
+  will-change: transform;
+}
+.playhead::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 2px;
+  background: var(--sun);
+  box-shadow: 0 0 10px rgb(255 209 102 / 0.55);
+}
+.playhead-head {
+  position: absolute;
+  top: 2px;
+  left: -6px;
+  width: 12px;
+  height: 14px;
+  background: var(--sun);
+  clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%);
+}
+
+.tl-tip {
+  position: fixed;
+  z-index: 90;
+  max-width: 340px;
+  padding: 9px 11px;
+  border-radius: var(--r-md);
+  background: var(--raised-2);
+  box-shadow: var(--shadow-pop);
+  font-size: 12px;
+  pointer-events: none;
+  transform: translateY(-100%);
+  animation: pop-in 0.12s var(--ease-out);
+}
+.clip-tip {
+  display: grid;
+  gap: 3px;
+}
+.tip-lock,
+.tip-warn {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--sun);
+}
+.tip-lock svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  margin-top: 2px;
+}
