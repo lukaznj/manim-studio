@@ -121,28 +121,28 @@ export function CodePane() {
           {dirty && <span className="dirty-dot" />}
         </div>
         <div className="pane-actions">
-          <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title="Spremi bez rendera">
-            <Save /> Spremi
+          <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title="Save without rendering">
+            <Save /> Save
           </button>
-          <button className="btn small" onClick={() => void saveScene({ render: true })} title="Spremi i renderiraj (⌘S)">
-            <Play /> Renderiraj <span className="kbd">⌘S</span>
+          <button className="btn small" onClick={() => void saveScene({ render: true })} title="Save and render (⌘S)">
+            <Play /> Render <span className="kbd">⌘S</span>
           </button>
         </div>
       </div>
       {conflict !== null && (
         <div className="banner">
-          <span>Datoteka je promijenjena izvana dok si je uređivao.</span>
+          <span>The file changed on disk while you were editing it.</span>
           <button className="btn small" onClick={() => resolveConflict('theirs')}>
-            Učitaj novu verziju
+            Load the new version
           </button>
           <button className="btn ghost small" onClick={() => resolveConflict('mine')}>
-            Zadrži moju
+            Keep mine
           </button>
         </div>
       )}
       <div className="code-host" ref={host} />
       <div className={`claude-editing ${chatBusy ? 'on' : ''}`}>
-        <Sparkles /> Claude uređuje scenu…
+        <Sparkles /> Claude is editing the scene…
       </div>
     </div>
   )

@@ -39,6 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("text")
     a.add_argument("out")
     a.add_argument("--model", default="small")
+    a.add_argument("--language", default=None, help="BCP 47 code; None lets Whisper detect it")
 
     sub.add_parser("check")
     sub.add_parser("tts-worker")
@@ -70,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "align":
         from .align import align
 
-        align(args.audio, args.text, args.out, args.model)
+        align(args.audio, args.text, args.out, args.model, (args.language or "").split("-")[0] or None)
         emit("done", path=args.out)
         return 0
 

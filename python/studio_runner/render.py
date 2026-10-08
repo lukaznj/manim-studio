@@ -140,7 +140,7 @@ def load_scene_class(scene_file: Path, wanted: str | None):
         c for c in vars(module).values() if isinstance(c, type) and issubclass(c, Scene) and c.__module__ == "scene"
     ]
     if not classes:
-        raise RuntimeError("scene.py nema nijednu klasu scene (class Video(StudioScene): ...)")
+        raise RuntimeError("scene.py defines no Scene class (expected: class Video(StudioScene): ...)")
     if wanted:
         for c in classes:
             if c.__name__ == wanted:
@@ -232,7 +232,7 @@ def _error_info(e: BaseException, scene_file: Path) -> dict:
             line = frame.lineno
     message = str(e) or type(e).__name__
     if "latex" in message.lower() or "dvisvgm" in message.lower():
-        message += " — provjeri je li LaTeX instaliran (Postavke → Okruženje)"
+        message += " (check that LaTeX is installed: Settings → Environment)"
     return {
         "message": f"{type(e).__name__}: {message}",
         "line": line,

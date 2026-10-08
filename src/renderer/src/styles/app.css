@@ -640,7 +640,10 @@
 .np-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 20px;
+  gap: 16px 20px;
+}
+.np-row .span-2 {
+  grid-column: 1 / -1;
 }
 .theme-swatches {
   display: flex;

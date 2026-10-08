@@ -96,7 +96,7 @@ export function currentOrNewRender(): Promise<RenderOutcome> {
 export async function frame(t: number, width?: number): Promise<string> {
   const p = requireProject()
   const timeline = readTimeline(p.path)
-  if (!timeline) throw new Error('Još nema renderiranog videa')
+  if (!timeline) throw new Error('Nothing has been rendered yet')
   const out = join(p.path, '.studio', 'frames', `frame-${Date.now()}.png`)
   mkdirSync(join(p.path, '.studio', 'frames'), { recursive: true })
   const clamped = Math.min(Math.max(t, 0), Math.max(timeline.duration - 0.01, 0))
@@ -116,5 +116,5 @@ async function afterPreview(dir: string, _timeline: Timeline): Promise<void> {
   } catch {
     // a missing thumbnail is cosmetic
   }
-  if (!commitsPaused) await commitAll(dir, 'Uređivanje', 'user').catch(() => null)
+  if (!commitsPaused) await commitAll(dir, 'Edit', 'user').catch(() => null)
 }

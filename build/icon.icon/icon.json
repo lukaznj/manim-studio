@@ -1,0 +1,132 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "display-p3:0.09020,0.16471,0.29412,1.00000",
+      "display-p3:0.02745,0.05490,0.10196,1.00000"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0.5,
+        "y": 0
+      },
+      "stop": {
+        "x": 0.5,
+        "y": 0.7
+      }
+    }
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "display-p3:0.62000,0.74000,1.00000,1.00000",
+                  "display-p3:0.18431,0.42745,0.96471,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.3,
+                    "y": 0.15
+                  },
+                  "stop": {
+                    "x": 0.7,
+                    "y": 0.9
+                  }
+                }
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-gray:1.00000,1.00000"
+              }
+            }
+          ],
+          "glass": true,
+          "image-name": "pen.svg",
+          "name": "pen"
+        }
+      ],
+      "lighting": "individual",
+      "name": "Pen",
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.6
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.35
+      }
+    },
+    {
+      "layers": [
+        {
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "display-p3:0.96000,0.55000,0.25000,1.00000",
+                  "display-p3:1.00000,0.86000,0.45000,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.2,
+                    "y": 0.3
+                  },
+                  "stop": {
+                    "x": 0.72,
+                    "y": 0.6
+                  }
+                }
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-gray:1.00000,0.85000"
+              }
+            }
+          ],
+          "glass": true,
+          "image-name": "curve.svg",
+          "name": "curve"
+        }
+      ],
+      "lighting": "individual",
+      "name": "Curve",
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.25
+      }
+    },
+    {
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "grid.svg",
+          "name": "grid"
+        }
+      ],
+      "name": "Paper",
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "specular": false
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}

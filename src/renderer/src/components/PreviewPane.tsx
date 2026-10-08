@@ -39,24 +39,24 @@ export function PreviewPane() {
               {env !== 'ready' ? (
                 <>
                   <Wrench />
-                  <p>Za pregled treba instalirati manim okruženje.</p>
+                  <p>The preview needs the manim environment installed.</p>
                   <button className="btn" onClick={() => openDialog({ kind: 'settings', tab: 'env' })}>
-                    Otvori okruženje
+                    Open environment settings
                   </button>
                 </>
               ) : render.status === 'rendering' ? (
                 <>
                   <span className="spinner big" />
-                  <p>Prvi render… manim crta sve kadrove, sljedeći idu brže.</p>
+                  <p>First render… manim draws every frame now; later renders reuse its cache.</p>
                 </>
               ) : (
                 <>
                   <Code2 />
                   <p>
-                    Spremi scenu (<span className="kbd">⌘S</span>) za prvi pregled.
+                    Save the scene (<span className="kbd">⌘S</span>) to render the first preview.
                   </p>
                   <button className="btn" onClick={() => void saveScene({ render: true })}>
-                    Renderiraj
+                    Render
                   </button>
                 </>
               )}
@@ -65,7 +65,7 @@ export function PreviewPane() {
           {captions && timeline && <CaptionOverlay />}
           {render.status === 'rendering' && src && (
             <div className="frame-status">
-              <span className="spinner" /> Renderiram{render.expected ? ` ${render.clips ?? 0}/${render.expected}` : '…'}
+              <span className="spinner" /> Rendering{render.expected ? ` ${render.clips ?? 0}/${render.expected}` : '…'}
             </div>
           )}
         </div>
@@ -75,14 +75,14 @@ export function PreviewPane() {
       <div className="preview-foot">
         <div className="preview-flags">
           {(dirty || stale) && render.status !== 'rendering' && (
-            <button className="flag sun" onClick={() => void saveScene({ render: true })} title="Spremi i renderiraj">
-              Pregled ne odgovara kodu · <span className="kbd">⌘S</span>
+            <button className="flag sun" onClick={() => void saveScene({ render: true })} title="Save and render">
+              Preview is out of date · <span className="kbd">⌘S</span>
             </button>
           )}
           {warnings.length > 0 && (
             <div className="popover-anchor">
               <button className="flag coral" onClick={() => setWarningsOpen((o) => !o)}>
-                <TriangleAlert /> {warnings.length === 1 ? '1 upozorenje' : `${warnings.length} upozorenja`} <ChevronDown />
+                <TriangleAlert /> {warnings.length === 1 ? '1 warning' : `${warnings.length} warnings`} <ChevronDown />
               </button>
               {warningsOpen && (
                 <div className="popover warnings-pop" onMouseLeave={() => setWarningsOpen(false)}>
@@ -97,7 +97,7 @@ export function PreviewPane() {
                     >
                       <span className="mono faint">{w.start.toFixed(1)}s</span>
                       <span>{w.message}</span>
-                      {w.line && <span className="mono faint">r. {w.line}</span>}
+                      {w.line && <span className="mono faint">L{w.line}</span>}
                     </button>
                   ))}
                   <button
@@ -105,12 +105,12 @@ export function PreviewPane() {
                     onClick={() => {
                       setWarningsOpen(false)
                       void sendChat(
-                        'Render prijavljuje probleme s rasporedom (tekst izvan kadra ili preklapanja). Pogledaj kadrove i popravi raspored, pa provjeri ponovno.',
+                        'The render reports layout problems (text off screen or overlapping). Look at the frames, fix the layout, then check again.',
                         false,
                       )
                     }}
                   >
-                    <Sparkles /> Neka Claude popravi raspored
+                    <Sparkles /> Ask Claude to fix the layout
                   </button>
                 </div>
               )}
@@ -120,10 +120,10 @@ export function PreviewPane() {
         <div className="preview-tools">
           {timeline && (
             <span className="faint mono">
-              {timeline.width}×{timeline.height} · {timeline.fps} fps · render {timeline.renderSeconds.toFixed(1)} s
+              {timeline.width}×{timeline.height} · {timeline.fps} fps · rendered in {timeline.renderSeconds.toFixed(1)} s
             </span>
           )}
-          <button className={`icon-btn ${captions ? 'on' : ''}`} onClick={() => setCaptions((c) => !c)} title="Prikaži titlove u pregledu">
+          <button className={`icon-btn ${captions ? 'on' : ''}`} onClick={() => setCaptions((c) => !c)} title="Show subtitles in the preview">
             <Captions />
           </button>
         </div>
@@ -150,28 +150,28 @@ function ErrorCard() {
     <div className="error-card">
       <div className="error-title">
         <CircleAlert />
-        <strong>{error.line ? `Greška u retku ${error.line}` : 'Render nije uspio'}</strong>
+        <strong>{error.line ? `Error on line ${error.line}` : 'The render failed'}</strong>
       </div>
       <p className="mono error-msg">{error.message}</p>
       {details && <pre className="mono error-trace">{error.traceback || error.log}</pre>}
       <div className="error-actions">
         <button className="btn ghost small" onClick={() => setDetails((d) => !d)}>
-          {details ? 'Sakrij detalje' : 'Prikaži detalje'}
+          {details ? 'Hide details' : 'Show details'}
         </button>
         {error.line && (
           <button className="btn small" onClick={() => editorBridge.revealLine(error.line!, true)}>
-            Idi na redak
+            Go to line
           </button>
         )}
         <button
           className="btn small primary"
           disabled={chatBusy}
-          onClick={() => void sendChat(`Render je pao${error.line ? ` u retku ${error.line}` : ''}:\n${error.message}\n\nPopravi grešku i provjeri render.`, false)}
+          onClick={() => void sendChat(`The render failed${error.line ? ` on line ${error.line}` : ''}:\n${error.message}\n\nFix it and check the render.`, false)}
         >
-          <Sparkles /> Popravi s Claudeom
+          <Sparkles /> Fix with Claude
         </button>
         <button className="btn ghost small" onClick={() => void renderNow()}>
-          Ponovi
+          Retry
         </button>
       </div>
     </div>

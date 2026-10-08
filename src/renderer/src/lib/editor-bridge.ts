@@ -107,7 +107,7 @@ export const editorBridge = {
   },
 
   setReadOnly(readOnly: boolean) {
-    editor?.updateOptions({ readOnly, readOnlyMessage: { value: 'Claude upravo uređuje scenu — pričekaj da završi ili ga zaustavi.' } })
+    editor?.updateOptions({ readOnly, readOnlyMessage: { value: 'Claude is editing the scene right now. Wait for it to finish, or stop it.' } })
   },
 
   focus() {

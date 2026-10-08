@@ -2,7 +2,8 @@
 //
 // Sign-in runs the unmodified Claude Code binary's own `auth login` (browser OAuth);
 // the app never sees or stores a token. Usage counts against the signed-in user's
-// plan. See docs/04-decisions/0004-claude-via-agent-sdk.md.
+// plan, or against their own Anthropic API key if they set one in Settings.
+// See docs/04-decisions/0004-claude-via-agent-sdk.md.
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { app } from 'electron'
@@ -15,13 +16,25 @@ import { commitAll } from './git'
 import { paths } from './paths'
 import { project, readChat, readTimeline, requireProject, updateMeta, writeChat } from './projects'
 import { currentOrNewRender, frameBase64, pauseCommits } from './render'
-import { getSettings } from './settings'
+import { getSecret, getSettings } from './settings'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
 const sdk = () => (sdkPromise ??= import('@anthropic-ai/claude-agent-sdk'))
 
-const claudeEnv = () => ({ ...cleanEnv(), CLAUDE_AGENT_SDK_CLIENT_APP: `manim-studio/${app.getVersion()}` })
+/** cleanEnv() strips inherited ANTHROPIC_* variables; a key the user saved in Settings is put back. */
+const claudeEnv = (): NodeJS.ProcessEnv => {
+  const apiKey = getSecret('anthropic')
+  return { ...cleanEnv(), CLAUDE_AGENT_SDK_CLIENT_APP: `manim-studio/${app.getVersion()}`, ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}) }
+}
+
+const languageName = (code: string) => {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code
+  } catch {
+    return code
+  }
+}
 
 // --- sign-in ----------------------------------------------------------------------------
 
@@ -37,6 +50,7 @@ function runClaude(args: string[]): Promise<{ code: number | null; out: string }
 }
 
 export async function claudeStatus(): Promise<ClaudeStatus> {
+  if (getSecret('anthropic')) return { loggedIn: true, method: 'api-key', subscription: 'API key' }
   try {
     const { out } = await runClaude(['auth', 'status'])
     const json = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1))
@@ -138,7 +152,7 @@ export function closeChat(): void {
 
 export async function chatSend(req: ChatRequest): Promise<void> {
   const p = requireProject()
-  if (turn) throw new Error('Claude još radi na prethodnoj poruci')
+  if (turn) throw new Error('Claude is still working on the previous message')
 
   const content: Exclude<SDKUserMessage['message']['content'], string> = []
   let frame: string | undefined
@@ -199,13 +213,13 @@ function contextNote(req: ChatRequest): string {
     const c = req.context
     const lines = [...new Set(c.lines)].sort((a, b) => a - b)
     notes.push(
-      `[Odabrano na vremenskoj crti: ${c.start.toFixed(2)}–${c.end.toFixed(2)} s` +
-        (lines.length ? `, scene.py redci ${lines.join(', ')}` : '') +
+      `[Selected on the timeline: ${c.start.toFixed(2)}–${c.end.toFixed(2)} s` +
+        (lines.length ? `, scene.py lines ${lines.join(', ')}` : '') +
         (c.labels.length ? ` (${c.labels.slice(0, 6).join('; ')})` : '') +
         ']',
     )
   }
-  if (req.frameAt !== undefined) notes.push(`[Priložena slika: kadar pregleda u ${req.frameAt.toFixed(2)} s]`)
+  if (req.frameAt !== undefined) notes.push(`[Attached image: the preview frame at ${req.frameAt.toFixed(2)} s]`)
   return notes.length ? notes.join('\n') + '\n\n' : ''
 }
 
@@ -231,7 +245,7 @@ async function startSession(dir: string): Promise<void> {
         {},
         async () => {
           const t = readTimeline(dir)
-          return textResult(t ? describeTimeline(t) : 'Još nema uspješnog rendera.')
+          return textResult(t ? describeTimeline(t) : 'No successful render yet.')
         },
       ),
       tool(
@@ -239,11 +253,11 @@ async function startSession(dir: string): Promise<void> {
         'Look at frames of the latest preview render at the given times (seconds). Use it to check layout, legibility and that things look right — after every visual change. Up to 6 times per call.',
         { times: z.array(z.number()).min(1).max(6) },
         async ({ times }) => {
-          if (!readTimeline(dir)) return textResult('Još nema renderiranog videa; pozovi render_preview.')
+          if (!readTimeline(dir)) return textResult('Nothing rendered yet; call render_preview.')
           const images = await Promise.all(times.map((t) => frameBase64(t, 854)))
           return {
             content: images.flatMap((data, i) => [
-              { type: 'text' as const, text: `Kadar u ${times[i].toFixed(2)} s:` },
+              { type: 'text' as const, text: `Frame at ${times[i].toFixed(2)} s:` },
               { type: 'image' as const, data, mimeType: 'image/png' },
             ]),
           }
@@ -275,7 +289,7 @@ async function startSession(dir: string): Promise<void> {
       if (target && roots.some((r) => inside(r, isAbsolute(target) ? target : resolve(dir, target)))) {
         return { behavior: 'allow', updatedInput: input }
       }
-      return { behavior: 'deny', message: `U Manim Studiju ${name} smije raditi samo unutar projekta (${dir}).` }
+      return { behavior: 'deny', message: `In Manim Studio, ${name} may only work inside the project (${dir}).` }
     },
     stderr: (line) => console.error('[claude]', line),
   }
@@ -292,7 +306,7 @@ async function pump(s: Session): Promise<void> {
     finishTurn(false, (e as Error).message)
   } finally {
     if (session === s) session = null
-    if (turn) finishTurn(false, 'Veza s Claudeom je prekinuta.')
+    if (turn) finishTurn(false, 'The connection to Claude was lost.')
   }
 }
 
@@ -364,12 +378,12 @@ function studioPrompt(dir: string): string {
   const site = join(paths.env(), '.pixi', 'envs', 'default', process.platform === 'win32' ? 'Lib' : 'lib/python3.12', 'site-packages')
   return [
     '# Manim Studio',
-    'You are working inside Manim Studio, a desktop editor where admins of the Croatian matura study app "Maturita" make short educational maths videos with manim.',
+    'You are working inside Manim Studio, a desktop editor for making short educational maths videos with manim.',
     `The project folder is ${dir}. The video is scene.py; the app renders it on every save and shows a timeline produced by the render. Read the project's CLAUDE.md first; it holds the conventions.`,
     `Format: ${meta.aspect} (${portrait ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
     'You cannot run shell commands. To see your work: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done.',
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
-    'Write all narration and on-screen text in Croatian (standard, ijekavian), matching the matura curriculum. Reply to the user in Croatian, briefly: what you changed and what you checked.',
+    `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     `The python used for renders is ${pythonExe('default')} (for reference only).`,
   ].join('\n')
 }
@@ -379,26 +393,26 @@ function textResult(text: string) {
 }
 
 function describeOutcome(o: Awaited<ReturnType<typeof currentOrNewRender>>): string {
-  if ('cancelled' in o) return 'Render je prekinut (novija promjena je pokrenula novi). Pozovi render_preview ponovno.'
+  if ('cancelled' in o) return 'The render was cancelled (a newer change started another one). Call render_preview again.'
   if ('error' in o) {
     const tb = o.error.traceback.split('\n').slice(-25).join('\n')
-    return `GREŠKA u renderu${o.error.line ? ` (scene.py redak ${o.error.line})` : ''}: ${o.error.message}\n\n${tb}`
+    return `Render FAILED${o.error.line ? ` (scene.py line ${o.error.line})` : ''}: ${o.error.message}\n\n${tb}`
   }
-  return 'Render uspješan.\n' + describeTimeline(o.timeline)
+  return 'Render succeeded.\n' + describeTimeline(o.timeline)
 }
 
 function describeTimeline(t: Timeline): string {
   const f = (n: number) => n.toFixed(2)
-  const out = [`Trajanje ${f(t.duration)} s, ${t.width}×${t.height}, render ${t.renderSeconds} s.`]
-  if (t.sections.length) out.push('Odjeljci: ' + t.sections.map((s) => `"${s.name || '—'}" ${f(s.start)}–${f(s.end)}`).join(', '))
-  out.push('Klipovi:')
+  const out = [`Duration ${f(t.duration)} s, ${t.width}×${t.height}, render ${t.renderSeconds} s.`]
+  if (t.sections.length) out.push('Sections: ' + t.sections.map((s) => `"${s.name || '—'}" ${f(s.start)}–${f(s.end)}`).join(', '))
+  out.push('Clips:')
   for (const c of t.clips) {
     const what = c.anims.map((a) => (a.target ? `${a.name}(${a.target})` : a.name)).join(', ')
-    out.push(`  ${f(c.start)}–${f(c.end)} redak ${c.line ?? '?'} ${c.kind}: ${what}`)
+    out.push(`  ${f(c.start)}–${f(c.end)} line ${c.line ?? '?'} ${c.kind}: ${what}`)
   }
-  for (const v of t.voice) out.push(`Glas ${f(v.start)}–${f(v.end)} redak ${v.line ?? '?'} [${v.source}]: "${v.text}"`)
-  for (const w of t.warnings) out.push(`UPOZORENJE ${f(w.start)}–${f(w.end)} redak ${w.line ?? '?'}: ${w.message}`)
-  for (const w of t.voiceWarnings) out.push(`UPOZORENJE glas: ${w}`)
+  for (const v of t.voice) out.push(`Voice ${f(v.start)}–${f(v.end)} line ${v.line ?? '?'} [${v.source}]: "${v.text}"`)
+  for (const w of t.warnings) out.push(`WARNING ${f(w.start)}–${f(w.end)} line ${w.line ?? '?'}: ${w.message}`)
+  for (const w of t.voiceWarnings) out.push(`WARNING voice: ${w}`)
   return out.join('\n')
 }
 
@@ -407,26 +421,26 @@ function summarize(name: string, input: unknown): string {
   const file = typeof i.file_path === 'string' ? basename(i.file_path) : ''
   switch (name) {
     case 'Read':
-      return `Čita ${file}`
+      return `Reading ${file}`
     case 'Edit':
-      return `Uređuje ${file}`
+      return `Editing ${file}`
     case 'Write':
-      return `Piše ${file}`
+      return `Writing ${file}`
     case 'Glob':
     case 'Grep':
-      return `Pretražuje ${String(i.pattern ?? '')}`.slice(0, 60)
+      return `Searching ${String(i.pattern ?? '')}`.slice(0, 60)
     case 'WebSearch':
-      return `Traži na webu: ${String(i.query ?? '')}`.slice(0, 70)
+      return `Searching the web: ${String(i.query ?? '')}`.slice(0, 70)
     case 'WebFetch':
-      return `Otvara ${String(i.url ?? '').replace(/^https?:\/\//, '').split('/')[0]}`
+      return `Opening ${String(i.url ?? '').replace(/^https?:\/\//, '').split('/')[0]}`
     case 'TodoWrite':
-      return 'Planira korake'
+      return 'Planning steps'
     case 'mcp__studio__render_preview':
-      return 'Renderira pregled'
+      return 'Rendering the preview'
     case 'mcp__studio__get_timeline':
-      return 'Čita vremensku crtu'
+      return 'Reading the timeline'
     case 'mcp__studio__view_frames':
-      return `Gleda kadrove ${Array.isArray(i.times) ? i.times.map((t) => `${Number(t).toFixed(1)}s`).join(', ') : ''}`
+      return `Looking at frames ${Array.isArray(i.times) ? i.times.map((t) => `${Number(t).toFixed(1)}s`).join(', ') : ''}`
     default:
       return name
   }

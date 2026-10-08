@@ -33,7 +33,7 @@ def match_starts(script_words: list[str], heard: list[tuple[str, float]], durati
     return [float(t) for t in starts]
 
 
-def align(audio: str, text: str, out: str, model_size: str = "small", language: str = "hr") -> None:
+def align(audio: str, text: str, out: str, model_size: str = "small", language: str | None = None) -> None:
     from faster_whisper import WhisperModel
 
     model = WhisperModel(model_size, device="auto", compute_type="int8")
