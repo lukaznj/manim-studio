@@ -2,7 +2,7 @@
 // release's sha256. Run before `npm run dev` the first time, and in CI before packaging.
 //   node scripts/fetch-pixi.mjs [platform] [arch]   (defaults: this machine)
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -43,10 +43,11 @@ if (expected !== actual) throw new Error(`sha256 mismatch for ${archive}: ${actu
 
 const work = mkdtempSync(join(tmpdir(), 'pixi-'))
 writeFileSync(join(work, archive), data)
-if (archive.endsWith('.zip')) execFileSync('tar', ['-xf', join(work, archive), '-C', work])
-else execFileSync('tar', ['-xzf', join(work, archive), '-C', work])
+// Windows' own bsdtar reads zips; Git Bash's GNU tar (first on PATH in CI) doesn't.
+const tar = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar'
+execFileSync(tar, [archive.endsWith('.zip') ? '-xf' : '-xzf', join(work, archive), '-C', work])
 mkdirSync(outDir, { recursive: true })
-renameSync(join(work, exe), join(outDir, exe))
+copyFileSync(join(work, exe), join(outDir, exe)) // not rename: tmp and the repo can be on different drives
 if (platform !== 'win32') chmodSync(join(outDir, exe), 0o755)
 rmSync(work, { recursive: true, force: true })
 console.log(`pixi ${VERSION} (${triple}) → resources/bin/${exe}`)

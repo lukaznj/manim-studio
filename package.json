@@ -2,8 +2,10 @@
   "name": "manim-studio",
   "productName": "Manim Studio",
   "version": "0.1.0",
-  "description": "Code-first video editor for manim educational videos (maturita admins)",
+  "description": "Desktop editor for maths explainer videos made with manim, written with Claude",
   "author": "Luka Ražem",
+  "license": "MIT",
+  "repository": "github:lukaznj/manim-studio",
   "private": true,
   "main": "./out/main/index.js",
   "scripts": {

@@ -4,18 +4,18 @@ Each item below was either measured during development, or not verified because 
 
 ## Not verified yet
 
-- **Claude chat, signed in, end to end.**
-  - Verified: the Agent SDK starts with the app's exact options, lists the built-in and `mcp__studio__*` tools, connects the in-process MCP server, and reports a failed sign-in as an error the UI handles.
-  - Not exercised: a real conversation (editing `scene.py`, calling `render_preview`/`view_frames`). The dev machine's Claude Code wasn't signed in.
-  - First thing to try: Prijavi se → "Napravi uvod…".
-- **Windows.** Nothing has run on Windows yet:
-  - TinyTeX unpacking (a 7-Zip self-extractor, run with `-y -o<dir>`)
-  - the SAPI hr-HR system voice (needs the Croatian language pack)
-  - paths and the NSIS installer
-- **Signed, notarized macOS build and an actual auto-update.** The local package was unsigned. Release metadata (`app-update.yml`, `latest-mac.yml`) is generated correctly.
+- **Windows and Linux.** CI builds and tests both (typecheck, unit tests, the Python end-to-end render, packaging), but nobody has run the installed app yet. Untested by hand:
+  - TinyTeX unpacking on Windows (a 7-Zip self-extractor, run with `-y -o<dir>`)
+  - the Windows SAPI voice, including a language whose voice pack isn't installed
+  - `espeak-ng` on Linux, and the AppImage's microphone permission for the recording booth
+  - the NSIS installer and its auto-update
+- **Signed, notarized macOS build and an actual auto-update.** There's no Developer ID yet, so macOS builds are ad-hoc signed. Release metadata (`app-update.yml`, `latest-mac.yml`) is generated correctly.
+- **Plan sign-in in public releases.** See the open question in [[../04-decisions/0004-claude-via-agent-sdk|ADR 0004]] before shipping a public release.
 - **ElevenLabs.** The REST call and timestamp alignment are written to the documented API, but no key was available to call it.
 
 ## Measured
+
+- **Claude chat, signed in with a Pro plan.** Claude edited `scene.py`, called `render_preview`, `get_timeline` and `view_frames`, and the turn was committed. A bug where parallel frame grabs collided (Claude got stale or broken images) was found this way and fixed: frames now come from one batch command into a fresh folder.
 
 - **First render in a fresh environment takes about 40 s.** Python compiles manim's bytecode on first import. Later renders take 2–10 s thanks to manim's cache.
 - **OmniVoice.**

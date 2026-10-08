@@ -72,6 +72,8 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
   )
 }
 
+const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1) : '')
+
 function AccountTab() {
   const claude = useStore((s) => s.claude)
   const settings = useStore((s) => s.settings)!
@@ -115,7 +117,7 @@ function AccountTab() {
             {usingKey
               ? 'Usage is billed to the API key’s Console account.'
               : claude?.loggedIn
-                ? `Claude ${claude.subscription ?? ''} · usage counts against this plan`
+                ? `Claude ${planName(claude.subscription)} · usage counts against this plan`
                 : 'Studio runs Claude Code with your own Claude account. Sign-in opens in your browser.'}
           </div>
         </div>

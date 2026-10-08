@@ -10,5 +10,5 @@ paths:
 - **Playback.** The playhead and anything per-frame subscribe to `lib/playback.ts`, not React state.
 - **Code edits.** Go through `lib/editor-bridge.ts` (Monaco) so they're undoable. Timeline-to-code math lives in `lib/edits.ts`, which has tests.
 - **Dialogs.** Use `<Modal>` (native `<dialog>`). Mark the field that should take focus with `data-autofocus`; otherwise focus lands on the dialog itself, not its close button.
-- **Copy.** Croatian, sentence case, verbs that say what happens. Errors say what broke and how to fix it.
+- **Copy.** English, sentence case, verbs that say what happens ("Save take", not "OK"). Errors say what broke and how to fix it.
 - **Motion.** Only for state changes, and it must respect `prefers-reduced-motion`.

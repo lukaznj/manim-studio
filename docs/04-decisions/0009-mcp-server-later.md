@@ -7,7 +7,7 @@ date: 2026-10-08
 
 ## Context
 
-Today Claude works with Studio from inside the app, through three in-process MCP tools (`render_preview`, `get_timeline`, `view_frames`). Maturita already runs an MCP server for its content (`/mcp` on its backend, maturita ADR 0031). Some admins write lessons in Claude Desktop, and could want the same assistant to drive video work.
+Today Claude works with Studio from inside the app, through three in-process MCP tools (`render_preview`, `get_timeline`, `view_frames`). People who write course content in Claude Desktop or Claude Code, often through their platform's own MCP server, could want the same assistant to drive video work.
 
 ## Proposal
 
@@ -21,7 +21,7 @@ Expose Studio's capabilities as an MCP server:
   - return frames as images
   - read voice blocks, export
 - **Connection.** Claude Desktop and Claude Code connect to it like any MCP server, using the user's own Claude plan with no app sign-in involved.
-- **Joined up with maturita.** One Claude conversation could then write a lesson through maturita's MCP and its explainer video through Studio's, and later attach the export to the lesson (see [[../01-product/roadmap|roadmap]]: "Publish to Maturita").
+- **Joined up with content platforms.** One Claude conversation could write a lesson through a platform's MCP server (Maturita has one) and its explainer video through Studio's, then attach the export to the lesson. Attaching belongs in a fork ([[0011-open-source-english]]).
 
 ## Open questions
 

@@ -11,7 +11,8 @@ paths:
 - **Claude auth** (ADR 0004):
   - Sign-in only through the bundled binary's `auth login`; never read, store or forward Claude credentials.
   - Every child process gets `cleanEnv()`, which strips `ANTHROPIC_*`, `CLAUDE_CODE_*`, `PIXI_*`, `CONDA_*`, `PYTHON*`.
+  - The only key that goes back in is the user's own Anthropic API key, if they saved one (`claude.ts:claudeEnv`).
 - **Paths** come from `paths.ts`, which differs between dev and packaged builds (`resources/` vs `process.resourcesPath`). Never fall back to binaries on PATH (an old pixi broke installs once).
-- **Secrets** (the ElevenLabs key) use `safeStorage` via `settings.ts:setSecret`. They are passed to Python as env vars, never as arguments, and never sent to the renderer.
+- **Secrets** (the ElevenLabs and Anthropic API keys) use `safeStorage` via `settings.ts:setSecret`. They reach child processes (Python, Claude Code) as env vars, never as arguments, and never go to the renderer.
 - **Renders.** `render.ts` serializes renders per quality and tags events with an `id`; the renderer ignores superseded ids.
 - **Claude's tool permissions:** writes only inside the project, reads inside the project, the studio package and the manim sources. Keep `canUseTool` that strict.
