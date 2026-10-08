@@ -35,6 +35,7 @@ const commands = {
       executablePath: process.env.DRIVE_EXECUTABLE ?? bin,
       args: process.env.DRIVE_EXECUTABLE ? [] : [APP_DIR],
       env: { ...process.env, STUDIO_USER_DATA: DATA, STUDIO_PROJECTS_DIR: PROJECTS },
+      colorScheme: null, // Playwright would pin prefers-color-scheme to light; let Settings → Appearance drive it
       timeout: 30_000,
     })
     page = await app.firstWindow()

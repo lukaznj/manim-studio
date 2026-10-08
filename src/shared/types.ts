@@ -172,10 +172,14 @@ export interface ClaudeLoginEvent {
 
 // --- settings -------------------------------------------------------------------------
 
+export type Appearance = 'system' | 'light' | 'dark'
+
 export interface Settings {
+  appearance: Appearance // 'system' follows the OS
   projectsDir: string
   recentProjects: string[]
   claudeModel: string // '' = Claude Code's default for the account
+  claudeEffort: Effort | '' // '' = the model's default
   autoRender: boolean
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
@@ -222,10 +226,13 @@ export type ChatEvent =
   | { type: 'done'; ok: boolean; error?: string; costUsd?: number }
   | { type: 'reset' }
 
+export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
 export interface ModelOption {
   value: string
   label: string
   description: string
+  efforts: Effort[] // empty: the model has no effort setting
 }
 
 // --- history / updates ------------------------------------------------------------------
