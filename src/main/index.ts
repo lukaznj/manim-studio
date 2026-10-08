@@ -6,6 +6,7 @@ import type { EventChannel, ProjectMeta, Quality } from '../shared/types'
 import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, closeChat, loadChat, onChatEvent } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
 import { history, restore } from './git'
+import { startDesktopEndpoint } from './mcp'
 import { paths } from './paths'
 import * as projects from './projects'
 import { cancel, frame, onRenderEvent, render } from './render'
@@ -16,6 +17,15 @@ import { deleteRecording, elevenLabsVoices, onWorkerLog, saveRecording, saveRefe
 
 // Isolated data for automated runs (scripts/drive.mjs); never set in normal use.
 if (process.env.STUDIO_USER_DATA) app.setPath('userData', process.env.STUDIO_USER_DATA)
+
+// One running copy per data folder. A second launch (Claude Desktop starting Studio, a
+// manim-studio:// link) brings this one forward instead.
+if (!app.requestSingleInstanceLock()) app.exit(0)
+app.on('second-instance', () => void showWindow())
+app.on('open-url', (e) => {
+  e.preventDefault()
+  void app.whenReady().then(showWindow)
+})
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'studio-media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } },
@@ -54,6 +64,27 @@ function createWindow(): void {
   })
   if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
+}
+
+async function showWindow(): Promise<BrowserWindow> {
+  if (!win) createWindow()
+  const w = win!
+  if (w.webContents.isLoading()) await new Promise<void>((r) => w.webContents.once('did-finish-load', () => r()))
+  if (w.isMinimized()) w.restore()
+  w.show()
+  w.focus()
+  return w
+}
+
+/** For Claude Desktop: show the window with this project open, as if it had been clicked on Home. */
+async function openInWindow(dir: string): Promise<void> {
+  await showWindow()
+  // The page may still be starting up (its listeners come after its first data loads), so ask again until it has.
+  for (let i = 0; projects.project()?.path !== dir; i++) {
+    if (i === 150) throw new Error('Manim Studio didn’t open the project. Is a dialog open in it?')
+    if (i % 10 === 0) send('open-project', { path: dir })
+    await new Promise((r) => setTimeout(r, 100))
+  }
 }
 
 /** Local media (renders, recordings, thumbnails) with Range support so <video> can seek. */
@@ -148,6 +179,11 @@ function registerIpc(): void {
   handle('cancelRender', () => cancel('preview'))
   handle('frame', async (t: number, width?: number) => frame(t, width))
   handle('exportVideo', () => exportVideo())
+  handle('installClaudeExtension', async () => {
+    // Claude Desktop owns .mcpb files and shows its own install dialog.
+    const error = await shell.openPath(paths.mcpb())
+    if (error) throw new Error(`Couldn’t open the extension (${error}). Is Claude Desktop installed?`)
+  })
 
   handle('saveRecording', async (key: string, wav: ArrayBuffer) => {
     const text = projects.readTimeline(projects.requireProject().path)?.voice.find((v) => v.key === key)?.text
@@ -222,6 +258,12 @@ app.whenReady().then(() => {
   onChatEvent((e) => send('chat', e))
   projects.onSceneChangedOnDisk((source) => send('file-changed', { source, external: true }))
   setupUpdater((e) => send('update', e))
+  startDesktopEndpoint({
+    openInWindow,
+    sceneWritten: (source) => send('file-changed', { source, external: true, agent: true }),
+    exportVideo,
+  })
+  if (app.isPackaged) app.setAsDefaultProtocolClient('manim-studio')
   createWindow()
 
   // A fresh install or an app update that changed pixi.toml: bring the env up to date quietly.

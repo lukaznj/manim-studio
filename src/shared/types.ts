@@ -276,7 +276,7 @@ export interface VoiceOption {
   description?: string
 }
 
-export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'export'
+export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'export' | 'open-project'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -322,6 +322,8 @@ export interface StudioApi {
   chatInterrupt(): Promise<void>
   chatReset(): Promise<void>
   chatModels(): Promise<ModelOption[]>
+  /** Opens the bundled Claude Desktop extension, which Claude Desktop offers to install. */
+  installClaudeExtension(): Promise<void>
 
   history(): Promise<Commit[]>
   restore(oid: string): Promise<void>
@@ -335,7 +337,10 @@ export interface StudioApi {
   on(channel: 'setup', cb: (e: SetupEvent) => void): () => void
   on(channel: 'claude-login', cb: (e: ClaudeLoginEvent) => void): () => void
   on(channel: 'chat', cb: (e: ChatEvent) => void): () => void
-  on(channel: 'file-changed', cb: (e: { source: string; external: boolean }) => void): () => void
+  /** `agent`: Claude Desktop wrote it and renders through its own tool. */
+  on(channel: 'file-changed', cb: (e: { source: string; external: boolean; agent?: boolean }) => void): () => void
+  /** Claude Desktop asked for this project (see src/main/mcp.ts). */
+  on(channel: 'open-project', cb: (e: { path: string }) => void): () => void
   on(channel: 'update', cb: (e: UpdateEvent) => void): () => void
   on(channel: 'export', cb: (e: { stage: string; percent?: number; path?: string; error?: string }) => void): () => void
 }

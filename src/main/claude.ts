@@ -8,14 +8,15 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { app } from 'electron'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
-import { z } from 'zod'
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, ClaudeStatus, ModelOption, Timeline } from '../shared/types'
+import { sceneTools } from '../shared/studio-tools'
+import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, ClaudeStatus, ModelOption } from '../shared/types'
 import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
 import { project, readChat, readTimeline, requireProject, updateMeta, writeChat } from './projects'
-import { currentOrNewRender, frameBase64, framesBase64, pauseCommits } from './render'
+import { frameBase64, pauseCommits } from './render'
+import { getTimeline, renderPreview, viewFrames } from './scene-tools'
 import { getSecret, getSettings } from './settings'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
@@ -28,7 +29,7 @@ const claudeEnv = (): NodeJS.ProcessEnv => {
   return { ...cleanEnv(), CLAUDE_AGENT_SDK_CLIENT_APP: `manim-studio/${app.getVersion()}`, ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}) }
 }
 
-const languageName = (code: string) => {
+export const languageName = (code: string) => {
   try {
     return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code
   } catch {
@@ -244,36 +245,9 @@ async function startSession(dir: string): Promise<void> {
     name: 'studio',
     version: app.getVersion(),
     tools: [
-      tool(
-        'render_preview',
-        'Render the low-resolution preview of scene.py and report what happened: duration, sections, layout warnings (things off screen, overlapping text), voice problems, or the error with its scene.py line. The app also re-renders on every save; this waits for that result. Call it after editing.',
-        {},
-        async () => textResult(describeOutcome(await currentOrNewRender())),
-      ),
-      tool(
-        'get_timeline',
-        'The current timeline from the last successful render: sections, every play()/wait() clip with its scene.py line and times, voiceover blocks with their text and audio source, subtitles and layout warnings.',
-        {},
-        async () => {
-          const t = readTimeline(dir)
-          return textResult(t ? describeTimeline(t) : 'No successful render yet.')
-        },
-      ),
-      tool(
-        'view_frames',
-        'Look at frames of the latest preview render at the given times (seconds). Use it to check layout, legibility and that things look right — after every visual change. Up to 6 times per call.',
-        { times: z.array(z.number()).min(1).max(6) },
-        async ({ times }) => {
-          if (!readTimeline(dir)) return textResult('Nothing rendered yet; call render_preview.')
-          const images = await framesBase64(times, 854)
-          return {
-            content: images.flatMap((data, i) => [
-              { type: 'text' as const, text: `Frame at ${times[i].toFixed(2)} s:` },
-              { type: 'image' as const, data, mimeType: 'image/png' },
-            ]),
-          }
-        },
-      ),
+      tool('render_preview', sceneTools.render_preview.description, sceneTools.render_preview.shape, () => renderPreview()),
+      tool('get_timeline', sceneTools.get_timeline.description, sceneTools.get_timeline.shape, async () => getTimeline()),
+      tool('view_frames', sceneTools.view_frames.description, sceneTools.view_frames.shape, ({ times }) => viewFrames(times)),
     ],
   })
 
@@ -398,34 +372,6 @@ function studioPrompt(dir: string): string {
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     `The python used for renders is ${pythonExe('default')} (for reference only).`,
   ].join('\n')
-}
-
-function textResult(text: string) {
-  return { content: [{ type: 'text' as const, text }] }
-}
-
-function describeOutcome(o: Awaited<ReturnType<typeof currentOrNewRender>>): string {
-  if ('cancelled' in o) return 'The render was cancelled (a newer change started another one). Call render_preview again.'
-  if ('error' in o) {
-    const tb = o.error.traceback.split('\n').slice(-25).join('\n')
-    return `Render FAILED${o.error.line ? ` (scene.py line ${o.error.line})` : ''}: ${o.error.message}\n\n${tb}`
-  }
-  return 'Render succeeded.\n' + describeTimeline(o.timeline)
-}
-
-function describeTimeline(t: Timeline): string {
-  const f = (n: number) => n.toFixed(2)
-  const out = [`Duration ${f(t.duration)} s, ${t.width}×${t.height}, render ${t.renderSeconds} s.`]
-  if (t.sections.length) out.push('Sections: ' + t.sections.map((s) => `"${s.name || '—'}" ${f(s.start)}–${f(s.end)}`).join(', '))
-  out.push('Clips:')
-  for (const c of t.clips) {
-    const what = c.anims.map((a) => (a.target ? `${a.name}(${a.target})` : a.name)).join(', ')
-    out.push(`  ${f(c.start)}–${f(c.end)} line ${c.line ?? '?'} ${c.kind}: ${what}`)
-  }
-  for (const v of t.voice) out.push(`Voice ${f(v.start)}–${f(v.end)} line ${v.line ?? '?'} [${v.source}]: "${v.text}"`)
-  for (const w of t.warnings) out.push(`WARNING ${f(w.start)}–${f(w.end)} line ${w.line ?? '?'}: ${w.message}`)
-  for (const w of t.voiceWarnings) out.push(`WARNING voice: ${w}`)
-  return out.join('\n')
 }
 
 function summarize(name: string, input: unknown): string {
