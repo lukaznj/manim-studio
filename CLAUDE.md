@@ -14,6 +14,7 @@ Open-source (MIT) desktop editor (Electron) for maths explainer videos. The vide
   - `studio_runner` is the CLI the app spawns: render, frame, thumbnail, export, align, tts-worker.
   - It runs in a pixi env the app installs (`python/pixi.toml` + `pixi.lock`).
 - **Claude:** `@anthropic-ai/claude-agent-sdk`, signed in through the bundled Claude Code binary's own login. Never handle tokens; see `docs/04-decisions/0004-claude-via-agent-sdk.md`.
+- **Claude Desktop:** the extension in `mcpb/` (built into `out/manim-studio.mcpb`) forwards to `src/main/mcp.ts`. Tool names, descriptions and inputs live in `src/shared/studio-tools.ts` for both Claudes. See ADR 0009.
 - **Project template:** `templates/project/`, which includes the `CLAUDE.md` Claude follows *inside* video projects.
 
 ## Commands

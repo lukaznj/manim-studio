@@ -9,6 +9,11 @@ Each item below was either measured during development, or not verified because 
   - the Windows SAPI voice, including a language whose voice pack isn't installed
   - `espeak-ng` on Linux, and the AppImage's microphone permission for the recording booth
   - the NSIS installer and its auto-update
+- **The Claude Desktop extension.**
+  - Tested end to end on macOS with an MCP client that plays Claude Desktop (`scripts/desktop-smoke.mjs`): create, write, render, frames, edit, export.
+  - Starting the packaged app from cold works too: the first call answered in 3.1 s.
+  - Not yet installed into Claude Desktop itself and used from a real conversation.
+  - Windows and Linux start Studio through `manim-studio://`, which is untested. AppImages may not register it, and then the extension asks the user to open Studio.
 - **Signed, notarized macOS build and an actual auto-update.** There's no Developer ID yet, so macOS builds are ad-hoc signed. Release metadata (`app-update.yml`, `latest-mac.yml`) is generated correctly.
 - **ElevenLabs.** The REST call and timestamp alignment are written to the documented API, but no key was available to call it.
 

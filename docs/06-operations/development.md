@@ -60,6 +60,20 @@ Things that bit during development:
 
 The installers are attached to the run for a week, which is the easiest way to try a branch on another OS.
 
+## Claude Desktop extension
+
+`npm run build` also builds `out/manim-studio.mcpb` (`scripts/build-mcpb.mjs`, validated by the official `mcpb` CLI). To exercise it without Claude Desktop, run `scripts/desktop-smoke.mjs` against a running app. It starts the extension over stdio, as Claude Desktop does, and makes a short video:
+
+```bash
+npm run build && node scripts/drive.mjs &        # the driver's isolated app
+curl -s localhost:7357 -d launch
+STUDIO_USER_DATA=$TMPDIR/manim-studio-drive/data node scripts/desktop-smoke.mjs
+```
+
+Without `STUDIO_USER_DATA`, the extension looks for the real app and starts the installed one.
+
+Only one copy of the app runs per data folder. Quit an installed Manim Studio before `npm run dev`, or the dev copy brings the installed one forward and exits.
+
 ## Python runner by hand
 
 ```bash

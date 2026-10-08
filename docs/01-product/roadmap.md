@@ -4,10 +4,6 @@ Nothing here is committed. Each item gets an ADR when it's picked up.
 
 ## Next
 
-- **MCP server for Manim Studio.** See [[../04-decisions/0009-mcp-server-later|ADR 0009]].
-  - Expose the app's tools (render, timeline, frames, project list, export) over MCP.
-  - Claude Desktop, Claude Code or other agents could then drive Studio from outside.
-  - The in-process tools from [[../02-architecture/system-overview|the system overview]] are the starting set.
 - **Model and effort comparison.** Find which model and effort level make the best videos for the usage they cost. That decides the default, and what to recommend on smaller plans.
   - A fixed set of briefs, run unchanged across models × effort levels:
     - portrait and landscape
@@ -26,6 +22,8 @@ Nothing here is committed. Each item gets an ADR when it's picked up.
 - **Signed builds.** A notarized macOS build, which can update itself, and a signed Windows installer ([[../06-operations/releasing|releasing]]).
 
 ## Later
+
+- Claude Code and other MCP clients: the extension's server (`out/mcpb/server/index.js`) is a plain stdio MCP server, so they can run it too. Documenting that is all it needs ([[../04-decisions/0009-mcp-server-later|ADR 0009]]).
 
 - Intel Mac builds: a second macOS job, see [[../06-operations/releasing|releasing]].
 - Several scene files per project, with helper modules opened as editor tabs.

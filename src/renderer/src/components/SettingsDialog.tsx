@@ -1,4 +1,4 @@
-import { AudioLines, Check, Circle, Cpu, KeyRound, Laptop, LogOut, Monitor, Moon, Settings2, Sparkles, Square, Sun } from 'lucide-react'
+import { AudioLines, Check, Circle, Cpu, KeyRound, Laptop, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Component, ComponentState, VoiceOption, VoiceProvider, VoiceSettings } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -153,6 +153,15 @@ function AccountTab() {
           <ModelControls />
         </Row>
       )}
+
+      <Row
+        title="Claude Desktop"
+        text="Ask Claude in the Claude desktop app for a maths video, and Manim Studio opens and makes it there. Installs the Manim Studio extension; Claude Desktop asks you to confirm."
+      >
+        <button className="btn small" onClick={() => void api.installClaudeExtension().catch((e) => toast(errorText(e), 'error'))}>
+          <Plug /> Add to Claude Desktop
+        </button>
+      </Row>
     </div>
   )
 }

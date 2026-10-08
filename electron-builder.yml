@@ -10,6 +10,8 @@ files:
   - out/**
   - package.json
   - '!**/*.map'
+  - '!out/mcpb/**'
+  - '!out/*.mcpb'
 
 # The Claude Code binary is spawned, so it must live outside the asar archive.
 asarUnpack:
@@ -23,6 +25,13 @@ extraResources:
     to: templates
   - from: resources/bin # pixi, from `npm run fetch-pixi` for the target platform
     to: bin
+  - from: out/manim-studio.mcpb # the Claude Desktop extension (scripts/build-mcpb.mjs)
+    to: manim-studio.mcpb
+
+# Claude Desktop's extension starts Studio with manim-studio:// on Windows and Linux (macOS uses the bundle id).
+protocols:
+  - name: Manim Studio
+    schemes: [manim-studio]
 
 mac:
   target:

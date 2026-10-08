@@ -1,6 +1,6 @@
 # Video project (Manim Studio)
 
-One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studio renders `scene.py` on every save and builds the timeline from the render. The narration language is the project's language; Studio's system prompt tells you which.
+One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studio renders `scene.py` and builds the timeline from each render. The narration language is the project's language; Studio tells you which.
 
 ## Files
 
