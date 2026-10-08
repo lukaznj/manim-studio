@@ -66,4 +66,4 @@ publish:
   provider: github
   owner: lukaznj
   repo: manim-studio
-  releaseType: release
+  releaseType: draft # CI publishes it once all platforms uploaded

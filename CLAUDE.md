@@ -1,6 +1,6 @@
 # Manim Studio
 
-Desktop editor (Electron) in which Maturita admins make maths explainer videos. The video is manim code (`scene.py`); Claude writes it, the app renders it, and the timeline is produced by each render. Product and decisions: `docs/` (an Obsidian vault). Start at `docs/README.md`.
+Open-source (MIT) desktop editor (Electron) for maths explainer videos. The video is manim code (`scene.py`); Claude writes it, the app renders it, and the timeline is produced by each render. Product and decisions: `docs/` (an Obsidian vault). Start at `docs/README.md`.
 
 ## Stack
 
@@ -28,7 +28,7 @@ npm run build && node scripts/drive.mjs   # drive the built app over HTTP (scree
 
 ## Rules that apply everywhere
 
-- **UI copy is Croatian; identifiers, docs and comments are English.**
+- **Everything is English:** UI copy, identifiers, docs and comments. The narration language is per project (`project.json` `voice.language`), so never assume English in the voice, subtitle or text-layout paths either ([ADR 0011](docs/04-decisions/0011-open-source-english.md)).
 - **The timeline contract has two halves.** `render.py` produces it and `src/shared/types.ts` types it. Change both, and keep `python/tests/test_runner.py` passing.
 - **No new runtime dependency without a reason** a few lines of code can't cover. Animations use CSS and native APIs, with no motion library.
 - **Verify UI changes in the real app** (`scripts/drive.mjs` + screenshots), not just by typechecking. Most bugs found so far were layout bugs that only showed on screen.
