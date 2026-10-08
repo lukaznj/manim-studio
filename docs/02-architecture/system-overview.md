@@ -1,13 +1,16 @@
 # System overview
 
 ```
+ Claude Desktop ── stdio ──▶ Manim Studio extension (.mcpb, mcpb/server.ts)
+                                    │ HTTP on 127.0.0.1 + token (mcp-endpoint.json)
+                                    ▼
 ┌──────────────────────── Electron app ────────────────────────┐
 │ renderer (React, src/renderer)                               │
 │   Monaco · <video> preview · timeline · chat · booth         │
 │        │ window.studio (preload, contextBridge)              │
 │ main process (src/main)                                      │
 │   projects · render queue · git history · settings           │
-│   env (pixi, TinyTeX) · voice · updater · claude             │
+│   env (pixi, TinyTeX) · voice · updater · claude · mcp       │
 └──────┬───────────────────┬────────────────────┬──────────────┘
        │ spawn             │ Agent SDK          │ https
        ▼                   ▼                    ▼
@@ -35,6 +38,7 @@
   - It ships inside the Agent SDK's platform package, unpacked from the asar archive.
   - It runs with the signed-in user's credentials.
   - The app gives it three in-process MCP tools (`render_preview`, `get_timeline`, `view_frames`) and the built-in file tools. Bash is not given, and edits are allowed only inside the project folder ([[../04-decisions/0004-claude-via-agent-sdk|ADR 0004]]).
+- **Claude Desktop extension.** A stdio MCP server that Claude Desktop runs. It forwards tool calls to the app's local endpoint (`src/main/mcp.ts`) and starts Studio if needed ([[../04-decisions/0009-mcp-server-later|ADR 0009]]).
 - **OmniVoice worker.**
   - It is optional and long-lived. Model loading is slow, so one HTTP server on localhost serves every render ([[voice-pipeline]]).
 
@@ -49,6 +53,7 @@
 | `userData/python-env/` | pixi manifest + lock + `.pixi/envs/{default,omnivoice,transcribe}` | – |
 | `userData/tinytex/` | LaTeX | – |
 | `userData/settings.json`, `elevenlabs.secret`, `anthropic.secret` | Settings; API keys encrypted with the OS keychain | – |
+| `userData/mcp-endpoint.json` | Port and per-run token for the Claude Desktop extension; owner-only, removed on quit | – |
 
 ## IPC
 

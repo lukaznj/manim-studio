@@ -160,7 +160,11 @@ export async function boot(): Promise<void> {
     if (e.state !== 'installing') void api.setupStatus().then((setup) => set({ setup }))
     else set((s) => (s.setup ? { setup: { ...s.setup, [e.component]: 'installing' } } : {}))
   })
-  api.on('file-changed', ({ source }) => onExternalChange(source))
+  api.on('file-changed', ({ source, agent }) => onExternalChange(source, agent))
+  api.on('open-project', ({ path }) => {
+    if (get().project?.path === path) return
+    void openProject(path).then(() => toast('Claude Desktop opened this project'))
+  })
   api.on('export', (e) => set({ exportState: e }))
 }
 
@@ -305,15 +309,16 @@ function onRender(e: RenderEvent): void {
   }
 }
 
-function onExternalChange(source: string): void {
+function onExternalChange(source: string, agent = false): void {
   if (get().dirty) {
     set({ conflict: source })
     return
   }
   editorBridge.setValue(source)
   set({ savedSource: source, dirty: false })
-  // Claude renders through its own tool; for anything else (an external editor), render here.
-  if (!get().chatBusy && get().settings?.autoRender) void renderNow()
+  // Claude (in the chat or in Claude Desktop) renders through its own tool; for anything else
+  // (an external editor), render here.
+  if (!agent && !get().chatBusy && get().settings?.autoRender) void renderNow()
 }
 
 export function resolveConflict(take: 'theirs' | 'mine'): void {

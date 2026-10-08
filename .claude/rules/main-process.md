@@ -15,4 +15,6 @@ paths:
 - **Paths** come from `paths.ts`, which differs between dev and packaged builds (`resources/` vs `process.resourcesPath`). Never fall back to binaries on PATH (an old pixi broke installs once).
 - **Secrets** (the ElevenLabs and Anthropic API keys) use `safeStorage` via `settings.ts:setSecret`. They reach child processes (Python, Claude Code) as env vars, never as arguments, and never go to the renderer.
 - **Renders.** `render.ts` serializes renders per quality and tags events with an `id`; the renderer ignores superseded ids.
+- **Tools for Claude** are defined once in `src/shared/studio-tools.ts`. Handlers live in `scene-tools.ts` (shared) and `mcp.ts` (Claude Desktop only). Claude Desktop's calls must return within 45 s; anything longer runs in the background and reports on the next call.
+- **The local endpoint** (`mcp.ts`) binds 127.0.0.1 only, checks the bearer token on every request, and writes only the open project's `scene.py`.
 - **Claude's tool permissions:** writes only inside the project, reads inside the project, the studio package and the manim sources. Keep `canUseTool` that strict.
