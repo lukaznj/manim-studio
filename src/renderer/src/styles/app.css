@@ -507,7 +507,7 @@
   animation: draw 1.6s 0.2s var(--ease-out) forwards;
 }
 .empty-art .pop {
-  transform-origin: 100px 99px;
+  transform-origin: 132px 62px;
   transform: scale(0);
   animation: popdot 0.5s 1.3s var(--ease-spring) forwards;
 }

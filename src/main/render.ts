@@ -1,8 +1,10 @@
 // One preview render at a time: a new request cancels the one in flight (the newest
 // source always wins). Final renders run separately for export.
 import type { ChildProcess } from 'node:child_process'
-import { mkdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import type { Quality, RenderError, RenderEvent, Timeline } from '../shared/types'
 import { commitAll } from './git'
 import { readTimeline, requireProject } from './projects'
@@ -94,19 +96,36 @@ export function currentOrNewRender(): Promise<RenderOutcome> {
 }
 
 export async function frame(t: number, width?: number): Promise<string> {
-  const p = requireProject()
-  const timeline = readTimeline(p.path)
-  if (!timeline) throw new Error('Nothing has been rendered yet')
-  const out = join(p.path, '.studio', 'frames', `frame-${Date.now()}.png`)
-  mkdirSync(join(p.path, '.studio', 'frames'), { recursive: true })
-  const clamped = Math.min(Math.max(t, 0), Math.max(timeline.duration - 0.01, 0))
-  const args = ['frame', timeline.video, String(clamped), out, ...(width ? ['--width', String(width)] : [])]
-  await (await runRunner('default', args)).done
+  const [out] = await frames([t], width, join(requireProject().path, '.studio', 'frames'))
   return out
 }
 
+/** Frames of the latest preview, extracted by one runner call into a fresh folder (parallel
+ *  calls once shared a Date.now() filename and handed Claude each other's half-written PNGs). */
+async function frames(times: number[], width: number | undefined, parent: string): Promise<string[]> {
+  const p = requireProject()
+  const timeline = readTimeline(p.path)
+  if (!timeline) throw new Error('Nothing has been rendered yet')
+  const dir = join(parent, randomUUID())
+  mkdirSync(dir, { recursive: true })
+  const clamped = times.map((t) => Math.min(Math.max(t, 0), Math.max(timeline.duration - 0.01, 0)))
+  const args = ['frames', timeline.video, dir, '--times', clamped.join(','), ...(width ? ['--width', String(width)] : [])]
+  const { paths } = await (await runRunner<{ paths: string[] }>('default', args)).done
+  return paths
+}
+
+export async function framesBase64(times: number[], width?: number): Promise<string[]> {
+  const dir = join(tmpdir(), 'manim-studio-frames')
+  const outs = await frames(times, width, dir)
+  try {
+    return outs.map((f) => readFileSync(f).toString('base64'))
+  } finally {
+    rmSync(dirname(outs[0]), { recursive: true, force: true })
+  }
+}
+
 export async function frameBase64(t: number, width?: number): Promise<string> {
-  return readFileSync(await frame(t, width)).toString('base64')
+  return (await framesBase64([t], width))[0]
 }
 
 async function afterPreview(dir: string, _timeline: Timeline): Promise<void> {

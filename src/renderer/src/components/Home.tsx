@@ -130,8 +130,8 @@ function EmptyState() {
       <svg viewBox="0 0 200 120" className="empty-art" aria-hidden>
         <line x1="10" y1="100" x2="190" y2="100" stroke="var(--line-strong)" strokeWidth="1.5" />
         <line x1="100" y1="10" x2="100" y2="110" stroke="var(--line-strong)" strokeWidth="1.5" />
-        <path d="M40 18 C 70 150, 130 150, 160 18" fill="none" stroke="var(--sun)" strokeWidth="3" strokeLinecap="round" className="draw" />
-        <circle cx="100" cy="99" r="5" fill="var(--blue)" className="pop" />
+        <path d="M54 22 Q93.1 154.6 132.2 61.8" fill="none" stroke="var(--sun)" strokeWidth="3" strokeLinecap="round" className="draw" />
+        <circle cx="132.2" cy="61.8" r="6" fill="var(--blue)" className="pop" />
       </svg>
       <h2>Every video starts with an empty scene</h2>
       <p className="muted">Pick a format, describe what to show, and Claude writes the animation, the narration and the subtitles with you.</p>

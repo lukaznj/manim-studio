@@ -15,7 +15,7 @@ import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
 import { project, readChat, readTimeline, requireProject, updateMeta, writeChat } from './projects'
-import { currentOrNewRender, frameBase64, pauseCommits } from './render'
+import { currentOrNewRender, frameBase64, framesBase64, pauseCommits } from './render'
 import { getSecret, getSettings } from './settings'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
@@ -254,7 +254,7 @@ async function startSession(dir: string): Promise<void> {
         { times: z.array(z.number()).min(1).max(6) },
         async ({ times }) => {
           if (!readTimeline(dir)) return textResult('Nothing rendered yet; call render_preview.')
-          const images = await Promise.all(times.map((t) => frameBase64(t, 854)))
+          const images = await framesBase64(times, 854)
           return {
             content: images.flatMap((data, i) => [
               { type: 'text' as const, text: `Frame at ${times[i].toFixed(2)} s:` },
