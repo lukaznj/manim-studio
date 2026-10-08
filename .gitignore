@@ -1,0 +1,15 @@
+node_modules/
+out/
+dist/
+resources/bin/
+python/.pixi/
+**/__pycache__/
+.DS_Store
+*.log
+
+# Obsidian per-user state
+docs/.obsidian/workspace*.json
+
+# --- graphify (regenerate with `graphify update .`) ---
+graphify-out/
+*.tsbuildinfo

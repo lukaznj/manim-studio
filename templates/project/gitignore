@@ -1,0 +1,4 @@
+# Renders and frames are rebuilt from scene.py; exports are big and regenerable.
+.studio/
+exports/
+__pycache__/

@@ -1,0 +1,58 @@
+# Packaging and auto-update. Release process: docs/06-operations/releasing.md
+appId: cc.razem.manimstudio
+productName: Manim Studio
+copyright: Luka Razem
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+
+# The Claude Code binary is spawned, so it must live outside the asar archive.
+asarUnpack:
+  - node_modules/@anthropic-ai/claude-agent-sdk-*/**
+
+extraResources:
+  - from: python
+    to: python
+    filter: ['**/*', '!**/__pycache__/**', '!.pixi/**', '!tests/**']
+  - from: templates
+    to: templates
+  - from: resources/bin # pixi, from `npm run fetch-pixi` for the target platform
+    to: bin
+
+mac:
+  target:
+    - target: dmg
+    - target: zip # what the updater downloads; latest-mac.yml points at it
+  category: public.app-category.education
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSMicrophoneUsageDescription: Manim Studio snima tvoju naraciju za video.
+  # Signing uses CSC_LINK/CSC_KEY_PASSWORD; notarization runs when APPLE_ID,
+  # APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID are set. Unsigned builds work but
+  # can't auto-update on macOS (the app then offers a manual download).
+
+win:
+  target: nsis
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# Public releases repo (the source repo stays private); clients need no token.
+publish:
+  provider: github
+  owner: lukaznj
+  repo: manim-studio-releases
+  releaseType: release

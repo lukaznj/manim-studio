@@ -1,0 +1,136 @@
+import { Clapperboard, FolderOpen } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import type { Aspect, Theme } from '../../../shared/types'
+import { api } from '../lib/api'
+import { closeDialog, createProject, useStore } from '../store'
+import { Modal } from './ui'
+
+const ASPECTS: { value: Aspect; title: string; hint: string }[] = [
+  { value: '16:9', title: 'Vodoravno', hint: 'Za ekran, projektor i YouTube' },
+  { value: '9:16', title: 'Uspravno', hint: 'Za mobitel, preko cijelog ekrana' },
+]
+
+const THEMES: { value: Theme; title: string }[] = [
+  { value: 'dark', title: 'Tamna' },
+  { value: 'light', title: 'Svijetla' },
+]
+
+export function NewProjectDialog() {
+  const open = useStore((s) => s.dialog?.kind === 'new-project')
+  const projectsDir = useStore((s) => s.settings?.projectsDir ?? '')
+  const [name, setName] = useState('')
+  const [aspect, setAspect] = useState<Aspect>('9:16')
+  const [theme, setTheme] = useState<Theme>('dark')
+  const [parentDir, setParentDir] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setName('')
+      setParentDir(projectsDir)
+      setBusy(false)
+    }
+  }, [open, projectsDir])
+
+  const submit = async () => {
+    if (!name.trim() || busy) return
+    setBusy(true)
+    await createProject({ name: name.trim(), aspect, theme, parentDir })
+    setBusy(false)
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={closeDialog}
+      title="Novi projekt"
+      icon={<Clapperboard className="head-icon" />}
+      width={640}
+      footer={
+        <>
+          <button className="btn ghost" onClick={closeDialog}>
+            Odustani
+          </button>
+          <button className="btn primary" disabled={!name.trim() || busy} onClick={() => void submit()}>
+            {busy && <span className="spinner" />} Napravi projekt
+          </button>
+        </>
+      }
+    >
+      <div className="modal-body new-project">
+        <div className="field">
+          <label htmlFor="np-name">Naziv videa</label>
+          <input
+            id="np-name"
+            className="input"
+            data-autofocus
+            placeholder="npr. Kvadratna funkcija — tjeme parabole"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void submit()}
+          />
+        </div>
+
+        <div className="field">
+          <span className="label">Format</span>
+          <div className="aspect-cards" role="radiogroup">
+            {ASPECTS.map((a) => (
+              <button
+                key={a.value}
+                role="radio"
+                aria-checked={aspect === a.value}
+                className={`aspect-card ${aspect === a.value ? 'on' : ''}`}
+                onClick={() => setAspect(a.value)}
+              >
+                <div className="aspect-stage">
+                  <div className={`aspect-frame ${a.value === '9:16' ? 'portrait' : 'landscape'} theme-${theme}`}>
+                    <svg viewBox="0 0 40 30" preserveAspectRatio="xMidYMid meet">
+                      <path d="M8 6 C 14 30, 26 30, 32 6" className="aspect-curve" />
+                      <circle cx="20" cy="23.5" r="1.8" className="aspect-dot" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="aspect-label">
+                  <strong>{a.title}</strong> <span className="mono faint">{a.value}</span>
+                  <div className="hint">{a.hint}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <span className="hint">Format se kasnije ne mijenja: raspored scene ovisi o njemu.</span>
+        </div>
+
+        <div className="np-row">
+          <div className="field">
+            <span className="label">Tema videa</span>
+            <div className="theme-swatches" role="radiogroup">
+              {THEMES.map((t) => (
+                <button key={t.value} role="radio" aria-checked={theme === t.value} className={`swatch theme-${t.value} ${theme === t.value ? 'on' : ''}`} onClick={() => setTheme(t.value)}>
+                  <span className="swatch-chip" />
+                  {t.title}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="field grow">
+            <span className="label">Mapa</span>
+            <div className="path-pick">
+              <span className="mono path-text" title={parentDir}>
+                {parentDir}
+              </span>
+              <button
+                className="btn small"
+                onClick={async () => {
+                  const dir = await api.pickFolder()
+                  if (dir) setParentDir(dir)
+                }}
+              >
+                <FolderOpen /> Promijeni
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}

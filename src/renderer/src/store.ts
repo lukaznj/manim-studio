@@ -1,0 +1,370 @@
+import { create } from 'zustand'
+import type {
+  AppInfo,
+  ChatEvent,
+  ChatMessage,
+  ClaudeStatus,
+  Component,
+  OpenProject,
+  ProjectMeta,
+  ProjectSummary,
+  Quality,
+  RenderError,
+  RenderEvent,
+  SetupStatus,
+  Settings,
+  Timeline,
+  UpdateEvent,
+} from '../../shared/types'
+import { api } from './lib/api'
+import { editorBridge } from './lib/editor-bridge'
+import { playback } from './lib/playback'
+import { sha1 } from './lib/time'
+
+export interface Toast {
+  id: number
+  kind: 'ok' | 'error' | 'info'
+  text: string
+}
+
+export interface RenderState {
+  status: 'idle' | 'rendering' | 'error'
+  id?: number
+  clips?: number
+  expected?: number
+  t?: number
+  error?: RenderError
+  startedAt?: number
+}
+
+export type Dialog =
+  | { kind: 'new-project' }
+  | { kind: 'settings'; tab?: 'account' | 'voice' | 'env' | 'about' }
+  | { kind: 'booth'; key?: string }
+  | { kind: 'export' }
+  | null
+
+interface State {
+  screen: 'home' | 'editor'
+  app: AppInfo | null
+  settings: Settings | null
+  setup: SetupStatus | null
+  setupLog: Partial<Record<Component, string[]>>
+  setupProgress: Partial<Record<Component, number>>
+  claude: ClaudeStatus | null
+  projects: ProjectSummary[]
+
+  project: { path: string; meta: ProjectMeta } | null
+  savedSource: string
+  dirty: boolean
+  stale: boolean
+  conflict: string | null
+  timeline: Timeline | null
+  render: RenderState
+  finalRender: RenderState
+  exportState: { stage: string; path?: string; error?: string } | null
+  selection: number[] // clip indices
+  recordings: string[]
+
+  chat: ChatMessage[]
+  chatBusy: boolean
+  streaming: Record<string, string>
+
+  update: UpdateEvent
+  dialog: Dialog
+  toasts: Toast[]
+}
+
+export const useStore = create<State>(() => ({
+  screen: 'home',
+  app: null,
+  settings: null,
+  setup: null,
+  setupLog: {},
+  setupProgress: {},
+  claude: null,
+  projects: [],
+  project: null,
+  savedSource: '',
+  dirty: false,
+  stale: false,
+  conflict: null,
+  timeline: null,
+  render: { status: 'idle' },
+  finalRender: { status: 'idle' },
+  exportState: null,
+  selection: [],
+  recordings: [],
+  chat: [],
+  chatBusy: false,
+  streaming: {},
+  update: { state: 'idle' },
+  dialog: null,
+  toasts: [],
+}))
+
+const set = useStore.setState
+const get = useStore.getState
+
+// --- small helpers ----------------------------------------------------------------------
+
+let toastId = 1
+export function toast(text: string, kind: Toast['kind'] = 'info'): void {
+  const id = toastId++
+  set((s) => ({ toasts: [...s.toasts, { id, kind, text }] }))
+  setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), kind === 'error' ? 7000 : 3800)
+}
+
+export function errorText(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e)
+  return msg.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+}
+
+async function guard<T>(p: Promise<T>): Promise<T | undefined> {
+  try {
+    return await p
+  } catch (e) {
+    toast(errorText(e), 'error')
+    return undefined
+  }
+}
+
+function withTransition(update: () => void): void {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown }
+  if (doc.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) doc.startViewTransition(update)
+  else update()
+}
+
+export const openDialog = (dialog: Dialog) => set({ dialog })
+export const closeDialog = () => set({ dialog: null })
+
+// --- boot ---------------------------------------------------------------------------------
+
+export async function boot(): Promise<void> {
+  const [app, settings, setup] = await Promise.all([api.appInfo(), api.getSettings(), api.setupStatus()])
+  set({ app, settings, setup })
+  void refreshProjects()
+  void refreshClaude()
+
+  api.on('render', onRender)
+  api.on('chat', onChat)
+  api.on('update', (update) => set({ update }))
+  api.on('setup', (e) => {
+    set((s) => ({
+      setupLog: e.line ? { ...s.setupLog, [e.component]: [...(s.setupLog[e.component] ?? []), e.line].slice(-80) } : s.setupLog,
+      setupProgress: e.progress !== undefined ? { ...s.setupProgress, [e.component]: e.progress } : s.setupProgress,
+    }))
+    if (e.state !== 'installing') void api.setupStatus().then((setup) => set({ setup }))
+    else set((s) => (s.setup ? { setup: { ...s.setup, [e.component]: 'installing' } } : {}))
+  })
+  api.on('file-changed', ({ source }) => onExternalChange(source))
+  api.on('export', (e) => set({ exportState: e }))
+}
+
+export async function refreshProjects(): Promise<void> {
+  set({ projects: await api.listProjects() })
+}
+
+export async function refreshClaude(): Promise<void> {
+  set({ claude: await api.claudeStatus() })
+}
+
+export async function refreshSetup(): Promise<void> {
+  set({ setup: await api.setupStatus() })
+}
+
+export async function updateSettings(patch: Partial<Settings>): Promise<void> {
+  set({ settings: await api.setSettings(patch) })
+}
+
+export async function installComponent(c: Component): Promise<void> {
+  set((s) => ({ setupLog: { ...s.setupLog, [c]: [] }, setupProgress: { ...s.setupProgress, [c]: undefined } }))
+  await guard(api.install(c))
+  await refreshSetup()
+}
+
+// --- projects -------------------------------------------------------------------------------
+
+export async function openProject(path: string): Promise<void> {
+  const opened = await guard(api.openProject(path))
+  if (!opened) return
+  withTransition(() => applyOpened(opened))
+  playback.restore(0)
+  if (!opened.timeline && get().setup?.env === 'ready') void renderNow()
+}
+
+function applyOpened(o: OpenProject): void {
+  set({
+    screen: 'editor',
+    project: { path: o.path, meta: o.meta },
+    savedSource: o.source,
+    dirty: false,
+    stale: false,
+    conflict: null,
+    timeline: o.timeline,
+    render: { status: 'idle' },
+    finalRender: { status: 'idle' },
+    selection: [],
+    recordings: o.recordings,
+    chat: o.chat,
+    chatBusy: false,
+    streaming: {},
+  })
+}
+
+export async function createProject(input: Parameters<typeof api.createProject>[0]): Promise<void> {
+  const path = await guard(api.createProject(input))
+  if (!path) return
+  closeDialog()
+  await openProject(path)
+  void refreshProjects()
+}
+
+export async function closeProject(): Promise<void> {
+  if (get().dirty) await saveScene()
+  await api.closeProject()
+  withTransition(() => set({ screen: 'home', project: null, timeline: null, chat: [], selection: [] }))
+  void refreshProjects()
+}
+
+export async function updateMeta(patch: Partial<ProjectMeta>): Promise<void> {
+  const meta = await guard(api.updateMeta(patch))
+  if (meta) set((s) => ({ project: s.project ? { ...s.project, meta } : null }))
+}
+
+// --- editing and rendering ------------------------------------------------------------------------
+
+export function markEdited(source: string): void {
+  set({ dirty: source !== get().savedSource })
+  void checkStale(source)
+}
+
+async function checkStale(source: string): Promise<void> {
+  const t = get().timeline
+  set({ stale: !!t && (await sha1(source)) !== t.sourceHash })
+}
+
+export async function saveScene(opts: { render?: boolean } = {}): Promise<void> {
+  const source = editorBridge.getValue()
+  if (source === null) return
+  await api.saveScene(source)
+  set({ savedSource: source, dirty: false, conflict: null })
+  if (opts.render ?? get().settings?.autoRender ?? true) void renderNow()
+}
+
+export async function renderNow(quality: Quality = 'preview'): Promise<void> {
+  if (get().setup?.env !== 'ready') {
+    toast('Manim okruženje još nije instalirano — Postavke → Okruženje', 'error')
+    return
+  }
+  await guard(api.render(quality))
+}
+
+function onRender(e: RenderEvent): void {
+  const key = e.quality === 'final' ? 'finalRender' : 'render'
+  const current = get()[key]
+  if (e.type === 'start') {
+    set({ [key]: { status: 'rendering', id: e.id, clips: 0, expected: e.expectedClips, startedAt: Date.now() } } as Partial<State>)
+    return
+  }
+  if (current.id !== undefined && e.id !== current.id) return // a superseded render
+  if (e.type === 'progress') set({ [key]: { ...current, clips: e.clips, t: e.t } } as Partial<State>)
+  if (e.type === 'cancelled') set({ [key]: { status: 'idle' } } as Partial<State>)
+  if (e.type === 'error') {
+    set({ [key]: { status: 'error', error: e.error } } as Partial<State>)
+    if (e.quality === 'preview') editorBridge.showError(e.error)
+  }
+  if (e.type === 'done') {
+    set({ [key]: { status: 'idle' } } as Partial<State>)
+    if (e.quality === 'preview') {
+      const t = playback.time
+      editorBridge.showError(null)
+      set({ timeline: e.timeline, selection: get().selection.filter((i) => i < e.timeline.clips.length) })
+      void checkStale(editorBridge.getValue() ?? get().savedSource)
+      requestAnimationFrame(() => playback.restore(Math.min(t, e.timeline.duration)))
+      if (e.timeline.voiceWarnings.length) toast(`Glas: ${e.timeline.voiceWarnings[0]}`, 'error')
+    }
+  }
+}
+
+function onExternalChange(source: string): void {
+  if (get().dirty) {
+    set({ conflict: source })
+    return
+  }
+  editorBridge.setValue(source)
+  set({ savedSource: source, dirty: false })
+  // Claude renders through its own tool; for anything else (an external editor), render here.
+  if (!get().chatBusy && get().settings?.autoRender) void renderNow()
+}
+
+export function resolveConflict(take: 'theirs' | 'mine'): void {
+  const theirs = get().conflict
+  if (theirs === null) return
+  if (take === 'theirs') {
+    editorBridge.setValue(theirs)
+    set({ savedSource: theirs, dirty: false, conflict: null })
+    void renderNow()
+  } else {
+    set({ conflict: null })
+    void saveScene()
+  }
+}
+
+export function selectClips(indices: number[]): void {
+  set({ selection: indices })
+}
+
+// --- chat -------------------------------------------------------------------------------------------
+
+function onChat(e: ChatEvent): void {
+  if (e.type === 'message') set((s) => ({ chat: [...s.chat.filter((m) => m.id !== e.message.id), e.message] }))
+  if (e.type === 'delta') set((s) => ({ streaming: { ...s.streaming, [e.messageId]: (s.streaming[e.messageId] ?? '') + e.text } }))
+  if (e.type === 'part')
+    set((s) => ({
+      streaming: { ...s.streaming, [e.messageId]: '' },
+      chat: s.chat.map((m) => (m.id === e.messageId ? { ...m, parts: [...m.parts, e.part] } : m)),
+    }))
+  if (e.type === 'tool-status')
+    set((s) => ({
+      chat: s.chat.map((m) =>
+        m.id === e.messageId ? { ...m, parts: m.parts.map((p) => (p.kind === 'tool' && p.id === e.toolId ? { ...p, status: e.status } : p)) } : m,
+      ),
+    }))
+  if (e.type === 'busy') {
+    set({ chatBusy: e.busy })
+    editorBridge.setReadOnly(e.busy)
+  }
+  if (e.type === 'done') {
+    // An expired or revoked sign-in shows up as a failed turn; re-check so the sign-in card returns.
+    if (!e.ok) void refreshClaude()
+    set((s) => ({
+      streaming: {},
+      chat: e.ok
+        ? s.chat.map((m) => ({ ...m, parts: m.parts.map((p) => (p.kind === 'tool' && p.status === 'running' ? { ...p, status: 'ok' as const } : p)) }))
+        : [...s.chat, { id: crypto.randomUUID(), role: 'error', parts: [{ kind: 'text', text: e.error || 'Claude je stao s greškom.' }], at: Date.now() }],
+    }))
+  }
+  if (e.type === 'reset') set({ chat: [], streaming: {}, chatBusy: false })
+}
+
+export async function sendChat(text: string, withFrame: boolean): Promise<boolean> {
+  const { timeline, selection, dirty } = get()
+  if (dirty) await saveScene({ render: false })
+  const clips = timeline ? selection.map((i) => timeline.clips[i]).filter(Boolean) : []
+  const context = clips.length
+    ? {
+        start: Math.min(...clips.map((c) => c.start)),
+        end: Math.max(...clips.map((c) => c.end)),
+        lines: clips.map((c) => c.line).filter((l): l is number => l !== null),
+        labels: clips.map((c) => c.anims.map((a) => (a.target ? `${a.name} ${a.target}` : a.name)).join(' + ')),
+      }
+    : undefined
+  try {
+    await api.chatSend({ text, context, frameAt: withFrame && timeline ? playback.time : undefined })
+    return true
+  } catch (e) {
+    toast(errorText(e), 'error')
+    return false
+  }
+}
