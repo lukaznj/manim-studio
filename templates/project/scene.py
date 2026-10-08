@@ -4,16 +4,16 @@ from studio import *
 
 class Video(StudioScene):
     def construct(self):
-        self.next_section("Uvod")
-        title = Text("Kvadratna funkcija", weight=BOLD).scale(1.1)
-        subtitle = Text("Gdje je tjeme parabole?", color=MUTED).scale(0.55)
+        self.next_section("Intro")
+        title = Text("Quadratic functions", weight=BOLD).scale(1.1)
+        subtitle = Text("Where is the vertex of a parabola?", color=MUTED).scale(0.55)
         header = fit(VGroup(title, subtitle).arrange(DOWN, buff=0.3))
-        with self.voiceover("Danas gledamo kvadratnu funkciju i njezin graf, parabolu.") as v:
+        with self.voiceover("Today we look at a quadratic function and its graph, the parabola.") as v:
             self.play(Write(title), run_time=1.5)
             self.play(FadeIn(subtitle, shift=UP * 0.2), run_time=1)
         self.play(header.animate.scale(0.75).to_edge(UP, buff=MARGIN), run_time=1)
 
-        self.next_section("Graf")
+        self.next_section("Graph")
         axes = Axes(
             x_range=[-3, 3, 1],
             y_range=[-1, 5, 1],
@@ -27,10 +27,10 @@ class Video(StudioScene):
         vertex = Dot(axes.c2p(0, 0), color=HIGHLIGHT)
 
         with self.voiceover(
-            "Parabola je simetrična, a njezina najniža točka zove se <bookmark mark='tjeme'/>tjeme."
+            "The parabola is symmetric, and its lowest point is called the <bookmark mark='vertex'/>vertex."
         ) as v:
             self.play(Create(axes), run_time=1.2)
             self.play(Create(graph), FadeIn(label), run_time=1.5)
-            self.wait_until_bookmark("tjeme")
+            self.wait_until_bookmark("vertex")
             self.play(GrowFromCenter(vertex), Flash(vertex, color=HIGHLIGHT), run_time=0.8)
         self.wait(1)

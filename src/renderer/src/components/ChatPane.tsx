@@ -5,10 +5,10 @@ import { api } from '../lib/api'
 import { openDialog, refreshClaude, selectClips, sendChat, toast, errorText, useStore } from '../store'
 
 const SUGGESTIONS = [
-  'Napravi uvod: naslov, kratka najava teme i naracija.',
-  'Objasni korak po korak kako se rješava kvadratna jednadžba.',
-  'Provjeri cijeli video: preklapanja, tempo, čitljivost.',
-  'Uspori odabrani dio i dodaj pauzu nakon rezultata.',
+  'Make an intro: a title, a short preview of the topic, and narration.',
+  'Explain step by step how to solve a quadratic equation.',
+  'Check the whole video: overlaps, pacing, legibility.',
+  'Slow down the selected part and add a pause after the result.',
 ]
 
 export function ChatPane() {
@@ -27,7 +27,7 @@ export function ChatPane() {
     <div className="chat-pane">
       <div className="pane-head">
         <div className="file-tab">
-          <Sparkles className="claude-mark" /> Claude
+          <Sparkles className="claude-mark" /> Claude Agent
         </div>
         <div className="pane-actions">
           {claude?.loggedIn && (
@@ -37,10 +37,10 @@ export function ChatPane() {
           )}
           <button
             className="icon-btn"
-            title="Novi razgovor"
+            title="New conversation"
             disabled={busy || chat.length === 0}
             onClick={() => {
-              if (confirm('Započeti novi razgovor? Claude zaboravlja dosadašnji kontekst ovog projekta.')) void api.chatReset()
+              if (confirm('Start a new conversation? Claude forgets the context of this project’s current one.')) void api.chatReset()
             }}
           >
             <RotateCcw />
@@ -86,7 +86,7 @@ function SignIn() {
     try {
       const status = await api.claudeLogin()
       await refreshClaude()
-      if (!status.loggedIn) toast('Prijava nije dovršena.', 'error')
+      if (!status.loggedIn) toast('Sign-in wasn’t completed.', 'error')
     } catch (e) {
       toast(errorText(e), 'error')
     } finally {
@@ -98,27 +98,32 @@ function SignIn() {
   return (
     <div className="chat-signin">
       <Sparkles className="signin-mark" />
-      <h3>Prijavi se s Claude računom</h3>
+      <h3>Sign in to use Claude</h3>
       <p className="muted">
-        Claude piše i popravlja scenu, gleda kadrove i provjerava raspored. Prijava se otvara u pregledniku kod Anthropica, a potrošnja ide na tvoj Claude
-        plan. Aplikacija ne vidi tvoju lozinku ni token.
+        Claude writes and fixes the scene, looks at the frames and checks the layout. Studio runs Claude Code with your own Claude account: sign-in
+        happens in your browser, usage counts against your plan, and the app never sees your password or tokens.
       </p>
       <button className="btn primary" disabled={busy} onClick={() => void login()}>
-        {busy ? <span className="spinner" /> : <Sparkles />} {busy ? 'Čekam preglednik…' : 'Prijavi se'}
+        {busy ? <span className="spinner" /> : <Sparkles />} {busy ? 'Waiting for the browser…' : 'Sign in'}
       </button>
       {busy && url && (
         <p className="hint">
-          Preglednik se nije otvorio?{' '}
+          Didn’t a browser open?{' '}
           <a href="#" onClick={() => void api.openExternal(url)}>
-            Otvori poveznicu za prijavu
+            Open the sign-in link
           </a>
         </p>
       )}
+      {!busy && (
+        <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
+          Use an Anthropic API key instead
+        </button>
+      )}
       {busy && needsCode && (
         <div className="code-entry">
-          <input className="input mono" placeholder="Zalijepi kod iz preglednika" value={code} onChange={(e) => setCode(e.target.value)} />
+          <input className="input mono" placeholder="Paste the code from the browser" value={code} onChange={(e) => setCode(e.target.value)} />
           <button className="btn" onClick={() => void api.claudeLoginCode(code)}>
-            Potvrdi
+            Confirm
           </button>
         </div>
       )}
@@ -130,9 +135,9 @@ function Intro() {
   return (
     <div className="chat-intro">
       <p className="muted">
-        Opiši što video treba pokazati. Claude uređuje <span className="mono">scene.py</span>, renderira i gleda kadrove prije nego kaže da je gotovo.
+        Describe what the video should show. Claude edits <span className="mono">scene.py</span>, renders it and looks at the frames before it says it’s done.
       </p>
-      <p className="hint">Odaberi klipove na vremenskoj crti da Claude zna o kojem dijelu govoriš.</p>
+      <p className="hint">Select clips on the timeline so Claude knows which part you mean.</p>
     </div>
   )
 }
@@ -144,10 +149,10 @@ function Message({ message: m, streaming, busy }: { message: ChatMessage; stream
       <div className="msg user">
         {(m.context || m.frame) && (
           <div className="msg-attach">
-            {m.frame && <img src={m.frame} alt="Kadar" />}
+            {m.frame && <img src={m.frame} alt="Preview frame" />}
             {m.context && (
               <span className="context-chip">
-                <Film /> {m.context.start.toFixed(1)}–{m.context.end.toFixed(1)} s{m.context.lines.length ? ` · r. ${[...new Set(m.context.lines)].join(', ')}` : ''}
+                <Film /> {m.context.start.toFixed(1)}–{m.context.end.toFixed(1)} s{m.context.lines.length ? ` · L${[...new Set(m.context.lines)].join(', ')}` : ''}
               </span>
             )}
           </div>
@@ -215,7 +220,7 @@ function Composer() {
     if (!clips.length) return null
     const start = Math.min(...clips.map((c) => c!.start))
     const end = Math.max(...clips.map((c) => c!.end))
-    return `${clips.length === 1 ? '1 klip' : `${clips.length} klipa`} · ${start.toFixed(1)}–${end.toFixed(1)} s`
+    return `${clips.length === 1 ? '1 clip' : `${clips.length} clips`} · ${start.toFixed(1)}–${end.toFixed(1)} s`
   }, [selection, timeline])
 
   useEffect(() => {
@@ -247,14 +252,14 @@ function Composer() {
           {sel && (
             <span className="context-chip">
               <Film /> {sel}
-              <button onClick={() => selectClips([])} aria-label="Makni odabir">
+              <button onClick={() => selectClips([])} aria-label="Clear the selection">
                 <X />
               </button>
             </span>
           )}
           {timeline && (
-            <button className={`attach-toggle ${frame ? 'on' : ''}`} onClick={() => setFrame((f) => !f)} title="Priloži trenutni kadar pregleda">
-              <Camera /> Kadar
+            <button className={`attach-toggle ${frame ? 'on' : ''}`} onClick={() => setFrame((f) => !f)} title="Attach the current preview frame">
+              <Camera /> Frame
             </button>
           )}
         </div>
@@ -262,7 +267,7 @@ function Composer() {
           ref={area}
           className="composer-input"
           rows={2}
-          placeholder={busy ? 'Claude radi…' : 'Što da napravim? (Enter šalje, Shift+Enter novi red)'}
+          placeholder={busy ? 'Claude is working…' : 'What should I make? (Enter sends, Shift+Enter for a new line)'}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -274,14 +279,14 @@ function Composer() {
         />
         <div className="composer-foot">
           <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
-            Model i račun
+            Model and account
           </button>
           {busy ? (
-            <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title="Zaustavi">
+            <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title="Stop">
               <Square />
             </button>
           ) : (
-            <button className="send-btn" disabled={!text.trim()} onClick={() => void send()} title="Pošalji (Enter)">
+            <button className="send-btn" disabled={!text.trim()} onClick={() => void send()} title="Send (Enter)">
               <ArrowUp />
             </button>
           )}

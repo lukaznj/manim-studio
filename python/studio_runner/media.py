@@ -5,23 +5,37 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def _grab(container, stream, t: float):
+    """The frame showing at time t (the last one, past the end)."""
+    container.seek(max(int(t / stream.time_base), 0), stream=stream, backward=True)
+    chosen = None
+    for f in container.decode(stream):
+        chosen = f
+        if f.time is not None and f.time >= t - 1e-3:
+            break
+    if chosen is None:
+        raise RuntimeError(f"no frame at {t}s")
+    return chosen.to_image()
+
+
+def _fit(image, width: int | None):
+    if width and image.width > width:
+        return image.resize((width, round(image.height * width / image.width)))
+    return image
+
+
 def frame(video: str, t: float, out: str, width: int | None = None) -> None:
+    frames(video, [t], [out], width)
+
+
+def frames(video: str, times: list[float], outs: list[str], width: int | None = None) -> None:
+    """Several frames from one open container, written to the given paths in order."""
     import av
 
     with av.open(video) as container:
         stream = container.streams.video[0]
-        container.seek(max(int(t / stream.time_base), 0), stream=stream, backward=True)
-        chosen = None
-        for f in container.decode(stream):
-            chosen = f
-            if f.time is not None and f.time >= t - 1e-3:
-                break
-        if chosen is None:
-            raise RuntimeError(f"no frame at {t}s in {video}")
-        image = chosen.to_image()
-    if width and image.width > width:
-        image = image.resize((width, round(image.height * width / image.width)))
-    image.save(out)
+        for t, out in zip(times, outs):
+            _fit(_grab(container, stream, t), width).save(out)
 
 
 def thumbnail(timeline: dict, out: str, width: int) -> float:
@@ -40,23 +54,16 @@ def thumbnail(timeline: dict, out: str, width: int) -> float:
     with av.open(timeline["video"]) as container:
         stream = container.streams.video[0]
         for t in times:
-            container.seek(max(int(t / stream.time_base), 0), stream=stream, backward=True)
-            frame = None
-            for f in container.decode(stream):
-                frame = f
-                if f.time is not None and f.time >= t - 1e-3:
-                    break
-            if frame is None:
+            try:
+                image = _grab(container, stream, t)
+            except RuntimeError:
                 continue
-            image = frame.to_image()
             score = sum(ImageStat.Stat(image.convert("L").resize((160, 160))).stddev)
             if score > best_score:
                 best, best_score, best_t = image, score, t
     if best is None:
         raise RuntimeError("no frames to choose a thumbnail from")
-    if best.width > width:
-        best = best.resize((width, round(best.height * width / best.width)))
-    best.convert("RGB").save(out, quality=88)
+    _fit(best, width).convert("RGB").save(out, quality=88)
     return best_t
 
 

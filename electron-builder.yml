@@ -1,7 +1,7 @@
 # Packaging and auto-update. Release process: docs/06-operations/releasing.md
 appId: cc.razem.manimstudio
 productName: Manim Studio
-copyright: Luka Razem
+copyright: Copyright © 2026 Luka Ražem
 directories:
   output: dist
   buildResources: build
@@ -29,18 +29,29 @@ mac:
     - target: dmg
     - target: zip # what the updater downloads; latest-mac.yml points at it
   category: public.app-category.education
+  # Icon Composer document (Liquid Glass on macOS 26+); electron-builder compiles it with
+  # actool (Xcode 26+) into Assets.car plus an .icns fallback for older macOS.
+  icon: build/icon.icon
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    NSMicrophoneUsageDescription: Manim Studio snima tvoju naraciju za video.
+    NSMicrophoneUsageDescription: Manim Studio records your narration for videos.
   # Signing uses CSC_LINK/CSC_KEY_PASSWORD; notarization runs when APPLE_ID,
   # APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID are set. Unsigned builds work but
   # can't auto-update on macOS (the app then offers a manual download).
 
 win:
   target: nsis
+  icon: build/icon.png
   artifactName: ${productName}-Setup-${version}.${ext}
+
+linux:
+  target: AppImage # self-updating; .deb would need a maintainer e-mail
+  icon: build/icon.png
+  category: Education
+  synopsis: Code-first editor for manim maths videos
+  artifactName: ${productName}-${version}-${arch}.${ext}
 
 nsis:
   oneClick: true
@@ -50,9 +61,9 @@ nsis:
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
 
-# Public releases repo (the source repo stays private); clients need no token.
+# Releases live in this (public) repo; installed apps read them without a token.
 publish:
   provider: github
   owner: lukaznj
-  repo: manim-studio-releases
-  releaseType: release
+  repo: manim-studio
+  releaseType: draft # CI publishes it once all platforms uploaded

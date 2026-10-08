@@ -507,7 +507,7 @@
   animation: draw 1.6s 0.2s var(--ease-out) forwards;
 }
 .empty-art .pop {
-  transform-origin: 100px 99px;
+  transform-origin: 132px 62px;
   transform: scale(0);
   animation: popdot 0.5s 1.3s var(--ease-spring) forwards;
 }
@@ -640,7 +640,10 @@
 .np-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 20px;
+  gap: 16px 20px;
+}
+.np-row .span-2 {
+  grid-column: 1 / -1;
 }
 .theme-swatches {
   display: flex;

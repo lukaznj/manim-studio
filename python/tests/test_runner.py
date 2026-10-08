@@ -41,7 +41,7 @@ class RenderTimeline(unittest.TestCase):
         self.assertEqual((self.result["width"], self.result["height"]), (854, 480))
 
     def test_sections(self):
-        self.assertEqual([s["name"] for s in self.result["sections"]], ["Uvod", "Greška"])
+        self.assertEqual([s["name"] for s in self.result["sections"]], ["Intro", "Mistakes"])
 
     def test_clips_map_to_lines_and_edits(self):
         by_line = {}
@@ -55,7 +55,7 @@ class RenderTimeline(unittest.TestCase):
 
     def test_voice_and_subtitles(self):
         [v] = self.result["voice"]
-        self.assertEqual(v["text"], "Pogledajmo derivaciju funkcije.")
+        self.assertEqual(v["text"], "Let's look at the derivative.")
         self.assertEqual(v["source"], "silence")
         self.assertEqual([b["mark"] for b in v["bookmarks"]], ["A"])
         self.assertTrue(self.result["subtitles"])

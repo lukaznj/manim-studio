@@ -25,6 +25,12 @@ def main(argv: list[str] | None = None) -> int:
     f.add_argument("out")
     f.add_argument("--width", type=int)
 
+    fs = sub.add_parser("frames")
+    fs.add_argument("video")
+    fs.add_argument("out_dir", type=Path)
+    fs.add_argument("--times", required=True, help="comma-separated seconds")
+    fs.add_argument("--width", type=int)
+
     e = sub.add_parser("export")
     e.add_argument("timeline", type=Path)
     e.add_argument("dest", type=Path)
@@ -39,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("text")
     a.add_argument("out")
     a.add_argument("--model", default="small")
+    a.add_argument("--language", default=None, help="BCP 47 code; None lets Whisper detect it")
 
     sub.add_parser("check")
     sub.add_parser("tts-worker")
@@ -57,6 +64,16 @@ def main(argv: list[str] | None = None) -> int:
         emit("done", path=args.out)
         return 0
 
+    if args.cmd == "frames":
+        from .media import frames
+
+        times = [float(t) for t in args.times.split(",")]
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        outs = [str(args.out_dir / f"frame-{i}.png") for i in range(len(times))]
+        frames(args.video, times, outs, args.width)
+        emit("done", paths=outs)
+        return 0
+
     if args.cmd == "thumbnail":
         from .media import thumbnail
 
@@ -70,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "align":
         from .align import align
 
-        align(args.audio, args.text, args.out, args.model)
+        align(args.audio, args.text, args.out, args.model, (args.language or "").split("-")[0] or None)
         emit("done", path=args.out)
         return 0
 

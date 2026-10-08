@@ -96,6 +96,7 @@ function registerIpc(): void {
   handle('getSettings', () => getSettings())
   handle('setSettings', (patch: Parameters<typeof setSettings>[0]) => setSettings(patch))
   handle('setElevenLabsKey', (key: string) => setSecret('elevenlabs', key.trim()))
+  handle('setAnthropicKey', (key: string) => setSecret('anthropic', key.trim()))
 
   handle('claudeStatus', () => claudeStatus())
   handle('claudeLogin', () => claudeLogin((e) => send('claude-login', e)))
@@ -110,14 +111,14 @@ function registerIpc(): void {
     return opened
   })
   handle('pickProject', async () => {
-    const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory'], title: 'Otvori projekt (mapa sa scene.py)' })
+    const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory'], title: 'Open a project (the folder with scene.py)' })
     const dir = r.filePaths[0]
     if (!dir) return null
-    if (!existsSync(join(dir, 'project.json'))) throw new Error('U toj mapi nema project.json — nije Manim Studio projekt.')
+    if (!existsSync(join(dir, 'project.json'))) throw new Error('That folder has no project.json, so it is not a Manim Studio project.')
     return dir
   })
   handle('pickFolder', async () => {
-    const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'], title: 'Mapa za projekte' })
+    const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'], title: 'Projects folder' })
     return r.filePaths[0] ?? null
   })
   handle('closeProject', () => {
@@ -183,7 +184,7 @@ async function exportVideo(): Promise<string> {
     send('export', { stage: 'error', error: outcome.error.message })
     throw new Error(outcome.error.message)
   }
-  if ('cancelled' in outcome) throw new Error('Izvoz je prekinut')
+  if ('cancelled' in outcome) throw new Error('The export was cancelled')
   send('export', { stage: 'package' })
   const dest = join(p.path, 'exports', projects.slugify(p.meta.name))
   await (await runRunner('default', ['export', join(p.path, '.studio', 'final', 'timeline.json'), dest])).done

@@ -4,20 +4,21 @@ The full reasoning is in [[../04-decisions/0008-ink-at-night-design|ADR 0008]]. 
 
 | | |
 |---|---|
-| ![[screenshots/home-first-run.png]] | Home on first run: setup steps, and an empty state drawing the parabola |
-| ![[screenshots/new-project.png]] | New project: the format cards animate their frame, the theme swatches show the video palette |
-| ![[screenshots/editor-code-follow.png]] | Editor while playing: line 35 is marked because it produces the frame on screen |
-| ![[screenshots/editor-retimed-clip.png]] | After dragging FadeIn's edge: `run_time=1.8` in code, re-rendered, the clip and line selected |
-| ![[screenshots/editor-render-error.png]] | A render error: the line is marked in the code, with "Popravi s Claudeom" |
-| ![[screenshots/history.png]] | Version history |
+| ![[screenshots/editor.png]] | The editor after a Claude turn: code, preview, Claude Agent, and the timeline with sections, animations, voice and subtitles. Line 48 is marked because it produces the frame on screen. |
+| ![[screenshots/home.png]] | Projects, each with a thumbnail picked from the render |
+| ![[screenshots/new-project.png]] | New project: the format cards animate their frame, the theme swatches show the video palette, and the narration language is chosen here |
+| ![[screenshots/recording-booth.png]] | The recording booth: a teleprompter over every voiceover block |
+| ![[screenshots/history.png]] | Version history: renders and Claude turns as restorable versions |
 | ![[screenshots/settings-voice.png]] | Voice settings per project |
-| ![[screenshots/app-icon.png]] | App icon, rendered with manim (`scripts/make-icon.py`) |
+| ![[screenshots/app-icon.png]] | The app icon: `build/icon.icon`, an Icon Composer document with Liquid Glass |
+| ![[screenshots/icon-appearances.png]] | The icon in the default, dark, clear and tinted appearances, rendered with `ictool` |
 
 ## Rules of thumb
 
 - **One action colour.** Chalk-yellow means "do this" or "this is time". Don't introduce a second accent for actions.
-- **Copy.** Croatian sentence case. Buttons say what happens: "Spremi snimku", not "U redu". Errors say what broke and offer the fix.
+- **Copy.** English, sentence case. Buttons say what happens: "Save take", not "OK". Errors say what broke and offer the fix ("Fix with Claude").
 - **Motion.**
   - Allowed: state changes the user should see (retiming, dialogs, progress).
   - Not allowed: decoration.
   - Everything respects `prefers-reduced-motion`.
+- **Screenshots** never show an account or an e-mail address.

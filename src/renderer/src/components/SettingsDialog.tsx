@@ -18,16 +18,16 @@ export function SettingsDialog() {
   }, [dialog])
 
   return (
-    <Modal open={open} onClose={closeDialog} title="Postavke" icon={<Settings2 className="head-icon" />} width={720}>
+    <Modal open={open} onClose={closeDialog} title="Settings" icon={<Settings2 className="head-icon" />} width={720}>
       <div className="settings-tabs">
         <Tabs
           value={tab}
           onChange={setTab}
           items={[
             { value: 'account', label: 'Claude' },
-            { value: 'voice', label: 'Glas' },
-            { value: 'env', label: 'Okruženje' },
-            { value: 'about', label: 'O aplikaciji' },
+            { value: 'voice', label: 'Voice' },
+            { value: 'env', label: 'Environment' },
+            { value: 'about', label: 'About' },
           ]}
         />
       </div>
@@ -53,11 +53,33 @@ function Row(props: { title: ReactNode; text?: ReactNode; children?: ReactNode }
   )
 }
 
+function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: string) => Promise<void> }) {
+  const [key, setKey] = useState('')
+  return (
+    <div className="inline-form">
+      <input className="input" type="password" placeholder={props.saved ? '••••••••••' : props.placeholder} value={key} onChange={(e) => setKey(e.target.value)} />
+      <button
+        className="btn"
+        disabled={!key.trim()}
+        onClick={async () => {
+          await props.onSave(key)
+          setKey('')
+        }}
+      >
+        <KeyRound /> Save
+      </button>
+    </div>
+  )
+}
+
+const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1) : '')
+
 function AccountTab() {
   const claude = useStore((s) => s.claude)
   const settings = useStore((s) => s.settings)!
   const [models, setModels] = useState<ModelOption[] | null>(null)
   const [busy, setBusy] = useState(false)
+  const usingKey = claude?.method === 'api-key'
 
   useEffect(() => {
     if (claude?.loggedIn)
@@ -79,19 +101,27 @@ function AccountTab() {
     }
   }
 
+  const saveKey = async (key: string) => {
+    useStore.setState({ settings: await api.setAnthropicKey(key) })
+    await refreshClaude()
+    toast(key ? 'API key saved' : 'API key removed', 'ok')
+  }
+
   return (
     <div className="set-group">
       <div className={`account-card ${claude?.loggedIn ? 'on' : ''}`}>
         <Sparkles />
         <div>
-          <strong>{claude?.loggedIn ? claude.email ?? 'Prijavljen' : 'Nisi prijavljen'}</strong>
+          <strong>{usingKey ? 'Anthropic API key' : claude?.loggedIn ? claude.email ?? 'Signed in' : 'Not signed in'}</strong>
           <div className="hint">
-            {claude?.loggedIn
-              ? `Claude ${claude.subscription ?? ''} · potrošnja ide na ovaj plan`
-              : 'Prijava se otvara u pregledniku kod Anthropica. Svaki admin koristi svoj Claude plan.'}
+            {usingKey
+              ? 'Usage is billed to the API key’s Console account.'
+              : claude?.loggedIn
+                ? `Claude ${planName(claude.subscription)} · usage counts against this plan`
+                : 'Studio runs Claude Code with your own Claude account. Sign-in opens in your browser.'}
           </div>
         </div>
-        {claude?.loggedIn ? (
+        {usingKey ? null : claude?.loggedIn ? (
           <button
             className="btn ghost small"
             onClick={async () => {
@@ -99,48 +129,68 @@ function AccountTab() {
               await refreshClaude()
             }}
           >
-            <LogOut /> Odjava
+            <LogOut /> Sign out
           </button>
         ) : (
           <button className="btn primary small" disabled={busy} onClick={() => void login()}>
-            {busy && <span className="spinner" />} Prijavi se
+            {busy && <span className="spinner" />} Sign in
           </button>
         )}
       </div>
 
-      <Row title="Model" text="Koji Claude model piše scene. Zadani je onaj koji tvoj plan preporučuje.">
+      <Row
+        title="Anthropic API key"
+        text={
+          settings.hasAnthropicKey
+            ? 'Saved and encrypted on this computer; it takes precedence over the sign-in.'
+            : 'Optional, instead of signing in: a key from console.anthropic.com, billed per use.'
+        }
+      >
+        <div className="inline-form">
+          <KeyField saved={settings.hasAnthropicKey} placeholder="sk-ant-…" onSave={saveKey} />
+          {settings.hasAnthropicKey && (
+            <button className="btn ghost" onClick={() => void saveKey('')}>
+              Remove
+            </button>
+          )}
+        </div>
+      </Row>
+
+      <Row title="Model" text="Which Claude model writes the scenes. The default is whatever your plan recommends.">
         <select className="select" value={settings.claudeModel} onChange={(e) => void updateSettings({ claudeModel: e.target.value })} disabled={!claude?.loggedIn}>
-          {(models ?? [{ value: '', label: 'Zadano', description: '' }]).map((m) => (
+          {(models ?? [{ value: '', label: 'Default', description: '' }]).map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
             </option>
           ))}
         </select>
       </Row>
-      <p className="hint">Novi model vrijedi od sljedećeg razgovora (ikona ↺ u razgovoru).</p>
+      <p className="hint">A new model applies from the next conversation (the ↺ button in the chat).</p>
     </div>
   )
 }
 
 const PROVIDERS: { value: VoiceProvider; title: string; text: string; icon: ReactNode }[] = [
-  { value: 'system', title: 'Sistemski glas', text: 'Besplatno, bez interneta. Za skice i tempo (macOS: Lana).', icon: <Laptop /> },
-  { value: 'elevenlabs', title: 'ElevenLabs', text: 'Najprirodniji hrvatski glas. Plaća se po znaku.', icon: <AudioLines /> },
-  { value: 'omnivoice', title: 'OmniVoice', text: 'Lokalno i besplatno, klonira tvoj glas iz kratke snimke.', icon: <Cpu /> },
+  { value: 'system', title: 'System voice', text: 'Free and offline, in the project’s language. Good for drafts and pacing.', icon: <Laptop /> },
+  { value: 'elevenlabs', title: 'ElevenLabs', text: 'The most natural voices. Paid per character.', icon: <AudioLines /> },
+  { value: 'omnivoice', title: 'OmniVoice', text: 'Local and free, 600+ languages, clones your voice from a short clip.', icon: <Cpu /> },
 ]
 
 const EL_MODELS = [
-  { id: 'eleven_multilingual_v2', label: 'Multilingual v2 — stabilan, preporučeno' },
-  { id: 'eleven_v3', label: 'v3 — izražajniji' },
-  { id: 'eleven_flash_v2_5', label: 'Flash v2.5 — brz i jeftiniji' },
+  { id: 'eleven_multilingual_v2', label: 'Multilingual v2 (stable, recommended)' },
+  { id: 'eleven_v3', label: 'v3 (more expressive)' },
+  { id: 'eleven_flash_v2_5', label: 'Flash v2.5 (fast, cheaper)' },
   { id: 'eleven_turbo_v2_5', label: 'Turbo v2.5' },
 ]
+
+const LANGUAGES = ['en', 'en-GB', 'es', 'fr', 'de', 'it', 'pt', 'pt-BR', 'nl', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'hu', 'ro', 'sv', 'da', 'nb', 'fi', 'tr', 'el', 'uk', 'ru', 'ar', 'hi', 'ja', 'ko', 'zh']
+const languageName = new Intl.DisplayNames(['en'], { type: 'language' })
 
 function VoiceTab() {
   const project = useStore((s) => s.project)
   const settings = useStore((s) => s.settings)!
   const setup = useStore((s) => s.setup)
   const voice: VoiceSettings = project?.meta.voice ?? settings.defaultVoice
-  const [key, setKey] = useState('')
   const [elVoices, setElVoices] = useState<VoiceOption[] | null>(null)
   const [sysVoices, setSysVoices] = useState<VoiceOption[]>([])
 
@@ -152,7 +202,7 @@ function VoiceTab() {
 
   useEffect(() => {
     api.systemVoices().then(setSysVoices).catch(() => setSysVoices([]))
-  }, [])
+  }, [voice.language])
   useEffect(() => {
     if (voice.provider === 'elevenlabs' && settings.hasElevenLabsKey)
       api
@@ -164,9 +214,20 @@ function VoiceTab() {
         })
   }, [voice.provider, settings.hasElevenLabsKey])
 
+  const languages = LANGUAGES.includes(voice.language) ? LANGUAGES : [voice.language, ...LANGUAGES]
+
   return (
     <div className="set-group">
-      <div className="eyebrow">{project ? `Glas za „${project.meta.name}”` : 'Zadani glas za nove projekte'}</div>
+      <div className="eyebrow">{project ? `Voice for “${project.meta.name}”` : 'Default voice for new projects'}</div>
+      <Row title="Narration language" text="Claude writes the narration and on-screen text in it; voices and subtitles follow it.">
+        <select className="select" value={voice.language} onChange={(e) => save({ language: e.target.value, systemVoice: undefined })}>
+          {languages.map((code) => (
+            <option key={code} value={code}>
+              {languageName.of(code)}
+            </option>
+          ))}
+        </select>
+      </Row>
       <div className="provider-cards">
         {PROVIDERS.map((p) => (
           <button key={p.value} className={`provider-card ${voice.provider === p.value ? 'on' : ''}`} onClick={() => save({ provider: p.value })}>
@@ -178,9 +239,10 @@ function VoiceTab() {
       </div>
 
       {voice.provider === 'system' && (
-        <Row title="Glas" text={sysVoices.length ? 'Hrvatski glasovi su na vrhu.' : 'Na ovom sustavu nema popisa glasova; koristi se zadani.'}>
-          <select className="select" value={voice.systemVoice ?? 'Lana'} onChange={(e) => save({ systemVoice: e.target.value })}>
-            {(sysVoices.length ? sysVoices : [{ id: 'Lana', name: 'Lana' }]).map((v) => (
+        <Row title="Voice" text={sysVoices.length ? 'Voices for the narration language are listed first.' : 'This system has no voice list; the best match is picked automatically.'}>
+          <select className="select" value={voice.systemVoice ?? ''} onChange={(e) => save({ systemVoice: e.target.value || undefined })}>
+            <option value="">Automatic (best voice for the language)</option>
+            {sysVoices.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.name} {v.description ? `— ${v.description}` : ''}
               </option>
@@ -191,23 +253,17 @@ function VoiceTab() {
 
       {voice.provider === 'elevenlabs' && (
         <>
-          <Row title="API ključ" text={settings.hasElevenLabsKey ? 'Spremljen i šifriran na ovom računalu.' : 'elevenlabs.io → Profile → API keys'}>
-            <div className="inline-form">
-              <input className="input" type="password" placeholder={settings.hasElevenLabsKey ? '••••••••••' : 'sk_…'} value={key} onChange={(e) => setKey(e.target.value)} />
-              <button
-                className="btn"
-                disabled={!key.trim()}
-                onClick={async () => {
-                  useStore.setState({ settings: await api.setElevenLabsKey(key) })
-                  setKey('')
-                  toast('Ključ spremljen', 'ok')
-                }}
-              >
-                <KeyRound /> Spremi
-              </button>
-            </div>
+          <Row title="API key" text={settings.hasElevenLabsKey ? 'Saved and encrypted on this computer.' : 'elevenlabs.io → Profile → API keys'}>
+            <KeyField
+              saved={settings.hasElevenLabsKey}
+              placeholder="sk_…"
+              onSave={async (key) => {
+                useStore.setState({ settings: await api.setElevenLabsKey(key) })
+                toast('Key saved', 'ok')
+              }}
+            />
           </Row>
-          <Row title="Glas" text="Glasovi iz tvoje ElevenLabs knjižnice.">
+          <Row title="Voice" text="Voices from your ElevenLabs library.">
             <select
               className="select"
               value={voice.elevenlabs?.voiceId ?? ''}
@@ -217,7 +273,7 @@ function VoiceTab() {
                 save({ elevenlabs: { modelId: voice.elevenlabs?.modelId ?? EL_MODELS[0].id, voiceId: e.target.value, voiceName: v?.name } })
               }}
             >
-              <option value="">{elVoices ? 'Odaberi glas' : settings.hasElevenLabsKey ? 'Učitavam…' : 'Najprije spremi ključ'}</option>
+              <option value="">{elVoices ? 'Choose a voice' : settings.hasElevenLabsKey ? 'Loading…' : 'Save a key first'}</option>
               {elVoices?.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name} {v.description ? `— ${v.description}` : ''}
@@ -243,37 +299,44 @@ function VoiceTab() {
 
       {voice.provider === 'omnivoice' && (
         <>
-          <Row title="OmniVoice model" text="Oko 3,3 GB modela + PyTorch, preuzima se jednom. Na Apple Siliconu koristi GPU.">
+          <Row title="OmniVoice model" text="About 3.3 GB of weights plus PyTorch, downloaded once. Uses the GPU on Apple Silicon and NVIDIA.">
             <InstallButton component="omnivoice" state={setup?.omnivoice ?? 'missing'} />
           </Row>
-          {project ? <ReferenceRecorder /> : <p className="hint">Referentnu snimku glasa postavljaš unutar projekta.</p>}
+          {project ? <ReferenceRecorder /> : <p className="hint">The reference recording of your voice is set inside a project.</p>}
         </>
       )}
 
       <div className="set-divider" />
-      <Row title="Precizni bookmarki za snimke" text="Whisper (faster-whisper) pronađe gdje si izgovorio koju riječ. Oko 500 MB.">
+      <Row title="Exact bookmarks for recordings" text="Whisper (faster-whisper) finds where you said each word. About 500 MB.">
         <InstallButton component="transcribe" state={setup?.transcribe ?? 'missing'} />
       </Row>
     </div>
   )
 }
 
-const REFERENCE_TEXT = 'Funkcija pridružuje svakom elementu domene točno jedan element kodomene, a graf funkcije crtamo u koordinatnom sustavu.'
+// A few seconds of natural speech in the project's language makes the best clone.
+const REFERENCE_TEXT: Record<string, string> = {
+  en: 'A function assigns exactly one value to every input, and we draw its graph in a coordinate system.',
+  hr: 'Funkcija pridružuje svakom elementu domene točno jedan element kodomene, a graf funkcije crtamo u koordinatnom sustavu.',
+  de: 'Eine Funktion ordnet jedem Eingabewert genau einen Wert zu, und ihren Graphen zeichnen wir in ein Koordinatensystem.',
+  es: 'Una función asigna exactamente un valor a cada entrada, y dibujamos su gráfica en un sistema de coordenadas.',
+}
 
 function ReferenceRecorder() {
   const project = useStore((s) => s.project)!
   const rec = useRecorder()
   const has = !!project.meta.voice.omnivoice?.refAudio
+  const text = REFERENCE_TEXT[project.meta.voice.language.split('-')[0]] ?? REFERENCE_TEXT.en
   const toggle = async () => {
     try {
       if (rec.state === 'idle') await rec.start()
       else {
         const buffer = await rec.stop()
         if (!buffer) return
-        if (buffer.duration < 3) return toast('Snimka je prekratka — pročitaj cijelu rečenicu.', 'error')
-        const meta = await api.saveVoiceReference(encodeWav(buffer), REFERENCE_TEXT)
+        if (buffer.duration < 3) return toast('That was too short. Read the whole sentence.', 'error')
+        const meta = await api.saveVoiceReference(encodeWav(buffer), text)
         useStore.setState((s) => ({ project: s.project ? { ...s.project, meta } : null }))
-        toast('Referentni glas spremljen', 'ok')
+        toast('Reference voice saved', 'ok')
       }
     } catch (e) {
       toast(errorText(e), 'error')
@@ -281,22 +344,22 @@ function ReferenceRecorder() {
   }
   return (
     <div className="reference">
-      <div className="set-row-title">Tvoj glas za kloniranje {has && <span className="badge mint">spremljeno</span>}</div>
-      <p className="hint">Pročitaj prirodno, 5–10 sekundi:</p>
-      <blockquote>{REFERENCE_TEXT}</blockquote>
+      <div className="set-row-title">Your voice, for cloning {has && <span className="badge mint">saved</span>}</div>
+      <p className="hint">Read this naturally, 5–10 seconds:</p>
+      <blockquote>{text}</blockquote>
       <button className={`btn ${rec.state !== 'idle' ? 'danger' : ''}`} onClick={() => void toggle()}>
         {rec.state === 'idle' ? <Circle /> : <Square />}
-        {rec.state === 'countdown' ? `Kreće za ${rec.count}…` : rec.state === 'recording' ? `Zaustavi (${rec.elapsed.toFixed(1)} s)` : has ? 'Snimi ponovno' : 'Snimi'}
+        {rec.state === 'countdown' ? `Starting in ${rec.count}…` : rec.state === 'recording' ? `Stop (${rec.elapsed.toFixed(1)} s)` : has ? 'Record again' : 'Record'}
       </button>
     </div>
   )
 }
 
 const COMPONENTS: { id: Component; title: string; text: string }[] = [
-  { id: 'env', title: 'Manim okruženje', text: 'Python 3.12, manim 0.21, manim-voiceover, cairo/pango (pixi, conda-forge).' },
-  { id: 'latex', title: 'LaTeX (TinyTeX)', text: 'Za MathTex i Tex. Bez njega rade samo Text i oblici.' },
-  { id: 'omnivoice', title: 'OmniVoice', text: 'Lokalni hrvatski TTS s kloniranjem glasa.' },
-  { id: 'transcribe', title: 'Whisper', text: 'Vremena riječi u ljudskim snimkama.' },
+  { id: 'env', title: 'Manim environment', text: 'Python 3.12, manim 0.21, manim-voiceover, cairo/pango (pixi, conda-forge).' },
+  { id: 'latex', title: 'LaTeX (TinyTeX)', text: 'For MathTex and Tex. Without it, only Text and shapes work.' },
+  { id: 'omnivoice', title: 'OmniVoice', text: 'Local multilingual speech with voice cloning.' },
+  { id: 'transcribe', title: 'Whisper', text: 'Word timings for human recordings.' },
 ]
 
 function EnvTab() {
@@ -316,14 +379,14 @@ function EnvTab() {
           {setup[c.id] === 'installing' && <ProgressLine value={progress[c.id]} />}
           {!!log[c.id]?.length && (
             <button className="link-btn" onClick={() => setOpenLog(openLog === c.id ? null : c.id)}>
-              {openLog === c.id ? 'Sakrij zapis' : 'Prikaži zapis'}
+              {openLog === c.id ? 'Hide log' : 'Show log'}
             </button>
           )}
           {openLog === c.id && <pre className="env-log mono">{log[c.id]?.join('\n')}</pre>}
         </div>
       ))}
       <div className="set-divider" />
-      <Row title="Renderiraj pri spremanju" text="Svako spremanje (⌘S) pokreće pregled. Isključi za vrlo spore scene.">
+      <Row title="Render on save" text="Every save (⌘S) renders a preview. Turn it off for very slow scenes.">
         <label className="switch">
           <input type="checkbox" checked={settings.autoRender} onChange={(e) => void updateSettings({ autoRender: e.target.checked })} />
           <span />
@@ -334,22 +397,22 @@ function EnvTab() {
 }
 
 const STATE_TEXT: Record<ComponentState, string> = {
-  missing: 'Instaliraj',
-  installing: 'Instaliram…',
-  ready: 'Spremno',
-  outdated: 'Ažuriraj',
-  unsupported: 'Nije podržano',
-  error: 'Pokušaj ponovno',
+  missing: 'Install',
+  installing: 'Installing…',
+  ready: 'Ready',
+  outdated: 'Update',
+  unsupported: 'Not supported',
+  error: 'Try again',
 }
 
 function InstallButton({ component, state }: { component: Component; state: ComponentState }) {
   if (state === 'ready')
     return (
       <span className="badge mint">
-        <Check /> Spremno
+        <Check /> Ready
       </span>
     )
-  if (state === 'unsupported') return <span className="badge">Nije podržano na ovom računalu</span>
+  if (state === 'unsupported') return <span className="badge">Not supported on this computer</span>
   return (
     <button className="btn small" disabled={state === 'installing'} onClick={() => void installComponent(component)}>
       {state === 'installing' && <span className="spinner" />} {STATE_TEXT[state]}
@@ -363,37 +426,37 @@ function AboutTab() {
   const settings = useStore((s) => s.settings)!
   const status =
     update.state === 'checking'
-      ? 'Provjeravam…'
+      ? 'Checking…'
       : update.state === 'none'
-        ? 'Imaš najnoviju verziju.'
+        ? 'You have the latest version.'
         : update.state === 'available'
-          ? `Dostupna je verzija ${update.version}.`
+          ? `Version ${update.version} is available.`
           : update.state === 'downloading'
-            ? `Preuzimam ${Math.round(update.percent)}%`
+            ? `Downloading ${Math.round(update.percent)}%`
             : update.state === 'ready'
-              ? `Verzija ${update.version} je spremna — ponovno pokreni.`
+              ? `Version ${update.version} is ready. Restart to finish.`
               : update.state === 'error'
                 ? update.message
                 : ''
   return (
     <div className="set-group">
-      <Row title={`Manim Studio ${app.version}`} text={`${app.platform} · ${app.arch}`}>
+      <Row title={`Manim Studio ${app.version}`} text={`${app.platform} · ${app.arch} · open source (MIT)`}>
         <button className="btn small" onClick={() => void api.checkForUpdates()}>
-          Provjeri ažuriranja
+          Check for updates
         </button>
       </Row>
       {status && <p className="hint">{status}</p>}
       {update.state === 'available' && (
         <button className="btn primary small" onClick={() => void api.downloadUpdate()}>
-          Preuzmi {update.version}
+          Download {update.version}
         </button>
       )}
       {update.state === 'ready' && (
         <button className="btn primary small" onClick={() => void api.installUpdate()}>
-          Ponovno pokreni i ažuriraj
+          Restart and update
         </button>
       )}
-      <Row title="Mapa projekata" text={<span className="mono">{settings.projectsDir}</span>}>
+      <Row title="Projects folder" text={<span className="mono">{settings.projectsDir}</span>}>
         <button
           className="btn small"
           onClick={async () => {
@@ -401,16 +464,16 @@ function AboutTab() {
             if (dir) void updateSettings({ projectsDir: dir })
           }}
         >
-          Promijeni
+          Change
         </button>
       </Row>
-      <Row title="Sva izdanja" text="Ako automatsko ažuriranje ne uspije, nova verzija se može preuzeti ručno.">
+      <Row title="Releases" text="If an automatic update fails, download the new version from the releases page.">
         <button className="btn small ghost" onClick={() => void api.openExternal(app.releasesUrl)}>
-          Otvori
+          Open
         </button>
       </Row>
       <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'env' })}>
-        Okruženje →
+        Environment →
       </button>
     </div>
   )

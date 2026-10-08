@@ -5,6 +5,7 @@ import { cp } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { ChatMessage, NewProjectInput, OpenProject, ProjectMeta, ProjectSummary, Timeline } from '../shared/types'
 import { initRepo } from './git'
+import { slugify } from './slug'
 import { paths } from './paths'
 import { getSettings, rememberProject, setSettings } from './settings'
 
@@ -20,7 +21,7 @@ let onExternalChange: (source: string) => void = () => {}
 
 export const project = () => current
 export const requireProject = (): Current => {
-  if (!current) throw new Error('Nijedan projekt nije otvoren')
+  if (!current) throw new Error('No project is open')
   return current
 }
 
@@ -80,19 +81,7 @@ export function listProjects(): ProjectSummary[] {
   return out.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
-export function slugify(name: string): string {
-  const map: Record<string, string> = { č: 'c', ć: 'c', š: 's', ž: 'z', đ: 'd', Č: 'c', Ć: 'c', Š: 's', Ž: 'z', Đ: 'd' }
-  return (
-    name
-      .replace(/[čćšžđČĆŠŽĐ]/g, (c) => map[c])
-      .normalize('NFKD')
-      .replace(/[^\w\s-]/g, '')
-      .trim()
-      .toLowerCase()
-      .replace(/[\s_-]+/g, '-')
-      .slice(0, 60) || 'projekt'
-  )
-}
+export { slugify }
 
 export async function createProject(input: NewProjectInput): Promise<string> {
   const parent = input.parentDir || getSettings().projectsDir
@@ -104,12 +93,12 @@ export async function createProject(input: NewProjectInput): Promise<string> {
   // electron-builder leaves out files named .gitignore, so the template ships it as "gitignore".
   if (existsSync(join(dir, 'gitignore'))) renameSync(join(dir, 'gitignore'), join(dir, '.gitignore'))
   const meta: ProjectMeta = {
-    name: input.name.trim() || 'Novi video',
+    name: input.name.trim() || 'Untitled video',
     aspect: input.aspect,
     theme: input.theme,
     fps: 30,
     createdAt: new Date().toISOString(),
-    voice: { ...getSettings().defaultVoice },
+    voice: { ...getSettings().defaultVoice, language: input.language || getSettings().defaultVoice.language },
   }
   writeFileSync(metaFile(dir), JSON.stringify(meta, null, 2))
   mkdirSync(join(dir, 'voice', 'recordings'), { recursive: true })

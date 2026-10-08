@@ -3,11 +3,11 @@
 Every new project gets `templates/project/CLAUDE.md`, the rules Claude follows inside a video project. In short:
 
 - **One class.** `scene.py` has one `class Video(StudioScene)`. Start with `from manim import *` and `from studio import *`.
-- **Sections.** `self.next_section("Naziv")` per part. Sections become the chapter lane of the timeline.
+- **Sections.** `self.next_section("Name")` per part. Sections become the chapter lane of the timeline.
 - **Narration.**
   - Every spoken sentence goes in a `with self.voiceover("…") as v:` block, with its animations inside the block.
-  - Maths is spelled out the way a teacher says it ("x na kvadrat"), because TTS reads symbols badly.
-- **Text.** Croatian prose uses `Text`/`MarkupText`, which defaults to the bundled Nunito, the maturita display face. Formulas use `MathTex`. Croatian sentences never go inside `Tex`.
+  - Narration is in the project's language. Maths is spelled out the way a teacher says it ("x squared"), because TTS reads symbols badly.
+- **Text.** Prose uses `Text`/`MarkupText`, which defaults to the bundled Nunito. Formulas use `MathTex`. Sentences never go inside `Tex`, so any script renders without LaTeX language packages.
 - **Colours.** Only the semantic palette from `studio.brand` (`TEXT`, `MUTED`, `ACCENT`, `HIGHLIGHT`, `POSITIVE`, `NEGATIVE`), which follows the project's light or dark theme.
 - **Layout.**
   - Stay inside `SAFE_W × SAFE_H`; `fit(mobject)` scales anything down into it.

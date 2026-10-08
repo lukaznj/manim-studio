@@ -37,15 +37,15 @@ export function Home() {
       <div className="home-inner">
         <header className="home-head">
           <div>
-            <h1>Projekti</h1>
-            <p className="muted">Svaki projekt je jedan video: scena u kodu, glas i titlovi.</p>
+            <h1>Projects</h1>
+            <p className="muted">Each project is one video: a scene in code, its voice and its subtitles.</p>
           </div>
           <div className="home-actions">
             <button className="btn ghost" onClick={() => void openFolder()}>
-              <FolderOpen /> Otvori mapu…
+              <FolderOpen /> Open folder…
             </button>
             <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
-              <Plus /> Novi projekt
+              <Plus /> New project
             </button>
           </div>
         </header>
@@ -84,7 +84,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
         <div className="project-name">{p.name}</div>
         <div className="project-sub">
           {p.missing ? (
-            <span className="badge coral">Mapa ne postoji</span>
+            <span className="badge coral">Folder not found</span>
           ) : (
             <>
               <span className="badge">{p.aspect}</span>
@@ -99,7 +99,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
           e.stopPropagation()
           setMenu((m) => !m)
         }}
-        aria-label="Više"
+        aria-label="More"
       >
         <MoreHorizontal />
       </button>
@@ -107,7 +107,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
         <div className="menu" onMouseLeave={() => setMenu(false)} onClick={(e) => e.stopPropagation()}>
           {!p.missing && (
             <button onClick={() => void api.reveal(p.path)}>
-              <FolderOpen /> Prikaži u mapi
+              <FolderOpen /> Show in folder
             </button>
           )}
           <button
@@ -116,7 +116,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
               void refreshProjects()
             }}
           >
-            <Trash2 /> Makni s popisa
+            <Trash2 /> Remove from list
           </button>
         </div>
       )}
@@ -130,25 +130,25 @@ function EmptyState() {
       <svg viewBox="0 0 200 120" className="empty-art" aria-hidden>
         <line x1="10" y1="100" x2="190" y2="100" stroke="var(--line-strong)" strokeWidth="1.5" />
         <line x1="100" y1="10" x2="100" y2="110" stroke="var(--line-strong)" strokeWidth="1.5" />
-        <path d="M40 18 C 70 150, 130 150, 160 18" fill="none" stroke="var(--sun)" strokeWidth="3" strokeLinecap="round" className="draw" />
-        <circle cx="100" cy="99" r="5" fill="var(--blue)" className="pop" />
+        <path d="M54 22 Q93.1 154.6 132.2 61.8" fill="none" stroke="var(--sun)" strokeWidth="3" strokeLinecap="round" className="draw" />
+        <circle cx="132.2" cy="61.8" r="6" fill="var(--blue)" className="pop" />
       </svg>
-      <h2>Prvi video počinje praznom scenom</h2>
-      <p className="muted">Odaberi format, a Claude ti pomaže napisati animaciju, naraciju i titlove.</p>
+      <h2>Every video starts with an empty scene</h2>
+      <p className="muted">Pick a format, describe what to show, and Claude writes the animation, the narration and the subtitles with you.</p>
       <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
-        <Plus /> Novi projekt
+        <Plus /> New project
       </button>
     </div>
   )
 }
 
 const STATE_LABEL: Record<ComponentState, string> = {
-  missing: 'Nije instalirano',
-  installing: 'Instaliram…',
-  ready: 'Spremno',
-  outdated: 'Treba ažurirati',
-  unsupported: 'Nije podržano',
-  error: 'Greška',
+  missing: 'Not installed',
+  installing: 'Installing…',
+  ready: 'Ready',
+  outdated: 'Needs an update',
+  unsupported: 'Not supported',
+  error: 'Failed',
 }
 
 function SetupPanel() {
@@ -174,16 +174,16 @@ function SetupPanel() {
     {
       id: 'env' as const,
       icon: <Terminal />,
-      title: 'Manim okruženje',
-      text: 'Python, manim i glas. Instalira se u mapu aplikacije, oko 750 MB.',
+      title: 'Manim environment',
+      text: 'Python, manim and voice tools, installed into the app’s own folder. About 750 MB.',
       state: setup.env,
       action: () => void installComponent('env'),
     },
     {
       id: 'latex' as const,
       icon: <Sigma />,
-      title: 'LaTeX za formule',
-      text: 'Potreban za MathTex. TinyTeX s paketima za manim, oko 250 MB.',
+      title: 'LaTeX for formulas',
+      text: 'Needed for MathTex: TinyTeX with the packages manim uses. About 250 MB.',
       state: setup.latex,
       action: () => void installComponent('latex'),
     },
@@ -192,8 +192,8 @@ function SetupPanel() {
   return (
     <section className="setup">
       <div className="setup-head">
-        <span className="eyebrow">Prvo pokretanje</span>
-        <h2>Pripremi računalo za renderiranje</h2>
+        <span className="eyebrow">First run</span>
+        <h2>Set up this computer for rendering</h2>
       </div>
       <ol className="setup-steps">
         {steps.map((s) => (
@@ -208,7 +208,7 @@ function SetupPanel() {
             </div>
             {s.state !== 'ready' && s.state !== 'installing' && (
               <button className="btn" onClick={s.action}>
-                {s.state === 'outdated' ? 'Ažuriraj' : s.state === 'error' ? 'Pokušaj ponovno' : 'Instaliraj'}
+                {s.state === 'outdated' ? 'Update' : s.state === 'error' ? 'Try again' : 'Install'}
               </button>
             )}
           </li>
@@ -217,17 +217,17 @@ function SetupPanel() {
           <span className="step-icon">{claude?.loggedIn ? <Check /> : <Sparkles />}</span>
           <div className="step-body">
             <div className="step-title">
-              Claude račun <span className="faint">· {claude?.loggedIn ? claude.email ?? 'Prijavljen' : 'Nisi prijavljen'}</span>
+              Claude <span className="faint">· {claude?.loggedIn ? claude.email ?? claude.subscription ?? 'Signed in' : 'Not signed in'}</span>
             </div>
             <div className="hint">
               {loggingIn
-                ? 'Dovrši prijavu u pregledniku koji se otvorio.'
-                : 'Prijava ide kroz Anthropicov preglednički postupak; potrošnja ide na tvoj Claude plan.'}
+                ? 'Finish signing in in the browser window that opened.'
+                : 'Studio runs Claude Code with your own Claude account. Sign-in happens in your browser; usage counts against your plan.'}
             </div>
           </div>
           {!claude?.loggedIn && (
             <button className="btn" disabled={loggingIn} onClick={() => void login()}>
-              {loggingIn ? <span className="spinner" /> : null} Prijavi se
+              {loggingIn ? <span className="spinner" /> : null} Sign in
             </button>
           )}
         </li>
