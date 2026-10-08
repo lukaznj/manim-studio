@@ -15,8 +15,6 @@ git push --follow-tags     # .github/workflows/release.yml takes it from here
 
 Installed apps notice within 4 hours, or on their next start. Users click the update pill, and the update installs on restart. If the release changed `python/pixi.toml` or `pixi.lock`, the app re-syncs its Python environment on the next start.
 
-Before the first public release, settle the open sign-in question in [[../04-decisions/0004-claude-via-agent-sdk|ADR 0004]].
-
 ## Signing (optional)
 
 Nothing is required: CI publishes with the workflow's own `GITHUB_TOKEN`. Without the secrets below:

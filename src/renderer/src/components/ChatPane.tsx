@@ -1,8 +1,8 @@
-import { ArrowUp, Camera, Check, CircleAlert, Film, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
+import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ChatMessage, ChatPart } from '../../../shared/types'
+import type { ChatMessage, ChatPart, Effort, ModelOption } from '../../../shared/types'
 import { api } from '../lib/api'
-import { openDialog, refreshClaude, selectClips, sendChat, toast, errorText, useStore } from '../store'
+import { openDialog, refreshClaude, selectClips, sendChat, toast, errorText, updateSettings, useStore } from '../store'
 
 const SUGGESTIONS = [
   'Make an intro: a title, a short preview of the topic, and narration.',
@@ -31,9 +31,9 @@ export function ChatPane() {
         </div>
         <div className="pane-actions">
           {claude?.loggedIn && (
-            <span className="faint account-chip" title={claude.email}>
+            <button className="faint account-chip" title="Account settings" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
               {claude.subscription ? `${claude.subscription}` : claude.email}
-            </span>
+            </button>
           )}
           <button
             className="icon-btn"
@@ -278,9 +278,7 @@ function Composer() {
           }}
         />
         <div className="composer-foot">
-          <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
-            Model and account
-          </button>
+          <ModelControls />
           {busy ? (
             <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title="Stop">
               <Square />
@@ -292,6 +290,58 @@ function Composer() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+const EFFORTS: Record<Effort, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' }
+
+/** Which model Claude runs and how hard it thinks. A change applies to the current conversation. */
+export function ModelControls() {
+  const settings = useStore((s) => s.settings)
+  const models = useStore((s) => s.models)
+  if (!settings) return null
+  const { claudeModel, claudeEffort } = settings
+  const list: ModelOption[] = models.length ? [...models] : [{ value: '', label: 'Default model', description: '', efforts: [] }]
+  // A model picked under another account still shows, so the picker never claims the wrong one.
+  if (!list.some((m) => m.value === claudeModel)) list.push({ value: claudeModel, label: claudeModel, description: '', efforts: [] })
+  const current = list.find((m) => m.value === claudeModel)!
+  const efforts = claudeEffort && !current.efforts.includes(claudeEffort) ? [...current.efforts, claudeEffort] : current.efforts
+
+  const pickModel = (value: string) => {
+    const offered = list.find((m) => m.value === value)?.efforts ?? []
+    // Claude Code would quietly lower an effort the new model doesn't offer; use its default instead.
+    void updateSettings({ claudeModel: value, ...(claudeEffort && !offered.includes(claudeEffort) ? { claudeEffort: '' as const } : {}) })
+  }
+
+  return (
+    <div className="model-controls">
+      <label className="chip-select" title={current.description || 'Model'}>
+        <Sparkles />
+        <select aria-label="Model" value={claudeModel} onChange={(e) => pickModel(e.target.value)}>
+          {list.map((m) => (
+            <option key={m.value} value={m.value} title={m.description}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="chev" />
+      </label>
+      <label
+        className="chip-select"
+        title={efforts.length ? 'How much Claude thinks before acting. Higher is slower and uses more of your plan.' : 'This model has no effort setting'}
+      >
+        <Gauge />
+        <select aria-label="Effort" value={claudeEffort} disabled={!efforts.length} onChange={(e) => void updateSettings({ claudeEffort: e.target.value as Effort | '' })}>
+          <option value="">Default effort</option>
+          {efforts.map((e) => (
+            <option key={e} value={e}>
+              {EFFORTS[e]} effort
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="chev" />
+      </label>
     </div>
   )
 }

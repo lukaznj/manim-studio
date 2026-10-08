@@ -5,9 +5,11 @@ import type { Settings } from '../shared/types'
 import { paths } from './paths'
 
 const defaults = (): Settings => ({
+  appearance: 'system',
   projectsDir: paths.defaultProjectsDir(),
   recentProjects: [],
   claudeModel: '',
+  claudeEffort: '',
   autoRender: true,
   hasElevenLabsKey: false,
   hasAnthropicKey: false,

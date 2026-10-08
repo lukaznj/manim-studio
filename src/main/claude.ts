@@ -180,6 +180,14 @@ export async function chatInterrupt(): Promise<void> {
   await session?.query.interrupt().catch(() => undefined)
 }
 
+/** Model and effort also apply to the running conversation, so switching keeps its context. */
+export async function applyChatSettings(): Promise<void> {
+  const { claudeModel, claudeEffort } = getSettings()
+  // A session that already ended picks the settings up when the next one starts.
+  await session?.query.setModel(claudeModel || undefined).catch(() => undefined)
+  await session?.query.applyFlagSettings({ effortLevel: claudeEffort || null }).catch(() => undefined)
+}
+
 export async function chatReset(): Promise<void> {
   closeChat()
   messages = []
@@ -190,17 +198,20 @@ export async function chatReset(): Promise<void> {
   emit({ type: 'reset' })
 }
 
-let models: ModelOption[] | null = null
-
+/** What this account can use. Not cached: it changes with the sign-in or API key (the renderer asks once per account). */
 export async function chatModels(): Promise<ModelOption[]> {
-  if (models) return models
   const { query } = await sdk()
   const inbox = new Inbox()
   const q = query({ prompt: inbox, options: { env: claudeEnv(), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
   try {
     const list = await q.supportedModels()
-    models = list.map((m) => ({ value: m.value === 'default' ? '' : m.value, label: m.displayName, description: m.description }))
-    return models
+    return list.map((m) => ({
+      value: m.value === 'default' ? '' : m.value,
+      // "Default (recommended)" says less than which model it is: "Opus 5.5 · Best for…" → "Default (Opus 5.5)".
+      label: m.value === 'default' && m.description.includes(' · ') ? `Default (${m.description.split(' · ')[0]})` : m.displayName,
+      description: m.description,
+      efforts: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [],
+    }))
   } finally {
     inbox.close()
     q.close()
@@ -273,6 +284,7 @@ async function startSession(dir: string): Promise<void> {
     env: claudeEnv(),
     pathToClaudeCodeExecutable: paths.claude(),
     model: getSettings().claudeModel || undefined,
+    effort: getSettings().claudeEffort || undefined,
     resume: resumable ? meta.claudeSessionId : undefined,
     includePartialMessages: true,
     settingSources: ['project'],

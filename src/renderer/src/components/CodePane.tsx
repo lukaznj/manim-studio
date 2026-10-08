@@ -3,6 +3,7 @@ import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
 import { FileCode2, Play, Save, Sparkles } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { editorBridge } from '../lib/editor-bridge'
+import { isDark, onThemeChange } from '../lib/theme'
 import { markEdited, resolveConflict, saveScene, useStore } from '../store'
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() }
@@ -52,6 +53,54 @@ monaco.editor.defineTheme('studio', {
   },
 })
 
+// The same roles on paper: durations stay amber because the timeline edits them.
+monaco.editor.defineTheme('studio-light', {
+  base: 'vs',
+  inherit: true,
+  rules: [
+    { token: '', foreground: '0d1a2b' },
+    { token: 'comment', foreground: '7a879b', fontStyle: 'italic' },
+    { token: 'keyword', foreground: 'c2412d' },
+    { token: 'string', foreground: '1f7a43' },
+    { token: 'number', foreground: '9a6400' },
+    { token: 'type.identifier', foreground: '2f5fd0' },
+    { token: 'identifier', foreground: '1d2b3e' },
+    { token: 'delimiter', foreground: '5b6b82' },
+    { token: 'tag', foreground: '2f5fd0' },
+  ],
+  colors: {
+    'editor.background': '#f6f8fb',
+    'editor.foreground': '#0d1a2b',
+    'editor.lineHighlightBackground': '#e7ecf3aa',
+    'editor.lineHighlightBorder': '#00000000',
+    'editorLineNumber.foreground': '#a6b1c1',
+    'editorLineNumber.activeForeground': '#46566c',
+    'editor.selectionBackground': '#2f6df630',
+    'editor.inactiveSelectionBackground': '#2f6df618',
+    'editorCursor.foreground': '#c78a00',
+    'editorIndentGuide.background1': '#e1e6ee',
+    'editorIndentGuide.activeBackground1': '#c3ccd9',
+    'editorWhitespace.foreground': '#d8dee8',
+    'editorWidget.background': '#ffffff',
+    'editorWidget.border': '#c3ccd9',
+    'editorHoverWidget.background': '#ffffff',
+    'editorHoverWidget.border': '#c3ccd9',
+    'editorSuggestWidget.background': '#ffffff',
+    'editorSuggestWidget.selectedBackground': '#ebeff5',
+    'editorGutter.background': '#f6f8fb',
+    'editorError.foreground': '#dc4a33',
+    'editorWarning.foreground': '#c78a00',
+    'scrollbarSlider.background': '#c3ccd988',
+    'scrollbarSlider.hoverBackground': '#a6b1c1',
+    'editorBracketMatch.background': '#2f6df618',
+    'editorBracketMatch.border': '#2f6df666',
+    'minimap.background': '#f6f8fb',
+  },
+})
+
+const editorTheme = (dark: boolean) => (dark ? 'studio' : 'studio-light')
+onThemeChange((dark) => monaco.editor.setTheme(editorTheme(dark)))
+
 export function CodePane() {
   const host = useRef<HTMLDivElement>(null)
   const savedSource = useStore((s) => s.savedSource)
@@ -65,7 +114,7 @@ export function CodePane() {
     const model = monaco.editor.createModel(useStore.getState().savedSource, 'python')
     const editor = monaco.editor.create(host.current, {
       model,
-      theme: 'studio',
+      theme: editorTheme(isDark()),
       fontFamily: "'JetBrains Mono Variable', ui-monospace, Menlo, monospace",
       fontSize: 13,
       lineHeight: 21,

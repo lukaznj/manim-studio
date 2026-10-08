@@ -16,7 +16,9 @@ The first users (Maturita's admins) had their own Claude plans (not Max), with n
 - **Allowed:** "an end user signing in to the unmodified Claude Code binary with their own Claude subscription". The same page says a product may run Claude Code as long as the binary is unmodified and each end user authenticates with their own API key or plan credentials.
 - **But:** the Agent SDK overview also says that, unless previously approved, third-party developers may not offer claude.ai login or rate limits for their products, "including agents built on the Claude Agent SDK".
 
-The first two points fit this app: the binary is unmodified, the flow is Anthropic's own, and the app never touches credentials. The third reads against it, and it matters more now that anyone can download the app.
+The first two points fit this app: the binary is unmodified, the flow is Anthropic's own, and the app never touches credentials. The third reads against it.
+
+**Resolved (2026-10-08, by the maintainer):** plan sign-in stays, in public releases too. The app doesn't offer a login of its own: "Sign in" runs Anthropic's flow inside the unmodified Claude Code binary, and each user's usage goes on their own subscription, which the legal page explicitly allows. Anthropic hasn't been asked or given approval; this is the maintainer's reading of the terms.
 
 ## Decision
 
@@ -34,15 +36,18 @@ The first two points fit this app: the binary is unmodified, the flow is Anthrop
   - `canUseTool` allows writes only inside the project, and reads only inside the project, the Studio Python package and the manim sources (so Claude reads the API instead of guessing it).
 - **Session per project.** The session id is saved in `project.json` and resumed when the session file exists on this machine.
 - **Commits.** Renders don't commit while Claude works; the turn commits once at the end as "Claude: …".
-- **Model.** The default is the account's own default. Settings lists whatever `supportedModels()` offers that plan.
+- **Model and effort.** Two pickers under the chat box (and in Settings → Claude) list what `supportedModels()` offers the current account, with each model's effort levels.
+  - Empty means the account's default model, or the model's default effort.
+  - A change applies to the running session (`setModel`, `applyFlagSettings({ effortLevel })`), so switching keeps the conversation. Verified: the next turn ran on the new model and effort, in the same session.
+  - Picking a model that doesn't offer the chosen effort resets effort to the model's default. Otherwise Claude Code would lower it silently while the picker showed the old value.
+  - The list is fetched again whenever the sign-in or API key changes.
+  - Settings are global, not per project.
 
 ## Consequences
 
 - No keys to distribute, and each person's usage stays on their own plan.
+- Which model and effort make the best videos for the usage they cost is still open. See the model comparison in the [[../01-product/roadmap|roadmap]].
 - If Anthropic changes these terms, this ADR is where to start. The API key path already works and needs no change.
-- **Open question before public releases:** is the in-app "Sign in" button allowed for a publicly distributed app? There are three ways to settle it:
-  - ask Anthropic (the terms page points to sales for exactly this)
-  - make the API key the default and leave plan sign-in to users who already ran `claude auth login` themselves
-  - drop plan sign-in from public builds
-- Whatever the answer, the app has no servers, no shared account and no credentials of its own. Forks must keep it that way.
+- If Anthropic objects to plan sign-in in a third-party app, the fallbacks are ready: make the API key the default, or drop the in-app "Sign in" and leave plan use to people who ran `claude auth login` themselves.
+- The app has no servers, no shared account and no credentials of its own. Forks must keep it that way, or the reading above no longer holds.
 - **Verified** with a Pro plan sign-in: Claude edited `scene.py`, rendered, read the timeline, looked at frames, the turn was committed as "Claude: …", and the session resumed after a restart.

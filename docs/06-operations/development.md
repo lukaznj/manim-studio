@@ -46,6 +46,7 @@ The commands are `launch`, `ss`, `click`, `click-text`, `mouse`, `drag <sel> <dx
 Things that bit during development:
 
 - Scope selectors to `dialog[open]`. Closed dialogs stay in the DOM.
+- The driver leaves `prefers-color-scheme` to the app (Playwright would pin it to light). Switch themes with `eval window.studio.setSettings({appearance:'light'})`.
 - Monaco has no `Cmd+End`; click a line and type.
 - Screenshots for the docs go in `docs/05-design/screenshots/`, resized with `sips -Z 1600`. Never commit one that shows an account (Settings → Claude shows the e-mail).
 

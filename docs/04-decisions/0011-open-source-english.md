@@ -24,5 +24,5 @@ Manim Studio was built for Maturita's admins: Croatian UI, Croatian narration, a
 
 - Croatian is now one language among many, not the default. Croatian-specific choices that cost nothing stay: the Croatian hyphenation packages in TinyTeX, and Lana as the preferred macOS voice for `hr`.
 - Releases come from the same public repo ([[0006-auto-update-github-releases]]).
-- Plan sign-in in a publicly distributed app has an open question ([[0004-claude-via-agent-sdk]]).
+- Plan sign-in stays in public releases ([[0004-claude-via-agent-sdk]] explains why).
 - Docs written before this ADR can mention admins and Maturita as history. Product docs speak to anyone.
