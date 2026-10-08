@@ -20,14 +20,14 @@ export function TitleBar() {
       <div className="titlebar-left">
         {screen === 'editor' && project ? (
           <>
-            <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Natrag na projekte" title="Natrag na projekte">
+            <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
               <ChevronLeft />
             </button>
             <div className="crumb">
-              <span className="faint">Projekti</span>
+              <span className="faint">Projects</span>
               <span className="faint">/</span>
               <strong>{project.meta.name}</strong>
-              {dirty && <span className="dirty-dot" title="Nespremljene promjene (⌘S)" />}
+              {dirty && <span className="dirty-dot" title="Unsaved changes (⌘S)" />}
               <span className="badge">{project.meta.aspect}</span>
             </div>
           </>
@@ -40,19 +40,19 @@ export function TitleBar() {
         {render.status === 'rendering' && (
           <span className="render-pill">
             <span className="spinner" />
-            Renderiram{render.expected ? ` ${render.clips ?? 0}/${render.expected}` : '…'}
+            Rendering{render.expected ? ` ${render.clips ?? 0}/${render.expected}` : '…'}
           </span>
         )}
         <UpdatePill />
         {screen === 'editor' && (
           <div className="popover-anchor">
-            <button className={`icon-btn ${historyOpen ? 'on' : ''}`} onClick={() => setHistoryOpen((o) => !o)} title="Povijest verzija">
+            <button className={`icon-btn ${historyOpen ? 'on' : ''}`} onClick={() => setHistoryOpen((o) => !o)} title="Version history">
               <History />
             </button>
             {historyOpen && <HistoryPopover onClose={() => setHistoryOpen(false)} />}
           </div>
         )}
-        <button className="icon-btn" onClick={() => openDialog({ kind: 'settings' })} title="Postavke">
+        <button className="icon-btn" onClick={() => openDialog({ kind: 'settings' })} title="Settings">
           <Settings />
         </button>
       </div>
@@ -71,25 +71,25 @@ function UpdatePill() {
   if (update.state === 'available')
     return (
       <button className="update-pill" onClick={() => void api.downloadUpdate()} title={update.notes}>
-        <ArrowDownToLine /> Nova verzija {update.version}
+        <ArrowDownToLine /> Update to {update.version}
       </button>
     )
   if (update.state === 'downloading')
     return (
       <span className="update-pill busy">
-        <Ring value={update.percent / 100} size={15} /> Preuzimam {Math.round(update.percent)}%
+        <Ring value={update.percent / 100} size={15} /> Downloading {Math.round(update.percent)}%
       </span>
     )
   if (update.state === 'ready')
     return (
       <button className="update-pill ready" onClick={() => void api.installUpdate()}>
-        <RefreshCw /> Ponovno pokreni za {update.version}
+        <RefreshCw /> Restart to update to {update.version}
       </button>
     )
   if (update.state === 'error' && update.manualUrl)
     return (
       <button className="update-pill" onClick={() => void api.openExternal(update.manualUrl ?? releasesUrl ?? '')} onContextMenu={() => setDismissed(true)} title={update.message}>
-        <ArrowDownToLine /> Preuzmi novu verziju ručno
+        <ArrowDownToLine /> Download the update manually
       </button>
     )
   return null

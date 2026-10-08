@@ -254,7 +254,7 @@ export async function saveScene(opts: { render?: boolean } = {}): Promise<void> 
 
 export async function renderNow(quality: Quality = 'preview'): Promise<void> {
   if (get().setup?.env !== 'ready') {
-    toast('Manim okruženje još nije instalirano — Postavke → Okruženje', 'error')
+    toast('The manim environment isn’t installed yet (Settings → Environment)', 'error')
     return
   }
   await guard(api.render(quality))
@@ -282,7 +282,7 @@ function onRender(e: RenderEvent): void {
       set({ timeline: e.timeline, selection: get().selection.filter((i) => i < e.timeline.clips.length) })
       void checkStale(editorBridge.getValue() ?? get().savedSource)
       requestAnimationFrame(() => playback.restore(Math.min(t, e.timeline.duration)))
-      if (e.timeline.voiceWarnings.length) toast(`Glas: ${e.timeline.voiceWarnings[0]}`, 'error')
+      if (e.timeline.voiceWarnings.length) toast(`Voice: ${e.timeline.voiceWarnings[0]}`, 'error')
     }
   }
 }
@@ -342,7 +342,7 @@ function onChat(e: ChatEvent): void {
       streaming: {},
       chat: e.ok
         ? s.chat.map((m) => ({ ...m, parts: m.parts.map((p) => (p.kind === 'tool' && p.status === 'running' ? { ...p, status: 'ok' as const } : p)) }))
-        : [...s.chat, { id: crypto.randomUUID(), role: 'error', parts: [{ kind: 'text', text: e.error || 'Claude je stao s greškom.' }], at: Date.now() }],
+        : [...s.chat, { id: crypto.randomUUID(), role: 'error', parts: [{ kind: 'text', text: e.error || 'Claude stopped with an error.' }], at: Date.now() }],
     }))
   }
   if (e.type === 'reset') set({ chat: [], streaming: {}, chatBusy: false })

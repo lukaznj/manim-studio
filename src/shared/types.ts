@@ -40,6 +40,8 @@ export interface NewProjectInput {
   name: string
   aspect: Aspect
   theme: Theme
+  /** Narration and on-screen language, a BCP 47 code like "en" or "hr". */
+  language: string
   parentDir?: string
 }
 
@@ -176,6 +178,7 @@ export interface Settings {
   claudeModel: string // '' = Claude Code's default for the account
   autoRender: boolean
   hasElevenLabsKey: boolean
+  hasAnthropicKey: boolean
   defaultVoice: VoiceSettings
   sidebarWidth: number
   chatWidth: number
@@ -278,6 +281,7 @@ export interface StudioApi {
   getSettings(): Promise<Settings>
   setSettings(patch: Partial<Settings>): Promise<Settings>
   setElevenLabsKey(key: string): Promise<Settings>
+  setAnthropicKey(key: string): Promise<Settings>
 
   claudeStatus(): Promise<ClaudeStatus>
   claudeLogin(): Promise<ClaudeStatus>

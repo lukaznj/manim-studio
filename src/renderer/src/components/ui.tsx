@@ -40,7 +40,7 @@ export function Modal(props: {
       <div className="modal-head">
         {props.icon}
         <h2>{props.title}</h2>
-        <button className="icon-btn" onClick={props.onClose} aria-label="Zatvori">
+        <button className="icon-btn" onClick={props.onClose} aria-label="Close">
           <X />
         </button>
       </div>

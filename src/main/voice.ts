@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { ProjectMeta, SetupEvent, VoiceOption } from '../shared/types'
 import { setupStatus } from './env'
-import { listRecordings, requireProject } from './projects'
+import { listRecordings, project, requireProject } from './projects'
 import { runRunner } from './runner'
 import { getSecret } from './settings'
 
@@ -22,7 +22,7 @@ export async function voiceEnv(meta: ProjectMeta, dir: string): Promise<Record<s
 }
 
 export async function saveRecording(key: string, wav: ArrayBuffer, text?: string): Promise<string[]> {
-  if (!/^[0-9a-f]{12}$/.test(key)) throw new Error('Neispravan ključ snimke')
+  if (!/^[0-9a-f]{12}$/.test(key)) throw new Error('Invalid recording key')
   const dir = join(requireProject().path, 'voice', 'recordings')
   mkdirSync(dir, { recursive: true })
   const file = join(dir, `${key}.wav`)
@@ -30,14 +30,15 @@ export async function saveRecording(key: string, wav: ArrayBuffer, text?: string
   rmSync(join(dir, `${key}.json`), { force: true })
   // Word timings make bookmarks land on the spoken word; optional component.
   if (text && setupStatus().transcribe === 'ready') {
-    const job = await runRunner('transcribe', ['align', file, text, join(dir, `${key}.json`)])
+    const language = requireProject().meta.voice.language
+    const job = await runRunner('transcribe', ['align', file, text, join(dir, `${key}.json`), '--language', language])
     await job.done.catch(() => undefined)
   }
   return listRecordings()
 }
 
 export function deleteRecording(key: string): string[] {
-  if (!/^[0-9a-f]{12}$/.test(key)) throw new Error('Neispravan ključ snimke')
+  if (!/^[0-9a-f]{12}$/.test(key)) throw new Error('Invalid recording key')
   const dir = join(requireProject().path, 'voice', 'recordings')
   rmSync(join(dir, `${key}.wav`), { force: true })
   rmSync(join(dir, `${key}.json`), { force: true })
@@ -52,7 +53,7 @@ export function saveReference(wav: ArrayBuffer): string {
 
 export async function elevenLabsVoices(): Promise<VoiceOption[]> {
   const key = getSecret('elevenlabs')
-  if (!key) throw new Error('Najprije dodaj ElevenLabs API ključ')
+  if (!key) throw new Error('Add your ElevenLabs API key first')
   const res = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } })
   if (!res.ok) throw new Error(`ElevenLabs: HTTP ${res.status}`)
   const data = (await res.json()) as { voices: { voice_id: string; name: string; labels?: Record<string, string> }[] }
@@ -70,10 +71,12 @@ export async function systemVoices(): Promise<VoiceOption[]> {
     .split('\n')
     .map((line) => line.match(/^(.+?)\s+([a-z]{2}_[A-Z]{2})\s+#\s*(.*)$/))
     .filter((m): m is RegExpMatchArray => !!m)
-    .map((m) => ({ id: m[1].trim(), name: m[1].trim(), description: `${m[2]} — ${m[3]}` }))
-  // Croatian first, then the rest; the list repeats some voices.
+    // Newer voices are listed as "Lana (Croatian (Croatia))"; `say -v` wants just "Lana".
+    .map((m) => ({ id: m[1].replace(/\s*\(.*\)$/, '').trim(), name: m[1].trim(), description: `${m[2]} — ${m[3]}` }))
+  // The project's language first, then the rest; the list repeats some voices.
+  const lang = (project()?.meta.voice.language ?? 'en').split('-')[0] + '_'
   const seen = new Set<string>()
-  return [...voices.filter((v) => v.description.startsWith('hr_')), ...voices.filter((v) => !v.description.startsWith('hr_'))].filter(
+  return [...voices.filter((v) => v.description.startsWith(lang)), ...voices.filter((v) => !v.description.startsWith(lang))].filter(
     (v) => !seen.has(v.id) && seen.add(v.id),
   )
 }
@@ -95,9 +98,9 @@ export function ensureTtsWorker(): Promise<string> {
   workerUrl = new Promise<string>((resolve, reject) => {
     runRunner('omnivoice', ['tts-worker'], {
       onEvent: (e) => {
-        if (e.type === 'loading') log(`Učitavam OmniVoice (${e.device})…`)
+        if (e.type === 'loading') log(`Loading OmniVoice (${e.device})…`)
         if (e.type === 'ready') {
-          log('OmniVoice je spreman.')
+          log('OmniVoice is ready.')
           resolve(String(e.url))
         }
       },
@@ -109,7 +112,7 @@ export function ensureTtsWorker(): Promise<string> {
           if (line) log(line.slice(0, 200))
         })
         job.done
-          .then(() => reject(new Error('OmniVoice se ugasio')))
+          .then(() => reject(new Error('OmniVoice stopped')))
           .catch(reject)
           .finally(() => {
             workerUrl = null

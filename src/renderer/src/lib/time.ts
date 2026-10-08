@@ -11,7 +11,7 @@ export function seconds(t: number): string {
   return `${t.toFixed(t < 10 ? 1 : 0)} s`
 }
 
-const rtf = new Intl.RelativeTimeFormat('hr', { numeric: 'auto' })
+const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 
 export function ago(ms: number): string {
   const diff = (ms - Date.now()) / 1000
@@ -24,7 +24,7 @@ export function ago(ms: number): string {
     ['minute', 60],
   ]
   for (const [unit, size] of units) if (Math.abs(diff) >= size) return rtf.format(Math.round(diff / size), unit)
-  return 'upravo sada'
+  return 'just now'
 }
 
 export async function sha1(text: string): Promise<string> {

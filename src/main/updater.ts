@@ -6,7 +6,7 @@ import electronUpdater from 'electron-updater'
 import type { UpdateEvent } from '../shared/types'
 
 const { autoUpdater } = electronUpdater
-export const RELEASES_URL = 'https://github.com/lukaznj/manim-studio-releases/releases/latest'
+export const RELEASES_URL = 'https://github.com/lukaznj/manim-studio/releases/latest'
 const CHECK_EVERY_MS = 4 * 60 * 60 * 1000
 
 let send: (e: UpdateEvent) => void = () => {}

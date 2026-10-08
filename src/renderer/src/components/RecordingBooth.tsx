@@ -91,7 +91,7 @@ export function BoothDialog() {
   const dialog = useStore((s) => s.dialog)
   const open = dialog?.kind === 'booth'
   return (
-    <Modal open={open} onClose={closeDialog} title="Snimanje glasa" icon={<Mic className="head-icon coral" />} width={980} className="booth-modal">
+    <Modal open={open} onClose={closeDialog} title="Record voice" icon={<Mic className="head-icon coral" />} width={980} className="booth-modal">
       <Booth initialKey={dialog?.kind === 'booth' ? dialog.key : undefined} />
     </Modal>
   )
@@ -165,7 +165,7 @@ function Booth({ initialKey }: { initialKey?: string }) {
         if (buffer) setTake(buffer)
       }
     } catch (e) {
-      toast(`Mikrofon: ${errorText(e)}`, 'error')
+      toast(`Microphone: ${errorText(e)}`, 'error')
     }
   }, [rec, device])
 
@@ -198,7 +198,7 @@ function Booth({ initialKey }: { initialKey?: string }) {
       setTake(null)
       const next = blocks.find((b) => !list.includes(b.key))
       if (next) setKey(next.key)
-      toast('Snimka spremljena', 'ok')
+      toast('Recording saved', 'ok')
     } catch (e) {
       toast(errorText(e), 'error')
     } finally {
@@ -207,7 +207,7 @@ function Booth({ initialKey }: { initialKey?: string }) {
   }
 
   const remove = async () => {
-    if (!key || !confirm('Obrisati snimku? Ova rečenica opet koristi računalni glas.')) return
+    if (!key || !confirm('Delete this recording? The sentence goes back to the computer voice.')) return
     useStore.setState({ recordings: await api.deleteRecording(key) })
     changed.current = true
   }
@@ -239,7 +239,7 @@ function Booth({ initialKey }: { initialKey?: string }) {
   if (!blocks.length)
     return (
       <div className="modal-body booth-empty">
-        <p className="muted">Scena još nema naraciju. Dodaj blok `with self.voiceover("…")` ili zamoli Claudea, pa renderiraj.</p>
+        <p className="muted">The scene has no narration yet. Add a `with self.voiceover("…")` block (or ask Claude), then render.</p>
       </div>
     )
 
@@ -247,7 +247,7 @@ function Booth({ initialKey }: { initialKey?: string }) {
     <div className="booth">
       <aside className="booth-list">
         <div className="eyebrow booth-count">
-          Rečenice · {blocks.filter((b) => recordings.includes(b.key)).length}/{blocks.length} snimljeno
+          Sentences · {blocks.filter((b) => recordings.includes(b.key)).length}/{blocks.length} recorded
         </div>
         {blocks.map((b, i) => (
           <BlockRow key={b.key} block={b} index={i} active={b.key === key} recorded={recordings.includes(b.key)} onClick={() => select(b.key)} />
@@ -258,7 +258,7 @@ function Booth({ initialKey }: { initialKey?: string }) {
           <>
             <div className="prompter">
               <span className="eyebrow">
-                Pročitaj · {recorded ? 'snimljeno' : `trenutno: ${block.source === 'recording' ? 'snimka' : 'računalni glas'}`} · {(block.end - block.start).toFixed(1)} s
+                Read aloud · {recorded ? 'recorded' : `now: ${block.source === 'recording' ? 'recording' : 'computer voice'}`} · {(block.end - block.start).toFixed(1)} s
               </span>
               <p className={`prompter-text ${rec.state === 'recording' ? 'live' : ''}`}>{block.text}</p>
             </div>
@@ -275,44 +275,44 @@ function Booth({ initialKey }: { initialKey?: string }) {
               )}
               {rec.state === 'idle' && take && <canvas ref={canvas} className="take-wave" />}
               {rec.state === 'idle' && !take && (
-                <div className="take-empty faint">{recorded ? 'Postoji snimka. Snimi ponovno za novu verziju.' : 'Pritisni R i čitaj kad odbrojavanje završi.'}</div>
+                <div className="take-empty faint">{recorded ? 'There is a recording. Record again to replace it.' : 'Press R and start reading when the countdown ends.'}</div>
               )}
             </div>
 
             <div className="booth-controls">
-              <button className={`rec-btn ${rec.state !== 'idle' ? 'live' : ''}`} onClick={() => void toggleRecord()} title="Snimi / zaustavi (R)">
+              <button className={`rec-btn ${rec.state !== 'idle' ? 'live' : ''}`} onClick={() => void toggleRecord()} title="Record / stop (R)">
                 {rec.state === 'idle' ? <Circle /> : <Square />}
               </button>
               <button className="btn" disabled={rec.state !== 'idle' || (!take && !recorded)} onClick={play}>
-                {playing ? <Pause /> : <Play />} {take ? 'Preslušaj' : 'Preslušaj snimku'} <span className="kbd">␣</span>
+                {playing ? <Pause /> : <Play />} {take ? 'Play take' : 'Play recording'} <span className="kbd">␣</span>
               </button>
               {take && (
                 <>
                   <button className="btn primary" disabled={saving} onClick={() => void save()}>
-                    <Check /> Spremi snimku <span className="kbd">↵</span>
+                    <Check /> Save recording <span className="kbd">↵</span>
                   </button>
                   <button className="btn ghost" onClick={() => setTake(null)}>
-                    <RotateCcw /> Odbaci
+                    <RotateCcw /> Discard
                   </button>
                 </>
               )}
               {!take && recorded && (
                 <button className="btn ghost" onClick={() => void remove()}>
-                  <Trash2 /> Obriši snimku
+                  <Trash2 /> Delete recording
                 </button>
               )}
               <select className="select mic-select" value={device} onChange={(e) => setDevice(e.target.value)} disabled={rec.state !== 'idle'}>
-                <option value="">Zadani mikrofon</option>
+                <option value="">Default microphone</option>
                 {devices.map((d) => (
                   <option key={d.deviceId} value={d.deviceId}>
-                    {d.label || 'Mikrofon'}
+                    {d.label || 'Microphone'}
                   </option>
                 ))}
               </select>
             </div>
             <p className="hint booth-hint">
-              Animacije se prilagode dužini snimke. Bookmarki padaju na izgovorenu riječ ako je instaliran Whisper (Postavke → Glas), inače se
-              procjenjuju razmjerno tekstu.
+              Animations stretch to the length of your recording. With Whisper installed (Settings → Voice), bookmarks land on the spoken word;
+              otherwise they're estimated from the text.
             </p>
           </>
         )}
