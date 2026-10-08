@@ -10,7 +10,6 @@ Each item below was either measured during development, or not verified because 
   - `espeak-ng` on Linux, and the AppImage's microphone permission for the recording booth
   - the NSIS installer and its auto-update
 - **Signed, notarized macOS build and an actual auto-update.** There's no Developer ID yet, so macOS builds are ad-hoc signed. Release metadata (`app-update.yml`, `latest-mac.yml`) is generated correctly.
-- **Plan sign-in in public releases.** See the open question in [[../04-decisions/0004-claude-via-agent-sdk|ADR 0004]] before shipping a public release.
 - **ElevenLabs.** The REST call and timestamp alignment are written to the documented API, but no key was available to call it.
 
 ## Measured

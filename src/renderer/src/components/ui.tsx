@@ -50,11 +50,17 @@ export function Modal(props: {
   )
 }
 
-export function Tabs<T extends string>(props: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[] }) {
+/** Segmented control. Pass `radio` (the group's label) when it picks a setting instead of switching a view. */
+export function Tabs<T extends string>(props: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[]; radio?: string }) {
   return (
-    <div className="tabs" role="tablist">
+    <div className="tabs" role={props.radio ? 'radiogroup' : 'tablist'} aria-label={props.radio}>
       {props.items.map((it) => (
-        <button key={it.value} role="tab" aria-selected={props.value === it.value} onClick={() => props.onChange(it.value)}>
+        <button
+          key={it.value}
+          role={props.radio ? 'radio' : 'tab'}
+          {...(props.radio ? { 'aria-checked': props.value === it.value } : { 'aria-selected': props.value === it.value })}
+          onClick={() => props.onChange(it.value)}
+        >
           {it.label}
         </button>
       ))}
@@ -101,8 +107,8 @@ export function Wordmark({ size = 15 }: { size?: number }) {
       <svg viewBox="0 0 24 24" width={size * 1.3} height={size * 1.3} aria-hidden>
         <defs>
           <linearGradient id="wm-curve" x1="0" y1="0" x2="1" y2="0.4">
-            <stop offset="0" stopColor="#F58C40" />
-            <stop offset="1" stopColor="#FFDB73" />
+            <stop offset="0" style={{ stopColor: 'var(--mark-from)' }} />
+            <stop offset="1" style={{ stopColor: 'var(--mark-to)' }} />
           </linearGradient>
         </defs>
         <path d="M5.4 7 Q11 24.2 16.6 12.2" fill="none" stroke="url(#wm-curve)" strokeWidth="2.6" strokeLinecap="round" />

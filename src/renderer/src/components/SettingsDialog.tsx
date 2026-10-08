@@ -1,9 +1,10 @@
-import { AudioLines, Check, Circle, Cpu, KeyRound, Laptop, LogOut, Settings2, Sparkles, Square } from 'lucide-react'
+import { AudioLines, Check, Circle, Cpu, KeyRound, Laptop, LogOut, Monitor, Moon, Settings2, Sparkles, Square, Sun } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
-import type { Component, ComponentState, ModelOption, VoiceOption, VoiceProvider, VoiceSettings } from '../../../shared/types'
+import type { Component, ComponentState, VoiceOption, VoiceProvider, VoiceSettings } from '../../../shared/types'
 import { api } from '../lib/api'
 import { encodeWav } from '../lib/audio'
 import { closeDialog, errorText, installComponent, openDialog, refreshClaude, toast, updateMeta, updateSettings, useStore } from '../store'
+import { ModelControls } from './ChatPane'
 import { useRecorder } from './RecordingBooth'
 import { Modal, ProgressLine, Tabs } from './ui'
 
@@ -27,7 +28,7 @@ export function SettingsDialog() {
             { value: 'account', label: 'Claude' },
             { value: 'voice', label: 'Voice' },
             { value: 'env', label: 'Environment' },
-            { value: 'about', label: 'About' },
+            { value: 'about', label: 'General' },
           ]}
         />
       </div>
@@ -77,17 +78,8 @@ const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1
 function AccountTab() {
   const claude = useStore((s) => s.claude)
   const settings = useStore((s) => s.settings)!
-  const [models, setModels] = useState<ModelOption[] | null>(null)
   const [busy, setBusy] = useState(false)
   const usingKey = claude?.method === 'api-key'
-
-  useEffect(() => {
-    if (claude?.loggedIn)
-      api
-        .chatModels()
-        .then(setModels)
-        .catch(() => setModels([]))
-  }, [claude?.loggedIn])
 
   const login = async () => {
     setBusy(true)
@@ -156,16 +148,11 @@ function AccountTab() {
         </div>
       </Row>
 
-      <Row title="Model" text="Which Claude model writes the scenes. The default is whatever your plan recommends.">
-        <select className="select" value={settings.claudeModel} onChange={(e) => void updateSettings({ claudeModel: e.target.value })} disabled={!claude?.loggedIn}>
-          {(models ?? [{ value: '', label: 'Default', description: '' }]).map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </Row>
-      <p className="hint">A new model applies from the next conversation (the ↺ button in the chat).</p>
+      {claude?.loggedIn && (
+        <Row title="Model and effort" text="Which model writes the scenes and how much it thinks first. Also under the chat box; a change applies to the current conversation.">
+          <ModelControls />
+        </Row>
+      )}
     </div>
   )
 }
@@ -440,6 +427,18 @@ function AboutTab() {
                 : ''
   return (
     <div className="set-group">
+      <Row title="Appearance" text="System follows your computer’s light or dark setting.">
+        <Tabs
+          radio="Appearance"
+          value={settings.appearance}
+          onChange={(appearance) => void updateSettings({ appearance })}
+          items={[
+            { value: 'system', label: <><Monitor />System</> },
+            { value: 'light', label: <><Sun />Light</> },
+            { value: 'dark', label: <><Moon />Dark</> },
+          ]}
+        />
+      </Row>
       <Row title={`Manim Studio ${app.version}`} text={`${app.platform} · ${app.arch} · open source (MIT)`}>
         <button className="btn small" onClick={() => void api.checkForUpdates()}>
           Check for updates
