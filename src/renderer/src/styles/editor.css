@@ -141,7 +141,7 @@ body.resizing-y .code-host {
   border-radius: 999px;
   background: var(--raised-2);
   box-shadow: var(--shadow-pop);
-  color: var(--sun);
+  color: var(--sun-text);
   font-size: 12px;
   font-weight: 600;
   transform: translate(-50%, 20px);
@@ -169,7 +169,7 @@ body.resizing-y .code-host {
 
 /* Monaco decorations: the follow line (signature), selection and errors. */
 .monaco-editor .follow-line {
-  background: linear-gradient(90deg, rgb(255 209 102 / 0.13), rgb(255 209 102 / 0.03) 60%, transparent);
+  background: linear-gradient(90deg, light-dark(rgb(240 173 10 / 0.16), rgb(255 209 102 / 0.13)), rgb(255 209 102 / 0.03) 60%, transparent);
   transition: background 0.2s;
 }
 .monaco-editor .follow-gutter {
@@ -203,17 +203,17 @@ body.resizing-y .code-host {
   overflow: hidden;
   background:
     radial-gradient(ellipse at 50% 40%, rgb(47 109 246 / 0.06), transparent 65%),
-    linear-gradient(transparent 31px, rgb(255 255 255 / 0.018) 32px) 0 0 / 32px 32px,
-    linear-gradient(90deg, transparent 31px, rgb(255 255 255 / 0.018) 32px) 0 0 / 32px 32px;
+    linear-gradient(transparent 31px, light-dark(rgb(15 30 55 / 0.035), rgb(255 255 255 / 0.018)) 32px) 0 0 / 32px 32px,
+    linear-gradient(90deg, transparent 31px, light-dark(rgb(15 30 55 / 0.035), rgb(255 255 255 / 0.018)) 32px) 0 0 / 32px 32px;
 }
 .frame {
   position: relative;
   border-radius: 6px;
   overflow: hidden;
-  background: #0b1626;
+  background: light-dark(#dde3eb, #0b1626);
   box-shadow:
     0 0 0 1px var(--line-strong),
-    0 24px 60px -24px rgb(0 0 0 / 0.9);
+    0 24px 60px -24px light-dark(rgb(15 30 55 / 0.35), rgb(0 0 0 / 0.9));
   transition:
     width 0.35s var(--ease-out),
     height 0.35s var(--ease-out),
@@ -252,7 +252,7 @@ body.resizing-y .code-host {
   width: 26px;
   height: 26px;
   border-width: 2.5px;
-  color: var(--sun);
+  color: var(--sun-text);
 }
 .frame-status {
   position: absolute;
@@ -332,11 +332,11 @@ body.resizing-y .code-host {
 }
 .flag.sun {
   background: var(--sun-soft);
-  color: var(--sun);
+  color: var(--sun-text);
 }
 .flag.coral {
   background: var(--coral-soft);
-  color: #ff9a8a;
+  color: light-dark(#c4321f, #ff9a8a);
 }
 .warnings-pop {
   top: auto;
@@ -375,7 +375,7 @@ body.resizing-y .code-host {
   transform: translateX(-50%);
   padding: 14px 16px;
   border-radius: var(--r-lg);
-  background: rgb(26 14 18 / 0.95);
+  background: light-dark(rgb(255 243 241 / 0.97), rgb(26 14 18 / 0.95));
   border: 1px solid rgb(255 111 89 / 0.35);
   box-shadow: var(--shadow-pop);
   backdrop-filter: blur(10px);
@@ -402,7 +402,7 @@ body.resizing-y .code-host {
 .error-msg {
   margin: 8px 0 10px;
   font-size: 12px;
-  color: #ffd2ca;
+  color: light-dark(#7a1d10, #ffd2ca);
   white-space: pre-wrap;
   max-height: 90px;
   overflow: auto;
@@ -414,7 +414,7 @@ body.resizing-y .code-host {
   margin: 0 0 10px;
   padding: 10px;
   border-radius: var(--r-sm);
-  background: rgb(0 0 0 / 0.35);
+  background: light-dark(rgb(15 30 55 / 0.05), rgb(0 0 0 / 0.35));
   font-size: 11px;
   line-height: 1.5;
   color: var(--text-2);
@@ -435,9 +435,12 @@ body.resizing-y .code-host {
   grid-template-columns: minmax(0, 1fr);
 }
 .claude-mark {
-  color: var(--sun) !important;
+  color: var(--sun-text) !important;
 }
 .account-chip {
+  border: none;
+  background: none;
+  padding: 0;
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -445,6 +448,9 @@ body.resizing-y .code-host {
   font-size: 11.5px;
   text-transform: capitalize;
   margin-right: 4px;
+}
+.account-chip:hover {
+  color: var(--text-2);
 }
 .chat-list {
   min-height: 0;
@@ -531,7 +537,7 @@ body.resizing-y .code-host {
   padding: 10px 12px;
   border-radius: var(--r-md);
   background: var(--coral-soft);
-  color: #ffb3a6;
+  color: light-dark(#b42318, #ffb3a6);
   font-size: 12.5px;
 }
 .msg.error svg {
@@ -617,7 +623,7 @@ body.resizing-y .code-host {
   color: var(--text);
 }
 .tool-chip.running svg {
-  color: var(--sun);
+  color: var(--sun-text);
 }
 .tool-chip span {
   overflow: hidden;
@@ -675,7 +681,7 @@ body.resizing-y .code-host {
 .signin-mark {
   width: 26px;
   height: 26px;
-  color: var(--sun);
+  color: var(--sun-text);
 }
 .code-entry {
   display: flex;
@@ -755,7 +761,7 @@ body.resizing-y .code-host {
 .attach-toggle.on {
   border-style: solid;
   border-color: rgb(255 209 102 / 0.4);
-  color: var(--sun);
+  color: var(--sun-text);
   background: var(--sun-soft);
 }
 .composer-input {
@@ -773,7 +779,66 @@ body.resizing-y .code-host {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 6px 6px 12px;
+  gap: 8px;
+  padding: 4px 6px 6px 6px;
+}
+.model-controls {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+.chip-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.chip-select:hover:not(:has(select:disabled)) {
+  background: var(--raised-2);
+  color: var(--text-2);
+}
+.chip-select:has(select:focus-visible) {
+  box-shadow: 0 0 0 2px var(--blue);
+}
+.chip-select:has(select:disabled) {
+  opacity: 0.5;
+}
+.chip-select svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.chip-select .chev {
+  width: 11px;
+  height: 11px;
+  margin-left: -2px;
+  pointer-events: none;
+}
+.chip-select select {
+  appearance: none;
+  field-sizing: content; /* as wide as the chosen option, not the longest one */
+  min-width: 0;
+  max-width: 130px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.chip-select select:disabled {
+  cursor: default;
 }
 .send-btn {
   display: grid;
@@ -818,7 +883,7 @@ body.resizing-y .code-host {
   overflow: auto;
   padding: 10px;
   border-right: 1px solid var(--line);
-  background: rgb(0 0 0 / 0.12);
+  background: light-dark(rgb(15 30 55 / 0.03), rgb(0 0 0 / 0.12));
 }
 .booth-count {
   padding: 6px 8px 10px;
@@ -892,7 +957,7 @@ body.resizing-y .code-host {
   transition: color 0.3s;
 }
 .prompter-text.live {
-  color: #fff;
+  color: light-dark(#0b1626, #fff);
 }
 .take {
   position: relative;

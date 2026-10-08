@@ -8,6 +8,19 @@ Nothing here is committed. Each item gets an ADR when it's picked up.
   - Expose the app's tools (render, timeline, frames, project list, export) over MCP.
   - Claude Desktop, Claude Code or other agents could then drive Studio from outside.
   - The in-process tools from [[../02-architecture/system-overview|the system overview]] are the starting set.
+- **Model and effort comparison.** Find which model and effort level make the best videos for the usage they cost. That decides the default, and what to recommend on smaller plans.
+  - A fixed set of briefs, run unchanged across models × effort levels:
+    - portrait and landscape
+    - one formula-heavy and one graph-heavy video
+    - one narrated in a language other than English
+  - Measure per run:
+    - render errors and layout warnings in the final render
+    - turns and tool calls until Claude says it's done
+    - wall time
+    - usage: tokens, or cost from the `result` message
+    - a blind human rating of the finished video
+  - Claude Code's session transcript records the model and effort of every turn, so each run can be audited afterwards.
+  - Output: a results note in this vault, then an ADR if it changes the default.
 - **Bookmark editing on the timeline.** Drag a bookmark diamond onto another word in the narration. The voice track already shows the diamonds.
 - **Cut-and-reorder sections.** Drag a section on the section lane to move its block of code (an AST move of the code between `next_section` calls).
 - **Signed builds.** A notarized macOS build, which can update itself, and a signed Windows installer ([[../06-operations/releasing|releasing]]).

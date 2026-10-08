@@ -1,9 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell, systemPreferences } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, session, shell, systemPreferences } from 'electron'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import type { EventChannel, ProjectMeta, Quality } from '../shared/types'
-import { chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, closeChat, loadChat, onChatEvent } from './claude'
+import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, closeChat, loadChat, onChatEvent } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
 import { history, restore } from './git'
 import { paths } from './paths'
@@ -24,6 +24,11 @@ protocol.registerSchemesAsPrivileged([
 let win: BrowserWindow | null = null
 const send = (channel: EventChannel, payload: unknown) => win?.webContents.send(channel, payload)
 
+// The window behind the page (and the Windows/Linux title-bar buttons) in the title bar's --bg.
+// nativeTheme.themeSource follows Settings → Appearance and drives prefers-color-scheme too.
+const chrome = () =>
+  nativeTheme.shouldUseDarkColors ? { color: '#070e19', symbolColor: '#9eadc3', height: 44 } : { color: '#e7ebf1', symbolColor: '#46566c', height: 44 }
+
 function createWindow(): void {
   win = new BrowserWindow({
     width: 1480,
@@ -31,9 +36,9 @@ function createWindow(): void {
     minWidth: 1100,
     minHeight: 680,
     show: false,
-    backgroundColor: '#0d1117',
+    backgroundColor: chrome().color,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
-    titleBarOverlay: process.platform === 'darwin' ? undefined : { color: '#0d1117', symbolColor: '#c9d1d9', height: 44 },
+    titleBarOverlay: process.platform === 'darwin' ? undefined : chrome(),
     trafficLightPosition: { x: 16, y: 15 },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -94,7 +99,12 @@ function registerIpc(): void {
   handle('install', (c: Parameters<typeof install>[0]) => install(c))
 
   handle('getSettings', () => getSettings())
-  handle('setSettings', (patch: Parameters<typeof setSettings>[0]) => setSettings(patch))
+  handle('setSettings', (patch: Parameters<typeof setSettings>[0]) => {
+    const settings = setSettings(patch)
+    if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
+    if (patch.appearance) nativeTheme.themeSource = patch.appearance
+    return settings
+  })
   handle('setElevenLabsKey', (key: string) => setSecret('elevenlabs', key.trim()))
   handle('setAnthropicKey', (key: string) => setSecret('anthropic', key.trim()))
 
@@ -199,6 +209,11 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'media'))
   if (process.platform === 'darwin') Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }]))
 
+  nativeTheme.themeSource = getSettings().appearance
+  nativeTheme.on('updated', () => {
+    win?.setBackgroundColor(chrome().color)
+    if (process.platform !== 'darwin') win?.setTitleBarOverlay(chrome())
+  })
   registerMediaProtocol()
   registerIpc()
   onRenderEvent((e) => send('render', e))

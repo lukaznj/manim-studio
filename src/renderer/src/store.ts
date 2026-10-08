@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   ClaudeStatus,
   Component,
+  ModelOption,
   OpenProject,
   ProjectMeta,
   ProjectSummary,
@@ -52,6 +53,7 @@ interface State {
   setupLog: Partial<Record<Component, string[]>>
   setupProgress: Partial<Record<Component, number>>
   claude: ClaudeStatus | null
+  models: ModelOption[] // what the signed-in account (or API key) can use
   projects: ProjectSummary[]
 
   project: { path: string; meta: ProjectMeta } | null
@@ -83,6 +85,7 @@ export const useStore = create<State>(() => ({
   setupLog: {},
   setupProgress: {},
   claude: null,
+  models: [],
   projects: [],
   project: null,
   savedSource: '',
@@ -165,8 +168,23 @@ export async function refreshProjects(): Promise<void> {
   set({ projects: await api.listProjects() })
 }
 
+let modelsFor = '' // the account the model list belongs to
+
 export async function refreshClaude(): Promise<void> {
-  set({ claude: await api.claudeStatus() })
+  const claude = await api.claudeStatus()
+  set({ claude })
+  const who = claude.loggedIn ? `${claude.method}:${claude.email ?? ''}` : ''
+  if (who === modelsFor) return
+  if (!who) {
+    modelsFor = ''
+    set({ models: [] })
+    return
+  }
+  const models = await api.chatModels().catch(() => null)
+  if (models) {
+    modelsFor = who
+    set({ models })
+  }
 }
 
 export async function refreshSetup(): Promise<void> {

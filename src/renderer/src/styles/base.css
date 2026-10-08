@@ -1,5 +1,7 @@
 /* Tokens: "ink at night". Surfaces share the hue of the dark video theme (#0B1626) so the
-   preview reads as part of the stage; chalk-yellow is the one action colour. */
+   preview reads as part of the stage; chalk-yellow is the one action colour. The light theme
+   ("ink on paper") overrides the colours below; lib/theme.ts sets html[data-theme]. One-off
+   colours elsewhere use light-dark(), which follows color-scheme. */
 :root {
   --bg: #070e19;
   --panel: #0b1626;
@@ -16,6 +18,7 @@
   --sun-strong: #ffc23d;
   --sun-ink: #241a00;
   --sun-soft: rgb(255 209 102 / 0.12);
+  --sun-text: #ffd166; /* chalk-yellow as text or icon; darker on paper */
   --blue: #6b97ff;
   --blue-soft: rgb(107 151 255 / 0.16);
   --coral: #ff6f59;
@@ -24,6 +27,9 @@
   --mint-soft: rgb(76 194 106 / 0.14);
   --sea: #3aa1d8;
   --sea-soft: rgb(58 161 216 / 0.16);
+  --field: var(--bg);
+  --mark-from: #f58c40;
+  --mark-to: #ffdb73;
 
   --font-display: 'Nunito Variable', ui-rounded, system-ui, sans-serif;
   --font-ui: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -37,6 +43,41 @@
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
   color-scheme: dark;
+}
+
+/* "Ink on paper": grey chrome, near-white panes, the same roles and the same single action colour. */
+:root[data-theme='light'] {
+  --bg: #e7ebf1;
+  --panel: #f6f8fb;
+  --raised: #ebeff5;
+  --raised-2: #dfe5ee;
+  --line: #d8dee8;
+  --line-strong: #c3ccd9;
+
+  --text: #0d1a2b;
+  --text-2: #46566c;
+  --text-3: #637389;
+
+  --sun: #fbc232;
+  --sun-strong: #f0ad0a;
+  --sun-ink: #241a00;
+  --sun-soft: rgb(240 173 10 / 0.16);
+  --sun-text: #8c5e00;
+  --blue: #2a62e0;
+  --blue-soft: rgb(42 98 224 / 0.12);
+  --coral: #d0412b;
+  --coral-soft: rgb(208 65 43 / 0.11);
+  --mint: #1f7d38;
+  --mint-soft: rgb(31 125 56 / 0.12);
+  --sea: #1d73ab;
+  --sea-soft: rgb(29 115 171 / 0.13);
+  --field: #ffffff;
+  --mark-from: #f07a2a;
+  --mark-to: #e8a600;
+
+  --shadow-pop: 0 18px 50px -12px rgb(15 30 55 / 0.25), 0 0 0 1px var(--line-strong);
+
+  color-scheme: light;
 }
 
 * {
@@ -140,7 +181,7 @@ button {
 }
 .btn:hover {
   background: var(--raised-2);
-  border-color: #36507a;
+  border-color: light-dark(#aab6c6, #36507a);
 }
 .btn:active {
   transform: scale(0.97);
@@ -169,7 +210,7 @@ button {
 .btn.danger {
   background: var(--coral-soft);
   border-color: rgb(255 111 89 / 0.4);
-  color: #ffb3a6;
+  color: light-dark(#b42318, #ffb3a6);
 }
 .btn.danger:hover {
   background: rgb(255 111 89 / 0.24);
@@ -218,7 +259,7 @@ button {
   transform: scale(0.92);
 }
 .icon-btn.on {
-  color: var(--sun);
+  color: var(--sun-text);
   background: var(--sun-soft);
 }
 .icon-btn svg {
@@ -250,7 +291,7 @@ button {
   padding: 0 11px;
   border-radius: var(--r-sm);
   border: 1px solid var(--line-strong);
-  background: var(--bg);
+  background: var(--field);
   outline: none;
   transition:
     border-color 0.15s,
@@ -305,7 +346,7 @@ dialog.modal:not([open]) {
   }
 }
 dialog.modal::backdrop {
-  background: rgb(3 7 14 / 0.62);
+  background: light-dark(rgb(30 41 59 / 0.3), rgb(3 7 14 / 0.62));
   backdrop-filter: blur(6px);
   transition:
     background 0.22s,
@@ -343,7 +384,7 @@ dialog.modal::backdrop {
   gap: 8px;
   padding: 14px 20px;
   border-top: 1px solid var(--line);
-  background: rgb(0 0 0 / 0.12);
+  background: light-dark(rgb(15 30 55 / 0.03), rgb(0 0 0 / 0.12));
 }
 
 /* ---- misc primitives ---------------------------------------------------------------------- */
@@ -363,7 +404,7 @@ dialog.modal::backdrop {
 }
 .badge.sun {
   background: var(--sun-soft);
-  color: var(--sun);
+  color: var(--sun-text);
 }
 .badge.mint {
   background: var(--mint-soft);
@@ -371,7 +412,7 @@ dialog.modal::backdrop {
 }
 .badge.coral {
   background: var(--coral-soft);
-  color: #ff9a8a;
+  color: light-dark(#c4321f, #ff9a8a);
 }
 .badge.blue {
   background: var(--blue-soft);
@@ -421,6 +462,8 @@ dialog.modal::backdrop {
 .tabs button {
   flex: 1;
   height: 28px;
+  padding: 0 12px;
+  white-space: nowrap;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -430,10 +473,18 @@ dialog.modal::backdrop {
     background 0.15s,
     color 0.15s;
 }
-.tabs button[aria-selected='true'] {
-  background: var(--raised-2);
+.tabs button[aria-selected='true'],
+.tabs button[aria-checked='true'] {
+  /* On paper the chosen segment lifts to white instead of darkening. */
+  background: light-dark(#ffffff, var(--raised-2));
   color: var(--text);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset;
+  box-shadow: light-dark(0 1px 2px rgb(15 30 55 / 0.12), 0 1px 0 rgb(255 255 255 / 0.04) inset);
+}
+.tabs button svg {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
 }
 
 .toast-stack {
@@ -481,6 +532,14 @@ dialog.modal::backdrop {
 ::view-transition-new(root) {
   animation-duration: 0.28s;
   animation-timing-function: var(--ease-out);
+}
+
+/* Light ↔ dark: the whole window cross-fades, a little slower than a screen change. */
+:root:active-view-transition-type(theme)::view-transition-group(*),
+:root:active-view-transition-type(theme)::view-transition-old(*),
+:root:active-view-transition-type(theme)::view-transition-new(*) {
+  animation-duration: 0.45s;
+  animation-timing-function: ease-in-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

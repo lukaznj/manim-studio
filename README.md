@@ -19,7 +19,8 @@
 
   Animations stretch to fit the speech.
 - **Any language.** Pick the narration language per project. Claude writes in it, and the voices and subtitles follow.
-- **16:9 or 9:16.** Choose the format per project, light or dark.
+- **16:9 or 9:16.** Choose the format per project, and a light or dark video theme.
+- **Light and dark app.** Follows your system by default, and cross-fades when it switches.
 - **Version history.** Every render and every Claude turn is a commit you can go back to. No git install needed.
 - **Export.** A 1080p mp4, `.vtt`/`.srt` subtitles and a thumbnail.
 
@@ -27,6 +28,7 @@
 |---|---|
 | ![Projects](docs/05-design/screenshots/home.png) | ![New project](docs/05-design/screenshots/new-project.png) |
 | ![Recording booth](docs/05-design/screenshots/recording-booth.png) | ![Version history](docs/05-design/screenshots/history.png) |
+| ![The editor in the light theme](docs/05-design/screenshots/editor-light.png) | ![Projects in the light theme](docs/05-design/screenshots/home-light.png) |
 
 ## Install
 

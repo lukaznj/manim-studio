@@ -1,3 +1,4 @@
+import './lib/theme' // first: sets html[data-theme] before anything paints
 import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
 import '@fontsource-variable/nunito'
