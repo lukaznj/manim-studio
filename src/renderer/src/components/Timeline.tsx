@@ -30,17 +30,17 @@ const MIN_PPS = 6
 const MAX_PPS = 480
 
 const LOCK_REASON: Record<string, string> = {
-  voiceover: 'Ovaj dio traje dok traje naracija — mijenja se tekstom ili snimkom.',
-  bookmark: 'Čeka bookmark u naraciji — pomakni bookmark u tekstu.',
-  helper: 'Poziv je u pomoćnoj funkciji — trajanje promijeni u kodu ili pitaj Claudea.',
-  ambiguous: 'U tom retku je više poziva — promijeni ga u kodu.',
-  kwargs: 'Trajanje dolazi iz **kwargs — promijeni ga u kodu.',
-  syntax: 'Kod ima sintaksnu grešku.',
-  empty: 'Nema animacija u pozivu.',
+  voiceover: 'This lasts as long as the narration: change the text or the recording.',
+  bookmark: 'Waits for a bookmark in the narration: move the bookmark in the text.',
+  helper: 'The call is inside a helper function: change the duration in code, or ask Claude.',
+  ambiguous: 'That line has several calls: change it in code.',
+  kwargs: 'The duration comes from **kwargs: change it in code.',
+  syntax: 'The code has a syntax error.',
+  empty: 'The call has no animations.',
 }
 
 function lockText(reason: string): string {
-  if (reason.startsWith('computed:')) return `Trajanje je izraz (${reason.slice(9)}) — promijeni ga u kodu ili pitaj Claudea.`
+  if (reason.startsWith('computed:')) return `The duration is an expression (${reason.slice(9)}): change it in code, or ask Claude.`
   return LOCK_REASON[reason] ?? reason
 }
 
@@ -161,10 +161,10 @@ export function Timeline() {
         <div className="tl-labels" style={{ width: LABEL_W }}>
           <div className="tl-label ruler-label" />
           <div className="tl-label warn-label" />
-          <div className="tl-label">Odjeljci</div>
-          <div className="tl-label tall">Animacije</div>
-          <div className="tl-label taller">Glas</div>
-          <div className="tl-label">Titlovi</div>
+          <div className="tl-label">Sections</div>
+          <div className="tl-label tall">Animations</div>
+          <div className="tl-label taller">Voice</div>
+          <div className="tl-label">Subtitles</div>
         </div>
         <div className="tl-scroll" ref={scroller} onWheel={onWheel}>
           <div className={`tl-content ${zooming ? 'zooming' : ''} ${stale ? 'stale' : ''}`} style={{ width }} onPointerDown={scrub}>
@@ -177,7 +177,7 @@ export function Timeline() {
                       key={i}
                       className={`warn-bar ${w.kind}`}
                       style={{ left: w.start * scale, width: Math.max(4, (w.end - w.start) * scale) }}
-                      onMouseMove={(e) => showTip(e, <span>{w.message}{w.line ? ` · redak ${w.line}` : ''}</span>)}
+                      onMouseMove={(e) => showTip(e, <span>{w.message}{w.line ? ` · line ${w.line}` : ''}</span>)}
                       onMouseLeave={hideTip}
                       onPointerDown={(e) => {
                         e.stopPropagation()
@@ -202,7 +202,7 @@ export function Timeline() {
                           if (s.line) editorBridge.revealLine(s.line)
                         }}
                       >
-                        <span>{s.name || 'Bez naziva'}</span>
+                        <span>{s.name || 'Untitled'}</span>
                       </div>
                     ))}
                 </div>
@@ -241,7 +241,7 @@ export function Timeline() {
                 </div>
               </>
             ) : (
-              <div className="tl-empty">Vremenska crta nastaje iz rendera — spremi scenu (⌘S).</div>
+              <div className="tl-empty">The timeline comes from the render. Save the scene (⌘S) to make one.</div>
             )}
             <div className="playhead" ref={playhead}>
               <div className="playhead-head" />
@@ -292,20 +292,20 @@ function Toolbar(props: {
     return {
       count: clips.length,
       span: end - start,
-      lines: lines.length ? (lines.length === 1 ? `r. ${lines[0]}` : `r. ${Math.min(...lines)}–${Math.max(...lines)}`) : '',
+      lines: lines.length ? (lines.length === 1 ? `L${lines[0]}` : `L${Math.min(...lines)}–${Math.max(...lines)}`) : '',
     }
   }, [selection, timeline])
 
   return (
     <div className="tl-toolbar">
       <div className="transport">
-        <button className="icon-btn" onClick={() => playback.step(-1 / fps)} title="Kadar natrag (←)" disabled={!timeline}>
+        <button className="icon-btn" onClick={() => playback.step(-1 / fps)} title="Previous frame (←)" disabled={!timeline}>
           <SkipBack />
         </button>
-        <button className="play-btn" onClick={() => playback.toggle()} title="Reproduciraj (razmak)" disabled={!timeline}>
+        <button className="play-btn" onClick={() => playback.toggle()} title="Play / pause (Space)" disabled={!timeline}>
           {playing ? <Pause /> : <Play />}
         </button>
-        <button className="icon-btn" onClick={() => playback.step(1 / fps)} title="Kadar naprijed (→)" disabled={!timeline}>
+        <button className="icon-btn" onClick={() => playback.step(1 / fps)} title="Next frame (→)" disabled={!timeline}>
           <SkipForward />
         </button>
         <span className="timecode mono">
@@ -313,8 +313,8 @@ function Toolbar(props: {
           <span className="faint"> / {timecode(timeline?.duration ?? 0)}</span>
         </span>
         {stale && (
-          <span className="badge sun" title="Vremenska crta je od zadnjeg uspješnog rendera">
-            od zadnjeg rendera
+          <span className="badge sun" title="The timeline is from the last successful render">
+            from last render
           </span>
         )}
       </div>
@@ -322,21 +322,21 @@ function Toolbar(props: {
       <div className="tl-selection">
         {sel && (
           <>
-            <span className="badge blue">{sel.count === 1 ? '1 klip' : `${sel.count} klipa`}</span>
+            <span className="badge blue">{sel.count === 1 ? '1 clip' : `${sel.count} clips`}</span>
             <span className="mono faint">
               {sel.span.toFixed(1)} s {sel.lines && `· ${sel.lines}`}
             </span>
-            <button className={`icon-btn ${props.loop ? 'on' : ''}`} onClick={() => props.setLoop(!props.loop)} title="Ponavljaj odabrano">
+            <button className={`icon-btn ${props.loop ? 'on' : ''}`} onClick={() => props.setLoop(!props.loop)} title="Loop the selection">
               <Repeat />
             </button>
-            <span className="hint">Pitaj Claudea o odabranome u razgovoru →</span>
+            <span className="hint">Ask Claude about the selection in the chat →</span>
           </>
         )}
       </div>
 
       <div className="tl-right">
         <div className="zoom">
-          <button className="icon-btn" onClick={() => props.zoomTo(props.scale / 1.4)} title="Udalji (⌘ + kotačić)">
+          <button className="icon-btn" onClick={() => props.zoomTo(props.scale / 1.4)} title="Zoom out (⌘ + scroll)">
             <Minus />
           </button>
           <input
@@ -346,20 +346,20 @@ function Toolbar(props: {
             step={0.01}
             value={Math.log(props.scale)}
             onChange={(e) => props.zoomTo(Math.exp(Number(e.target.value)))}
-            aria-label="Zum vremenske crte"
+            aria-label="Timeline zoom"
           />
-          <button className="icon-btn" onClick={() => props.zoomTo(props.scale * 1.4)} title="Približi">
+          <button className="icon-btn" onClick={() => props.zoomTo(props.scale * 1.4)} title="Zoom in">
             <Plus />
           </button>
-          <button className={`icon-btn ${props.fit ? 'on' : ''}`} onClick={props.onFit} title="Cijeli video">
+          <button className={`icon-btn ${props.fit ? 'on' : ''}`} onClick={props.onFit} title="Fit the whole video">
             <Maximize2 />
           </button>
         </div>
         <button className="btn small" onClick={() => openDialog({ kind: 'booth' })} disabled={!timeline?.voice.length} title="⌘⇧R">
-          <Mic /> Snimanje glasa
+          <Mic /> Record voice
         </button>
         <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })} disabled={!timeline} title="⌘E">
-          <Download /> Izvezi
+          <Download /> Export
         </button>
       </div>
     </div>
@@ -389,7 +389,7 @@ function Ruler({ duration, scale }: { duration: number; scale: number }) {
 }
 
 function clipLabel(c: Clip): string {
-  if (c.kind === 'wait') return 'pauza'
+  if (c.kind === 'wait') return 'wait'
   return c.anims.map((a) => (a.name === 'animate' ? '.animate' : a.name)).join(' · ')
 }
 
@@ -440,7 +440,7 @@ function ClipView(props: {
       if (source === null) return
       markEdited(source)
       void saveScene({ render: true })
-      toast(`Trajanje ${next.toFixed(1)} s · redak ${c.edit.line}${c.repeat && c.repeat > 1 ? ` (svih ${c.repeat} ponavljanja)` : ''}`, 'ok')
+      toast(`Duration ${next.toFixed(1)} s · line ${c.edit.line}${c.repeat && c.repeat > 1 ? ` (all ${c.repeat} repeats)` : ''}`, 'ok')
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
@@ -448,7 +448,7 @@ function ClipView(props: {
 
   const tip = (
     <div className="clip-tip">
-      <strong>{c.kind === 'wait' ? 'Pauza' : c.anims.map((a) => a.name).join(' + ')}</strong>
+      <strong>{c.kind === 'wait' ? 'Wait' : c.anims.map((a) => a.name).join(' + ')}</strong>
       {c.anims
         .filter((a) => a.target)
         .slice(0, 4)
@@ -458,15 +458,15 @@ function ClipView(props: {
           </div>
         ))}
       <div className="mono">
-        {(c.end - c.start).toFixed(2)} s · {c.start.toFixed(2)}–{c.end.toFixed(2)} {c.line ? `· redak ${c.line}` : ''}
+        {(c.end - c.start).toFixed(2)} s · {c.start.toFixed(2)}–{c.end.toFixed(2)} {c.line ? `· line ${c.line}` : ''}
       </div>
-      {c.edit && c.repeat && c.repeat > 1 && <div className="tip-warn">U petlji: promjena vrijedi za svih {c.repeat} ponavljanja.</div>}
+      {c.edit && c.repeat && c.repeat > 1 && <div className="tip-warn">In a loop: the change applies to all {c.repeat} repeats.</div>}
       {c.locked && (
         <div className="tip-lock">
           <Lock /> {lockText(c.locked)}
         </div>
       )}
-      {c.edit && <div className="faint">Povuci desni rub za promjenu trajanja.</div>}
+      {c.edit && <div className="faint">Drag the right edge to change the duration.</div>}
     </div>
   )
 
@@ -487,12 +487,12 @@ function ClipView(props: {
 }
 
 const SOURCE: Record<VoiceSource, { label: string; icon: ReactNode; cls: string }> = {
-  recording: { label: 'Snimka', icon: <Mic />, cls: 'rec' },
-  system: { label: 'Sistemski glas', icon: <Laptop />, cls: 'tts' },
+  recording: { label: 'Recording', icon: <Mic />, cls: 'rec' },
+  system: { label: 'System voice', icon: <Laptop />, cls: 'tts' },
   elevenlabs: { label: 'ElevenLabs', icon: <AudioLines />, cls: 'tts' },
   omnivoice: { label: 'OmniVoice', icon: <Cpu />, cls: 'tts' },
-  silence: { label: 'Tišina (TTS nije uspio)', icon: <VolumeX />, cls: 'silent' },
-  unknown: { label: 'Nepoznato', icon: <AudioLines />, cls: 'tts' },
+  silence: { label: 'Silence (speech failed)', icon: <VolumeX />, cls: 'silent' },
+  unknown: { label: 'Unknown', icon: <AudioLines />, cls: 'tts' },
 }
 
 function VoiceView(props: { block: VoiceBlock; scale: number; showTip: (e: React.MouseEvent, body: ReactNode) => void; hideTip: () => void }) {
@@ -529,7 +529,7 @@ function VoiceView(props: { block: VoiceBlock; scale: number; showTip: (e: React
               {src.label} · {(v.end - v.start).toFixed(1)} s
             </strong>
             <div>“{v.text}”</div>
-            <div className="faint">Dvoklik otvara snimanje za ovu rečenicu.</div>
+            <div className="faint">Double-click to record this sentence.</div>
           </div>,
         )
       }
@@ -538,7 +538,7 @@ function VoiceView(props: { block: VoiceBlock; scale: number; showTip: (e: React
       <canvas ref={canvas} />
       <span className="voice-icon">{src.icon}</span>
       {v.bookmarks.map((b) => (
-        <span key={b.mark} className="bookmark" style={{ left: (b.t - v.start) * scale }} title={`bookmark „${b.mark}”`} />
+        <span key={b.mark} className="bookmark" style={{ left: (b.t - v.start) * scale }} title={`bookmark “${b.mark}”`} />
       ))}
     </div>
   )

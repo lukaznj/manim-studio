@@ -10,7 +10,8 @@ const defaults = (): Settings => ({
   claudeModel: '',
   autoRender: true,
   hasElevenLabsKey: false,
-  defaultVoice: { provider: 'system', language: 'hr', systemVoice: 'Lana' },
+  hasAnthropicKey: false,
+  defaultVoice: { provider: 'system', language: 'en' },
   sidebarWidth: 440,
   chatWidth: 380,
   timelineHeight: 248,
@@ -26,13 +27,13 @@ export function getSettings(): Settings {
     } catch {
       // first run, or a corrupt file: fall back to defaults
     }
-    cache = { ...defaults(), ...stored, hasElevenLabsKey: !!getSecret('elevenlabs') }
+    cache = { ...defaults(), ...stored, ...secretFlags() }
   }
   return cache
 }
 
 export function setSettings(patch: Partial<Settings>): Settings {
-  cache = { ...getSettings(), ...patch, hasElevenLabsKey: getSettings().hasElevenLabsKey }
+  cache = { ...getSettings(), ...patch, ...secretFlags() }
   writeFileSync(paths.settingsFile(), JSON.stringify(cache, null, 2))
   return cache
 }
@@ -43,6 +44,8 @@ export function rememberProject(path: string): void {
 }
 
 // --- secrets: encrypted with the OS keychain via safeStorage, never sent to the renderer ---
+
+const secretFlags = () => ({ hasElevenLabsKey: !!getSecret('elevenlabs'), hasAnthropicKey: !!getSecret('anthropic') })
 
 const secretFile = (name: string) => join(app.getPath('userData'), `${name}.secret`)
 
@@ -57,8 +60,8 @@ export function getSecret(name: string): string {
 }
 
 export function setSecret(name: string, value: string): Settings {
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('Šifriranje nije dostupno na ovom računalu')
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure storage is not available on this computer')
   writeFileSync(secretFile(name), value ? safeStorage.encryptString(value) : Buffer.alloc(0))
-  cache = { ...getSettings(), hasElevenLabsKey: !!value }
+  cache = { ...getSettings(), ...secretFlags() }
   return cache
 }

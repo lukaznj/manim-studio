@@ -6,21 +6,27 @@ import { closeDialog, createProject, useStore } from '../store'
 import { Modal } from './ui'
 
 const ASPECTS: { value: Aspect; title: string; hint: string }[] = [
-  { value: '16:9', title: 'Vodoravno', hint: 'Za ekran, projektor i YouTube' },
-  { value: '9:16', title: 'Uspravno', hint: 'Za mobitel, preko cijelog ekrana' },
+  { value: '16:9', title: 'Landscape', hint: 'For screens, projectors and YouTube' },
+  { value: '9:16', title: 'Portrait', hint: 'For phones, full screen' },
 ]
 
 const THEMES: { value: Theme; title: string }[] = [
-  { value: 'dark', title: 'Tamna' },
-  { value: 'light', title: 'Svijetla' },
+  { value: 'dark', title: 'Dark' },
+  { value: 'light', title: 'Light' },
 ]
+
+// Narration languages offered first; any BCP 47 code works in project.json.
+const LANGUAGES = ['en', 'en-GB', 'es', 'fr', 'de', 'it', 'pt', 'pt-BR', 'nl', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'hu', 'ro', 'sv', 'da', 'nb', 'fi', 'tr', 'el', 'uk', 'ru', 'ar', 'hi', 'ja', 'ko', 'zh']
+const languageName = new Intl.DisplayNames(['en'], { type: 'language' })
 
 export function NewProjectDialog() {
   const open = useStore((s) => s.dialog?.kind === 'new-project')
   const projectsDir = useStore((s) => s.settings?.projectsDir ?? '')
+  const defaultLanguage = useStore((s) => s.settings?.defaultVoice.language ?? 'en')
   const [name, setName] = useState('')
   const [aspect, setAspect] = useState<Aspect>('9:16')
   const [theme, setTheme] = useState<Theme>('dark')
+  const [language, setLanguage] = useState('en')
   const [parentDir, setParentDir] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -28,14 +34,15 @@ export function NewProjectDialog() {
     if (open) {
       setName('')
       setParentDir(projectsDir)
+      setLanguage(defaultLanguage)
       setBusy(false)
     }
-  }, [open, projectsDir])
+  }, [open, projectsDir, defaultLanguage])
 
   const submit = async () => {
     if (!name.trim() || busy) return
     setBusy(true)
-    await createProject({ name: name.trim(), aspect, theme, parentDir })
+    await createProject({ name: name.trim(), aspect, theme, language, parentDir })
     setBusy(false)
   }
 
@@ -43,28 +50,28 @@ export function NewProjectDialog() {
     <Modal
       open={open}
       onClose={closeDialog}
-      title="Novi projekt"
+      title="New project"
       icon={<Clapperboard className="head-icon" />}
       width={640}
       footer={
         <>
           <button className="btn ghost" onClick={closeDialog}>
-            Odustani
+            Cancel
           </button>
           <button className="btn primary" disabled={!name.trim() || busy} onClick={() => void submit()}>
-            {busy && <span className="spinner" />} Napravi projekt
+            {busy && <span className="spinner" />} Create project
           </button>
         </>
       }
     >
       <div className="modal-body new-project">
         <div className="field">
-          <label htmlFor="np-name">Naziv videa</label>
+          <label htmlFor="np-name">Video title</label>
           <input
             id="np-name"
             className="input"
             data-autofocus
-            placeholder="npr. Kvadratna funkcija — tjeme parabole"
+            placeholder="e.g. Quadratic functions: the vertex of a parabola"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void submit()}
@@ -97,12 +104,12 @@ export function NewProjectDialog() {
               </button>
             ))}
           </div>
-          <span className="hint">Format se kasnije ne mijenja: raspored scene ovisi o njemu.</span>
+          <span className="hint">The format can’t be changed later: the scene’s layout depends on it.</span>
         </div>
 
         <div className="np-row">
           <div className="field">
-            <span className="label">Tema videa</span>
+            <span className="label">Video theme</span>
             <div className="theme-swatches" role="radiogroup">
               {THEMES.map((t) => (
                 <button key={t.value} role="radio" aria-checked={theme === t.value} className={`swatch theme-${t.value} ${theme === t.value ? 'on' : ''}`} onClick={() => setTheme(t.value)}>
@@ -112,8 +119,18 @@ export function NewProjectDialog() {
               ))}
             </div>
           </div>
-          <div className="field grow">
-            <span className="label">Mapa</span>
+          <div className="field">
+            <label htmlFor="np-lang">Narration language</label>
+            <select id="np-lang" className="select" value={language} onChange={(e) => setLanguage(e.target.value)}>
+              {LANGUAGES.map((code) => (
+                <option key={code} value={code}>
+                  {languageName.of(code)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field grow span-2">
+            <span className="label">Folder</span>
             <div className="path-pick">
               <span className="mono path-text" title={parentDir}>
                 {parentDir}
@@ -125,7 +142,7 @@ export function NewProjectDialog() {
                   if (dir) setParentDir(dir)
                 }}
               >
-                <FolderOpen /> Promijeni
+                <FolderOpen /> Change
               </button>
             </div>
           </div>

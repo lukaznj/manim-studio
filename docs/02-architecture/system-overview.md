@@ -13,9 +13,9 @@
        ▼                   ▼                    ▼
  python -m studio_runner   bundled Claude Code  GitHub Releases
  (pixi env in userData)    binary (user's own   (electron-updater)
-   render / frame /        sign-in, in-process
-   thumbnail / export /    MCP tools "studio")
-   align / tts-worker
+   render / frames /       sign-in or key,
+   thumbnail / export /    in-process MCP
+   align / tts-worker      tools "studio")
 ```
 
 ## Processes
@@ -48,7 +48,7 @@
 | `<project>/exports/` | Final mp4/vtt/srt/jpg | no |
 | `userData/python-env/` | pixi manifest + lock + `.pixi/envs/{default,omnivoice,transcribe}` | – |
 | `userData/tinytex/` | LaTeX | – |
-| `userData/settings.json`, `elevenlabs.secret` | Settings; the API key encrypted with the OS keychain | – |
+| `userData/settings.json`, `elevenlabs.secret`, `anthropic.secret` | Settings; API keys encrypted with the OS keychain | – |
 
 ## IPC
 

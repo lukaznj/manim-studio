@@ -50,7 +50,7 @@ export async function runRunner<T = RunnerEvent>(
       if (event?.type === 'done') resolve(event as T)
       else if (event?.type === 'error') reject(Object.assign(new Error(String(event.message)), { event, log: log.join('\n') }))
       else if (signal) reject(Object.assign(new Error('cancelled'), { cancelled: true }))
-      else reject(Object.assign(new Error(`Python je izašao s kodom ${code}`), { log: log.join('\n') }))
+      else reject(Object.assign(new Error(`Python exited with code ${code}`), { log: log.join('\n') }))
     })
   })
   return { child, done, log: () => log.join('\n') }

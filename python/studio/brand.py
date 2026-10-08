@@ -1,4 +1,4 @@
-"""Maturita palette and per-project theme. Scenes use the semantic names
+"""The Studio palette and per-project theme. Scenes use the semantic names
 (TEXT, ACCENT, ...) so a project can switch light/dark without code changes."""
 
 import os
@@ -6,7 +6,7 @@ from pathlib import Path
 
 from manim import MarkupText, MathTex, Paragraph, Tex, Text, config
 
-# Raw brand colours (maturita admin + mobile "Fokus" tokens).
+# Raw palette (it started from the Maturita app's tokens).
 INK = "#16181D"
 NAVY = "#091E36"
 PAPER = "#F7F8FA"

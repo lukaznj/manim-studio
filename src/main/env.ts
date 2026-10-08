@@ -134,12 +134,12 @@ export async function install(component: Component): Promise<void> {
   if (installing.has(component)) return
   installing.add(component)
   delete errors[component]
-  emit({ component, state: 'installing', line: 'Pokrećem instalaciju…' })
+  emit({ component, state: 'installing', line: 'Starting the install…' })
   try {
     if (component === 'latex') await installLatex(component)
     else await installEnv(component === 'env' ? 'default' : component, component)
     installing.delete(component)
-    emit({ component, state: 'ready', line: 'Gotovo.' })
+    emit({ component, state: 'ready', line: 'Done.' })
   } catch (e) {
     installing.delete(component)
     errors[component] = (e as Error).message
@@ -149,7 +149,7 @@ export async function install(component: Component): Promise<void> {
 }
 
 async function installEnv(name: EnvName, component: Component): Promise<void> {
-  if (!existsSync(paths.pixi())) throw new Error(`Nedostaje pixi (${paths.pixi()}) — u razvoju pokreni: npm run fetch-pixi`)
+  if (!existsSync(paths.pixi())) throw new Error(`pixi is missing (${paths.pixi()}). In development, run: npm run fetch-pixi`)
   mkdirSync(paths.env(), { recursive: true })
   for (const f of ['pixi.toml', 'pixi.lock']) {
     const src = join(paths.python(), f)
@@ -170,9 +170,9 @@ async function installLatex(component: Component): Promise<void> {
   const url = `https://github.com/rstudio/tinytex-releases/releases/download/${TINYTEX_VERSION}/${asset}`
   const file = join(work, asset)
 
-  emit({ component, state: 'installing', line: `Preuzimam ${asset}…`, progress: 0 })
+  emit({ component, state: 'installing', line: `Downloading ${asset}…`, progress: 0 })
   const res = await fetch(url)
-  if (!res.ok || !res.body) throw new Error(`Preuzimanje TinyTeX-a nije uspjelo (HTTP ${res.status})`)
+  if (!res.ok || !res.body) throw new Error(`Downloading TinyTeX failed (HTTP ${res.status})`)
   const total = Number(res.headers.get('content-length') ?? 0)
   let received = 0
   const body = Readable.fromWeb(res.body as never)
@@ -182,7 +182,7 @@ async function installLatex(component: Component): Promise<void> {
   })
   await pipeline(body, createWriteStream(file))
 
-  emit({ component, state: 'installing', line: 'Raspakiravam…' })
+  emit({ component, state: 'installing', line: 'Unpacking…' })
   rmSync(dest, { recursive: true, force: true })
   if (process.platform === 'win32') {
     // A 7-Zip self-extracting archive that unpacks a TinyTeX\ folder.
@@ -194,9 +194,9 @@ async function installLatex(component: Component): Promise<void> {
   rmSync(work, { recursive: true, force: true })
 
   const bin = latexBin()
-  if (!bin) throw new Error('TinyTeX je raspakiran, ali bin/ mapa nedostaje')
+  if (!bin) throw new Error('TinyTeX was unpacked, but its bin/ folder is missing')
   const tlmgr = join(bin, process.platform === 'win32' ? 'tlmgr.bat' : 'tlmgr')
-  emit({ component, state: 'installing', line: 'Instaliram LaTeX pakete za manim…' })
+  emit({ component, state: 'installing', line: 'Installing the LaTeX packages manim needs…' })
   // The release's tlmgr usually trails its repository and refuses to install until updated.
   await run(tlmgr, ['update', '--self'], component)
   await run(tlmgr, ['install', ...LATEX_PACKAGES], component)
@@ -222,7 +222,7 @@ function run(cmd: string, args: string[], component: Component, opts: SpawnOptio
     child.stderr?.on('data', onData)
     child.on('error', reject)
     child.on('close', (code) =>
-      code === 0 ? resolve() : reject(new Error(`${cmd.split(/[\\/]/).pop()} je završio s greškom ${code}: ${tail.slice(-3).join(' · ')}`)),
+      code === 0 ? resolve() : reject(new Error(`${cmd.split(/[\\/]/).pop()} exited with code ${code}: ${tail.slice(-3).join(' · ')}`)),
     )
   })
 }

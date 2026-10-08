@@ -7,11 +7,11 @@ date: 2026-10-08
 
 ## Context
 
-Maturita is a phone app, so full-screen portrait video fits it, but some videos will also be shown on a projector. A scene's layout code depends on the frame's shape: positions, `next_to`, axis lengths.
+Study apps and short-video platforms want full-screen portrait video, but the same lessons are shown on projectors and YouTube. A scene's layout code depends on the frame's shape: positions, `next_to`, axis lengths.
 
 ## Decision
 
-- **Chosen per project.** The new-project dialog asks for the format, "Vodoravno 16:9" or "Uspravno 9:16". It can't be changed later.
+- **Chosen per project.** The new-project dialog asks for the format, "Landscape 16:9" or "Portrait 9:16". It can't be changed later.
 - **Frame geometry.**
   - Landscape is 14.2 × 8 units (manim's default).
   - Portrait mirrors it at 8 × 14.2, so default text sizes stay sensible.

@@ -6,7 +6,7 @@ Anything computed (`run_time=v.duration`, helper functions, `**kwargs`) is locke
 the timeline shows why, and the user asks Claude instead.
 
 Lines are 1-based, columns 0-based *characters* (ast gives UTF-8 byte offsets, which
-drift on lines with č/ć/š before the literal)."""
+drift on lines with non-ASCII letters, like č or é, before the literal)."""
 
 from __future__ import annotations
 

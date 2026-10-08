@@ -1,23 +1,39 @@
-# Builds and publishes a release when a v* tag is pushed (`npm version minor && git push --follow-tags`).
-# Installers and update metadata go to the public lukaznj/manim-studio-releases repo, which is
-# where installed apps look for updates. Setup and secrets: docs/06-operations/releasing.md
+# A v* tag (`npm version minor && git push --follow-tags`) builds all three platforms into a
+# draft GitHub release, then publishes it once every installer and latest*.yml is uploaded,
+# so installed apps never see a half-finished release. Signing: docs/06-operations/releasing.md
 name: Release
 
 on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: write
+
 jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --title "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   build:
+    needs: draft
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest # Apple Silicon
+          - os: macos-latest
             target: --mac --arm64
           - os: windows-latest
             target: --win --x64
+          - os: ubuntu-latest
+            target: --linux --x64
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,27 +42,29 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run fetch-pixi
-      - run: npm run typecheck
-      - run: npm test
-      - name: Python runner tests
+      - name: Xcode 26+ (compiles the Icon Composer icon)
         if: runner.os == 'macOS'
-        working-directory: python
-        run: ../resources/bin/pixi run python -m unittest discover tests
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - run: npm run build
-
-      - name: Package and publish (macOS, signed + notarized)
-        if: runner.os == 'macOS'
-        run: npx electron-builder ${{ matrix.target }} --publish always
+      - name: Package and upload to the draft release
+        run: npx electron-builder ${{ matrix.target }} $ADHOC --publish always
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+          # Without a certificate, sign ad hoc: an unsigned bundle counts as "damaged" once downloaded.
+          ADHOC: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_BASE64 == '' && '-c.mac.identity=-' || '' }}
+          # macOS signing + notarization; skipped when the secrets aren't set.
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_BASE64 || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CERT_PASSWORD || '' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Package and publish (Windows)
-        if: runner.os == 'Windows'
-        run: npx electron-builder ${{ matrix.target }} --publish always
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}

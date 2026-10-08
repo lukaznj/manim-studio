@@ -53,7 +53,7 @@ def _find(scene) -> dict[tuple, str]:
             continue  # a full-frame background
         t = EDGE_TOLERANCE
         if left < -hw - t or right > hw + t or bottom < -hh - t or top > hh + t:
-            found[("offscreen", id(m))] = f"{describe(m)} izlazi izvan kadra"
+            found[("offscreen", id(m))] = f"{describe(m)} goes outside the frame"
 
     leaves: list[Mobject] = []
     for m in scene.mobjects:
@@ -71,7 +71,7 @@ def _find(scene) -> dict[tuple, str]:
             smaller = min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
             if smaller > 1e-4 and w * h / smaller > OVERLAP_RATIO:
                 key = ("overlap", id(leaves[i]), id(leaves[j]))
-                found[key] = f"{describe(leaves[i])} preklapa {describe(leaves[j])}"
+                found[key] = f"{describe(leaves[i])} overlaps {describe(leaves[j])}"
     return found
 
 

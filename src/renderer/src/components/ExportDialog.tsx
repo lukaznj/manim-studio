@@ -43,26 +43,26 @@ export function ExportDialog() {
     <Modal
       open={open}
       onClose={() => !running && closeDialog()}
-      title="Izvoz videa"
+      title="Export video"
       icon={<Download className="head-icon" />}
       width={520}
       footer={
         result ? (
           <>
             <button className="btn ghost" onClick={closeDialog}>
-              Zatvori
+              Close
             </button>
             <button className="btn primary" onClick={() => void api.reveal(result)}>
-              <FolderOpen /> Prikaži u mapi
+              <FolderOpen /> Show in folder
             </button>
           </>
         ) : (
           <>
             <button className="btn ghost" disabled={running} onClick={closeDialog}>
-              Odustani
+              Cancel
             </button>
             <button className="btn primary" disabled={running || !timeline} onClick={() => void start()}>
-              {running ? <span className="spinner" /> : <Download />} {running ? 'Izvozim…' : 'Izvezi'}
+              {running ? <span className="spinner" /> : <Download />} {running ? 'Exporting…' : 'Export'}
             </button>
           </>
         )
@@ -74,26 +74,26 @@ export function ExportDialog() {
             <FileVideo /> <strong>Video</strong> <span className="mono faint">.mp4 · {res} · {fps} fps</span>
           </li>
           <li>
-            <Captions /> <strong>Titlovi</strong> <span className="mono faint">.vtt + .srt, iz naracije</span>
+            <Captions /> <strong>Subtitles</strong> <span className="mono faint">.vtt + .srt, from the narration</span>
           </li>
           <li>
-            <Image /> <strong>Sličica</strong> <span className="mono faint">.jpg, kadar s najviše sadržaja</span>
+            <Image /> <strong>Thumbnail</strong> <span className="mono faint">.jpg, the busiest frame</span>
           </li>
         </ul>
         {running && (
           <div className="export-progress">
             <div className="hint">
               {exportState?.stage === 'package'
-                ? 'Spremam datoteke…'
-                : `Renderiram u punoj kvaliteti${progress !== undefined ? ` · ${Math.round(progress * 100)}%` : '…'}`}
+                ? 'Saving the files…'
+                : `Rendering at full quality${progress !== undefined ? ` · ${Math.round(progress * 100)}%` : '…'}`}
             </div>
             <ProgressLine value={exportState?.stage === 'package' ? 1 : progress} />
-            <p className="hint">Puni render traje dulje od pregleda; nepromijenjeni dijelovi se ne crtaju ponovno.</p>
+            <p className="hint">A full-quality render takes longer than the preview; unchanged parts are reused from the cache.</p>
           </div>
         )}
         {result && (
           <div className="export-done">
-            <Check /> Spremljeno: <span className="mono">{result}</span>
+            <Check /> Saved: <span className="mono">{result}</span>
           </div>
         )}
         {error && (
@@ -101,7 +101,7 @@ export function ExportDialog() {
             <CircleAlert /> {error}
           </div>
         )}
-        {!running && !result && !error && <p className="hint">Datoteke idu u mapu „exports” unutar projekta.</p>}
+        {!running && !result && !error && <p className="hint">The files go into the project’s “exports” folder.</p>}
       </div>
     </Modal>
   )
