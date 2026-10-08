@@ -21,6 +21,7 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
+    "mcpb/**/*",
     "electron.vite.config.ts",
     "src/**/*.test.ts"
   ]

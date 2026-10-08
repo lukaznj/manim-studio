@@ -22,6 +22,9 @@ export const paths = {
     return app.isPackaged ? join(process.resourcesPath, 'bin', exe) : join(app.getAppPath(), 'resources', 'bin', exe)
   },
 
+  /** The Claude Desktop extension (built by scripts/build-mcpb.mjs; extraResources in a package). */
+  mcpb: () => (app.isPackaged ? join(process.resourcesPath, 'manim-studio.mcpb') : join(app.getAppPath(), 'out', 'manim-studio.mcpb')),
+
   /** The Claude Code binary shipped inside the Agent SDK's platform package. */
   claude(): string {
     const pkg = `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`

@@ -9,6 +9,7 @@
 ## What it does
 
 - **Claude writes the scene.** Describe what the video should show. Claude edits `scene.py`, renders it, looks at frames, and fixes layout problems before it answers. It uses your own Claude plan or an Anthropic API key.
+- **Or ask Claude Desktop.** Add the Manim Studio extension from Settings, then ask Claude in the Claude desktop app for a maths video. Manim Studio opens and Claude makes it there.
 - **The timeline comes from the render.** Sections, every `self.play`, the narration and the subtitles, each linked to its line of code. While the video plays, the line producing the frame lights up.
 - **Retime by dragging.** Drag a clip's edge and the `run_time=` in the code changes. Select clips and ask Claude about exactly that part.
 - **Narration and subtitles.** Narration lives in the code ([manim-voiceover](https://github.com/ManimCommunity/manim-voiceover)), and subtitles come from it. Voices:

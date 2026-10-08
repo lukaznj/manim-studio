@@ -12,7 +12,7 @@ const methods = [
   'listProjects', 'createProject', 'openProject', 'pickProject', 'pickFolder', 'closeProject', 'forgetProject', 'reveal',
   'saveScene', 'updateMeta', 'render', 'cancelRender', 'frame', 'exportVideo',
   'saveRecording', 'deleteRecording', 'saveVoiceReference', 'askMicrophone', 'elevenLabsVoices', 'systemVoices',
-  'chatSend', 'chatInterrupt', 'chatReset', 'chatModels', 'history', 'restore',
+  'chatSend', 'chatInterrupt', 'chatReset', 'chatModels', 'installClaudeExtension', 'history', 'restore',
   'checkForUpdates', 'downloadUpdate', 'installUpdate', 'openExternal',
 ] as const
 
