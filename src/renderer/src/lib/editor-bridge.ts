@@ -46,6 +46,29 @@ export const editorBridge = {
     return m.getValue()
   },
 
+  /**
+   * Inserts lines below the cursor's line, indented like it. Outside construct's body (the cursor
+   * still on the imports, say) they go after the scene's last line instead. One undo step.
+   */
+  insertLines(lines: string[]): boolean {
+    const m = model()
+    if (!editor || !m || !monaco) return false
+    const depth = (n: number) => m.getLineContent(n).match(/^\s*/)?.[0] ?? ''
+    let line = editor.getPosition()?.lineNumber ?? m.getLineCount()
+    const body = Array.from({ length: m.getLineCount() }, (_, i) => i + 1).filter((n) => m.getLineContent(n).trim() && depth(n).length >= 8)
+    if (body.length && (depth(line).length < 8 || line < body[0])) line = body[body.length - 1]
+    const current = m.getLineContent(line)
+    const indent = current.trim() ? depth(line) : '        '
+    const end = m.getLineMaxColumn(line)
+    editor.pushUndoStop()
+    editor.executeEdits('media', [{ range: new monaco.Range(line, end, line, end), text: '\n' + lines.map((l) => indent + l).join('\n') }])
+    editor.pushUndoStop()
+    editor.setPosition({ lineNumber: line + lines.length, column: m.getLineMaxColumn(line + lines.length) })
+    editor.revealLineInCenterIfOutsideViewport(line + lines.length)
+    editor.focus()
+    return true
+  },
+
   revealLine(line: number, focus = false) {
     if (!editor) return
     editor.revealLineInCenterIfOutsideViewport(line, 0)

@@ -5,10 +5,11 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { Quality, RenderError, RenderEvent, Timeline } from '../shared/types'
+import type { Quality, RenderError, RenderEvent, Theme, Timeline } from '../shared/types'
 import { commitAll } from './git'
 import { readTimeline, requireProject } from './projects'
 import { runRunner } from './runner'
+import { getSettings } from './settings'
 import { voiceEnv } from './voice'
 
 export type RenderOutcome = { timeline: Timeline } | { error: RenderError } | { cancelled: true }
@@ -32,7 +33,13 @@ export function pauseCommits(paused: boolean): void {
   commitsPaused = paused
 }
 
-export function render(quality: Quality): Promise<RenderOutcome> {
+/** A final render in another theme goes to its own folder (`.studio/final-light`), for exporting both. */
+export interface RenderVariant {
+  theme?: Theme
+  out?: string
+}
+
+export function render(quality: Quality, variant: RenderVariant = {}): Promise<RenderOutcome> {
   running.get(quality)?.cancel()
   const p = requireProject()
   const id = nextId++
@@ -53,7 +60,12 @@ export function render(quality: Quality): Promise<RenderOutcome> {
   entry.outcome = (async (): Promise<RenderOutcome> => {
     let log = ''
     try {
-      const job = await runRunner<{ result: Timeline }>('default', ['render', p.path, '--quality', quality], {
+      const { previewSize, previewFps } = getSettings()
+      const options =
+        quality === 'preview'
+          ? ['--size', String(previewSize), '--fps', String(previewFps)]
+          : [...(variant.theme ? ['--theme', variant.theme] : []), ...(variant.out ? ['--out', variant.out] : [])]
+      const job = await runRunner<{ result: Timeline }>('default', ['render', p.path, '--quality', quality, ...options], {
         extraEnv: await voiceEnv(p.meta, p.path),
         onEvent: (e) => {
           if (e.type === 'progress') send({ id, quality, type: 'progress', clips: Number(e.clips), t: Number(e.t) })

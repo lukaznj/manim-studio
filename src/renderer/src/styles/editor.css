@@ -92,6 +92,32 @@ body.resizing-y .code-host {
   font-weight: 600;
   font-size: 12.5px;
 }
+/* scene.py | Media: plain text tabs; the chosen one is full-strength. */
+.pane-tabs {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+.pane-tabs .file-tab {
+  height: 28px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+}
+.pane-tabs .file-tab:hover {
+  color: var(--text-2);
+  background: var(--raised);
+}
+.pane-tabs .file-tab[aria-selected='true'] {
+  color: var(--text);
+  background: var(--raised);
+}
+.pane-actions.hidden,
+.code-host.hidden {
+  display: none;
+}
 .file-tab svg {
   width: 15px;
   height: 15px;
@@ -116,6 +142,121 @@ body.resizing-y .code-host {
 .code-host {
   flex: 1;
   min-height: 0;
+}
+
+/* Media panel: the project's pictures and videos. */
+.media-pane {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.media-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* not the thumbnail's own width */
+  grid-template-rows: auto auto auto;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--raised);
+  overflow: hidden;
+}
+.media-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  background: var(--bg);
+  color: var(--text-3);
+}
+.media-thumb img {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  object-fit: contain;
+}
+.media-kind {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff; /* on the picture, in either theme */
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.media-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 9px 2px;
+  font-size: 11.5px;
+}
+.media-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+}
+.media-actions .icon-btn {
+  width: 26px;
+  height: 26px;
+}
+.media-add {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  min-height: 120px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-3);
+  font-weight: 600;
+}
+.media-add:hover {
+  color: var(--text-2);
+  border-color: var(--text-3);
+}
+.media-empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-top: 18%;
+  text-align: center;
+  color: var(--text-2);
+}
+.media-empty > svg {
+  width: 34px;
+  height: 34px;
+  color: var(--text-3);
+}
+.media-drop {
+  position: absolute;
+  inset: 8px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--blue);
+  border-radius: var(--r-lg);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 600;
+  pointer-events: none;
 }
 .banner {
   display: flex;

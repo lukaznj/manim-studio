@@ -12,8 +12,8 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { z } from 'zod'
 import { desktopTools, type DesktopToolName } from '../shared/studio-tools'
-import type { ClaudeDesktopStatus } from '../shared/types'
-import { languageName } from './claude'
+import type { ClaudeDesktopStatus, ExportResult } from '../shared/types'
+import { languageName, mediaNote } from './claude'
 import { createProject, listProjects, readScene, requireProject, saveScene } from './projects'
 import { getSettings } from './settings'
 import { getTimeline, renderPreview, textResult, viewFrames } from './scene-tools'
@@ -24,7 +24,7 @@ export interface DesktopHost {
   openInWindow(dir: string): Promise<void>
   /** Tells the window scene.py changed under it (the editor updates; no render, Claude asks for one). */
   sceneWritten(source: string): void
-  exportVideo(): Promise<string>
+  exportVideo(): Promise<ExportResult>
 }
 
 // Claude Desktop gives up on a tool call after about a minute, so nothing here waits longer.
@@ -147,6 +147,7 @@ function guide(): string {
     `"${meta.name}" is open in Manim Studio (${path}).`,
     `Format ${meta.aspect} (${meta.aspect === '9:16' ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), video theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
     `Write all narration and on-screen text in ${language}.`,
+    mediaNote(path),
     'Change scene.py only through write_scene or edit_scene. After each change call render_preview, then view_frames at the moments you changed.',
     'The guide below speaks of render_preview and view_frames; they are the same tools here.',
     '',
@@ -170,27 +171,26 @@ function findProject(query: string): string {
 }
 
 // One export at a time. A finished one is reported until scene.py changes; then a call starts a new one.
-type ExportJob = { dir: string; source: string; path?: string; error?: string }
+type ExportJob = { dir: string; source: string; result?: ExportResult; error?: string }
 let job: ExportJob | null = null
 
 async function exportVideo(host: DesktopHost): Promise<CallToolResult> {
   const dir = requireProject().path
   const source = readScene()
-  const running = job && !job.path && !job.error
-  if (!running && !(job?.path && job.dir === dir && job.source === source)) {
+  const running = job && !job.result && !job.error
+  if (!running && !(job?.result && job.dir === dir && job.source === source)) {
     const started: ExportJob = (job = { dir, source })
     host.exportVideo().then(
-      (path) => (started.path = path),
+      (result) => (started.result = result),
       (e: Error) => (started.error = e.message),
     )
   }
   const current = job!
-  for (let waited = 0; !current.path && !current.error && waited < MAX_WAIT_MS; waited += 500) await new Promise((r) => setTimeout(r, 500))
+  for (let waited = 0; !current.result && !current.error && waited < MAX_WAIT_MS; waited += 500) await new Promise((r) => setTimeout(r, 500))
   if (current.error) {
     job = null
     return textResult(`The export failed: ${current.error}`, true)
   }
-  if (!current.path) return textResult('Exporting the 1080p video; the app shows its progress. Call export_video again in a minute or two.')
-  const base = current.path.replace(/\.mp4$/, '')
-  return textResult(`Exported:\n- ${current.path}\n- ${base}.vtt and ${base}.srt (subtitles)\n- ${base}.jpg (thumbnail)`)
+  if (!current.result) return textResult('Exporting the 1080p video; the app shows its progress. Call export_video again in a minute or two.')
+  return textResult(`Exported into ${current.result.folder}:\n${current.result.files.map((f) => `- ${f}`).join('\n')}`)
 }

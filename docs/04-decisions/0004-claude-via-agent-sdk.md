@@ -44,7 +44,7 @@ The first two points fit this app: the binary is unmodified, the flow is Anthrop
 - **Session per project.** The session id is saved in `project.json` and resumed when the session file exists on this machine.
 - **Commits.** Renders don't commit while Claude works; the turn commits once at the end as "Claude: …".
 - **Model and effort.** Two pickers under the chat box (and in Settings → Claude) list what `supportedModels()` offers the current account, with each model's effort levels.
-  - Empty means the account's default model, or the model's default effort.
+  - Empty means the account's default model. Effort is always a real level: medium unless chosen, which is what Claude Code itself ran at by default, so the picker never says a vague "default".
   - A change applies to the running session (`setModel`, `applyFlagSettings({ effortLevel })`), so switching keeps the conversation. Verified: the next turn ran on the new model and effort, in the same session.
   - Picking a model that doesn't offer the chosen effort resets effort to the model's default. Otherwise Claude Code would lower it silently while the picker showed the old value.
   - The list is fetched again whenever the sign-in or API key changes.

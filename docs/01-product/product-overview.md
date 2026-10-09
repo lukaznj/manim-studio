@@ -20,7 +20,9 @@ Each person uses their own Claude plan or Anthropic API key ([[../04-decisions/0
    - Drafts use a free voice: the system voice for the project's language, or local OmniVoice.
    - The final take is ElevenLabs, OmniVoice cloning your voice, or your own recording from the recording booth.
    - Animations stretch to the real speech.
-6. **Export.** You get a 1080p mp4, `.vtt`/`.srt` subtitles taken from the narration, and a thumbnail.
+6. **Export.** A 1080p mp4 in the light theme, the dark one, or both, with subtitles and a thumbnail. Add languages and you also get each language's narration as an audio track plus its subtitles: what YouTube needs to offer viewers several languages ([[../04-decisions/0013-export-versions-and-languages|ADR 0013]]).
+
+Along the way you can add your own pictures and videos in the Media tab ([[../04-decisions/0012-own-media-in-scenes|ADR 0012]]). The first project you open starts a short tour of the editor.
 
 ## What it is not
 

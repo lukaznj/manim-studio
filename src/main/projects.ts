@@ -142,6 +142,12 @@ export function updateMeta(patch: Partial<ProjectMeta>): ProjectMeta {
   return p.meta
 }
 
+/** The pictures and videos in the open project's media/, for Claude's instructions. */
+export function mediaNames(dir = requireProject().path): string[] {
+  const media = join(dir, 'media')
+  return existsSync(media) ? readdirSync(media).filter((n) => !n.startsWith('.')).sort() : []
+}
+
 export function readScene(): string {
   return readFileSync(sceneFile(requireProject().path), 'utf8')
 }

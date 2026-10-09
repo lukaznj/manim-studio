@@ -23,7 +23,9 @@
 - **16:9 or 9:16.** Choose the format per project, and a light or dark video theme.
 - **Light and dark app.** Follows your system by default, and cross-fades when it switches.
 - **Version history.** Every render and every Claude turn is a commit you can go back to. No git install needed.
-- **Export.** A 1080p mp4, `.vtt`/`.srt` subtitles and a thumbnail.
+- **Your own pictures and videos.** Drop them into the Media tab, then insert them into the scene or ask Claude to use them.
+- **Export for YouTube, in any language.** A 1080p mp4 (light, dark or both), plus subtitles and a dubbed audio track for every language you add. Claude translates, and your chosen voice speaks it over the same video.
+- **A short tour** the first time you open a project (Help → Show Tutorial brings it back).
 
 | | |
 |---|---|

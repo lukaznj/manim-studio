@@ -39,7 +39,7 @@ _THEMES = {
 
 THEME = os.environ.get("STUDIO_THEME", "dark")
 _t = _THEMES.get(THEME, _THEMES["dark"])
-BG = _t["BG"]
+BG = os.environ.get("STUDIO_BG") or _t["BG"]  # the project's custom background, if it set one
 TEXT = _t["TEXT"]
 MUTED = _t["MUTED"]
 ACCENT = _t["ACCENT"]
