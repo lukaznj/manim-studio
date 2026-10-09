@@ -47,7 +47,7 @@ On first launch the app installs what renders need into its own data folder: Pyt
 
 Sign in from the app with your Claude account. The sign-in runs the official Claude Code login in your browser, and Claude Code keeps the credentials, so Manim Studio never sees them. Usage counts against your own plan.
 
-You can use an [Anthropic API key](https://console.anthropic.com) instead (Settings → Claude). It's stored encrypted with your system keychain.
+Or switch to an [Anthropic API key](https://console.anthropic.com) in Settings → Claude ("Use Claude with"). It's stored encrypted with your system keychain. With an account, the chat header shows how much of your plan's limits you've used, and Settings → Claude has every limit with its reset time.
 
 ## Develop
 

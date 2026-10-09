@@ -31,3 +31,10 @@ export async function sha1(text: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text))
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
+
+/** When a plan limit resets: "at 18:40" today, otherwise "Mon 09:00". */
+export function resetTime(iso: string): string {
+  const d = new Date(iso)
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  return d.toDateString() === new Date().toDateString() ? `at ${time}` : `${d.toLocaleDateString('en-GB', { weekday: 'short' })} ${time}`
+}

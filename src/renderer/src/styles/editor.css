@@ -437,20 +437,52 @@ body.resizing-y .code-host {
 .claude-mark {
   color: var(--sun-text) !important;
 }
-.account-chip {
+/* Claude plan usage: the tightest limit, a thin bar and its percentage. Amber from 70%, coral from 90%. */
+.usage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 7px;
+  margin-right: 2px;
   border: none;
-  background: none;
-  padding: 0;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11.5px;
-  text-transform: capitalize;
-  margin-right: 4px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  font: 600 11px var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
-.account-chip:hover {
+.usage-chip:hover {
+  background: var(--raised);
   color: var(--text-2);
+}
+.usage-bar {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+.usage-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--blue);
+  transition: width 0.4s var(--ease-out);
+}
+.warm .usage-bar > span {
+  background: var(--sun);
+}
+.hot .usage-bar > span {
+  background: var(--coral);
+}
+.usage-chip.warm {
+  color: var(--sun-text);
+}
+.usage-chip.hot {
+  color: var(--coral);
 }
 .chat-list {
   min-height: 0;

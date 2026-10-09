@@ -1,12 +1,13 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, session, shell, systemPreferences } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell, systemPreferences } from 'electron'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import type { EventChannel, ProjectMeta, Quality } from '../shared/types'
-import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, closeChat, loadChat, onChatEvent } from './claude'
+import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, claudeUsage, closeChat, loadChat, onChatEvent } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
 import { history, restore } from './git'
-import { startDesktopEndpoint } from './mcp'
+import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
+import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
 import { cancel, frame, onRenderEvent, render } from './render'
@@ -134,12 +135,16 @@ function registerIpc(): void {
     const settings = setSettings(patch)
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
+    // Another sign-in method means another Claude Code process: the next message starts it.
+    if ('claudeAuth' in patch) closeChat()
+    if (patch.appearance || patch.recentProjects) refreshMenu()
     return settings
   })
   handle('setElevenLabsKey', (key: string) => setSecret('elevenlabs', key.trim()))
   handle('setAnthropicKey', (key: string) => setSecret('anthropic', key.trim()))
 
   handle('claudeStatus', () => claudeStatus())
+  handle('claudeUsage', () => claudeUsage())
   handle('claudeLogin', () => claudeLogin((e) => send('claude-login', e)))
   handle('claudeLoginCode', (code: string) => claudeLoginCode(code))
   handle('claudeLogout', () => claudeLogout())
@@ -149,6 +154,7 @@ function registerIpc(): void {
   handle('openProject', (path: string) => {
     const opened = projects.openProject(path)
     loadChat(path)
+    refreshMenu()
     return opened
   })
   handle('pickProject', async () => {
@@ -167,6 +173,7 @@ function registerIpc(): void {
     stopTtsWorker()
     cancel('preview')
     projects.closeProject()
+    refreshMenu()
   })
   handle('forgetProject', (path: string) => setSettings({ recentProjects: getSettings().recentProjects.filter((p) => p !== path) }))
   handle('reveal', (path: string) => shell.showItemInFolder(path))
@@ -179,11 +186,8 @@ function registerIpc(): void {
   handle('cancelRender', () => cancel('preview'))
   handle('frame', async (t: number, width?: number) => frame(t, width))
   handle('exportVideo', () => exportVideo())
-  handle('installClaudeExtension', async () => {
-    // Claude Desktop owns .mcpb files and shows its own install dialog.
-    const error = await shell.openPath(paths.mcpb())
-    if (error) throw new Error(`Couldn’t open the extension (${error}). Is Claude Desktop installed?`)
-  })
+  handle('installClaudeExtension', installClaudeExtension)
+  handle('claudeDesktopStatus', () => claudeDesktopStatus())
 
   handle('saveRecording', async (key: string, wav: ArrayBuffer) => {
     const text = projects.readTimeline(projects.requireProject().path)?.voice.find((v) => v.key === key)?.text
@@ -222,6 +226,12 @@ function registerIpc(): void {
   )
 }
 
+/** Claude Desktop owns .mcpb files and shows its own install (or update) dialog. */
+async function installClaudeExtension(): Promise<void> {
+  const error = await shell.openPath(paths.mcpb())
+  if (error) throw new Error(`Couldn’t open the extension (${error}). Is Claude Desktop installed?`)
+}
+
 async function exportVideo(): Promise<string> {
   const p = projects.requireProject()
   send('export', { stage: 'render' })
@@ -243,7 +253,10 @@ app.whenReady().then(() => {
   app.setAppUserModelId('cc.razem.manimstudio')
   // The recording booth needs the microphone; nothing else asks for permissions.
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'media'))
-  if (process.platform === 'darwin') Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }]))
+  setupMenu(
+    (action, extra) => void showWindow().then(() => send('menu', { action, ...extra })),
+    () => void installClaudeExtension().catch((e: Error) => dialog.showErrorBox('Claude Desktop', e.message)),
+  )
 
   nativeTheme.themeSource = getSettings().appearance
   nativeTheme.on('updated', () => {

@@ -8,7 +8,7 @@ const invoke =
 
 const methods = [
   'appInfo', 'setupStatus', 'install', 'getSettings', 'setSettings', 'setElevenLabsKey', 'setAnthropicKey',
-  'claudeStatus', 'claudeLogin', 'claudeLoginCode', 'claudeLogout',
+  'claudeStatus', 'claudeUsage', 'claudeLogin', 'claudeLoginCode', 'claudeLogout', 'claudeDesktopStatus',
   'listProjects', 'createProject', 'openProject', 'pickProject', 'pickFolder', 'closeProject', 'forgetProject', 'reveal',
   'saveScene', 'updateMeta', 'render', 'cancelRender', 'frame', 'exportVideo',
   'saveRecording', 'deleteRecording', 'saveVoiceReference', 'askMicrophone', 'elevenLabsVoices', 'systemVoices',

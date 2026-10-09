@@ -10,7 +10,7 @@ import { app } from 'electron'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { sceneTools } from '../shared/studio-tools'
-import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, ClaudeStatus, ModelOption } from '../shared/types'
+import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, ClaudeStatus, ModelOption, PlanUsage, UsageWindow } from '../shared/types'
 import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
@@ -23,9 +23,12 @@ type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
 const sdk = () => (sdkPromise ??= import('@anthropic-ai/claude-agent-sdk'))
 
-/** cleanEnv() strips inherited ANTHROPIC_* variables; a key the user saved in Settings is put back. */
+/** Settings → Claude chooses between the Claude account sign-in and the user's own API key. */
+const usingApiKey = () => getSettings().claudeAuth === 'api-key'
+
+/** cleanEnv() strips inherited ANTHROPIC_* variables; the key saved in Settings goes back only when it's the chosen method. */
 const claudeEnv = (): NodeJS.ProcessEnv => {
-  const apiKey = getSecret('anthropic')
+  const apiKey = usingApiKey() ? getSecret('anthropic') : ''
   return { ...cleanEnv(), CLAUDE_AGENT_SDK_CLIENT_APP: `manim-studio/${app.getVersion()}`, ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}) }
 }
 
@@ -51,7 +54,7 @@ function runClaude(args: string[]): Promise<{ code: number | null; out: string }
 }
 
 export async function claudeStatus(): Promise<ClaudeStatus> {
-  if (getSecret('anthropic')) return { loggedIn: true, method: 'api-key', subscription: 'API key' }
+  if (usingApiKey()) return { loggedIn: !!getSecret('anthropic'), method: 'api-key', subscription: 'API key' }
   try {
     const { out } = await runClaude(['auth', 'status'])
     const json = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1))
@@ -216,6 +219,54 @@ export async function chatModels(): Promise<ModelOption[]> {
   } finally {
     inbox.close()
     q.close()
+  }
+}
+
+const WINDOW_LABELS: Record<string, string> = {
+  five_hour: '5-hour limit',
+  seven_day: 'Weekly limit',
+  seven_day_opus: 'Weekly Opus',
+  seven_day_sonnet: 'Weekly Sonnet',
+}
+
+type UsageAnswer = {
+  rate_limits_available: boolean
+  rate_limits: Record<string, unknown> & { model_scoped?: { display_name: string; utilization: number | null; resets_at: string | null }[] } | null
+}
+
+/**
+ * The plan's limits as /usage shows them: shared with claude.ai and Claude Desktop, not just Studio.
+ * The SDK marks this call experimental, so a missing or renamed method only hides the meter.
+ */
+export async function claudeUsage(): Promise<PlanUsage | null> {
+  if (usingApiKey()) return null
+  const read = async (q: Query) => {
+    const usage = (q as unknown as Record<string, unknown>).usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET
+    if (typeof usage !== 'function') return null
+    const answer = (await usage.call(q, { skipBehaviors: true })) as UsageAnswer
+    if (!answer.rate_limits_available || !answer.rate_limits) return null
+    const windows: UsageWindow[] = []
+    for (const [key, label] of Object.entries(WINDOW_LABELS)) {
+      const w = answer.rate_limits[key] as { utilization: number | null; resets_at: string | null } | null | undefined
+      if (w?.utilization != null) windows.push({ label, percent: w.utilization, resetsAt: w.resets_at })
+    }
+    for (const w of answer.rate_limits.model_scoped ?? [])
+      if (w.utilization != null) windows.push({ label: `Weekly ${w.display_name}`, percent: w.utilization, resetsAt: w.resets_at })
+    return windows.length ? { windows, checkedAt: Date.now() } : null
+  }
+  try {
+    if (session) return await read(session.query)
+    const { query } = await sdk()
+    const inbox = new Inbox()
+    const q = query({ prompt: inbox, options: { env: claudeEnv(), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
+    try {
+      return await read(q)
+    } finally {
+      inbox.close()
+      q.close()
+    }
+  } catch {
+    return null
   }
 }
 

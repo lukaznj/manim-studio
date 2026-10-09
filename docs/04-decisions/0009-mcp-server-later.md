@@ -20,6 +20,7 @@ Constraints:
 - **A Claude Desktop extension** (`.mcpb`, an MCP Bundle), built from `mcpb/server.ts` by `scripts/build-mcpb.mjs` and shipped inside the app.
   - Settings → Claude → "Add to Claude Desktop" opens it, and Claude Desktop shows its own install dialog.
   - It's a `node` extension: Claude Desktop supplies Node, so nothing else gets installed.
+  - Settings reads Claude Desktop's own record of installed extensions (`extensions-installations.json` in its data folder). It shows "Installed", "Turned off", or "Update in Claude Desktop" when the app ships a newer version. If Claude Desktop changes that format, the button simply offers to add the extension again.
 - **The extension is a thin proxy.** It is a stdio MCP server whose tool list comes from `src/shared/studio-tools.ts`, so listing works without the app.
   - On a tool call, it reads `<userData>/mcp-endpoint.json` (port, token, pid) and checks the app answers.
   - If the app isn't running, it starts it: `open -b cc.razem.manimstudio` on macOS, `manim-studio://` on Windows and Linux. It then waits up to a minute and forwards the call.

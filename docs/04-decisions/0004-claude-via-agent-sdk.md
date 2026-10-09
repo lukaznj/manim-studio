@@ -27,7 +27,14 @@ The first two points fit this app: the binary is unmodified, the flow is Anthrop
   - "Sign in" runs that binary's own `claude auth login --claudeai`, which is Anthropic's browser OAuth.
   - Credentials are stored by Claude Code itself; the app never sees them.
   - Status comes from `claude auth status` and sign-out from `claude auth logout`.
-- **API key, optional.** Settings → Claude takes an Anthropic API key from the user's own Console account. It's stored with `safeStorage` like the ElevenLabs key and handed to the binary as `ANTHROPIC_API_KEY`, which then takes precedence over the sign-in.
+- **Account or API key, chosen explicitly.** Settings → Claude has a switch, "Use Claude with: Claude account | API key" (`settings.claudeAuth`, default account).
+  - The API key comes from the user's own Console account. It's stored with `safeStorage` like the ElevenLabs key, and handed to the binary as `ANTHROPIC_API_KEY` only while the switch says API key.
+  - A saved key no longer silently overrides the sign-in.
+  - Switching ends the running chat session; the next message starts Claude Code with the new method and resumes the conversation.
+- **Plan usage, shown.** With an account, the chat header shows the plan's tightest limit, and Settings → Claude lists every limit with its reset time. The limits are shared with claude.ai and Claude Desktop.
+  - The numbers come from the SDK's `/usage` call (`usage_EXPERIMENTAL_…`), refreshed after each turn and when the window regains focus (at most once a minute).
+  - The SDK marks that call experimental, so if it disappears or changes shape, the meter hides instead of failing.
+  - The plan name is no longer shown in the chat header.
 - **Environment.** Otherwise `ANTHROPIC_*`, `CLAUDECODE` and `CLAUDE_CODE_*` are stripped from the environment, so a stray key or parent session can't redirect usage. `CLAUDE_AGENT_SDK_CLIENT_APP` names the app to Anthropic.
 - **Branding.** The chat pane is "Claude Agent", with no Claude Code branding or look, as the Agent SDK's branding guidelines ask.
 - **Tools Claude gets.**

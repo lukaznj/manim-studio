@@ -8,9 +8,11 @@ import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { z } from 'zod'
 import { desktopTools, type DesktopToolName } from '../shared/studio-tools'
+import type { ClaudeDesktopStatus } from '../shared/types'
 import { languageName } from './claude'
 import { createProject, listProjects, readScene, requireProject, saveScene } from './projects'
 import { getSettings } from './settings'
@@ -50,6 +52,32 @@ export function startDesktopEndpoint(host: DesktopHost): void {
     writeFileSync(endpointFile(), JSON.stringify({ port, token, pid: process.pid }), { mode: 0o600 })
   })
   app.on('will-quit', () => rmSync(endpointFile(), { force: true }))
+}
+
+/** Whether Claude Desktop has our extension: it records installs in its own data folder. */
+export function claudeDesktopStatus(): ClaudeDesktopStatus {
+  const dir =
+    process.platform === 'darwin'
+      ? join(homedir(), 'Library', 'Application Support', 'Claude')
+      : process.platform === 'win32'
+        ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Claude')
+        : join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'Claude')
+  const status: ClaudeDesktopStatus = { installed: false, enabled: false, version: null, current: app.getVersion() }
+  type Installed = { version?: string; manifest?: { name?: string; version?: string } }
+  try {
+    const { extensions } = JSON.parse(readFileSync(join(dir, 'extensions-installations.json'), 'utf8')) as { extensions: Record<string, Installed> }
+    const [id, ext] = Object.entries(extensions).find(([, e]) => e.manifest?.name === 'manim-studio') ?? []
+    if (!id || !ext) return status
+    let enabled = true
+    try {
+      enabled = JSON.parse(readFileSync(join(dir, 'Claude Extensions Settings', `${id}.json`), 'utf8')).isEnabled !== false
+    } catch {
+      // no settings file yet: Claude Desktop's default is on
+    }
+    return { ...status, installed: true, enabled, version: ext.version ?? ext.manifest?.version ?? null }
+  } catch {
+    return status // no Claude Desktop, or it changed how it stores extensions
+  }
 }
 
 function body(req: IncomingMessage): Promise<string> {

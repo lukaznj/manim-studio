@@ -5,7 +5,9 @@ import type {
   ChatMessage,
   ClaudeStatus,
   Component,
+  MenuAction,
   ModelOption,
+  PlanUsage,
   OpenProject,
   ProjectMeta,
   ProjectSummary,
@@ -54,6 +56,8 @@ interface State {
   setupProgress: Partial<Record<Component, number>>
   claude: ClaudeStatus | null
   models: ModelOption[] // what the signed-in account (or API key) can use
+  usage: PlanUsage | null // the Claude plan's limits, when signed in with an account
+  historyOpen: boolean
   projects: ProjectSummary[]
 
   project: { path: string; meta: ProjectMeta } | null
@@ -86,6 +90,8 @@ export const useStore = create<State>(() => ({
   setupProgress: {},
   claude: null,
   models: [],
+  usage: null,
+  historyOpen: false,
   projects: [],
   project: null,
   savedSource: '',
@@ -161,6 +167,9 @@ export async function boot(): Promise<void> {
     else set((s) => (s.setup ? { setup: { ...s.setup, [e.component]: 'installing' } } : {}))
   })
   api.on('file-changed', ({ source, agent }) => onExternalChange(source, agent))
+  api.on('menu', onMenu)
+  // Plan usage moves while you work elsewhere too (claude.ai, Claude Desktop), so look again on return.
+  window.addEventListener('focus', () => void refreshUsage())
   api.on('open-project', ({ path }) => {
     if (get().project?.path === path) return
     void openProject(path).then(() => toast('Claude Desktop opened this project'))
@@ -177,6 +186,7 @@ let modelsFor = '' // the account the model list belongs to
 export async function refreshClaude(): Promise<void> {
   const claude = await api.claudeStatus()
   set({ claude })
+  void refreshUsage(true) // gone with an API key or after signing out
   const who = claude.loggedIn ? `${claude.method}:${claude.email ?? ''}` : ''
   if (who === modelsFor) return
   if (!who) {
@@ -188,6 +198,64 @@ export async function refreshClaude(): Promise<void> {
   if (models) {
     modelsFor = who
     set({ models })
+  }
+}
+
+let usageAt = 0
+
+/** At most once a minute unless forced (after a sign-in or a chat turn): each check starts Claude Code. */
+export async function refreshUsage(force = false): Promise<void> {
+  if (!get().claude?.loggedIn) return set({ usage: null })
+  if (!force && Date.now() - usageAt < 60_000) return
+  usageAt = Date.now()
+  set({ usage: await api.claudeUsage().catch(() => null) })
+}
+
+/** Open a project folder chosen in the system dialog. */
+export async function pickAndOpenProject(): Promise<void> {
+  try {
+    const dir = await api.pickProject()
+    if (dir) await openProject(dir)
+  } catch (e) {
+    toast(errorText(e), 'error')
+  }
+}
+
+/** The macOS menu bar's commands (src/main/menu.ts), doing what the matching buttons and keys do. */
+function onMenu({ action, path, value }: { action: MenuAction; path?: string; value?: string }): void {
+  const { project, dialog } = get()
+  switch (action) {
+    case 'settings':
+      return openDialog({ kind: 'settings' })
+    case 'claude-settings':
+      return openDialog({ kind: 'settings', tab: 'account' })
+    case 'new-project':
+      return openDialog({ kind: 'new-project' })
+    case 'open-project':
+      return void pickAndOpenProject()
+    case 'open-recent':
+      return void (path && openProject(path))
+    case 'appearance':
+      return void updateSettings({ appearance: value as Settings['appearance'] })
+  }
+  if (!project || dialog) return // the rest work on the open project, like their keys
+  switch (action) {
+    case 'save':
+      return void saveScene({ render: true })
+    case 'render':
+      return void renderNow()
+    case 'play':
+      return playback.toggle()
+    case 'booth':
+      return openDialog({ kind: 'booth' })
+    case 'export':
+      return openDialog({ kind: 'export' })
+    case 'history':
+      return set((s) => ({ historyOpen: !s.historyOpen }))
+    case 'close-project':
+      return void closeProject()
+    case 'new-conversation':
+      if (get().chat.length && confirm('Start a new conversation? Claude forgets the context of this project’s current one.')) void api.chatReset()
   }
 }
 
@@ -245,7 +313,7 @@ export async function createProject(input: Parameters<typeof api.createProject>[
 export async function closeProject(): Promise<void> {
   if (get().dirty) await saveScene()
   await api.closeProject()
-  withTransition(() => set({ screen: 'home', project: null, timeline: null, chat: [], selection: [] }))
+  withTransition(() => set({ screen: 'home', project: null, timeline: null, chat: [], selection: [], historyOpen: false }))
   void refreshProjects()
 }
 
@@ -361,6 +429,7 @@ function onChat(e: ChatEvent): void {
   if (e.type === 'done') {
     // An expired or revoked sign-in shows up as a failed turn; re-check so the sign-in card returns.
     if (!e.ok) void refreshClaude()
+    else void refreshUsage(true)
     set((s) => ({
       streaming: {},
       chat: e.ok
