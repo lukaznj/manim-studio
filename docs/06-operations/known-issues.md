@@ -9,6 +9,7 @@ Each item below was either measured during development, or not verified because 
   - the Windows SAPI voice, including a language whose voice pack isn't installed
   - `espeak-ng` on Linux, and the AppImage's microphone permission for the recording booth
   - the NSIS installer and its auto-update
+- **Plan usage relies on an experimental SDK call.** `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET` may be renamed in a future Agent SDK. The meter then disappears, nothing breaks. Check it after updating the SDK.
 - **The Claude Desktop extension.**
   - Tested end to end on macOS with an MCP client that plays Claude Desktop (`scripts/desktop-smoke.mjs`): create, write, render, frames, edit, export.
   - Starting the packaged app from cold works too: the first call answered in 3.1 s.

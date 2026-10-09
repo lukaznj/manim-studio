@@ -11,7 +11,8 @@ export function TitleBar() {
   const render = useStore((s) => s.render)
   const dirty = useStore((s) => s.dirty)
   const platform = useStore((s) => s.app?.platform)
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const historyOpen = useStore((s) => s.historyOpen)
+  const setHistoryOpen = (open: boolean) => useStore.setState({ historyOpen: open })
 
   const progress = render.status === 'rendering' && render.expected ? (render.clips ?? 0) / render.expected : undefined
 
@@ -46,15 +47,18 @@ export function TitleBar() {
         <UpdatePill />
         {screen === 'editor' && (
           <div className="popover-anchor">
-            <button className={`icon-btn ${historyOpen ? 'on' : ''}`} onClick={() => setHistoryOpen((o) => !o)} title="Version history">
+            <button className={`icon-btn ${historyOpen ? 'on' : ''}`} onClick={() => setHistoryOpen(!historyOpen)} title="Version history">
               <History />
             </button>
             {historyOpen && <HistoryPopover onClose={() => setHistoryOpen(false)} />}
           </div>
         )}
-        <button className="icon-btn" onClick={() => openDialog({ kind: 'settings' })} title="Settings">
-          <Settings />
-        </button>
+        {/* On macOS, Settings… is ⌘, in the menu bar (src/main/menu.ts), the standard place. */}
+        {platform !== 'darwin' && (
+          <button className="icon-btn" onClick={() => openDialog({ kind: 'settings' })} title="Settings">
+            <Settings />
+          </button>
+        )}
       </div>
       {render.status === 'rendering' && <ProgressLine value={progress} className="titlebar-progress" />}
     </header>
