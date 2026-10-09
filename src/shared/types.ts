@@ -163,6 +163,34 @@ export interface ClaudeStatus {
   error?: string
 }
 
+/** How Studio's Claude authenticates: the Claude Code account sign-in, or the user's own API key. */
+export type ClaudeAuth = 'account' | 'api-key'
+
+/** One plan limit window, e.g. the 5-hour or the weekly limit. */
+export interface UsageWindow {
+  label: string
+  percent: number // 0–100 used
+  resetsAt: string | null // ISO time
+}
+
+/** Claude plan usage (claude.ai limits, shared with Claude Desktop and claude.ai). */
+export interface PlanUsage {
+  windows: UsageWindow[]
+  checkedAt: number
+}
+
+export interface ClaudeDesktopStatus {
+  installed: boolean
+  enabled: boolean
+  version: string | null // of the installed extension
+  current: string // the version this app ships
+}
+
+/** Commands from the macOS menu bar, carried out in the window. */
+export type MenuAction =
+  | 'settings' | 'claude-settings' | 'new-project' | 'open-project' | 'open-recent' | 'save' | 'render' | 'play'
+  | 'booth' | 'history' | 'export' | 'close-project' | 'new-conversation' | 'appearance'
+
 export interface ClaudeLoginEvent {
   line?: string
   url?: string
@@ -178,6 +206,7 @@ export interface Settings {
   appearance: Appearance // 'system' follows the OS
   projectsDir: string
   recentProjects: string[]
+  claudeAuth: ClaudeAuth
   claudeModel: string // '' = Claude Code's default for the account
   claudeEffort: Effort | '' // '' = the model's default
   autoRender: boolean
@@ -276,7 +305,7 @@ export interface VoiceOption {
   description?: string
 }
 
-export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'export' | 'open-project'
+export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'export' | 'open-project' | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -291,6 +320,8 @@ export interface StudioApi {
   setAnthropicKey(key: string): Promise<Settings>
 
   claudeStatus(): Promise<ClaudeStatus>
+  /** Plan limits used, or null with an API key or when Claude Code can't tell. */
+  claudeUsage(): Promise<PlanUsage | null>
   claudeLogin(): Promise<ClaudeStatus>
   claudeLoginCode(code: string): Promise<void>
   claudeLogout(): Promise<ClaudeStatus>
@@ -324,6 +355,7 @@ export interface StudioApi {
   chatModels(): Promise<ModelOption[]>
   /** Opens the bundled Claude Desktop extension, which Claude Desktop offers to install. */
   installClaudeExtension(): Promise<void>
+  claudeDesktopStatus(): Promise<ClaudeDesktopStatus>
 
   history(): Promise<Commit[]>
   restore(oid: string): Promise<void>
@@ -341,6 +373,7 @@ export interface StudioApi {
   on(channel: 'file-changed', cb: (e: { source: string; external: boolean; agent?: boolean }) => void): () => void
   /** Claude Desktop asked for this project (see src/main/mcp.ts). */
   on(channel: 'open-project', cb: (e: { path: string }) => void): () => void
+  on(channel: 'menu', cb: (e: { action: MenuAction; path?: string; value?: string }) => void): () => void
   on(channel: 'update', cb: (e: UpdateEvent) => void): () => void
   on(channel: 'export', cb: (e: { stage: string; percent?: number; path?: string; error?: string }) => void): () => void
 }

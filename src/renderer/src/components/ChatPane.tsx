@@ -1,7 +1,8 @@
 import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ChatMessage, ChatPart, Effort, ModelOption } from '../../../shared/types'
+import type { ChatMessage, ChatPart, Effort, ModelOption, PlanUsage } from '../../../shared/types'
 import { api } from '../lib/api'
+import { resetTime } from '../lib/time'
 import { openDialog, refreshClaude, selectClips, sendChat, toast, errorText, updateSettings, useStore } from '../store'
 
 const SUGGESTIONS = [
@@ -30,11 +31,7 @@ export function ChatPane() {
           <Sparkles className="claude-mark" /> Claude Agent
         </div>
         <div className="pane-actions">
-          {claude?.loggedIn && (
-            <button className="faint account-chip" title="Account settings" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
-              {claude.subscription ? `${claude.subscription}` : claude.email}
-            </button>
-          )}
+          <UsageMeter />
           <button
             className="icon-btn"
             title="New conversation"
@@ -65,7 +62,33 @@ export function ChatPane() {
   )
 }
 
+/** How much of the Claude plan is used: the tightest limit here, every limit in the tooltip and in Settings. */
+export const usageLines = (usage: PlanUsage) =>
+  usage.windows.map((w) => `${w.label}: ${Math.round(w.percent)}% used${w.resetsAt ? `, resets ${resetTime(w.resetsAt)}` : ''}`)
+
+export const usageLevel = (percent: number) => (percent >= 90 ? 'hot' : percent >= 70 ? 'warm' : '')
+
+function UsageMeter() {
+  const usage = useStore((s) => s.usage)
+  if (!usage) return null
+  const top = usage.windows.reduce((a, b) => (b.percent > a.percent ? b : a))
+  return (
+    <button
+      className={`usage-chip ${usageLevel(top.percent)}`}
+      title={`Your Claude plan (shared with claude.ai and Claude Desktop)\n${usageLines(usage).join('\n')}`}
+      aria-label={`Claude plan: ${Math.round(top.percent)}% of the ${top.label.toLowerCase()} used`}
+      onClick={() => openDialog({ kind: 'settings', tab: 'account' })}
+    >
+      <span className="usage-bar">
+        <span style={{ width: `${Math.min(100, top.percent)}%` }} />
+      </span>
+      {Math.round(top.percent)}%
+    </button>
+  )
+}
+
 function SignIn() {
+  const settings = useStore((s) => s.settings)
   const [busy, setBusy] = useState(false)
   const [url, setUrl] = useState<string | null>(null)
   const [needsCode, setNeedsCode] = useState(false)
@@ -95,6 +118,27 @@ function SignIn() {
     }
   }
 
+  const useKey = async (claudeAuth: 'account' | 'api-key') => {
+    await updateSettings({ claudeAuth })
+    await refreshClaude()
+    if (claudeAuth === 'api-key') openDialog({ kind: 'settings', tab: 'account' })
+  }
+
+  if (settings?.claudeAuth === 'api-key')
+    return (
+      <div className="chat-signin">
+        <Sparkles className="signin-mark" />
+        <h3>Add your Anthropic API key</h3>
+        <p className="muted">Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Claude.</p>
+        <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
+          Open Claude settings
+        </button>
+        <button className="link-btn" onClick={() => void useKey('account')}>
+          Sign in with a Claude account instead
+        </button>
+      </div>
+    )
+
   return (
     <div className="chat-signin">
       <Sparkles className="signin-mark" />
@@ -115,7 +159,7 @@ function SignIn() {
         </p>
       )}
       {!busy && (
-        <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
+        <button className="link-btn" onClick={() => void useKey('api-key')}>
           Use an Anthropic API key instead
         </button>
       )}

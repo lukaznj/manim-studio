@@ -24,4 +24,8 @@ The full reasoning is in [[../04-decisions/0008-ink-at-night-design|ADR 0008]]. 
   - Allowed: state changes the user should see (retiming, dialogs, progress).
   - Not allowed: decoration.
   - Everything respects `prefers-reduced-motion`.
+- **macOS menu bar.** On macOS every command is in the menu bar, the standard way (`src/main/menu.ts`): Settings… at ⌘, in the app menu, plus File, Video, Claude, View → Appearance and Help. The title bar has no settings gear there.
+  - A menu shortcut must do what the same key does in the page. The page sees ⌘-keys first, so they never fire twice.
+  - Keys the page owns while you work (Space, R) are shown in the menu but not taken from the page.
+  - Windows and Linux have no menu bar and keep the gear.
 - **Screenshots** never show an account or an e-mail address.
