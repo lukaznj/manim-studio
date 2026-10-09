@@ -1,10 +1,11 @@
 import { AudioLines, Check, Circle, Cpu, KeyRound, Laptop, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
-import type { Component, ComponentState, VoiceOption, VoiceProvider, VoiceSettings } from '../../../shared/types'
+import type { ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, PlanUsage, VoiceOption, VoiceProvider, VoiceSettings } from '../../../shared/types'
 import { api } from '../lib/api'
 import { encodeWav } from '../lib/audio'
-import { closeDialog, errorText, installComponent, openDialog, refreshClaude, toast, updateMeta, updateSettings, useStore } from '../store'
-import { ModelControls } from './ChatPane'
+import { resetTime } from '../lib/time'
+import { closeDialog, errorText, installComponent, openDialog, refreshClaude, refreshUsage, toast, updateMeta, updateSettings, useStore } from '../store'
+import { ModelControls, usageLevel } from './ChatPane'
 import { useRecorder } from './RecordingBooth'
 import { Modal, ProgressLine, Tabs } from './ui'
 
@@ -78,8 +79,16 @@ const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1
 function AccountTab() {
   const claude = useStore((s) => s.claude)
   const settings = useStore((s) => s.settings)!
+  const usage = useStore((s) => s.usage)
   const [busy, setBusy] = useState(false)
-  const usingKey = claude?.method === 'api-key'
+  const apiKey = settings.claudeAuth === 'api-key'
+
+  useEffect(() => void refreshUsage(true), [])
+
+  const setAuth = async (claudeAuth: ClaudeAuth) => {
+    await updateSettings({ claudeAuth })
+    await refreshClaude()
+  }
 
   const login = async () => {
     setBusy(true)
@@ -101,52 +110,67 @@ function AccountTab() {
 
   return (
     <div className="set-group">
-      <div className={`account-card ${claude?.loggedIn ? 'on' : ''}`}>
-        <Sparkles />
-        <div>
-          <strong>{usingKey ? 'Anthropic API key' : claude?.loggedIn ? claude.email ?? 'Signed in' : 'Not signed in'}</strong>
-          <div className="hint">
-            {usingKey
-              ? 'Usage is billed to the API key’s Console account.'
-              : claude?.loggedIn
-                ? `Claude ${planName(claude.subscription)} · usage counts against this plan`
-                : 'Studio runs Claude Code with your own Claude account. Sign-in opens in your browser.'}
-          </div>
-        </div>
-        {usingKey ? null : claude?.loggedIn ? (
-          <button
-            className="btn ghost small"
-            onClick={async () => {
-              await api.claudeLogout()
-              await refreshClaude()
-            }}
-          >
-            <LogOut /> Sign out
-          </button>
-        ) : (
-          <button className="btn primary small" disabled={busy} onClick={() => void login()}>
-            {busy && <span className="spinner" />} Sign in
-          </button>
-        )}
-      </div>
-
       <Row
-        title="Anthropic API key"
+        title="Use Claude with"
         text={
-          settings.hasAnthropicKey
-            ? 'Saved and encrypted on this computer; it takes precedence over the sign-in.'
-            : 'Optional, instead of signing in: a key from console.anthropic.com, billed per use.'
+          apiKey
+            ? 'Your own Anthropic API key, billed per use to its Console account.'
+            : 'Your Claude account. Usage counts against your plan, shared with claude.ai and Claude Desktop.'
         }
       >
-        <div className="inline-form">
-          <KeyField saved={settings.hasAnthropicKey} placeholder="sk-ant-…" onSave={saveKey} />
-          {settings.hasAnthropicKey && (
-            <button className="btn ghost" onClick={() => void saveKey('')}>
-              Remove
-            </button>
-          )}
-        </div>
+        <Tabs
+          radio="Use Claude with"
+          value={settings.claudeAuth}
+          onChange={(v) => void setAuth(v)}
+          items={[
+            { value: 'account', label: 'Claude account' },
+            { value: 'api-key', label: 'API key' },
+          ]}
+        />
       </Row>
+
+      {apiKey ? (
+        <Row title="Anthropic API key" text={settings.hasAnthropicKey ? 'Saved and encrypted on this computer.' : 'A key from console.anthropic.com.'}>
+          <div className="inline-form">
+            <KeyField saved={settings.hasAnthropicKey} placeholder="sk-ant-…" onSave={saveKey} />
+            {settings.hasAnthropicKey && (
+              <button className="btn ghost" onClick={() => void saveKey('')}>
+                Remove
+              </button>
+            )}
+          </div>
+        </Row>
+      ) : (
+        <>
+          <div className={`account-card ${claude?.loggedIn ? 'on' : ''}`}>
+            <Sparkles />
+            <div>
+              <strong>{claude?.loggedIn ? (claude.email ?? 'Signed in') : 'Not signed in'}</strong>
+              <div className="hint">
+                {claude?.loggedIn
+                  ? `Claude ${planName(claude.subscription)}`
+                  : 'Studio runs Claude Code with your own Claude account. Sign-in opens in your browser.'}
+              </div>
+            </div>
+            {claude?.loggedIn ? (
+              <button
+                className="btn ghost small"
+                onClick={async () => {
+                  await api.claudeLogout()
+                  await refreshClaude()
+                }}
+              >
+                <LogOut /> Sign out
+              </button>
+            ) : (
+              <button className="btn primary small" disabled={busy} onClick={() => void login()}>
+                {busy && <span className="spinner" />} Sign in
+              </button>
+            )}
+          </div>
+          {usage && <PlanUsageList usage={usage} />}
+        </>
+      )}
 
       {claude?.loggedIn && (
         <Row title="Model and effort" text="Which model writes the scenes and how much it thinks first. Also under the chat box; a change applies to the current conversation.">
@@ -154,15 +178,59 @@ function AccountTab() {
         </Row>
       )}
 
-      <Row
-        title="Claude Desktop"
-        text="Ask Claude in the Claude desktop app for a maths video, and Manim Studio opens and makes it there. Installs the Manim Studio extension; Claude Desktop asks you to confirm."
-      >
-        <button className="btn small" onClick={() => void api.installClaudeExtension().catch((e) => toast(errorText(e), 'error'))}>
-          <Plug /> Add to Claude Desktop
-        </button>
-      </Row>
+      <ClaudeDesktopRow />
     </div>
+  )
+}
+
+/** Every limit of the plan, with when it resets. */
+function PlanUsageList({ usage }: { usage: PlanUsage }) {
+  return (
+    <div className="plan-usage">
+      <div className="eyebrow">Plan usage · shared with claude.ai and Claude Desktop</div>
+      {usage.windows.map((w) => (
+        <div key={w.label} className={`plan-usage-row ${usageLevel(w.percent)}`}>
+          <span>{w.label}</span>
+          <span className="usage-bar">
+            <span style={{ width: `${Math.min(100, w.percent)}%` }} />
+          </span>
+          <span className="mono">{Math.round(w.percent)}%</span>
+          <span className="hint">{w.resetsAt ? `resets ${resetTime(w.resetsAt)}` : ''}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Installs the Claude Desktop extension, or says it's there (Claude Desktop's own records, re-read on focus). */
+function ClaudeDesktopRow() {
+  const [status, setStatus] = useState<ClaudeDesktopStatus | null>(null)
+  useEffect(() => {
+    const check = () => void api.claudeDesktopStatus().then(setStatus)
+    check()
+    window.addEventListener('focus', check)
+    return () => window.removeEventListener('focus', check)
+  }, [])
+  const outdated = !!status?.installed && status.version !== status.current
+  const text = !status?.installed
+    ? 'Ask Claude in the Claude desktop app for a maths video, and Manim Studio opens and makes it there. Installs the Manim Studio extension; Claude Desktop asks you to confirm.'
+    : outdated
+      ? `Claude Desktop has version ${status.version} of the extension and this app ships ${status.current}. Update it so both have the same tools.`
+      : status.enabled
+        ? 'The Manim Studio extension is installed. Ask Claude in the Claude desktop app for a maths video.'
+        : 'The extension is installed but turned off. Turn it on in Claude Desktop → Settings → Extensions.'
+  return (
+    <Row title="Claude Desktop" text={text}>
+      {status?.installed && !outdated ? (
+        <span className={`badge ${status.enabled ? 'mint' : ''}`}>
+          <Check /> {status.enabled ? 'Installed' : 'Turned off'}
+        </span>
+      ) : (
+        <button className="btn small" onClick={() => void api.installClaudeExtension().catch((e) => toast(errorText(e), 'error'))}>
+          <Plug /> {outdated ? 'Update in Claude Desktop' : 'Add to Claude Desktop'}
+        </button>
+      )}
+    </Row>
   )
 }
 
@@ -249,7 +317,14 @@ function VoiceTab() {
 
       {voice.provider === 'elevenlabs' && (
         <>
-          <Row title="API key" text={settings.hasElevenLabsKey ? 'Saved and encrypted on this computer.' : 'elevenlabs.io → Profile → API keys'}>
+          <Row
+            title="API key"
+            text={
+              settings.hasElevenLabsKey
+                ? 'Saved and encrypted on this computer.'
+                : 'elevenlabs.io → Developers → API keys. If you restrict the key, allow Text to Speech and Voices (read).'
+            }
+          >
             <KeyField
               saved={settings.hasElevenLabsKey}
               placeholder="sk_…"

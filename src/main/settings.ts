@@ -8,6 +8,7 @@ const defaults = (): Settings => ({
   appearance: 'system',
   projectsDir: paths.defaultProjectsDir(),
   recentProjects: [],
+  claudeAuth: 'account',
   claudeModel: '',
   claudeEffort: '',
   autoRender: true,

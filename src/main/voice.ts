@@ -55,7 +55,11 @@ export async function elevenLabsVoices(): Promise<VoiceOption[]> {
   const key = getSecret('elevenlabs')
   if (!key) throw new Error('Add your ElevenLabs API key first')
   const res = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } })
-  if (!res.ok) throw new Error(`ElevenLabs: HTTP ${res.status}`)
+  // ElevenLabs explains failures in detail.message, e.g. a key created without the voices_read permission.
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: { message?: string } } | null
+    throw new Error(`ElevenLabs: ${body?.detail?.message ?? `HTTP ${res.status}`}`)
+  }
   const data = (await res.json()) as { voices: { voice_id: string; name: string; labels?: Record<string, string> }[] }
   return data.voices.map((v) => ({
     id: v.voice_id,

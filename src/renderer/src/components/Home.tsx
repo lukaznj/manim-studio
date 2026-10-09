@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import type { ComponentState, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
 import { ago, timecode } from '../lib/time'
-import { installComponent, openDialog, openProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
+import { installComponent, openDialog, openProject, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
 import { ProgressLine } from './ui'
 
 export function Home() {
@@ -23,15 +23,6 @@ export function Home() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const openFolder = async () => {
-    try {
-      const dir = await api.pickProject()
-      if (dir) await openProject(dir)
-    } catch (e) {
-      toast(errorText(e), 'error')
-    }
-  }
-
   return (
     <div className="home">
       <div className="home-inner">
@@ -41,7 +32,7 @@ export function Home() {
             <p className="muted">Each project is one video: a scene in code, its voice and its subtitles.</p>
           </div>
           <div className="home-actions">
-            <button className="btn ghost" onClick={() => void openFolder()}>
+            <button className="btn ghost" onClick={() => void pickAndOpenProject()}>
               <FolderOpen /> Open folder…
             </button>
             <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>

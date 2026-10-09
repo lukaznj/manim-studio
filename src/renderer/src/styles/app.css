@@ -959,3 +959,29 @@
 .ring {
   flex: none;
 }
+
+/* Settings → Claude: every plan limit. */
+.plan-usage {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+}
+.plan-usage-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px 38px 120px;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+}
+.plan-usage-row .usage-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+}
+.plan-usage-row .mono {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

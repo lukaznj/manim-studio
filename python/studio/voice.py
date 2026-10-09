@@ -189,7 +189,11 @@ class StudioSpeech(SpeechService):
             with urllib.request.urlopen(req, timeout=180) as r:
                 data = json.load(r)
         except urllib.error.HTTPError as e:
-            detail = e.read().decode("utf-8", "replace")[:300]
+            body = e.read().decode("utf-8", "replace")
+            try:  # ElevenLabs explains failures in detail.message (e.g. a missing key permission)
+                detail = json.loads(body)["detail"]["message"]
+            except (ValueError, KeyError, TypeError):
+                detail = body[:300]
             raise RuntimeError(f"HTTP {e.code}: {detail}") from None
 
         path.write_bytes(base64.b64decode(data["audio_base64"]))
