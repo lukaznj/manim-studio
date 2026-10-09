@@ -29,8 +29,9 @@ export function refreshMenu(): void {
     click: () => send(action),
     ...extra,
   })
-  // Keys the page already handles while you work (Space, R) are shown but not taken from it.
-  const shown = { registerAccelerator: false }
+  // Space and R have no menu shortcut on purpose: the page handles them, and only when you're not
+  // typing. On macOS even a display-only accelerator (registerAccelerator: false) still fires for
+  // keys the page lets through, so typing a space in the chat would toggle playback.
   const recent = listProjects().filter((p) => !p.missing).slice(0, 10)
 
   const template: MenuItemConstructorOptions[] = [
@@ -73,8 +74,8 @@ export function refreshMenu(): void {
     {
       label: 'Video',
       submenu: [
-        item('Play / Pause', 'play', 'Space', { enabled: open, ...shown }),
-        item('Render Preview', 'render', 'R', { enabled: open, ...shown }),
+        item('Play / Pause', 'play', undefined, { enabled: open }),
+        item('Render Preview', 'render', undefined, { enabled: open }),
         { type: 'separator' },
         item('Record Voice…', 'booth', 'Shift+Cmd+R', { enabled: open }),
         item('Version History…', 'history', 'Cmd+Y', { enabled: open }),
