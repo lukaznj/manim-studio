@@ -18,6 +18,10 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("render")
     r.add_argument("project", type=Path)
     r.add_argument("--quality", choices=["preview", "final"], default="preview")
+    r.add_argument("--size", type=int, help="short side in pixels (preview: 480 by default)")
+    r.add_argument("--fps", type=int)
+    r.add_argument("--theme", choices=["dark", "light"], help="instead of the project's (for exporting both)")
+    r.add_argument("--out", help="output folder under .studio/ (default: the quality)")
 
     f = sub.add_parser("frame")
     f.add_argument("video")
@@ -47,6 +51,13 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--model", default="small")
     a.add_argument("--language", default=None, help="BCP 47 code; None lets Whisper detect it")
 
+    d = sub.add_parser("dub")
+    d.add_argument("timeline", type=Path)
+    d.add_argument("translations", type=Path, help="JSON: original narration text -> translation")
+    d.add_argument("lang")
+    d.add_argument("out_base", type=Path, help="files become <out_base>.<lang>.m4a/.srt/.vtt")
+    d.add_argument("--video", type=Path, action="append", default=[], help="also write <video>.<lang>.mp4")
+
     sub.add_parser("check")
     sub.add_parser("tts-worker")
 
@@ -55,7 +66,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "render":
         from .render import render
 
-        return render(args.project, args.quality)
+        return render(args.project, args.quality, size=args.size, fps=args.fps, theme=args.theme, out_name=args.out)
+
+    if args.cmd == "dub":
+        from .dub import dub
+
+        try:
+            emit("done", **dub(args.timeline, args.translations, args.lang, args.out_base, args.video))
+        except Exception as e:  # noqa: BLE001 - tell the app what broke, not just an exit code
+            emit("error", message=f"{type(e).__name__}: {e}")
+            return 1
+        return 0
 
     if args.cmd == "frame":
         from .media import frame
@@ -108,10 +129,12 @@ def export(timeline: Path, dest: Path) -> int:
 
     result = json.loads(timeline.read_text(encoding="utf-8"))
     dest.parent.mkdir(parents=True, exist_ok=True)
-    video = dest.with_suffix(".mp4")
+    # Appended, not with_suffix(): "name.dark" must become "name.dark.mp4", not "name.mp4".
+    at = lambda ext: dest.parent / f"{dest.name}{ext}"  # noqa: E731
+    video = at(".mp4")
     shutil.copyfile(result["video"], video)
-    write_subtitles(result["subtitles"], dest.with_suffix(".vtt"), dest.with_suffix(".srt"))
-    thumbnail({**result, "video": str(video)}, str(dest.with_suffix(".jpg")), width=1280)
+    write_subtitles(result["subtitles"], at(".vtt"), at(".srt"))
+    thumbnail({**result, "video": str(video)}, str(at(".jpg")), width=1280)
     emit("done", video=str(video))
     return 0
 

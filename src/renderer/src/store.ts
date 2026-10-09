@@ -42,7 +42,7 @@ export interface RenderState {
 
 export type Dialog =
   | { kind: 'new-project' }
-  | { kind: 'settings'; tab?: 'account' | 'voice' | 'env' | 'about' }
+  | { kind: 'settings'; tab?: 'account' | 'voice' | 'video' | 'env' | 'about' }
   | { kind: 'booth'; key?: string }
   | { kind: 'export' }
   | null
@@ -58,6 +58,9 @@ interface State {
   models: ModelOption[] // what the signed-in account (or API key) can use
   usage: PlanUsage | null // the Claude plan's limits, when signed in with an account
   historyOpen: boolean
+  chatDraft: string | null // text put into the chat box from elsewhere (the Media panel's "Ask Claude")
+  tour: boolean // the editor tutorial is showing
+  leftTab: 'code' | 'media'
   projects: ProjectSummary[]
 
   project: { path: string; meta: ProjectMeta } | null
@@ -68,7 +71,7 @@ interface State {
   timeline: Timeline | null
   render: RenderState
   finalRender: RenderState
-  exportState: { stage: string; path?: string; error?: string } | null
+  exportState: { stage: string; percent?: number } | null
   selection: number[] // clip indices
   recordings: string[]
 
@@ -92,6 +95,9 @@ export const useStore = create<State>(() => ({
   models: [],
   usage: null,
   historyOpen: false,
+  chatDraft: null,
+  tour: false,
+  leftTab: 'code',
   projects: [],
   project: null,
   savedSource: '',
@@ -211,6 +217,18 @@ export async function refreshUsage(force = false): Promise<void> {
   set({ usage: await api.claudeUsage().catch(() => null) })
 }
 
+/** The editor tutorial (Tour.tsx): shown once on the first project, again from Help or Settings → General. */
+export function startTour(): void {
+  if (!get().project) return toast('Open a project to see the tutorial: it walks through the editor.', 'info')
+  closeDialog()
+  set({ tour: true })
+}
+
+export function endTour(): void {
+  set({ tour: false })
+  if (!get().settings?.tutorialDone) void updateSettings({ tutorialDone: true })
+}
+
 /** Open a project folder chosen in the system dialog. */
 export async function pickAndOpenProject(): Promise<void> {
   try {
@@ -237,6 +255,8 @@ function onMenu({ action, path, value }: { action: MenuAction; path?: string; va
       return void (path && openProject(path))
     case 'appearance':
       return void updateSettings({ appearance: value as Settings['appearance'] })
+    case 'tutorial':
+      return startTour()
   }
   if (!project || dialog) return // the rest work on the open project, like their keys
   switch (action) {
@@ -279,6 +299,7 @@ export async function openProject(path: string): Promise<void> {
   const opened = await guard(api.openProject(path))
   if (!opened) return
   withTransition(() => applyOpened(opened))
+  firstRunTour()
   playback.restore(0)
   if (!opened.timeline && get().setup?.env === 'ready') void renderNow()
 }
@@ -308,6 +329,11 @@ export async function createProject(input: Parameters<typeof api.createProject>[
   closeDialog()
   await openProject(path)
   void refreshProjects()
+}
+
+/** The first project opened shows the tutorial, once the editor has laid itself out. */
+function firstRunTour(): void {
+  if (get().settings?.tutorialDone === false) setTimeout(() => get().project && !get().dialog && set({ tour: true }), 700)
 }
 
 export async function closeProject(): Promise<void> {

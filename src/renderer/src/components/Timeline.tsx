@@ -329,7 +329,6 @@ function Toolbar(props: {
             <button className={`icon-btn ${props.loop ? 'on' : ''}`} onClick={() => props.setLoop(!props.loop)} title="Loop the selection">
               <Repeat />
             </button>
-            <span className="hint">Ask Claude about the selection in the chat →</span>
           </>
         )}
       </div>
@@ -355,10 +354,10 @@ function Toolbar(props: {
             <Maximize2 />
           </button>
         </div>
-        <button className="btn small" onClick={() => openDialog({ kind: 'booth' })} disabled={!timeline?.voice.length} title="⌘⇧R">
+        <button className="btn small" onClick={() => openDialog({ kind: 'booth' })} disabled={!timeline?.voice.length} title="⌘⇧R" data-tour="voice">
           <Mic /> Record voice
         </button>
-        <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })} disabled={!timeline} title="⌘E">
+        <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })} disabled={!timeline} title="⌘E" data-tour="export">
           <Download /> Export
         </button>
       </div>

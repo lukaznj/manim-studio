@@ -14,7 +14,7 @@ import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, C
 import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
-import { project, readChat, readTimeline, requireProject, updateMeta, writeChat } from './projects'
+import { mediaNames, project, readChat, readTimeline, requireProject, updateMeta, writeChat } from './projects'
 import { frameBase64, pauseCommits } from './render'
 import { getTimeline, renderPreview, viewFrames } from './scene-tools'
 import { getSecret, getSettings } from './settings'
@@ -189,7 +189,7 @@ export async function applyChatSettings(): Promise<void> {
   const { claudeModel, claudeEffort } = getSettings()
   // A session that already ended picks the settings up when the next one starts.
   await session?.query.setModel(claudeModel || undefined).catch(() => undefined)
-  await session?.query.applyFlagSettings({ effortLevel: claudeEffort || null }).catch(() => undefined)
+  await session?.query.applyFlagSettings({ effortLevel: claudeEffort || 'medium' }).catch(() => undefined)
 }
 
 export async function chatReset(): Promise<void> {
@@ -220,6 +220,48 @@ export async function chatModels(): Promise<ModelOption[]> {
     inbox.close()
     q.close()
   }
+}
+
+/**
+ * Translates narration sentences for dubbing (export.ts). A one-off request with no tools, on the
+ * same sign-in and model as the chat. Returns one translation per sentence, in order.
+ */
+export async function translateNarration(sentences: string[], from: string, to: string): Promise<string[]> {
+  if (!sentences.length) return []
+  const { query } = await sdk()
+  const prompt = [
+    `Translate this narration of a maths explainer video from ${languageName(from)} to ${languageName(to)}.`,
+    `It will be spoken by a text-to-speech voice over the same animation, so keep each sentence about as long as the original, keep the maths exact, and write maths the way a teacher says it aloud in ${languageName(to)}.`,
+    `Answer with only a JSON array of ${sentences.length} strings, one per sentence, in order.`,
+    '',
+    JSON.stringify(sentences, null, 1),
+  ].join('\n')
+  const q = query({
+    prompt,
+    options: {
+      env: claudeEnv(),
+      pathToClaudeCodeExecutable: paths.claude(),
+      settingSources: [],
+      tools: [],
+      maxTurns: 1,
+      model: getSettings().claudeModel || undefined,
+      systemPrompt: 'You translate narration for educational maths videos. You answer with JSON only.',
+    },
+  })
+  let answer = ''
+  for await (const msg of q) {
+    if (msg.type !== 'result') continue
+    if (msg.subtype !== 'success' || msg.is_error) throw new Error(`Claude couldn’t translate: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
+    answer = msg.result
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(answer.slice(answer.indexOf('['), answer.lastIndexOf(']') + 1))
+  } catch {
+    parsed = null
+  }
+  if (!Array.isArray(parsed) || parsed.length !== sentences.length) throw new Error(`Claude’s ${languageName(to)} translation didn’t match the narration. Try the export again.`)
+  return parsed.map(String)
 }
 
 const WINDOW_LABELS: Record<string, string> = {
@@ -270,6 +312,14 @@ export async function claudeUsage(): Promise<PlanUsage | null> {
   }
 }
 
+/** Which of the user's pictures and videos the scene can use (CLAUDE.md explains image() and VideoClip()). */
+export function mediaNote(dir: string): string {
+  const names = mediaNames(dir)
+  return names.length
+    ? `The user's pictures and videos in media/: ${names.join(', ')}. Show a picture with image("name") and a video with VideoClip("name") (both from studio; see studio/media.py).`
+    : 'The project has no pictures or videos of its own (media/ is empty).'
+}
+
 function contextNote(req: ChatRequest): string {
   const notes: string[] = []
   if (req.context) {
@@ -309,7 +359,7 @@ async function startSession(dir: string): Promise<void> {
     env: claudeEnv(),
     pathToClaudeCodeExecutable: paths.claude(),
     model: getSettings().claudeModel || undefined,
-    effort: getSettings().claudeEffort || undefined,
+    effort: getSettings().claudeEffort || 'medium',
     resume: resumable ? meta.claudeSessionId : undefined,
     includePartialMessages: true,
     settingSources: ['project'],
@@ -421,6 +471,7 @@ function studioPrompt(dir: string): string {
     'You cannot run shell commands. To see your work: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done.',
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
+    mediaNote(dir),
     `The python used for renders is ${pythonExe('default')} (for reference only).`,
   ].join('\n')
 }

@@ -6,6 +6,7 @@ import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
 import { SettingsDialog } from './components/SettingsDialog'
 import { TitleBar } from './components/TitleBar'
+import { Tour } from './components/Tour'
 import { useStore } from './store'
 
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
       <SettingsDialog />
       <BoothDialog />
       <ExportDialog />
+      {screen === 'editor' && <Tour />}
       <div className="toast-stack" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>

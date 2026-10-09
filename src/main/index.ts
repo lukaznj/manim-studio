@@ -2,16 +2,17 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, sh
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
-import type { EventChannel, ProjectMeta, Quality } from '../shared/types'
+import type { EventChannel, ExportOptions, ProjectMeta, Quality } from '../shared/types'
 import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, claudeUsage, closeChat, loadChat, onChatEvent } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
+import { exportVideo } from './export'
+import { importMedia, listMedia, removeMedia } from './media'
 import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
 import { cancel, frame, onRenderEvent, render } from './render'
-import { runRunner } from './runner'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
 import { deleteRecording, elevenLabsVoices, onWorkerLog, saveRecording, saveReference, stopTtsWorker, systemVoices } from './voice'
@@ -185,7 +186,10 @@ function registerIpc(): void {
   })
   handle('cancelRender', () => cancel('preview'))
   handle('frame', async (t: number, width?: number) => frame(t, width))
-  handle('exportVideo', () => exportVideo())
+  handle('exportVideo', (options: ExportOptions) => exportWithProgress(options))
+  handle('listMedia', () => listMedia())
+  handle('importMedia', (paths: string[]) => importMedia(paths))
+  handle('removeMedia', (name: string) => removeMedia(name))
   handle('installClaudeExtension', installClaudeExtension)
   handle('claudeDesktopStatus', () => claudeDesktopStatus())
 
@@ -232,22 +236,8 @@ async function installClaudeExtension(): Promise<void> {
   if (error) throw new Error(`Couldn’t open the extension (${error}). Is Claude Desktop installed?`)
 }
 
-async function exportVideo(): Promise<string> {
-  const p = projects.requireProject()
-  send('export', { stage: 'render' })
-  const outcome = await render('final')
-  if ('error' in outcome) {
-    send('export', { stage: 'error', error: outcome.error.message })
-    throw new Error(outcome.error.message)
-  }
-  if ('cancelled' in outcome) throw new Error('The export was cancelled')
-  send('export', { stage: 'package' })
-  const dest = join(p.path, 'exports', projects.slugify(p.meta.name))
-  await (await runRunner('default', ['export', join(p.path, '.studio', 'final', 'timeline.json'), dest])).done
-  const video = `${dest}.mp4`
-  send('export', { stage: 'done', path: video })
-  return video
-}
+/** The export, with its progress shown in the window (the dialog, or Claude Desktop's export). */
+const exportWithProgress = (options: ExportOptions) => exportVideo(options, (e) => send('export', e))
 
 app.whenReady().then(() => {
   app.setAppUserModelId('cc.razem.manimstudio')
@@ -274,7 +264,7 @@ app.whenReady().then(() => {
   startDesktopEndpoint({
     openInWindow,
     sceneWritten: (source) => send('file-changed', { source, external: true, agent: true }),
-    exportVideo,
+    exportVideo: () => exportWithProgress({ themes: [], languages: [], languageVideos: false }),
   })
   if (app.isPackaged) app.setAsDefaultProtocolClient('manim-studio')
   createWindow()

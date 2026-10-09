@@ -258,6 +258,14 @@ function Composer() {
   const [text, setText] = useState('')
   const [frame, setFrame] = useState(true)
   const area = useRef<HTMLTextAreaElement>(null)
+  const draft = useStore((s) => s.chatDraft)
+
+  useEffect(() => {
+    if (draft === null) return
+    setText(draft)
+    useStore.setState({ chatDraft: null })
+    area.current?.focus()
+  }, [draft])
 
   const sel = useMemo(() => {
     const clips = selection.map((i) => timeline?.clips[i]).filter(Boolean)
@@ -340,22 +348,31 @@ function Composer() {
 
 const EFFORTS: Record<Effort, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' }
 
-/** Which model Claude runs and how hard it thinks. A change applies to the current conversation. */
+/**
+ * Which model Claude runs and how hard it thinks; a change applies to the current conversation.
+ * Effort is always a real level: medium unless chosen, which is what Claude Code ran at by default.
+ */
 export function ModelControls() {
   const settings = useStore((s) => s.settings)
   const models = useStore((s) => s.models)
   if (!settings) return null
-  const { claudeModel, claudeEffort } = settings
+  const { claudeModel } = settings
   const list: ModelOption[] = models.length ? [...models] : [{ value: '', label: 'Default model', description: '', efforts: [] }]
   // A model picked under another account still shows, so the picker never claims the wrong one.
   if (!list.some((m) => m.value === claudeModel)) list.push({ value: claudeModel, label: claudeModel, description: '', efforts: [] })
   const current = list.find((m) => m.value === claudeModel)!
-  const efforts = claudeEffort && !current.efforts.includes(claudeEffort) ? [...current.efforts, claudeEffort] : current.efforts
+  const effortFor = (efforts: Effort[]): Effort | null => {
+    const wanted = settings.claudeEffort || 'medium'
+    return efforts.includes(wanted) ? wanted : efforts.includes('medium') ? 'medium' : (efforts[0] ?? null)
+  }
+  // Until the account's models load, show the saved level rather than "no effort setting".
+  const efforts: Effort[] = models.length ? current.efforts : [settings.claudeEffort || 'medium']
+  const effort = effortFor(efforts)
 
   const pickModel = (value: string) => {
-    const offered = list.find((m) => m.value === value)?.efforts ?? []
-    // Claude Code would quietly lower an effort the new model doesn't offer; use its default instead.
-    void updateSettings({ claudeModel: value, ...(claudeEffort && !offered.includes(claudeEffort) ? { claudeEffort: '' as const } : {}) })
+    // Claude Code would quietly lower an effort the new model doesn't offer; pick one it does.
+    const next = effortFor(list.find((m) => m.value === value)?.efforts ?? [])
+    void updateSettings({ claudeModel: value, ...(next ? { claudeEffort: next } : {}) })
   }
 
   return (
@@ -371,18 +388,18 @@ export function ModelControls() {
         </select>
         <ChevronDown className="chev" />
       </label>
-      <label
-        className="chip-select"
-        title={efforts.length ? 'How much Claude thinks before acting. Higher is slower and uses more of your plan.' : 'This model has no effort setting'}
-      >
+      <label className="chip-select" title={effort ? 'How much Claude thinks before acting. Higher is slower and uses more of your plan.' : 'This model has no effort setting'}>
         <Gauge />
-        <select aria-label="Effort" value={claudeEffort} disabled={!efforts.length} onChange={(e) => void updateSettings({ claudeEffort: e.target.value as Effort | '' })}>
-          <option value="">Default effort</option>
-          {efforts.map((e) => (
-            <option key={e} value={e}>
-              {EFFORTS[e]} effort
-            </option>
-          ))}
+        <select aria-label="Effort" value={effort ?? ''} disabled={!effort} onChange={(e) => void updateSettings({ claudeEffort: e.target.value as Effort })}>
+          {effort ? (
+            efforts.map((e) => (
+              <option key={e} value={e}>
+                {EFFORTS[e]} effort
+              </option>
+            ))
+          ) : (
+            <option value="">No effort setting</option>
+          )}
         </select>
         <ChevronDown className="chev" />
       </label>

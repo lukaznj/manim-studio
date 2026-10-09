@@ -2,6 +2,7 @@ import { Clapperboard, FolderOpen } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Aspect, Theme } from '../../../shared/types'
 import { api } from '../lib/api'
+import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, createProject, useStore } from '../store'
 import { Modal } from './ui'
 
@@ -16,8 +17,6 @@ const THEMES: { value: Theme; title: string }[] = [
 ]
 
 // Narration languages offered first; any BCP 47 code works in project.json.
-const LANGUAGES = ['en', 'en-GB', 'es', 'fr', 'de', 'it', 'pt', 'pt-BR', 'nl', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'hu', 'ro', 'sv', 'da', 'nb', 'fi', 'tr', 'el', 'uk', 'ru', 'ar', 'hi', 'ja', 'ko', 'zh']
-const languageName = new Intl.DisplayNames(['en'], { type: 'language' })
 
 export function NewProjectDialog() {
   const open = useStore((s) => s.dialog?.kind === 'new-project')
