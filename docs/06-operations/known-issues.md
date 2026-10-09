@@ -9,6 +9,9 @@ Each item below was either measured during development, or not verified because 
   - the Windows SAPI voice, including a language whose voice pack isn't installed
   - `espeak-ng` on Linux, and the AppImage's microphone permission for the recording booth
   - the NSIS installer and its auto-update
+- **Dubbed languages can drift.** A translation much longer than the original is sped up at most 1.6× and then pushes the next sentence back. The export lists each sentence that ends up more than 0.5 s behind its picture.
+- **Other-language voices on Windows and Linux.** The system voice needs that language installed: a Windows language pack, or an espeak-ng voice. ElevenLabs and OmniVoice don't.
+- **macOS asks for keychain access after some updates.** Unsigned (ad-hoc signed) builds change their code identity with every build, so the first launch after an update may ask to use "Manim Studio Safe Storage", where the saved API keys are. Choose Always Allow. A Developer ID signature removes this.
 - **Plan usage relies on an experimental SDK call.** `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET` may be renamed in a future Agent SDK. The meter then disappears, nothing breaks. Check it after updating the SDK.
 - **The Claude Desktop extension.**
   - Tested end to end on macOS with an MCP client that plays Claude Desktop (`scripts/desktop-smoke.mjs`): create, write, render, frames, edit, export.

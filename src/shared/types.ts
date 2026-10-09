@@ -14,10 +14,19 @@ export interface VoiceSettings {
   omnivoice?: { refAudio?: string; refText?: string }
 }
 
+/** The video's background: a custom colour per theme (unset: the theme's own), and/or a picture from media/. */
+export interface Background {
+  dark?: string
+  light?: string
+  image?: string
+}
+
 export interface ProjectMeta {
   name: string
   aspect: Aspect
   theme: Theme
+  background?: Background
+  export?: ExportOptions // the last export's choices, offered again
   fps: number
   scene?: string
   createdAt: string
@@ -179,6 +188,25 @@ export interface PlanUsage {
   checkedAt: number
 }
 
+export interface ExportOptions {
+  themes: Theme[] // render a version per theme
+  languages: string[] // extra narration languages (ISO 639-1), voiced and subtitled
+  languageVideos: boolean // also a full video per extra language, for sites without audio tracks
+}
+
+export interface ExportResult {
+  folder: string
+  files: string[]
+  warnings: string[]
+}
+
+export interface MediaItem {
+  name: string // file name in the project's media/ folder
+  kind: 'image' | 'video'
+  size: number // bytes
+  thumb?: string // path of a preview picture
+}
+
 export interface ClaudeDesktopStatus {
   installed: boolean
   enabled: boolean
@@ -189,7 +217,7 @@ export interface ClaudeDesktopStatus {
 /** Commands from the macOS menu bar, carried out in the window. */
 export type MenuAction =
   | 'settings' | 'claude-settings' | 'new-project' | 'open-project' | 'open-recent' | 'save' | 'render' | 'play'
-  | 'booth' | 'history' | 'export' | 'close-project' | 'new-conversation' | 'appearance'
+  | 'booth' | 'history' | 'export' | 'close-project' | 'new-conversation' | 'appearance' | 'tutorial'
 
 export interface ClaudeLoginEvent {
   line?: string
@@ -207,8 +235,11 @@ export interface Settings {
   projectsDir: string
   recentProjects: string[]
   claudeAuth: ClaudeAuth
+  previewSize: 480 | 720 | 1080 // short side of the preview render, in pixels
+  previewFps: 15 | 24 | 30
+  tutorialDone: boolean // the first-run tour of the editor was finished or skipped
   claudeModel: string // '' = Claude Code's default for the account
-  claudeEffort: Effort | '' // '' = the model's default
+  claudeEffort: Effort | '' // '' (older settings) reads as 'medium'
   autoRender: boolean
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
@@ -340,7 +371,13 @@ export interface StudioApi {
   render(quality: Quality): Promise<void>
   cancelRender(): Promise<void>
   frame(t: number, width?: number): Promise<string>
-  exportVideo(): Promise<string>
+  exportVideo(options: ExportOptions): Promise<ExportResult>
+  listMedia(): Promise<MediaItem[]>
+  /** Copies files (from a drop, or a dialog when `paths` is empty) into the project's media/. */
+  importMedia(paths: string[]): Promise<MediaItem[]>
+  removeMedia(name: string): Promise<MediaItem[]>
+  /** A dropped File's path on disk (Electron's webUtils). */
+  pathForFile(file: File): string
 
   saveRecording(key: string, wav: ArrayBuffer): Promise<string[]>
   deleteRecording(key: string): Promise<string[]>
@@ -375,5 +412,5 @@ export interface StudioApi {
   on(channel: 'open-project', cb: (e: { path: string }) => void): () => void
   on(channel: 'menu', cb: (e: { action: MenuAction; path?: string; value?: string }) => void): () => void
   on(channel: 'update', cb: (e: UpdateEvent) => void): () => void
-  on(channel: 'export', cb: (e: { stage: string; percent?: number; path?: string; error?: string }) => void): () => void
+  on(channel: 'export', cb: (e: { stage: string; percent?: number }) => void): () => void
 }

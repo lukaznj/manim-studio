@@ -34,6 +34,10 @@ One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studi
   - Call `self.play(...)` and `self.wait(...)` directly in `construct`.
   - Give `run_time=` as a plain number.
   - The editor can drag those clips to retime them. Clips inside helper functions or with computed durations are locked.
+- **Your pictures and videos** — files the user added in Studio's Media panel are in `media/`:
+  - `image("photo.png")` is a picture, already scaled to fit the safe area.
+  - `VideoClip("demo.mp4")` plays a video inside the scene, without sound: show it, call `clip.start()`, then `self.wait(clip.duration)`.
+  - Use only the files Studio lists for this project; `media_path(name)` raises with the list if a name is wrong.
 - **Pacing** — a 2–4 minute video is the target. One idea per section. Leave about 0.5 s of stillness after an important result.
 
 ## Checking your work

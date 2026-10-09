@@ -11,6 +11,8 @@ paths:
 - **Config before import.** `render.configure()` must run before `studio` is imported: the frame constants (`PORTRAIT`, `SAFE_W`, …) are computed at import time.
 - **Monkeypatches** live in `render.Recorder` and nowhere else. Keep them thin: record, then call the original.
 - **Edit spans.** Columns are characters, not UTF-8 bytes (`source._chars`). Non-ASCII letters (č, ß, é) earlier on a line must not shift edits.
+- **Dubbing** (`studio_runner/dub.py`) reuses `StudioSpeech` with the language swapped. Keep its output on the original video's timing: speed up, push back, never overlap.
+- **Media helpers** (`studio/media.py`): keep decoder state out of mobjects; manim deep-copies them while animating.
 - **Voice providers** must degrade to silence with a message in `voice.WARNINGS`, never raise out of a render.
 - **Changing `pixi.toml`:**
   - Run `resources/bin/pixi lock` in `python/` and commit `pixi.lock`; installs use `--frozen`.

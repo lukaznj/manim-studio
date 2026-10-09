@@ -24,16 +24,20 @@ QUALITY = {
 }
 
 
-def configure(project: Path, quality: str) -> tuple[dict, Path]:
+def configure(
+    project: Path, quality: str, size: int | None = None, fps: int | None = None, theme: str | None = None, out_name: str | None = None
+) -> tuple[dict, Path]:
     from manim import config
 
     meta = json.loads((project / "project.json").read_text(encoding="utf-8"))
     portrait = meta.get("aspect") == "9:16"
     q = QUALITY[quality]
-    out = project / ".studio" / quality
+    out = project / ".studio" / (out_name or quality)
 
-    config.pixel_width, config.pixel_height = (q["short"], q["long"]) if portrait else (q["long"], q["short"])
-    config.frame_rate = q["fps"] or int(meta.get("fps", 30))
+    short = size or q["short"]
+    long = round(short * 16 / 9 / 2) * 2  # even, as video encoders want: 480 -> 854, 720 -> 1280
+    config.pixel_width, config.pixel_height = (short, long) if portrait else (long, short)
+    config.frame_rate = fps or q["fps"] or int(meta.get("fps", 30))
     config.frame_width, config.frame_height = (8.0, LONG_UNITS) if portrait else (LONG_UNITS, 8.0)
     config.media_dir = str(project / ".studio" / "cache")
     config.video_dir = str(out)
@@ -44,7 +48,11 @@ def configure(project: Path, quality: str) -> tuple[dict, Path]:
     config.save_last_frame = False
     config.preview = False
 
-    os.environ["STUDIO_THEME"] = meta.get("theme", "dark")
+    theme = theme or meta.get("theme", "dark")
+    background = meta.get("background") or {}
+    os.environ["STUDIO_THEME"] = theme
+    os.environ["STUDIO_BG"] = background.get(theme) or ""  # a custom colour for this theme
+    os.environ["STUDIO_BG_IMAGE"] = str(project / "media" / background["image"]) if background.get("image") else ""
     os.environ["STUDIO_PROJECT"] = str(project)
     from studio.brand import apply_theme
 
@@ -148,13 +156,13 @@ def load_scene_class(scene_file: Path, wanted: str | None):
     return classes[0]
 
 
-def render(project: Path, quality: str) -> int:
+def render(project: Path, quality: str, **options) -> int:
     project = project.resolve()
     scene_file = project / "scene.py"
     source = scene_file.read_text(encoding="utf-8")
     started = time.time()
     try:
-        meta, out = configure(project, quality)
+        meta, out = configure(project, quality, **options)
         recorder = Recorder(scene_file)
         recorder.install()
         scene = load_scene_class(scene_file, meta.get("scene"))()

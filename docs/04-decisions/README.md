@@ -15,3 +15,5 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0009-mcp-server-later]] | Claude Desktop drives Studio through an extension (.mcpb) and a local endpoint | accepted |
 | [[0010-fixed-aspect-per-project]] | 16:9 or 9:16 chosen per project, fixed | accepted |
 | [[0011-open-source-english]] | Open source (MIT), English, platform integrations in forks | accepted |
+| [[0012-own-media-in-scenes]] | Your own pictures and videos go into the scene through studio helpers, not a separate track | accepted |
+| [[0013-export-versions-and-languages]] | Export light and dark versions, and dubbed audio tracks plus subtitles per language | accepted |

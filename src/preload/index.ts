@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { StudioApi } from '../shared/types'
 
 const invoke =
@@ -10,7 +10,7 @@ const methods = [
   'appInfo', 'setupStatus', 'install', 'getSettings', 'setSettings', 'setElevenLabsKey', 'setAnthropicKey',
   'claudeStatus', 'claudeUsage', 'claudeLogin', 'claudeLoginCode', 'claudeLogout', 'claudeDesktopStatus',
   'listProjects', 'createProject', 'openProject', 'pickProject', 'pickFolder', 'closeProject', 'forgetProject', 'reveal',
-  'saveScene', 'updateMeta', 'render', 'cancelRender', 'frame', 'exportVideo',
+  'saveScene', 'updateMeta', 'render', 'cancelRender', 'frame', 'exportVideo', 'listMedia', 'importMedia', 'removeMedia',
   'saveRecording', 'deleteRecording', 'saveVoiceReference', 'askMicrophone', 'elevenLabsVoices', 'systemVoices',
   'chatSend', 'chatInterrupt', 'chatReset', 'chatModels', 'installClaudeExtension', 'history', 'restore',
   'checkForUpdates', 'downloadUpdate', 'installUpdate', 'openExternal',
@@ -18,6 +18,7 @@ const methods = [
 
 const api = Object.fromEntries(methods.map((m) => [m, invoke(m)])) as unknown as StudioApi
 
+api.pathForFile = (file: File) => webUtils.getPathForFile(file)
 api.mediaUrl = (path: string) => `studio-media://local/${encodeURIComponent(path)}`
 api.on = ((channel: string, cb: (payload: unknown) => void) => {
   const listener = (_e: Electron.IpcRendererEvent, payload: unknown) => cb(payload)

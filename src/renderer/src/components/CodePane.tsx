@@ -1,10 +1,11 @@
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
-import { FileCode2, Play, Save, Sparkles } from 'lucide-react'
+import { FileCode2, Images, Play, Save, Sparkles } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { editorBridge } from '../lib/editor-bridge'
 import { isDark, onThemeChange } from '../lib/theme'
 import { markEdited, resolveConflict, saveScene, useStore } from '../store'
+import { MediaPane } from './MediaPane'
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() }
 
@@ -108,6 +109,8 @@ export function CodePane() {
   const dirty = useStore((s) => s.dirty)
   const conflict = useStore((s) => s.conflict)
   const chatBusy = useStore((s) => s.chatBusy)
+  const tab = useStore((s) => s.leftTab)
+  const setTab = (leftTab: 'code' | 'media') => useStore.setState({ leftTab })
 
   useEffect(() => {
     if (!host.current) return
@@ -164,12 +167,18 @@ export function CodePane() {
   return (
     <div className="code-pane">
       <div className="pane-head">
-        <div className="file-tab">
-          <FileCode2 />
-          scene.py
-          {dirty && <span className="dirty-dot" />}
+        <div className="pane-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'code'} className="file-tab" onClick={() => setTab('code')}>
+            <FileCode2 />
+            scene.py
+            {dirty && <span className="dirty-dot" />}
+          </button>
+          <button role="tab" aria-selected={tab === 'media'} className="file-tab" onClick={() => setTab('media')} data-tour="media">
+            <Images />
+            Media
+          </button>
         </div>
-        <div className="pane-actions">
+        <div className={`pane-actions ${tab === 'media' ? 'hidden' : ''}`}>
           <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title="Save without rendering">
             <Save /> Save
           </button>
@@ -189,7 +198,9 @@ export function CodePane() {
           </button>
         </div>
       )}
-      <div className="code-host" ref={host} />
+      {/* Monaco stays mounted under the Media panel so its undo history and cursor survive the switch. */}
+      <div className={`code-host ${tab === 'media' ? 'hidden' : ''}`} ref={host} />
+      {tab === 'media' && <MediaPane />}
       <div className={`claude-editing ${chatBusy ? 'on' : ''}`}>
         <Sparkles /> Claude is editing the scene…
       </div>
