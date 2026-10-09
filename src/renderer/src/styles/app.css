@@ -932,6 +932,97 @@
   display: grid;
   gap: 8px;
 }
+.export-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 18px;
+}
+.export-option .hint {
+  margin-top: 2px;
+}
+.language-picker {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.lang-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border-radius: 999px;
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  font-weight: 550;
+  font-size: 12.5px;
+}
+.lang-chip.fixed {
+  padding-right: 10px;
+  color: var(--text-2);
+}
+.lang-chip button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+}
+.lang-chip button:hover {
+  background: var(--raised-2);
+  color: var(--text);
+}
+.lang-chip svg {
+  width: 12px;
+  height: 12px;
+}
+.select.lang-add {
+  width: auto;
+  height: 28px;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+.export-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.export-result {
+  display: grid;
+  gap: 10px;
+}
+.export-list {
+  margin: 0;
+  padding: 10px 12px 10px 28px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.export-warnings {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--sun-text);
+}
+.export-warnings svg {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
 .export-done,
 .export-error {
   display: flex;
@@ -984,4 +1075,81 @@
 .plan-usage-row .mono {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Settings → Video and General */
+.bg-colours {
+  display: flex;
+  gap: 14px;
+}
+.bg-colour {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.bg-colour input[type='color'] {
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: none;
+}
+.stack-controls {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+/* First-run tutorial: a spotlight that glides between the parts of the editor, and its card. */
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+.tour-spot {
+  position: fixed;
+  border-radius: var(--r-md);
+  box-shadow:
+    0 0 0 2px var(--sun),
+    0 0 0 100vmax light-dark(rgb(15 23 42 / 0.45), rgb(2 6 14 / 0.66));
+  transition:
+    top 0.35s var(--ease-out),
+    left 0.35s var(--ease-out),
+    width 0.35s var(--ease-out),
+    height 0.35s var(--ease-out);
+  pointer-events: none;
+}
+.tour-card {
+  position: fixed;
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px 14px;
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  transition:
+    top 0.35s var(--ease-out),
+    left 0.35s var(--ease-out);
+  animation: fade-up 0.25s var(--ease-out);
+}
+.tour-card h3 {
+  margin: 0;
+  font: 800 17px/1.25 var(--font-display);
+}
+.tour-card p {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.tour-actions > div {
+  display: flex;
+  gap: 6px;
 }

@@ -6,7 +6,7 @@ imported, so the frame constants below match the project's aspect ratio."""
 import os
 from pathlib import Path
 
-from manim import Mobject, config
+from manim import ImageMobject, Mobject, config
 from manim_voiceover import VoiceoverScene
 
 from .brand import (  # noqa: F401 - re-exported for scenes
@@ -46,6 +46,11 @@ class StudioScene(VoiceoverScene):
         super().setup()
         project = Path(os.environ.get("STUDIO_PROJECT", "."))
         self.set_speech_service(StudioSpeech.from_env(project))
+        # The project's background picture (Settings → Video), covering the frame behind everything.
+        if os.environ.get("STUDIO_BG_IMAGE"):
+            bg = ImageMobject(os.environ["STUDIO_BG_IMAGE"])
+            bg.scale(max(FRAME_W / bg.width, FRAME_H / bg.height)).set_z_index(-1000)
+            self.add(bg)
 
 
 def fit(mobject: Mobject, width: float = SAFE_W, height: float = SAFE_H) -> Mobject:
@@ -54,9 +59,14 @@ def fit(mobject: Mobject, width: float = SAFE_W, height: float = SAFE_H) -> Mobj
     return mobject.scale(scale)
 
 
+from .media import VideoClip, image, media_path  # noqa: E402 - needs fit() above
+
 __all__ = [
     "StudioScene",
     "fit",
+    "image",
+    "VideoClip",
+    "media_path",
     "FRAME_W",
     "FRAME_H",
     "PORTRAIT",

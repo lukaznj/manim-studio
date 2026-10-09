@@ -30,19 +30,19 @@ export function Editor() {
 
   return (
     <div className="editor" ref={ref} style={style}>
-      <section className="pane pane-code">
+      <section className="pane pane-code" data-tour="code">
         <CodePane />
       </section>
       <Resizer axis="x" containerRef={ref} prop="--code-w" min={300} max={900} onDone={(v) => void updateSettings({ sidebarWidth: v })} />
-      <section className="pane pane-preview">
+      <section className="pane pane-preview" data-tour="preview">
         <PreviewPane />
       </section>
       <Resizer axis="x" containerRef={ref} prop="--chat-w" min={300} max={640} invert onDone={(v) => void updateSettings({ chatWidth: v })} />
-      <section className="pane pane-chat">
+      <section className="pane pane-chat" data-tour="chat">
         <ChatPane />
       </section>
       <Resizer axis="y" containerRef={ref} prop="--tl-h" min={170} max={520} invert onDone={(v) => void updateSettings({ timelineHeight: v })} />
-      <section className="pane pane-timeline">
+      <section className="pane pane-timeline" data-tour="timeline">
         <Timeline />
       </section>
     </div>

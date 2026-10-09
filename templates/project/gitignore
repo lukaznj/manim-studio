@@ -2,3 +2,9 @@
 .studio/
 exports/
 __pycache__/
+# Your videos in media/ are usually big; pictures are kept in the history.
+media/*.mp4
+media/*.mov
+media/*.m4v
+media/*.webm
+media/*.mkv

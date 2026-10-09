@@ -26,13 +26,23 @@ export function setupUpdater(fn: (e: UpdateEvent) => void): void {
   autoUpdater.on('update-not-available', () => send({ state: 'none' }))
   autoUpdater.on('download-progress', (p) => send({ state: 'downloading', percent: p.percent }))
   autoUpdater.on('update-downloaded', (info) => send({ state: 'ready', version: info.version }))
-  autoUpdater.on('error', (e) =>
+  autoUpdater.on('error', (e) => {
+    console.error('[updater]', e.message)
     // An unsigned macOS build can't replace itself: offer the download page, but only when
     // there is something to download (a failed check, e.g. offline, is just reported).
-    send({ state: 'error', message: e.message, manualUrl: available ? RELEASES_URL : undefined }),
-  )
+    send({ state: 'error', message: friendly(e), manualUrl: available ? RELEASES_URL : undefined })
+  })
   setTimeout(() => void checkForUpdates(), 10_000)
   setInterval(() => void checkForUpdates(), CHECK_EVERY_MS)
+}
+
+/** electron-updater's errors carry the whole HTTP exchange; the window gets one sentence. */
+function friendly(e: Error): string {
+  const m = e.message
+  if (available) return 'The update couldn’t be installed automatically. Download it from the releases page.'
+  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ENETUNREACH|EAI_AGAIN|net::ERR_/.test(m)) return 'Couldn’t check for updates: no internet connection.'
+  if (/\b(404|401|403)\b/.test(m)) return 'Couldn’t check for updates: the releases page isn’t reachable (the repository may be private).'
+  return 'Couldn’t check for updates. Try again later.'
 }
 
 export async function checkForUpdates(): Promise<void> {

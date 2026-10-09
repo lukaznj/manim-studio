@@ -16,7 +16,7 @@
        ▼                   ▼                    ▼
  python -m studio_runner   bundled Claude Code  GitHub Releases
  (pixi env in userData)    binary (user's own   (electron-updater)
-   render / frames /       sign-in or key,
+   render / frames / dub / sign-in or key,
    thumbnail / export /    in-process MCP
    align / tts-worker      tools "studio")
 ```
@@ -48,8 +48,10 @@
 |---|---|---|
 | `<project>/scene.py`, `project.json`, `CLAUDE.md` | The video, its settings, Claude's conventions | yes |
 | `<project>/voice/tts/`, `voice/recordings/` | Generated speech and human takes | yes; regenerating costs money or a re-take |
+| `<project>/voice/translations/<lang>.json` | Claude's translations of the narration, for dubbed exports | yes; edit to correct a sentence |
+| `<project>/media/` | Your pictures and videos ([[../04-decisions/0012-own-media-in-scenes\|ADR 0012]]) | pictures yes, videos no |
 | `<project>/.studio/` | Renders, `timeline.json`, frames, chat log, thumbnail | no |
-| `<project>/exports/` | Final mp4/vtt/srt/jpg | no |
+| `<project>/exports/<name>/` | Videos per theme, audio tracks and subtitles per language, thumbnails ([[../04-decisions/0013-export-versions-and-languages\|ADR 0013]]) | no |
 | `userData/python-env/` | pixi manifest + lock + `.pixi/envs/{default,omnivoice,transcribe}` | – |
 | `userData/tinytex/` | LaTeX | – |
 | `userData/settings.json`, `elevenlabs.secret`, `anthropic.secret` | Settings; API keys encrypted with the OS keychain | – |

@@ -1,15 +1,16 @@
 import { AudioLines, Check, Circle, Cpu, KeyRound, Laptop, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
-import type { ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, PlanUsage, VoiceOption, VoiceProvider, VoiceSettings } from '../../../shared/types'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { Background, ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, MediaItem, PlanUsage, ProjectMeta, Settings, Theme, VoiceOption, VoiceProvider, VoiceSettings } from '../../../shared/types'
 import { api } from '../lib/api'
+import { LANGUAGES, languageName } from '../lib/languages'
 import { encodeWav } from '../lib/audio'
 import { resetTime } from '../lib/time'
-import { closeDialog, errorText, installComponent, openDialog, refreshClaude, refreshUsage, toast, updateMeta, updateSettings, useStore } from '../store'
+import { closeDialog, errorText, installComponent, openDialog, refreshClaude, refreshUsage, renderNow, startTour, toast, updateMeta, updateSettings, useStore } from '../store'
 import { ModelControls, usageLevel } from './ChatPane'
 import { useRecorder } from './RecordingBooth'
 import { Modal, ProgressLine, Tabs } from './ui'
 
-type Tab = 'account' | 'voice' | 'env' | 'about'
+type Tab = 'account' | 'voice' | 'video' | 'env' | 'about'
 
 export function SettingsDialog() {
   const dialog = useStore((s) => s.dialog)
@@ -28,6 +29,7 @@ export function SettingsDialog() {
           items={[
             { value: 'account', label: 'Claude' },
             { value: 'voice', label: 'Voice' },
+            { value: 'video', label: 'Video' },
             { value: 'env', label: 'Environment' },
             { value: 'about', label: 'General' },
           ]}
@@ -36,6 +38,7 @@ export function SettingsDialog() {
       <div className="modal-body settings-body">
         {tab === 'account' && <AccountTab />}
         {tab === 'voice' && <VoiceTab />}
+        {tab === 'video' && <VideoTab />}
         {tab === 'env' && <EnvTab />}
         {tab === 'about' && <AboutTab />}
       </div>
@@ -55,21 +58,48 @@ function Row(props: { title: ReactNode; text?: ReactNode; children?: ReactNode }
   )
 }
 
+/** An API key: once saved it shows as saved (it never comes back to the window), with Replace and Remove. */
 function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: string) => Promise<void> }) {
   const [key, setKey] = useState('')
+  const [replacing, setReplacing] = useState(false)
+  if (props.saved && !replacing)
+    return (
+      <div className="inline-form">
+        <span className="badge mint">
+          <Check /> Key saved
+        </span>
+        <button className="btn small" onClick={() => setReplacing(true)}>
+          Replace
+        </button>
+        <button className="btn small ghost" onClick={() => void props.onSave('')}>
+          Remove
+        </button>
+      </div>
+    )
+  const save = async () => {
+    await props.onSave(key.trim())
+    setKey('')
+    setReplacing(false)
+  }
   return (
     <div className="inline-form">
-      <input className="input" type="password" placeholder={props.saved ? '••••••••••' : props.placeholder} value={key} onChange={(e) => setKey(e.target.value)} />
-      <button
-        className="btn"
-        disabled={!key.trim()}
-        onClick={async () => {
-          await props.onSave(key)
-          setKey('')
-        }}
-      >
+      <input
+        className="input"
+        type="password"
+        placeholder={props.placeholder}
+        value={key}
+        autoFocus={replacing}
+        onChange={(e) => setKey(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && key.trim() && void save()}
+      />
+      <button className="btn" disabled={!key.trim()} onClick={() => void save()}>
         <KeyRound /> Save
       </button>
+      {replacing && (
+        <button className="btn ghost" onClick={() => setReplacing(false)}>
+          Cancel
+        </button>
+      )}
     </div>
   )
 }
@@ -133,11 +163,6 @@ function AccountTab() {
         <Row title="Anthropic API key" text={settings.hasAnthropicKey ? 'Saved and encrypted on this computer.' : 'A key from console.anthropic.com.'}>
           <div className="inline-form">
             <KeyField saved={settings.hasAnthropicKey} placeholder="sk-ant-…" onSave={saveKey} />
-            {settings.hasAnthropicKey && (
-              <button className="btn ghost" onClick={() => void saveKey('')}>
-                Remove
-              </button>
-            )}
           </div>
         </Row>
       ) : (
@@ -247,8 +272,80 @@ const EL_MODELS = [
   { id: 'eleven_turbo_v2_5', label: 'Turbo v2.5' },
 ]
 
-const LANGUAGES = ['en', 'en-GB', 'es', 'fr', 'de', 'it', 'pt', 'pt-BR', 'nl', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'hu', 'ro', 'sv', 'da', 'nb', 'fi', 'tr', 'el', 'uk', 'ru', 'ar', 'hi', 'ja', 'ko', 'zh']
-const languageName = new Intl.DisplayNames(['en'], { type: 'language' })
+
+// The themes' own backgrounds (python/studio/brand.py), shown until the project picks its own.
+const THEME_BG: Record<Theme, string> = { dark: '#0b1626', light: '#f7f8fa' }
+
+/** The open project's look: theme, background colours, a background picture. Changes re-render the preview. */
+function VideoTab() {
+  const project = useStore((s) => s.project)
+  const [pictures, setPictures] = useState<MediaItem[]>([])
+  const [colours, setColours] = useState<Background>({})
+  const timer = useRef<number>(undefined)
+
+  useEffect(() => {
+    if (!project) return
+    setColours(project.meta.background ?? {})
+    void api.listMedia().then((items) => setPictures(items.filter((i) => i.kind === 'image')))
+  }, [project?.path])
+
+  if (!project) return <p className="hint">Open a project to set its theme and background.</p>
+  const meta = project.meta
+  const background = meta.background ?? {}
+  const save = async (patch: Partial<ProjectMeta>) => {
+    await updateMeta(patch)
+    void renderNow()
+  }
+  // The colour picker reports every drag step; save once it settles.
+  const pickColour = (theme: Theme, colour: string | undefined) => {
+    const next = { ...colours, [theme]: colour }
+    setColours(next)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => void save({ background: { ...background, ...next, [theme]: colour } }), 500)
+  }
+
+  return (
+    <div className="set-group">
+      <div className="eyebrow">Video of “{meta.name}”</div>
+      <Row title="Theme" text="Text and accent colours. Export can make the other version too.">
+        <Tabs
+          radio="Theme"
+          value={meta.theme}
+          onChange={(theme) => void save({ theme })}
+          items={[
+            { value: 'dark', label: 'Dark' },
+            { value: 'light', label: 'Light' },
+          ]}
+        />
+      </Row>
+      <Row title="Background colour" text="Each theme's background, if you want another than its own. Keep text readable.">
+        <div className="bg-colours">
+          {(['dark', 'light'] as Theme[]).map((t) => (
+            <label key={t} className="bg-colour">
+              <input type="color" value={colours[t] ?? THEME_BG[t]} onChange={(e) => pickColour(t, e.target.value)} aria-label={`${t} background`} />
+              <span>{t === 'dark' ? 'Dark' : 'Light'}</span>
+              {colours[t] && (
+                <button className="link-btn" onClick={() => pickColour(t, undefined)}>
+                  Reset
+                </button>
+              )}
+            </label>
+          ))}
+        </div>
+      </Row>
+      <Row title="Background picture" text="A picture from the project's media, covering the frame behind everything. Add pictures in the Media tab.">
+        <select className="select" value={background.image ?? ''} onChange={(e) => void save({ background: { ...background, image: e.target.value || undefined } })}>
+          <option value="">None</option>
+          {pictures.map((p) => (
+            <option key={p.name} value={p.name}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </Row>
+    </div>
+  )
+}
 
 function VoiceTab() {
   const project = useStore((s) => s.project)
@@ -330,7 +427,7 @@ function VoiceTab() {
               placeholder="sk_…"
               onSave={async (key) => {
                 useStore.setState({ settings: await api.setElevenLabsKey(key) })
-                toast('Key saved', 'ok')
+                toast(key ? 'Key saved' : 'Key removed', 'ok')
               }}
             />
           </Row>
@@ -495,6 +592,7 @@ function AboutTab() {
   const app = useStore((s) => s.app)!
   const update = useStore((s) => s.update)
   const settings = useStore((s) => s.settings)!
+  const project = useStore((s) => s.project)
   const status =
     update.state === 'checking'
       ? 'Checking…'
@@ -523,6 +621,33 @@ function AboutTab() {
           ]}
         />
       </Row>
+      <Row
+        title="Preview quality"
+        text="The preview while you work: higher is sharper, but renders take longer. Exports are always 1080p at the project's frame rate."
+      >
+        <div className="stack-controls">
+          <Tabs
+            radio="Preview resolution"
+            value={String(settings.previewSize)}
+            onChange={(v) => void updateSettings({ previewSize: Number(v) as Settings['previewSize'] }).then(() => project && renderNow())}
+            items={[
+              { value: '480', label: '480p' },
+              { value: '720', label: '720p' },
+              { value: '1080', label: '1080p' },
+            ]}
+          />
+          <Tabs
+            radio="Preview frame rate"
+            value={String(settings.previewFps)}
+            onChange={(v) => void updateSettings({ previewFps: Number(v) as Settings['previewFps'] }).then(() => project && renderNow())}
+            items={[
+              { value: '15', label: '15 fps' },
+              { value: '24', label: '24 fps' },
+              { value: '30', label: '30 fps' },
+            ]}
+          />
+        </div>
+      </Row>
       <Row title={`Manim Studio ${app.version}`} text={`${app.platform} · ${app.arch} · open source (MIT)`}>
         <button className="btn small" onClick={() => void api.checkForUpdates()}>
           Check for updates
@@ -548,6 +673,11 @@ function AboutTab() {
           }}
         >
           Change
+        </button>
+      </Row>
+      <Row title="Tutorial" text="A short tour of the editor: the code, Claude, the timeline, media, narration and export.">
+        <button className="btn small" disabled={!project} title={project ? undefined : 'Open a project first'} onClick={startTour}>
+          Show the tutorial
         </button>
       </Row>
       <Row title="Releases" text="If an automatic update fails, download the new version from the releases page.">

@@ -63,6 +63,7 @@ export function refreshMenu(): void {
         },
         { type: 'separator' },
         item('Save and Render', 'save', 'Cmd+S', { enabled: open }),
+        item('Export Video…', 'export', 'Cmd+E', { enabled: open }),
         { type: 'separator' },
         { label: 'Show in Finder', enabled: open, click: () => open && shell.showItemInFolder(project()!.path) },
         item('Close Project', 'close-project', 'Shift+Cmd+W', { enabled: open }),
@@ -77,8 +78,6 @@ export function refreshMenu(): void {
         { type: 'separator' },
         item('Record Voice…', 'booth', 'Shift+Cmd+R', { enabled: open }),
         item('Version History…', 'history', 'Cmd+Y', { enabled: open }),
-        { type: 'separator' },
-        item('Export Video…', 'export', 'Cmd+E', { enabled: open }),
       ],
     },
     {
@@ -111,6 +110,8 @@ export function refreshMenu(): void {
     {
       role: 'help',
       submenu: [
+        item('Show Tutorial', 'tutorial'),
+        { type: 'separator' },
         { label: 'Manim Studio Help', click: () => void shell.openExternal(`${REPO_URL}#readme`) },
         { label: 'Manim Documentation', click: () => void shell.openExternal('https://docs.manim.community') },
         { type: 'separator' },
