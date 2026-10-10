@@ -198,6 +198,8 @@ def render(project: Path, quality: str, **options) -> int:
         ],
         "warnings": recorder.layout.results(),
         "voiceWarnings": WARNINGS,
+        # The voice this render spoke with; the app offers to re-voice when the project's differs.
+        "voiceSettings": json.loads(os.environ.get("STUDIO_VOICE") or "{}"),
     }
     (out / "timeline.json").write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
     _prune_old_videos(out, keep=Path(result["video"]))

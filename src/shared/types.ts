@@ -51,6 +51,8 @@ export interface NewProjectInput {
   theme: Theme
   /** Narration and on-screen language, a BCP 47 code like "en" or "hr". */
   language: string
+  /** The project's voice; unset takes Settings → Voice's default (with `language`). */
+  voice?: VoiceSettings
   parentDir?: string
 }
 
@@ -126,6 +128,8 @@ export interface Timeline {
   subtitles: Subtitle[]
   warnings: LayoutWarning[]
   voiceWarnings: string[]
+  /** The voice the render spoke with (project.json's at the time); unset in timelines from before 0.2. */
+  voiceSettings?: VoiceSettings
 }
 
 export interface RenderError {
@@ -334,6 +338,8 @@ export interface VoiceOption {
   id: string
   name: string
   description?: string
+  preview?: string // a sample to play (ElevenLabs)
+  users?: number // how many people saved it (ElevenLabs' library)
 }
 
 export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'export' | 'open-project' | 'menu'
@@ -384,7 +390,8 @@ export interface StudioApi {
   saveVoiceReference(wav: ArrayBuffer, text: string): Promise<ProjectMeta>
   askMicrophone(): Promise<boolean>
   elevenLabsVoices(): Promise<VoiceOption[]>
-  systemVoices(): Promise<VoiceOption[]>
+  elevenLabsLibrary(language: string, search: string): Promise<VoiceOption[]>
+  systemVoices(language?: string): Promise<VoiceOption[]>
 
   chatSend(request: ChatRequest): Promise<void>
   chatInterrupt(): Promise<void>

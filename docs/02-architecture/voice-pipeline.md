@@ -18,11 +18,13 @@ with self.voiceover("The vertex is the <bookmark mark='v'/>lowest point.") as v:
    | Provider | Where | Word timings | Notes |
    |---|---|---|---|
    | `system` (default) | macOS `say`, Windows SAPI, or `espeak-ng` on Linux, picked for the project's language | proportional | Free and offline, good for pacing drafts |
-   | `elevenlabs` | REST `/with-timestamps` | exact, from the character alignment | Needs an API key (Settings → Voice, stored encrypted). Multilingual v2 by default |
-   | `omnivoice` | local worker, `k2-fsa/OmniVoice` | proportional | Apache-2.0, 600+ languages, clones your voice from a 5–10 s reference |
+   | `elevenlabs` | REST `/with-timestamps` | exact, from the character alignment | Needs an API key (Settings → Voice, stored encrypted). v3 by default; voices from the account or ElevenLabs' library |
+   | `omnivoice` | local worker, `k2-fsa/OmniVoice` | proportional | Apache-2.0, 600+ languages, clones your voice from a 5–10 s reference. The worker quits after 10 idle minutes to free its memory |
 3. **Silence of an estimated length**, if the provider fails. The render never blocks on TTS; the timeline marks the block in coral and a toast says why.
 
-Audio is cached under `voice/tts/<key>-<provider-signature>.{wav,mp3}`. Changing the provider or the voice regenerates it; re-renders don't.
+Audio is cached under `voice/tts/<key>-<provider-signature>.{wav,mp3}`. Changing the provider or the voice regenerates it on the next render; re-renders with the same voice don't. Switching back to an earlier voice reuses its files, so it costs nothing.
+
+Each timeline records the voice it was rendered with (`voiceSettings`). When the project's voice differs, the timeline toolbar and Settings → Voice offer **Re-voice with <name>**, which is a render. Settings also says how many ElevenLabs characters it may use. Recordings stay. The language isn't compared: a new language needs new narration text, not a new voice.
 
 ## Recording booth
 

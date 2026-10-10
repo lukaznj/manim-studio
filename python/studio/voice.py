@@ -166,7 +166,7 @@ class StudioSpeech(SpeechService):
         s = self.settings.get("elevenlabs", {})
         api_key = os.environ.get("ELEVENLABS_API_KEY", "")
         voice_id = s.get("voiceId", "")
-        model_id = s.get("modelId", "eleven_multilingual_v2")
+        model_id = s.get("modelId", "eleven_v3")
         if not api_key:
             raise RuntimeError("no ElevenLabs API key (Settings → Voice)")
         if not voice_id:
@@ -176,25 +176,17 @@ class StudioSpeech(SpeechService):
             return rel, starts
 
         body: dict = {"text": words, "model_id": model_id}
-        # Only the v2.5 models accept a forced language; the others reject the field.
-        if model_id.endswith("v2_5"):
-            body["language_code"] = self.settings.get("language", "hr")
-        req = urllib.request.Request(
-            f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps"
-            "?output_format=mp3_44100_128",
-            data=json.dumps(body).encode(),
-            headers={"xi-api-key": api_key, "Content-Type": "application/json"},
-        )
+        # Pins the language (ISO 639-1); every model but Multilingual v2 takes it.
+        if model_id != "eleven_multilingual_v2":
+            body["language_code"] = self.settings.get("language", "en").split("-")[0]
         try:
-            with urllib.request.urlopen(req, timeout=180) as r:
-                data = json.load(r)
-        except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", "replace")
-            try:  # ElevenLabs explains failures in detail.message (e.g. a missing key permission)
-                detail = json.loads(body)["detail"]["message"]
-            except (ValueError, KeyError, TypeError):
-                detail = body[:300]
-            raise RuntimeError(f"HTTP {e.code}: {detail}") from None
+            data = _elevenlabs_post(voice_id, api_key, body)
+        except _HTTPError as e:
+            if e.code not in (400, 422) or "language_code" not in body:
+                raise
+            # A model that doesn't know the field or the language: speak without pinning it.
+            body.pop("language_code")
+            data = _elevenlabs_post(voice_id, api_key, body)
 
         path.write_bytes(base64.b64decode(data["audio_base64"]))
         starts = None
@@ -222,6 +214,30 @@ class StudioSpeech(SpeechService):
         with urllib.request.urlopen(req, timeout=600) as r:
             json.load(r)
         return rel, None
+
+
+class _HTTPError(RuntimeError):
+    def __init__(self, code: int, detail: str):
+        super().__init__(f"HTTP {code}: {detail}")
+        self.code = code
+
+
+def _elevenlabs_post(voice_id: str, api_key: str, body: dict) -> dict:
+    req = urllib.request.Request(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps?output_format=mp3_44100_128",
+        data=json.dumps(body).encode(),
+        headers={"xi-api-key": api_key, "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        text = e.read().decode("utf-8", "replace")
+        try:  # ElevenLabs explains failures in detail.message (e.g. a missing key permission)
+            detail = json.loads(text)["detail"]["message"]
+        except (ValueError, KeyError, TypeError):
+            detail = text[:300]
+        raise _HTTPError(e.code, detail) from None
 
 
 def _default_system_voice(language: str) -> str | None:

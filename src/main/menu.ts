@@ -3,12 +3,20 @@
 // the buttons. Rebuilt whenever what it shows changes: the open project, recents, appearance.
 // Windows and Linux have no menu bar (the title bar is drawn by the page) and keep their buttons.
 import { app, Menu, shell, type MenuItemConstructorOptions } from 'electron'
+import { mkdirSync } from 'node:fs'
 import type { MenuAction } from '../shared/types'
 import { checkForUpdates, RELEASES_URL } from './updater'
 import { listProjects, project } from './projects'
 import { getSettings } from './settings'
 
 const REPO_URL = 'https://github.com/lukaznj/manim-studio'
+
+/** The app's logs folder, where memory.ts writes memory.log. */
+function showLogs(): void {
+  const dir = app.getPath('logs')
+  mkdirSync(dir, { recursive: true })
+  void shell.openPath(dir)
+}
 
 let send: (action: MenuAction, extra?: { path?: string; value?: string }) => void = () => {}
 let installExtension: () => void = () => {}
@@ -118,6 +126,7 @@ export function refreshMenu(): void {
         { type: 'separator' },
         { label: 'Releases', click: () => void shell.openExternal(RELEASES_URL) },
         { label: 'Report an Issue', click: () => void shell.openExternal(`${REPO_URL}/issues`) },
+        { label: 'Show Logs', click: showLogs },
       ],
     },
   ]
