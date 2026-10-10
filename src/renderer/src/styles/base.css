@@ -335,6 +335,18 @@ dialog.modal {
     overlay 0.22s allow-discrete,
     display 0.22s allow-discrete;
 }
+/* Head and footer stay put; the body scrolls when the dialog reaches its max-height. */
+dialog.modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+dialog.modal > * {
+  flex: none;
+}
+dialog.modal > .modal-body {
+  flex: 0 1 auto;
+  min-height: 0;
+}
 dialog.modal:not([open]) {
   opacity: 0;
   transform: translateY(10px) scale(0.98);

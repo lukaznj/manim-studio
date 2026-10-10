@@ -33,6 +33,9 @@ protocols:
   - name: Manim Studio
     schemes: [manim-studio]
 
+# Gives Electron's helper apps the app icon (Activity Monitor shows them).
+afterPack: scripts/helper-icons.cjs
+
 mac:
   target:
     - target: dmg

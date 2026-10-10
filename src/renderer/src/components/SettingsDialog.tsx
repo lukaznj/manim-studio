@@ -7,6 +7,8 @@ import { encodeWav } from '../lib/audio'
 import { resetTime } from '../lib/time'
 import { closeDialog, errorText, installComponent, openDialog, refreshClaude, refreshUsage, renderNow, startTour, toast, updateMeta, updateSettings, useStore } from '../store'
 import { ModelControls, usageLevel } from './ChatPane'
+import { RevoiceButton, useOutdatedVoice, voiceLabel } from './Revoice'
+import { VoicePicker } from './VoicePicker'
 import { useRecorder } from './RecordingBooth'
 import { Modal, ProgressLine, Tabs } from './ui'
 
@@ -265,13 +267,13 @@ const PROVIDERS: { value: VoiceProvider; title: string; text: string; icon: Reac
   { value: 'omnivoice', title: 'OmniVoice', text: 'Local and free, 600+ languages, clones your voice from a short clip.', icon: <Cpu /> },
 ]
 
+// The first is the default (python/studio/voice.py uses it too when a project names none).
 const EL_MODELS = [
-  { id: 'eleven_multilingual_v2', label: 'Multilingual v2 (stable, recommended)' },
-  { id: 'eleven_v3', label: 'v3 (more expressive)' },
-  { id: 'eleven_flash_v2_5', label: 'Flash v2.5 (fast, cheaper)' },
-  { id: 'eleven_turbo_v2_5', label: 'Turbo v2.5' },
+  { id: 'eleven_v3', label: 'v3 (expressive, recommended)' },
+  { id: 'eleven_v4', label: 'v4 (newest, most expressive)' },
+  { id: 'eleven_multilingual_v2', label: 'Multilingual v2 (steadiest)' },
+  { id: 'eleven_flash_v2_5', label: 'Flash v2.5 (fast, half the price)' },
 ]
-
 
 // The themes' own backgrounds (python/studio/brand.py), shown until the project picks its own.
 const THEME_BG: Record<Theme, string> = { dark: '#0b1626', light: '#f7f8fa' }
@@ -347,39 +349,77 @@ function VideoTab() {
   )
 }
 
+/** The open video's voice, or the default that new projects start with. */
 function VoiceTab() {
   const project = useStore((s) => s.project)
   const settings = useStore((s) => s.settings)!
   const setup = useStore((s) => s.setup)
-  const voice: VoiceSettings = project?.meta.voice ?? settings.defaultVoice
-  const [elVoices, setElVoices] = useState<VoiceOption[] | null>(null)
+  const [scope, setScope] = useState<'project' | 'default'>('project')
+  const forProject = !!project && scope === 'project'
+
+  return (
+    <div className="set-group">
+      {project ? (
+        <Row title="Voice for" text={forProject ? `Only “${project.meta.name}”.` : 'What new projects start with; each can then pick its own.'}>
+          <Tabs
+            radio="Voice for"
+            value={scope}
+            onChange={setScope}
+            items={[
+              { value: 'project', label: 'This video' },
+              { value: 'default', label: 'New projects' },
+            ]}
+          />
+        </Row>
+      ) : (
+        <div className="eyebrow">Default voice for new projects</div>
+      )}
+      <VoiceForm
+        voice={forProject ? project.meta.voice : settings.defaultVoice}
+        inProject={forProject}
+        onChange={(voice) => void (forProject ? updateMeta({ voice }) : updateSettings({ defaultVoice: voice }))}
+      />
+      {forProject && <RevoiceRow />}
+      <div className="set-divider" />
+      <Row title="Exact bookmarks for recordings" text="Whisper (faster-whisper) finds where you said each word. About 500 MB.">
+        <InstallButton component="transcribe" state={setup?.transcribe ?? 'missing'} />
+      </Row>
+    </div>
+  )
+}
+
+/** After a voice change: the narration still has the old voice until the next render. */
+function RevoiceRow() {
+  const outdated = useOutdatedVoice()
+  if (!outdated) return null
+  const credit = outdated.to.provider === 'elevenlabs' ? ` That uses up to ${outdated.characters.toLocaleString('en')} ElevenLabs characters.` : ''
+  return (
+    <div className="revoice">
+      <Row title="The narration still has the old voice" text={`It was made with ${voiceLabel(outdated.from)}. Re-voicing speaks it again; your recordings stay.${credit}`}>
+        <RevoiceButton className="btn primary small" />
+      </Row>
+    </div>
+  )
+}
+
+/** Language, provider and voice: in Settings → Voice and in the new-project dialog. */
+export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings; onChange: (voice: VoiceSettings) => void; inProject: boolean }) {
+  const settings = useStore((s) => s.settings)!
+  const setup = useStore((s) => s.setup)
   const [sysVoices, setSysVoices] = useState<VoiceOption[]>([])
-
-  const save = (patch: Partial<VoiceSettings>) => {
-    const next = { ...voice, ...patch }
-    if (project) void updateMeta({ voice: next })
-    else void updateSettings({ defaultVoice: next })
-  }
+  const save = (patch: Partial<VoiceSettings>) => onChange({ ...voice, ...patch })
+  const el = voice.elevenlabs
+  const modelId = el?.modelId ?? EL_MODELS[0].id
+  const models = EL_MODELS.some((m) => m.id === modelId) ? EL_MODELS : [...EL_MODELS, { id: modelId, label: modelId }]
 
   useEffect(() => {
-    api.systemVoices().then(setSysVoices).catch(() => setSysVoices([]))
+    api.systemVoices(voice.language).then(setSysVoices, () => setSysVoices([]))
   }, [voice.language])
-  useEffect(() => {
-    if (voice.provider === 'elevenlabs' && settings.hasElevenLabsKey)
-      api
-        .elevenLabsVoices()
-        .then(setElVoices)
-        .catch((e) => {
-          setElVoices([])
-          toast(errorText(e), 'error')
-        })
-  }, [voice.provider, settings.hasElevenLabsKey])
 
   const languages = LANGUAGES.includes(voice.language) ? LANGUAGES : [voice.language, ...LANGUAGES]
 
   return (
-    <div className="set-group">
-      <div className="eyebrow">{project ? `Voice for “${project.meta.name}”` : 'Default voice for new projects'}</div>
+    <>
       <Row title="Narration language" text="Claude writes the narration and on-screen text in it; voices and subtitles follow it.">
         <select className="select" value={voice.language} onChange={(e) => save({ language: e.target.value, systemVoice: undefined })}>
           {languages.map((code) => (
@@ -389,9 +429,9 @@ function VoiceTab() {
           ))}
         </select>
       </Row>
-      <div className="provider-cards">
+      <div className="provider-cards" role="radiogroup" aria-label="Voice">
         {PROVIDERS.map((p) => (
-          <button key={p.value} className={`provider-card ${voice.provider === p.value ? 'on' : ''}`} onClick={() => save({ provider: p.value })}>
+          <button key={p.value} role="radio" aria-checked={voice.provider === p.value} className={`provider-card ${voice.provider === p.value ? 'on' : ''}`} onClick={() => save({ provider: p.value })}>
             {p.icon}
             <strong>{p.title}</strong>
             <span className="hint">{p.text}</span>
@@ -431,31 +471,17 @@ function VoiceTab() {
               }}
             />
           </Row>
-          <Row title="Voice" text="Voices from your ElevenLabs library.">
-            <select
-              className="select"
-              value={voice.elevenlabs?.voiceId ?? ''}
-              disabled={!elVoices?.length}
-              onChange={(e) => {
-                const v = elVoices?.find((x) => x.id === e.target.value)
-                save({ elevenlabs: { modelId: voice.elevenlabs?.modelId ?? EL_MODELS[0].id, voiceId: e.target.value, voiceName: v?.name } })
-              }}
-            >
-              <option value="">{elVoices ? 'Choose a voice' : settings.hasElevenLabsKey ? 'Loading…' : 'Save a key first'}</option>
-              {elVoices?.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name} {v.description ? `— ${v.description}` : ''}
-                </option>
-              ))}
-            </select>
+          <Row title="Voice" text={`The most used voices in ${languageName.of(voice.language)}, or search the library. ▶ plays a sample.`}>
+            <VoicePicker
+              language={voice.language}
+              hasKey={settings.hasElevenLabsKey}
+              value={el?.voiceId ? { id: el.voiceId, name: el.voiceName } : undefined}
+              onPick={(v) => save({ elevenlabs: { modelId, voiceId: v.id, voiceName: v.name } })}
+            />
           </Row>
           <Row title="Model">
-            <select
-              className="select"
-              value={voice.elevenlabs?.modelId ?? EL_MODELS[0].id}
-              onChange={(e) => save({ elevenlabs: { voiceId: voice.elevenlabs?.voiceId ?? '', voiceName: voice.elevenlabs?.voiceName, modelId: e.target.value } })}
-            >
-              {EL_MODELS.map((m) => (
+            <select className="select" value={modelId} onChange={(e) => save({ elevenlabs: { voiceId: el?.voiceId ?? '', voiceName: el?.voiceName, modelId: e.target.value } })}>
+              {models.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.label}
                 </option>
@@ -470,15 +496,10 @@ function VoiceTab() {
           <Row title="OmniVoice model" text="About 3.3 GB of weights plus PyTorch, downloaded once. Uses the GPU on Apple Silicon and NVIDIA.">
             <InstallButton component="omnivoice" state={setup?.omnivoice ?? 'missing'} />
           </Row>
-          {project ? <ReferenceRecorder /> : <p className="hint">The reference recording of your voice is set inside a project.</p>}
+          {inProject ? <ReferenceRecorder /> : <p className="hint">You record your voice for cloning inside the project, under Settings → Voice.</p>}
         </>
       )}
-
-      <div className="set-divider" />
-      <Row title="Exact bookmarks for recordings" text="Whisper (faster-whisper) finds where you said each word. About 500 MB.">
-        <InstallButton component="transcribe" state={setup?.transcribe ?? 'missing'} />
-      </Row>
-    </div>
+    </>
   )
 }
 

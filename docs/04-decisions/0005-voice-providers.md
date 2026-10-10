@@ -24,7 +24,11 @@ The first videos were narrated in Croatian, a language most TTS models skip, so 
     - Windows SAPI: the voice for the language's culture.
     - Linux: `espeak-ng`.
   - `elevenlabs`: final quality. Uses `/with-timestamps` for exact word timings.
+    - Model: v3 by default; v4, Multilingual v2 and Flash v2.5 are offered. `language_code` pins the project's language on every model but Multilingual v2, which rejects it. If a model rejects the language, the request is retried without it.
+    - Voices: the picker shows the language's ten most-used voices from ElevenLabs' voice library, searches the whole library, and lists the voices in the account, each with a sample to play. Library voices work in text to speech by their id, without saving them to the account first (ElevenLabs allows this on paid plans only). Without a key the library shows three voices and no search.
   - `omnivoice`: local and free, 600+ languages, clones the user's voice from a 5–10 s reference read in Settings. The reference text follows the project's language.
+- **Chosen per project.** The new-project dialog asks for the language and the voice. Settings → Voice changes the open video's voice, or the default that new projects start with.
+- **Re-voicing is a click, not automatic.** A voice change doesn't render by itself: browsing ElevenLabs voices would spend credit on every pick. The app notices that the narration was made with another voice and offers "Re-voice with <name>".
 - **Recordings win.** A human recording for a block overrides any provider (the recording booth). Optional Whisper alignment places bookmarks on the spoken word.
 - **Failures degrade.** A TTS failure becomes estimated silence with a warning, never a failed render.
 - **Committed audio.** All audio is committed with the project; regenerating costs money or a re-take.
@@ -33,6 +37,7 @@ The first videos were narrated in Croatian, a language most TTS models skip, so 
 
 ## Consequences
 
-- **Language.** `project.json` `voice.language` (an ISO 639-1 code) chooses the system voice, Whisper's language for alignment, and the language Claude writes narration in. ElevenLabs' multilingual model and OmniVoice detect it from the text.
+- **Language.** `project.json` `voice.language` (an ISO 639-1 code) chooses the system voice, the ElevenLabs voices on offer, Whisper's language for alignment, and the language Claude writes narration in. ElevenLabs is told the language (except on Multilingual v2); OmniVoice detects it from the text.
+- **OmniVoice's memory.** The worker keeps the model loaded between renders, which takes several GB (about 5.7 GB on Apple Silicon, where it runs in float32). It quits after 10 minutes without a request, and the next render starts it again.
 - Anyone can make a whole video with no paid service, then switch the provider or record over individual sentences. The timing re-flows because animations sit inside voiceover blocks.
 - ElevenLabs pricing is per character. The key lives encrypted on each machine (`safeStorage`).

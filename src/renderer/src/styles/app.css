@@ -532,10 +532,51 @@
 .head-icon.coral {
   color: var(--coral);
 }
+/* Two columns: the video on the left, its narration on the right. */
 .new-project {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.np-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 20px;
+}
+.np-voice {
+  padding-left: 28px;
+  border-left: 1px solid var(--line);
+}
+.np-voice .set-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.np-voice .set-row-control {
+  max-width: none;
+}
+.np-voice .set-row-control .select,
+.np-voice .voice-picker {
+  width: 100%;
+  min-width: 0;
+}
+.np-voice .inline-form .input {
+  flex: 1;
+}
+.np-voice .provider-cards {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.np-voice .provider-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+}
+.np-voice .provider-card svg {
+  grid-row: span 2;
+  margin: 0;
 }
 .aspect-cards {
   display: grid;
@@ -642,9 +683,6 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: 16px 20px;
 }
-.np-row .span-2 {
-  grid-column: 1 / -1;
-}
 .theme-swatches {
   display: flex;
   gap: 8px;
@@ -743,6 +781,128 @@
 }
 .set-row-control .select {
   min-width: 240px;
+}
+/* ElevenLabs voice picker (VoicePicker.tsx): a select-like button and a popover list anchored to it. */
+.voice-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 280px;
+  max-width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+.voice-picker > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.voice-picker svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--text-3);
+}
+.voice-panel {
+  inset: auto;
+  top: anchor(bottom);
+  right: anchor(right);
+  margin: 6px 0;
+  position-try-fallbacks: flip-block, flip-inline;
+  width: 440px;
+  min-width: anchor-size(width);
+  max-width: calc(100vw - 32px);
+  max-height: min(440px, 70vh);
+  padding: 0;
+  display: none;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: none;
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+}
+.voice-panel:popover-open {
+  display: grid;
+  animation: fade-up 0.18s var(--ease-out);
+}
+.voice-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.voice-search svg {
+  width: 15px;
+  height: 15px;
+  color: var(--text-3);
+}
+.voice-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.voice-list {
+  overflow: auto;
+  padding: 6px;
+}
+.voice-list .eyebrow {
+  padding: 10px 8px 4px;
+}
+.voice-note {
+  padding: 6px 8px;
+}
+.voice-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 2px 2px;
+  border-radius: var(--r-md);
+}
+.voice-row:hover {
+  background: var(--raised);
+}
+.voice-row.on {
+  background: var(--sun-soft);
+}
+.voice-choose {
+  display: grid;
+  gap: 1px;
+  padding: 6px 2px;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.voice-choose > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.voice-name {
+  font-weight: 600;
+}
+.voice-users {
+  font-size: 11px;
+}
+.voice-check {
+  width: 15px;
+  height: 15px;
+  color: var(--sun-text);
+}
+.revoice {
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--sun-soft);
 }
 .set-divider {
   height: 1px;

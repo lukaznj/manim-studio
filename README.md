@@ -14,11 +14,11 @@
 - **Retime by dragging.** Drag a clip's edge and the `run_time=` in the code changes. Select clips and ask Claude about exactly that part.
 - **Narration and subtitles.** Narration lives in the code ([manim-voiceover](https://github.com/ManimCommunity/manim-voiceover)), and subtitles come from it. Voices:
   - the free system voice
-  - [ElevenLabs](https://elevenlabs.io)
+  - [ElevenLabs](https://elevenlabs.io): the most-used voices for your language, or search their whole library, with samples to play
   - local [OmniVoice](https://github.com/k2-fsa/OmniVoice), which can clone your voice
   - your own recordings, made in the recording booth
 
-  Animations stretch to fit the speech.
+  Each project has its own voice. Switch it and one click re-voices the narration. Animations stretch to fit the speech.
 - **Any language.** Pick the narration language per project. Claude writes in it, and the voices and subtitles follow.
 - **16:9 or 9:16.** Choose the format per project, and a light or dark video theme.
 - **Light and dark app.** Follows your system by default, and cross-fades when it switches.

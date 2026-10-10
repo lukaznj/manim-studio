@@ -9,13 +9,15 @@ import { exportVideo } from './export'
 import { importMedia, listMedia, removeMedia } from './media'
 import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
+import { watchMemory } from './memory'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
 import { cancel, frame, onRenderEvent, render } from './render'
+import { runningJobs } from './runner'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
-import { deleteRecording, elevenLabsVoices, onWorkerLog, saveRecording, saveReference, stopTtsWorker, systemVoices } from './voice'
+import { deleteRecording, elevenLabsLibrary, elevenLabsVoices, onWorkerLog, saveRecording, saveReference, stopTtsWorker, systemVoices } from './voice'
 
 // Isolated data for automated runs (scripts/drive.mjs); never set in normal use.
 if (process.env.STUDIO_USER_DATA) app.setPath('userData', process.env.STUDIO_USER_DATA)
@@ -204,7 +206,8 @@ function registerIpc(): void {
     return projects.updateMeta({ voice: { ...p.meta.voice, omnivoice: { refAudio, refText: text } } })
   })
   handle('elevenLabsVoices', () => elevenLabsVoices())
-  handle('systemVoices', () => systemVoices())
+  handle('elevenLabsLibrary', (language: string, search: string) => elevenLabsLibrary(language, search))
+  handle('systemVoices', (language?: string) => systemVoices(language))
 
   handle('chatSend', (req: Parameters<typeof chatSend>[0]) => chatSend(req))
   handle('chatInterrupt', () => chatInterrupt())
@@ -267,6 +270,11 @@ app.whenReady().then(() => {
     exportVideo: () => exportWithProgress({ themes: [], languages: [], languageVideos: false }),
   })
   if (app.isPackaged) app.setAsDefaultProtocolClient('manim-studio')
+  watchMemory(join(app.getPath('logs'), 'memory.log'), () => ({
+    project: projects.project()?.path ?? null,
+    voice: projects.project()?.meta.voice.provider ?? null,
+    pythonJobs: [...runningJobs].map(([pid, job]) => ({ pid, what: job.what, since: job.since, lastLog: job.log().split('\n').slice(-15) })),
+  }))
   createWindow()
 
   // A fresh install or an app update that changed pixi.toml: bring the env up to date quietly.

@@ -51,24 +51,66 @@ export function saveReference(wav: ArrayBuffer): string {
   return rel
 }
 
-export async function elevenLabsVoices(): Promise<VoiceOption[]> {
-  const key = getSecret('elevenlabs')
-  if (!key) throw new Error('Add your ElevenLabs API key first')
-  const res = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } })
-  // ElevenLabs explains failures in detail.message, e.g. a key created without the voices_read permission.
+/** GET from ElevenLabs; failures come back as ElevenLabs' own explanation (detail.message), e.g. a missing key permission. */
+async function elevenLabs<T>(path: string, key: string): Promise<T> {
+  const res = await fetch(`https://api.elevenlabs.io${path}`, { headers: key ? { 'xi-api-key': key } : {} })
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { detail?: { message?: string } } | null
     throw new Error(`ElevenLabs: ${body?.detail?.message ?? `HTTP ${res.status}`}`)
   }
-  const data = (await res.json()) as { voices: { voice_id: string; name: string; labels?: Record<string, string> }[] }
+  return (await res.json()) as T
+}
+
+/** The voices in the user's ElevenLabs account: their own, saved ones and ElevenLabs' defaults. */
+export async function elevenLabsVoices(): Promise<VoiceOption[]> {
+  const key = getSecret('elevenlabs')
+  if (!key) throw new Error('Add your ElevenLabs API key first')
+  const data = await elevenLabs<{ voices: { voice_id: string; name: string; preview_url?: string; labels?: Record<string, string> }[] }>('/v1/voices', key)
   return data.voices.map((v) => ({
     id: v.voice_id,
     name: v.name,
     description: Object.values(v.labels ?? {}).join(' · '),
+    preview: v.preview_url,
   }))
 }
 
-export async function systemVoices(): Promise<VoiceOption[]> {
+interface LibraryVoice {
+  voice_id: string
+  name: string
+  gender?: string
+  age?: string
+  accent?: string
+  descriptive?: string
+  use_case?: string
+  preview_url?: string
+  cloned_by_count?: number
+}
+
+/**
+ * ElevenLabs' voice library, most used first: the top ten for a language, or the voices matching
+ * a search. Library voices work in text to speech without saving them first (not on the free plan).
+ * Without a key ElevenLabs shows only three and no search.
+ */
+export async function elevenLabsLibrary(language: string, search: string): Promise<VoiceOption[]> {
+  const key = getSecret('elevenlabs')
+  if (!key && search.trim()) throw new Error('Save your ElevenLabs API key to search all voices.')
+  const query = new URLSearchParams({ language: language.split('-')[0], sort: 'usage_character_count_1y', page_size: key ? '10' : '3' })
+  if (search.trim()) query.set('search', search.trim())
+  const data = await elevenLabs<{ voices: LibraryVoice[] }>(`/v1/shared-voices?${query}`, key)
+  return data.voices.map((v) => ({
+    id: v.voice_id,
+    name: v.name,
+    description: [v.gender, v.age, v.accent !== 'standard' && v.accent, v.descriptive, v.use_case]
+      .filter(Boolean)
+      .map((label) => String(label).replace(/_/g, ' ')) // "middle_aged" → "middle aged"
+      .join(' · '),
+    preview: v.preview_url,
+    users: v.cloned_by_count,
+  }))
+}
+
+/** The system's voices, those for `language` (default: the open project's) first. */
+export async function systemVoices(language = project()?.meta.voice.language ?? 'en'): Promise<VoiceOption[]> {
   if (process.platform !== 'darwin') return []
   const { stdout } = await exec('say', ['-v', '?'])
   const voices = stdout
@@ -78,7 +120,7 @@ export async function systemVoices(): Promise<VoiceOption[]> {
     // Newer voices are listed as "Lana (Croatian (Croatia))"; `say -v` wants just "Lana".
     .map((m) => ({ id: m[1].replace(/\s*\(.*\)$/, '').trim(), name: m[1].trim(), description: `${m[2]} — ${m[3]}` }))
   // The project's language first, then the rest; the list repeats some voices.
-  const lang = (project()?.meta.voice.language ?? 'en').split('-')[0] + '_'
+  const lang = language.split('-')[0] + '_'
   const seen = new Set<string>()
   return [...voices.filter((v) => v.description.startsWith(lang)), ...voices.filter((v) => !v.description.startsWith(lang))].filter(
     (v) => !seen.has(v.id) && seen.add(v.id),

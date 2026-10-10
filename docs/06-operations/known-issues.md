@@ -20,6 +20,8 @@ Each item below was either measured during development, or not verified because 
   - Windows and Linux start Studio through `manim-studio://`, which is untested. AppImages may not register it, and then the extension asks the user to open Studio.
 - **Signed, notarized macOS build and an actual auto-update.** There's no Developer ID yet, so macOS builds are ad-hoc signed. Release metadata (`app-update.yml`, `latest-mac.yml`) is generated correctly.
 - **ElevenLabs.** The REST call and timestamp alignment are written to the documented API, but no key was available to call it.
+  - Eleven v4 (`eleven_v4`, released September 2026) has not been called; its docs don't say whether `/with-timestamps` and `language_code` work with it. A failure shows as a warning and silence for that block.
+  - The voice picker's top ten and search need a key; without one, only the three-voice list was checked.
 
 ## Measured
 
@@ -30,6 +32,7 @@ Each item below was either measured during development, or not verified because 
   - About 1.5 GB of environment plus about 3.3 GB of model weights, downloaded once.
   - The first synthesis after starting the worker took about 12 s for 7 s of speech on Apple Silicon (MPS); the next one about 6 s.
   - Its word timings are proportional, not exact.
+  - The worker held about 5.7 GB on Apple Silicon (the model runs in float32 there). It now quits after 10 idle minutes.
 - **Whisper alignment.** The first run downloads the `small` model (about 480 MB, roughly 30 s).
 - **Python env install.** About 10 s on a warm pixi cache. A fresh machine downloads about 750 MB.
 - **LaTeX install.** About 45 s (a 67 MB download plus `tlmgr`).
