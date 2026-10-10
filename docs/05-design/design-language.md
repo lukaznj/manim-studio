@@ -8,10 +8,10 @@ The full reasoning is in [[../04-decisions/0008-ink-at-night-design|ADR 0008]]. 
 | ![[screenshots/editor-light.png]] | The same in the light theme, "ink on paper" |
 | ![[screenshots/home.png]] | Projects, each with a thumbnail picked from the render |
 | ![[screenshots/home-light.png]] | Projects in the light theme |
-| ![[screenshots/new-project.png]] | New project: the format cards animate their frame, the theme swatches show the video palette, and the narration language is chosen here |
+| ![[screenshots/new-project.png]] | New project: the format cards animate their frame, the theme swatches show the video palette, and the narration (language, provider, voice) is chosen on the right |
 | ![[screenshots/recording-booth.png]] | The recording booth: a teleprompter over every voiceover block |
 | ![[screenshots/history.png]] | Version history: renders and Claude turns as restorable versions |
-| ![[screenshots/settings-voice.png]] | Voice settings per project |
+| ![[screenshots/settings-voice.png]] | Voice settings: this video's voice or the default for new projects, with Re-voice after a change |
 | ![[screenshots/app-icon.png]] | The app icon: `build/icon.icon`, an Icon Composer document with Liquid Glass |
 | ![[screenshots/icon-appearances.png]] | The icon in the default, dark, clear and tinted appearances, rendered with `ictool` |
 
