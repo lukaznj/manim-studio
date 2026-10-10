@@ -10,6 +10,9 @@ export interface RunnerEvent {
   [key: string]: unknown
 }
 
+/** Python jobs still running, by pid: what each was asked to do, for the memory log (memory.ts). */
+export const runningJobs = new Map<number, { what: string; since: string; log: () => string }>()
+
 export interface RunnerJob<T> {
   child: ChildProcess
   done: Promise<T>
@@ -43,9 +46,13 @@ export async function runRunner<T = RunnerEvent>(
   child.stdout?.on('data', onStdout)
   child.stderr?.on('data', (b: Buffer) => b.toString('utf8').split('\n').forEach((l) => l.trim() && pushLog(log, l)))
 
+  const pid = child.pid
+  if (pid) runningJobs.set(pid, { what: `${env}: ${args.join(' ')}`.slice(0, 400), since: new Date().toISOString(), log: () => log.join('\n') })
+
   const done = new Promise<T>((resolve, reject) => {
     child.on('error', reject)
     child.on('close', (code, signal) => {
+      if (pid) runningJobs.delete(pid)
       const event = final as RunnerEvent | null
       if (event?.type === 'done') resolve(event as T)
       else if (event?.type === 'error') reject(Object.assign(new Error(String(event.message)), { event, log: log.join('\n') }))

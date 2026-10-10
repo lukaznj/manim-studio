@@ -51,6 +51,10 @@ Things that bit during development:
 - Monaco has no `Cmd+End`; click a line and type.
 - Screenshots for the docs go in `docs/05-design/screenshots/`, resized with `sips -Z 1600`. Never commit one that shows an account (Settings → Claude shows the e-mail).
 
+## Memory log
+
+`src/main/memory.ts` checks the memory of everything the app runs once a minute: its Electron processes, Claude Code and the Python jobs. On macOS it reads the physical footprint, what Activity Monitor shows. `ps`'s rss leaves out compressed memory and the GPU memory PyTorch uses on Apple Silicon. A process over 2.5 GB, or all of them together over 5 GB, appends a snapshot to `memory.log` in the app's logs folder, `~/Library/Logs/Manim Studio/` on macOS (Help → Show Logs). The snapshot lists every process with its command, the open project, and each running Python job with its last log lines. Another one is written for each further GB.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on every PR and push to `main`, on macOS, Windows and Linux:

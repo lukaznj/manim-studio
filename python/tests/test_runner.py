@@ -54,6 +54,7 @@ class RenderTimeline(unittest.TestCase):
         self.assertEqual(by_line[10][0]["locked"], "bookmark")
 
     def test_voice_and_subtitles(self):
+        self.assertEqual(self.result["voiceSettings"], {"provider": "none"})
         [v] = self.result["voice"]
         self.assertEqual(v["text"], "Let's look at the derivative.")
         self.assertEqual(v["source"], "silence")

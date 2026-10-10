@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Clip, Timeline as TimelineData, VoiceBlock, VoiceSource } from '../../../shared/types'
+import { RevoiceButton } from './Revoice'
 import { api } from '../lib/api'
 import { draggedDuration, durationEdit } from '../lib/edits'
 import { editorBridge } from '../lib/editor-bridge'
@@ -317,6 +318,7 @@ function Toolbar(props: {
             from last render
           </span>
         )}
+        <RevoiceButton />
       </div>
 
       <div className="tl-selection">

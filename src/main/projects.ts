@@ -98,7 +98,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
     theme: input.theme,
     fps: 30,
     createdAt: new Date().toISOString(),
-    voice: { ...getSettings().defaultVoice, language: input.language || getSettings().defaultVoice.language },
+    voice: { ...(input.voice ?? getSettings().defaultVoice), language: input.language || input.voice?.language || getSettings().defaultVoice.language },
   }
   writeFileSync(metaFile(dir), JSON.stringify(meta, null, 2))
   mkdirSync(join(dir, 'voice', 'recordings'), { recursive: true })
