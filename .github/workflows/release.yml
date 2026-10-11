@@ -49,14 +49,18 @@ jobs:
           xcode-version: latest-stable
       - run: npm run build
       - name: Package and upload to the draft release
-        run: npx electron-builder ${{ matrix.target }} $ADHOC --publish always
+        # electron-builder reads even an empty CSC_LINK as a certificate path ("… not a file"), so it's
+        # set only when there's a certificate. Without one, macOS signs ad hoc: an unsigned bundle counts
+        # as "damaged" once downloaded.
+        run: |
+          if [ -n "$MAC_CERT" ]; then export CSC_LINK="$MAC_CERT" CSC_KEY_PASSWORD="$MAC_CERT_PASSWORD"
+          elif [ "$RUNNER_OS" = macOS ]; then ADHOC=-c.mac.identity=-; fi
+          npx electron-builder ${{ matrix.target }} $ADHOC --publish always
         env:
           GH_TOKEN: ${{ github.token }}
-          # Without a certificate, sign ad hoc: an unsigned bundle counts as "damaged" once downloaded.
-          ADHOC: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_BASE64 == '' && '-c.mac.identity=-' || '' }}
-          # macOS signing + notarization; skipped when the secrets aren't set.
-          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_BASE64 || '' }}
-          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CERT_PASSWORD || '' }}
+          MAC_CERT: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_BASE64 || '' }}
+          MAC_CERT_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CERT_PASSWORD || '' }}
+          # Notarization; electron-builder skips it when these are empty.
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
