@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { ExportOptions, ExportResult, Theme } from '../../../shared/types'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
+import { revealLabel } from '../lib/platform'
 import { closeDialog, errorText, updateMeta, useStore } from '../store'
 import { Modal, ProgressLine } from './ui'
 
@@ -75,7 +76,7 @@ export function ExportDialog() {
               Close
             </button>
             <button className="btn primary" onClick={() => void api.reveal(result.files[0] ?? result.folder)}>
-              <FolderOpen /> Show in Finder
+              <FolderOpen /> {revealLabel}
             </button>
           </>
         ) : (

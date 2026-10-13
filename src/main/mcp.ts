@@ -16,8 +16,9 @@ import type { ClaudeDesktopStatus, ExportResult } from '../shared/types'
 import { languageName, mediaNote } from './claude'
 import { createProject, listProjects, readScene, requireProject, saveScene } from './projects'
 import { getSettings } from './settings'
-import { getTimeline, renderPreview, textResult, viewFrames } from './scene-tools'
+import { getTimeline, readSource, renderPreview, textResult, viewFrames, viewSourcePages } from './scene-tools'
 import { slugify } from './slug'
+import { sourcesNote } from './sources'
 
 export interface DesktopHost {
   /** Shows the window and opens the project in it, the same way a click on Home does. */
@@ -127,6 +128,10 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
       return getTimeline()
     case 'view_frames':
       return viewFrames(args.times as number[])
+    case 'read_source':
+      return readSource(String(args.source), args.from_page as number | undefined, args.to_page as number | undefined)
+    case 'view_source_pages':
+      return viewSourcePages(String(args.source), args.pages as number[])
     case 'export_video':
       return exportVideo(host)
   }
@@ -148,6 +153,7 @@ function guide(): string {
     `Format ${meta.aspect} (${meta.aspect === '9:16' ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), video theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
     `Write all narration and on-screen text in ${language}.`,
     mediaNote(path),
+    sourcesNote(path),
     'Change scene.py only through write_scene or edit_scene. After each change call render_preview, then view_frames at the moments you changed.',
     'The guide below speaks of render_preview and view_frames; they are the same tools here.',
     '',

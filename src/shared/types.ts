@@ -211,6 +211,28 @@ export interface MediaItem {
   thumb?: string // path of a preview picture
 }
 
+/** A PDF in the project's sources/ folder (ADR 0014): material a video is made from. */
+export interface SourceItem {
+  name: string // file name in sources/
+  size: number // bytes
+  pages?: number // unset until indexed, or when it couldn't be read
+  title?: string // from the PDF's metadata
+  noText?: number[] // pages without a text layer (scans, pictures)
+  thumb?: string // path of page 1's picture
+  error?: string // why it couldn't be read
+}
+
+export interface SourceImport {
+  items: SourceItem[] // everything in sources/ afterwards
+  added: string[] // the names the imported files have in sources/ (an identical file already there counts)
+}
+
+/** A PDF attached to a chat message, whole or some of its pages (1-based). */
+export interface SourceRef {
+  name: string
+  pages?: number[]
+}
+
 export interface ClaudeDesktopStatus {
   installed: boolean
   enabled: boolean
@@ -266,6 +288,7 @@ export interface ChatRequest {
   text: string
   context?: ChatContext
   frameAt?: number
+  source?: SourceRef
 }
 
 export type ChatPart =
@@ -278,6 +301,7 @@ export interface ChatMessage {
   parts: ChatPart[]
   context?: ChatContext
   frame?: string // data URL thumbnail sent with the message
+  source?: SourceRef
   at: number
 }
 
@@ -382,6 +406,13 @@ export interface StudioApi {
   /** Copies files (from a drop, or a dialog when `paths` is empty) into the project's media/. */
   importMedia(paths: string[]): Promise<MediaItem[]>
   removeMedia(name: string): Promise<MediaItem[]>
+  /** The PDFs in sources/, indexed on first sight (page count, text, thumbnail). */
+  listSources(): Promise<SourceItem[]>
+  /** Copies PDFs (from a drop, or a dialog when `paths` is empty) into the project's sources/. */
+  importSources(paths: string[]): Promise<SourceImport>
+  removeSource(name: string): Promise<SourceItem[]>
+  /** Paths of page pictures `width` pixels wide (pages are 1-based). */
+  sourcePages(name: string, pages: number[], width: number): Promise<string[]>
   /** A dropped File's path on disk (Electron's webUtils). */
   pathForFile(file: File): string
 

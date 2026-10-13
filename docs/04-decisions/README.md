@@ -17,3 +17,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0011-open-source-english]] | Open source (MIT), English, platform integrations in forks | accepted |
 | [[0012-own-media-in-scenes]] | Your own pictures and videos go into the scene through studio helpers, not a separate track | accepted |
 | [[0013-export-versions-and-languages]] | Export light and dark versions, and dubbed audio tracks plus subtitles per language | accepted |
+| [[0014-pdf-sources]] | PDFs are sources in the project, read by Claude through Studio tools and shown with pdf_page() | accepted |

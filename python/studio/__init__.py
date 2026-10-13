@@ -60,6 +60,7 @@ def fit(mobject: Mobject, width: float = SAFE_W, height: float = SAFE_H) -> Mobj
 
 
 from .media import VideoClip, image, media_path  # noqa: E402 - needs fit() above
+from .sources import pdf_page, source_path  # noqa: E402 - needs fit() above
 
 __all__ = [
     "StudioScene",
@@ -67,6 +68,8 @@ __all__ = [
     "image",
     "VideoClip",
     "media_path",
+    "pdf_page",
+    "source_path",
     "FRAME_W",
     "FRAME_H",
     "PORTRAIT",

@@ -1,11 +1,13 @@
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
-import { FileCode2, Images, Play, Save, Sparkles } from 'lucide-react'
+import { FileCode2, FileText, Images, Play, Save, Sparkles } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { editorBridge } from '../lib/editor-bridge'
 import { isDark, onThemeChange } from '../lib/theme'
+import { shortcut } from '../lib/platform'
 import { markEdited, resolveConflict, saveScene, useStore } from '../store'
 import { MediaPane } from './MediaPane'
+import { SourcesPane } from './SourcesPane'
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() }
 
@@ -110,7 +112,7 @@ export function CodePane() {
   const conflict = useStore((s) => s.conflict)
   const chatBusy = useStore((s) => s.chatBusy)
   const tab = useStore((s) => s.leftTab)
-  const setTab = (leftTab: 'code' | 'media') => useStore.setState({ leftTab })
+  const setTab = (leftTab: 'code' | 'media' | 'sources') => useStore.setState({ leftTab })
 
   useEffect(() => {
     if (!host.current) return
@@ -177,13 +179,17 @@ export function CodePane() {
             <Images />
             Media
           </button>
+          <button role="tab" aria-selected={tab === 'sources'} className="file-tab" onClick={() => setTab('sources')} title="PDFs the video is made from">
+            <FileText />
+            Sources
+          </button>
         </div>
-        <div className={`pane-actions ${tab === 'media' ? 'hidden' : ''}`}>
+        <div className={`pane-actions ${tab !== 'code' ? 'hidden' : ''}`}>
           <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title="Save without rendering">
             <Save /> Save
           </button>
-          <button className="btn small" onClick={() => void saveScene({ render: true })} title="Save and render (⌘S)">
-            <Play /> Render <span className="kbd">⌘S</span>
+          <button className="btn small" onClick={() => void saveScene({ render: true })} title={`Save and render (${shortcut("S")})`}>
+            <Play /> Render <span className="kbd">{shortcut("S")}</span>
           </button>
         </div>
       </div>
@@ -198,9 +204,10 @@ export function CodePane() {
           </button>
         </div>
       )}
-      {/* Monaco stays mounted under the Media panel so its undo history and cursor survive the switch. */}
-      <div className={`code-host ${tab === 'media' ? 'hidden' : ''}`} ref={host} />
+      {/* Monaco stays mounted under the other panels so its undo history and cursor survive the switch. */}
+      <div className={`code-host ${tab !== 'code' ? 'hidden' : ''}`} ref={host} />
       {tab === 'media' && <MediaPane />}
+      {tab === 'sources' && <SourcesPane />}
       <div className={`claude-editing ${chatBusy ? 'on' : ''}`}>
         <Sparkles /> Claude is editing the scene…
       </div>

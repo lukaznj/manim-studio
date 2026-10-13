@@ -24,6 +24,9 @@ let installExtension: () => void = () => {}
 export function setupMenu(fn: typeof send, onInstallExtension: () => void): void {
   send = fn
   installExtension = onInstallExtension
+  // Without a menu of our own, Electron keeps its default one: hidden by the page-drawn title bar,
+  // but its accelerators still fire, so Ctrl+Shift+R (Record voice) force-reloaded the window.
+  if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
   refreshMenu()
 }
 

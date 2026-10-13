@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { encodeWav } from '../lib/audio'
 import { resetTime } from '../lib/time'
+import { shortcut } from '../lib/platform'
 import { closeDialog, errorText, installComponent, openDialog, refreshClaude, refreshUsage, renderNow, startTour, toast, updateMeta, updateSettings, useStore } from '../store'
 import { ModelControls, usageLevel } from './ChatPane'
 import { RevoiceButton, useOutdatedVoice, voiceLabel } from './Revoice'
@@ -575,7 +576,7 @@ function EnvTab() {
         </div>
       ))}
       <div className="set-divider" />
-      <Row title="Render on save" text="Every save (⌘S) renders a preview. Turn it off for very slow scenes.">
+      <Row title="Render on save" text={`Every save (${shortcut("S")}) renders a preview. Turn it off for very slow scenes.`}>
         <label className="switch">
           <input type="checkbox" checked={settings.autoRender} onChange={(e) => void updateSettings({ autoRender: e.target.checked })} />
           <span />
