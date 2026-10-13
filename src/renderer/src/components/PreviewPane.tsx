@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { editorBridge } from '../lib/editor-bridge'
 import { playback } from '../lib/playback'
+import { shortcut } from '../lib/platform'
 import { openDialog, renderNow, saveScene, sendChat, useStore } from '../store'
 
 export function PreviewPane() {
@@ -53,7 +54,7 @@ export function PreviewPane() {
                 <>
                   <Code2 />
                   <p>
-                    Save the scene (<span className="kbd">⌘S</span>) to render the first preview.
+                    Save the scene (<span className="kbd">{shortcut("S")}</span>) to render the first preview.
                   </p>
                   <button className="btn" onClick={() => void saveScene({ render: true })}>
                     Render
@@ -76,7 +77,7 @@ export function PreviewPane() {
         <div className="preview-flags">
           {(dirty || stale) && render.status !== 'rendering' && (
             <button className="flag sun" onClick={() => void saveScene({ render: true })} title="Save and render">
-              Preview is out of date · <span className="kbd">⌘S</span>
+              Preview is out of date · <span className="kbd">{shortcut("S")}</span>
             </button>
           )}
           {warnings.length > 0 && (

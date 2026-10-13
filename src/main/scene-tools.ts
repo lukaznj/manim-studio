@@ -1,9 +1,11 @@
 // Handlers for the scene tools in src/shared/studio-tools.ts, shared by the in-app chat
 // (claude.ts) and Claude Desktop (mcp.ts). They work on the open project.
+import { readFileSync } from 'node:fs'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { Timeline } from '../shared/types'
 import { readTimeline, requireProject } from './projects'
 import { currentOrNewRender, framesBase64, type RenderOutcome } from './render'
+import { requireSource, sourcePageCount, sourcePages, sourceText } from './sources'
 
 export const textResult = (text: string, isError = false): CallToolResult => ({ content: [{ type: 'text', text }], ...(isError ? { isError } : {}) })
 
@@ -28,6 +30,36 @@ export async function viewFrames(times: number[]): Promise<CallToolResult> {
       { type: 'text' as const, text: `Frame at ${times[i].toFixed(2)} s:` },
       { type: 'image' as const, data, mimeType: 'image/png' },
     ]),
+  }
+}
+
+export async function readSource(source: string, from?: number, to?: number): Promise<CallToolResult> {
+  try {
+    return textResult(await sourceText(source, from, to))
+  } catch (e) {
+    return textResult((e as Error).message, true)
+  }
+}
+
+/** Pages as pictures, about the size Claude reads a page at (the API scales larger ones down anyway). */
+export async function viewSourcePages(source: string, pages: number[]): Promise<CallToolResult> {
+  try {
+    const name = requireSource(source)
+    const count = await sourcePageCount(name)
+    const missing = pages.filter((n) => n > count)
+    const files = await sourcePages(name, pages, 1100)
+    if (!files.length) return textResult(`${name} has ${count} pages; there is no page ${missing.join(', ')}.`, true)
+    return {
+      content: [
+        ...(missing.length ? [{ type: 'text' as const, text: `${name} has ${count} pages; skipped page ${missing.join(', ')}.` }] : []),
+        ...files.flatMap((file) => [
+          { type: 'text' as const, text: `${name}, page ${file.match(/page-(\d+)-\d+\.png$/)?.[1]}:` },
+          { type: 'image' as const, data: readFileSync(file).toString('base64'), mimeType: 'image/png' },
+        ]),
+      ],
+    }
+  } catch (e) {
+    return textResult((e as Error).message, true)
   }
 }
 

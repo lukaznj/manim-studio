@@ -195,11 +195,15 @@ async function installLatex(component: Component): Promise<void> {
 
   const bin = latexBin()
   if (!bin) throw new Error('TinyTeX was unpacked, but its bin/ folder is missing')
-  const tlmgr = join(bin, process.platform === 'win32' ? 'tlmgr.bat' : 'tlmgr')
+  // Node won't spawn a .bat without a shell (EINVAL since CVE-2024-27980); the quotes keep
+  // "Manim Studio" in the path together for cmd.exe.
+  const win = process.platform === 'win32'
+  const tlmgr = win ? `"${join(bin, 'tlmgr.bat')}"` : join(bin, 'tlmgr')
+  const shell = { shell: win }
   emit({ component, state: 'installing', line: 'Installing the LaTeX packages manim needs…' })
   // The release's tlmgr usually trails its repository and refuses to install until updated.
-  await run(tlmgr, ['update', '--self'], component)
-  await run(tlmgr, ['install', ...LATEX_PACKAGES], component)
+  await run(tlmgr, ['update', '--self'], component, shell)
+  await run(tlmgr, ['install', ...LATEX_PACKAGES], component, shell)
   writeFileSync(latexMarker(), TINYTEX_VERSION)
 }
 
@@ -222,7 +226,7 @@ function run(cmd: string, args: string[], component: Component, opts: SpawnOptio
     child.stderr?.on('data', onData)
     child.on('error', reject)
     child.on('close', (code) =>
-      code === 0 ? resolve() : reject(new Error(`${cmd.split(/[\\/]/).pop()} exited with code ${code}: ${tail.slice(-3).join(' · ')}`)),
+      code === 0 ? resolve() : reject(new Error(`${cmd.split(/[\\/]/).pop()?.replace(/"/g, '')} exited with code ${code}: ${tail.slice(-3).join(' · ')}`)),
     )
   })
 }

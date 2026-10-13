@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { app } from 'electron'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import { pageRanges } from '../shared/pages'
 import { sceneTools } from '../shared/studio-tools'
 import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, ClaudeStatus, ModelOption, PlanUsage, UsageWindow } from '../shared/types'
 import { cleanEnv, pythonExe } from './env'
@@ -16,8 +17,9 @@ import { commitAll } from './git'
 import { paths } from './paths'
 import { mediaNames, project, readChat, readTimeline, requireProject, updateMeta, writeChat } from './projects'
 import { frameBase64, pauseCommits } from './render'
-import { getTimeline, renderPreview, viewFrames } from './scene-tools'
+import { getTimeline, readSource, renderPreview, viewFrames, viewSourcePages } from './scene-tools'
 import { getSecret, getSettings } from './settings'
+import { sourcesNote } from './sources'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
@@ -167,7 +169,7 @@ export async function chatSend(req: ChatRequest): Promise<void> {
   }
   content.push({ type: 'text', text: contextNote(req) + req.text })
 
-  const user: ChatMessage = { id: randomUUID(), role: 'user', parts: [{ kind: 'text', text: req.text }], context: req.context, frame, at: Date.now() }
+  const user: ChatMessage = { id: randomUUID(), role: 'user', parts: [{ kind: 'text', text: req.text }], context: req.context, frame, source: req.source, at: Date.now() }
   const reply: ChatMessage = { id: randomUUID(), role: 'assistant', parts: [], at: Date.now() }
   messages.push(user, reply)
   turn = { message: reply, prompt: req.text }
@@ -333,6 +335,10 @@ function contextNote(req: ChatRequest): string {
     )
   }
   if (req.frameAt !== undefined) notes.push(`[Attached image: the preview frame at ${req.frameAt.toFixed(2)} s]`)
+  if (req.source) {
+    const pages = req.source.pages?.length ? `, pages ${pageRanges(req.source.pages)}` : ''
+    notes.push(`[Attached source: sources/${req.source.name}${pages}. Read it with read_source and look at its pages with view_source_pages.]`)
+  }
   return notes.length ? notes.join('\n') + '\n\n' : ''
 }
 
@@ -349,10 +355,12 @@ async function startSession(dir: string): Promise<void> {
       tool('render_preview', sceneTools.render_preview.description, sceneTools.render_preview.shape, () => renderPreview()),
       tool('get_timeline', sceneTools.get_timeline.description, sceneTools.get_timeline.shape, async () => getTimeline()),
       tool('view_frames', sceneTools.view_frames.description, sceneTools.view_frames.shape, ({ times }) => viewFrames(times)),
+      tool('read_source', sceneTools.read_source.description, sceneTools.read_source.shape, ({ source, from_page, to_page }) => readSource(source, from_page, to_page)),
+      tool('view_source_pages', sceneTools.view_source_pages.description, sceneTools.view_source_pages.shape, ({ source, pages }) => viewSourcePages(source, pages)),
     ],
   })
 
-  const studioTools = ['mcp__studio__render_preview', 'mcp__studio__get_timeline', 'mcp__studio__view_frames']
+  const studioTools = Object.keys(sceneTools).map((name) => `mcp__studio__${name}`)
   const readRoots = [dir, paths.python(), join(paths.env(), '.pixi', 'envs', 'default')]
   const options: Options = {
     cwd: dir,
@@ -372,6 +380,8 @@ async function startSession(dir: string): Promise<void> {
       const target = String(input.file_path ?? input.path ?? '')
       const writes = name === 'Edit' || name === 'Write'
       if (!writes && !target && ['Glob', 'Grep'].includes(name)) return { behavior: 'allow', updatedInput: input }
+      // Claude Code opens PDF pages only with poppler installed; our tools work everywhere.
+      if (name === 'Read' && /\.pdf$/i.test(target)) return { behavior: 'deny', message: 'Use read_source for a PDF’s text and view_source_pages to look at its pages.' }
       const roots = writes ? [dir] : readRoots
       if (target && roots.some((r) => inside(r, isAbsolute(target) ? target : resolve(dir, target)))) {
         return { behavior: 'allow', updatedInput: input }
@@ -472,6 +482,8 @@ function studioPrompt(dir: string): string {
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     mediaNote(dir),
+    sourcesNote(dir),
+    'To find something in a long PDF, Grep its text in .studio/sources/<name>/text.txt (one "=== Page N ===" line per page).',
     `The python used for renders is ${pythonExe('default')} (for reference only).`,
   ].join('\n')
 }
@@ -499,6 +511,10 @@ function summarize(name: string, input: unknown): string {
       return 'Rendering the preview'
     case 'mcp__studio__get_timeline':
       return 'Reading the timeline'
+    case 'mcp__studio__read_source':
+      return `Reading ${String(i.source ?? '')}${i.from_page ? ` from page ${i.from_page}` : ''}`
+    case 'mcp__studio__view_source_pages':
+      return `Looking at ${String(i.source ?? '')}, page ${Array.isArray(i.pages) ? pageRanges(i.pages.map(Number)) : ''}`
     case 'mcp__studio__view_frames':
       return `Looking at frames ${Array.isArray(i.times) ? i.times.map((t) => `${Number(t).toFixed(1)}s`).join(', ') : ''}`
     default:
