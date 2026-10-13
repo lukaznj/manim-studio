@@ -1,9 +1,14 @@
-import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
+import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, FileText, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ChatMessage, ChatPart, Effort, ModelOption, PlanUsage } from '../../../shared/types'
+import { pageRanges } from '../../../shared/pages'
+import type { ChatMessage, ChatPart, Effort, ModelOption, PlanUsage, SourceRef } from '../../../shared/types'
 import { api } from '../lib/api'
 import { resetTime } from '../lib/time'
 import { openDialog, refreshClaude, selectClips, sendChat, toast, errorText, updateSettings, useStore } from '../store'
+import { addSources, attachSource } from './SourcesPane'
+
+/** "notes.pdf · p. 3–5" */
+const sourceLabel = (s: SourceRef) => (s.pages?.length ? `${s.name} · p. ${pageRanges(s.pages)}` : s.name)
 
 const SUGGESTIONS = [
   'Make an intro: a title, a short preview of the topic, and narration.',
@@ -191,9 +196,14 @@ function Message({ message: m, streaming, busy }: { message: ChatMessage; stream
     const text = m.parts.find((p) => p.kind === 'text')
     return (
       <div className="msg user">
-        {(m.context || m.frame) && (
+        {(m.context || m.frame || m.source) && (
           <div className="msg-attach">
             {m.frame && <img src={m.frame} alt="Preview frame" />}
+            {m.source && (
+              <span className="context-chip">
+                <FileText /> {sourceLabel(m.source)}
+              </span>
+            )}
             {m.context && (
               <span className="context-chip">
                 <Film /> {m.context.start.toFixed(1)}–{m.context.end.toFixed(1)} s{m.context.lines.length ? ` · L${[...new Set(m.context.lines)].join(', ')}` : ''}
@@ -259,6 +269,8 @@ function Composer() {
   const [frame, setFrame] = useState(true)
   const area = useRef<HTMLTextAreaElement>(null)
   const draft = useStore((s) => s.chatDraft)
+  const source = useStore((s) => s.chatSource)
+  const [dropping, setDropping] = useState(false)
 
   useEffect(() => {
     if (draft === null) return
@@ -299,8 +311,31 @@ function Composer() {
           ))}
         </div>
       )}
-      <div className={`composer-box ${busy ? 'busy' : ''}`}>
+      <div
+        className={`composer-box ${busy ? 'busy' : ''} ${dropping ? 'dropping' : ''}`}
+        onDragOver={(e) => {
+          if (![...e.dataTransfer.items].some((i) => i.kind === 'file')) return
+          e.preventDefault()
+          setDropping(true)
+        }}
+        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDropping(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDropping(false)
+          const pdfs = [...e.dataTransfer.files].filter((f) => /\.pdf$/i.test(f.name)).map((f) => api.pathForFile(f))
+          if (!pdfs.length) return toast('Drop a PDF here to give it to Claude. Pictures and videos go in Media.', 'info')
+          void addSources(pdfs).then((r) => r?.added[0] && attachSource(r.added[0]))
+        }}
+      >
         <div className="composer-attach">
+          {source && (
+            <span className="context-chip">
+              <FileText /> {sourceLabel(source)}
+              <button onClick={() => useStore.setState({ chatSource: null })} aria-label="Don’t attach the PDF">
+                <X />
+              </button>
+            </span>
+          )}
           {sel && (
             <span className="context-chip">
               <Film /> {sel}

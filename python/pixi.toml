@@ -20,6 +20,8 @@ sox = "*"
 [pypi-dependencies]
 manim = "==0.21.0"
 manim-voiceover = "==0.4.0"
+# PDF sources (ADR 0014): page text, thumbnails and page images, no poppler needed.
+pypdfium2 = "==5.14.0"
 
 # Optional, installed on demand from Settings: local multilingual TTS (600+ languages)
 # with voice cloning (Apache-2.0, ~3.3 GB of weights downloaded on first use).

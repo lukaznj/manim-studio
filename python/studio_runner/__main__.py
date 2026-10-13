@@ -58,6 +58,16 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("out_base", type=Path, help="files become <out_base>.<lang>.m4a/.srt/.vtt")
     d.add_argument("--video", type=Path, action="append", default=[], help="also write <video>.<lang>.mp4")
 
+    pi = sub.add_parser("pdf-index")
+    pi.add_argument("pdf", type=Path)
+    pi.add_argument("out_dir", type=Path)
+
+    pp = sub.add_parser("pdf-pages")
+    pp.add_argument("pdf", type=Path)
+    pp.add_argument("out_dir", type=Path)
+    pp.add_argument("--pages", required=True, help="comma-separated, 1-based")
+    pp.add_argument("--width", type=int, default=800)
+
     sub.add_parser("check")
     sub.add_parser("tts-worker")
 
@@ -110,6 +120,19 @@ def main(argv: list[str] | None = None) -> int:
 
         align(args.audio, args.text, args.out, args.model, (args.language or "").split("-")[0] or None)
         emit("done", path=args.out)
+        return 0
+
+    if args.cmd in ("pdf-index", "pdf-pages"):
+        from . import sources
+
+        try:
+            if args.cmd == "pdf-index":
+                emit("done", info=sources.index(args.pdf, args.out_dir))
+            else:
+                emit("done", paths=sources.pages(args.pdf, args.out_dir, [int(n) for n in args.pages.split(",")], args.width))
+        except Exception as e:  # noqa: BLE001 - a damaged or encrypted PDF is reported, not a traceback
+            emit("error", message=f"{type(e).__name__}: {e}")
+            return 1
         return 0
 
     if args.cmd == "check":

@@ -258,6 +258,172 @@ body.resizing-y .code-host {
   font-weight: 600;
   pointer-events: none;
 }
+/* Sources panel: the PDFs a video is made from (ADR 0014). */
+.source-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.source-loading {
+  padding: 8px 2px;
+  font-size: 12px;
+}
+.source-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--raised);
+}
+.source-thumb {
+  display: grid;
+  place-items: center;
+  align-self: start;
+  width: 72px;
+  aspect-ratio: 210 / 297; /* A4, the usual page */
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: #fff; /* paper, in either theme */
+  color: #8794a8;
+  overflow: hidden;
+}
+.source-thumb:not(:disabled):hover {
+  border-color: var(--blue);
+}
+.source-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.source-body {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  font-size: 11.5px;
+}
+.source-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.source-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+}
+.source-note svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--sun-text);
+}
+.source-note.error,
+.source-note.error svg {
+  color: var(--coral);
+}
+.source-body .media-actions {
+  padding: 4px 0 0;
+  margin-left: -2px;
+}
+.source-add {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+}
+
+.source-pages {
+  display: grid;
+  gap: 10px;
+}
+.source-pages-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 11.5px;
+}
+.source-pages-head .faint {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.page-thumb {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: #fff; /* paper, in either theme */
+  overflow: hidden;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.page-thumb img {
+  display: block;
+  width: 100%;
+}
+.page-thumb:hover {
+  border-color: var(--blue);
+}
+.page-thumb.on {
+  border-color: var(--sun);
+  box-shadow: 0 0 0 2px var(--sun);
+}
+.page-num {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff; /* on the page, in either theme */
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.page-thumb.on .page-num {
+  background: var(--sun);
+  color: var(--sun-ink);
+}
+.page-more {
+  justify-self: center;
+}
+.page-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  font-size: 11.5px;
+}
+.page-bar .mono {
+  margin-right: auto;
+}
+.composer-box.dropping {
+  border-color: var(--blue);
+  border-style: dashed;
+  background: var(--blue-soft);
+}
 .banner {
   display: flex;
   align-items: center;

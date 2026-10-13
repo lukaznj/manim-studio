@@ -16,6 +16,7 @@ import type {
   RenderEvent,
   SetupStatus,
   Settings,
+  SourceRef,
   Timeline,
   UpdateEvent,
 } from '../../shared/types'
@@ -58,9 +59,10 @@ interface State {
   models: ModelOption[] // what the signed-in account (or API key) can use
   usage: PlanUsage | null // the Claude plan's limits, when signed in with an account
   historyOpen: boolean
-  chatDraft: string | null // text put into the chat box from elsewhere (the Media panel's "Ask Claude")
+  chatDraft: string | null // text put into the chat box from elsewhere (the Media and Sources panels)
   tour: boolean // the editor tutorial is showing
-  leftTab: 'code' | 'media'
+  leftTab: 'code' | 'media' | 'sources'
+  chatSource: SourceRef | null // a PDF (or some of its pages) attached to the next chat message
   projects: ProjectSummary[]
 
   project: { path: string; meta: ProjectMeta } | null
@@ -98,6 +100,7 @@ export const useStore = create<State>(() => ({
   chatDraft: null,
   tour: false,
   leftTab: 'code',
+  chatSource: null,
   projects: [],
   project: null,
   savedSource: '',
@@ -339,7 +342,7 @@ function firstRunTour(): void {
 export async function closeProject(): Promise<void> {
   if (get().dirty) await saveScene()
   await api.closeProject()
-  withTransition(() => set({ screen: 'home', project: null, timeline: null, chat: [], selection: [], historyOpen: false }))
+  withTransition(() => set({ screen: 'home', project: null, timeline: null, chat: [], selection: [], historyOpen: false, chatSource: null }))
   void refreshProjects()
 }
 
@@ -357,7 +360,8 @@ export function markEdited(source: string): void {
 
 async function checkStale(source: string): Promise<void> {
   const t = get().timeline
-  set({ stale: !!t && (await sha1(source)) !== t.sourceHash })
+  // Python reads scene.py with universal newlines, so a CRLF file (Windows) hashes as LF there.
+  set({ stale: !!t && (await sha1(source.replace(/\r\n?/g, '\n'))) !== t.sourceHash })
 }
 
 export async function saveScene(opts: { render?: boolean } = {}): Promise<void> {
@@ -479,7 +483,8 @@ export async function sendChat(text: string, withFrame: boolean): Promise<boolea
       }
     : undefined
   try {
-    await api.chatSend({ text, context, frameAt: withFrame && timeline ? playback.time : undefined })
+    await api.chatSend({ text, context, frameAt: withFrame && timeline ? playback.time : undefined, source: get().chatSource ?? undefined })
+    set({ chatSource: null })
     return true
   } catch (e) {
     toast(errorText(e), 'error')

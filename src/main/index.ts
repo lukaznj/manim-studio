@@ -1,12 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell, systemPreferences } from 'electron'
 import { createReadStream, existsSync, statSync } from 'node:fs'
-import { join, resolve, sep } from 'node:path'
+import { join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import type { EventChannel, ExportOptions, ProjectMeta, Quality } from '../shared/types'
 import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, claudeUsage, closeChat, loadChat, onChatEvent } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
 import { exportVideo } from './export'
 import { importMedia, listMedia, removeMedia } from './media'
+import { importSources, listSources, removeSource, sourcePages } from './sources'
 import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
 import { watchMemory } from './memory'
@@ -179,7 +180,7 @@ function registerIpc(): void {
     refreshMenu()
   })
   handle('forgetProject', (path: string) => setSettings({ recentProjects: getSettings().recentProjects.filter((p) => p !== path) }))
-  handle('reveal', (path: string) => shell.showItemInFolder(path))
+  handle('reveal', (path: string) => shell.showItemInFolder(normalize(path))) // the renderer joins with /
   handle('saveScene', (source: string) => projects.saveScene(source))
   handle('updateMeta', (patch: Partial<ProjectMeta>) => projects.updateMeta(patch))
 
@@ -192,6 +193,10 @@ function registerIpc(): void {
   handle('listMedia', () => listMedia())
   handle('importMedia', (paths: string[]) => importMedia(paths))
   handle('removeMedia', (name: string) => removeMedia(name))
+  handle('listSources', () => listSources())
+  handle('importSources', (paths: string[]) => importSources(paths))
+  handle('removeSource', (name: string) => removeSource(name))
+  handle('sourcePages', (name: string, pages: number[], width: number) => sourcePages(name, pages, width))
   handle('installClaudeExtension', installClaudeExtension)
   handle('claudeDesktopStatus', () => claudeDesktopStatus())
 

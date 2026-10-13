@@ -52,7 +52,8 @@ export async function importMedia(paths: string[]): Promise<MediaItem[]> {
     copyFileSync(src, join(dir, name))
     if (VIDEO.test(name)) ignoreVideos()
   }
-  if (skipped.length) throw new Error(`Only pictures and videos can be added; skipped ${skipped.join(', ')}.`)
+  if (skipped.length)
+    throw new Error(`Only pictures and videos can be added; skipped ${skipped.join(', ')}.${skipped.some((n) => /\.pdf$/i.test(n)) ? ' PDFs go in Sources.' : ''}`)
   return listMedia()
 }
 

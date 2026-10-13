@@ -20,6 +20,23 @@ export const sceneTools = {
       'Look at frames of the latest preview render at the given times (seconds). Use it to check layout, legibility and that things look right — after every visual change. Up to 6 times per call.',
     shape: { times: z.array(z.number()).min(1).max(6) },
   },
+  read_source: {
+    description:
+      'Read the text of a PDF the user added as a source (sources/), page by page, each page after a "=== Page N ===" line. Read a long PDF in parts with from_page/to_page. Pages without a text layer (scans, pictures) are named; look at those with view_source_pages.',
+    shape: {
+      source: z.string().describe('The PDF’s file name in sources/, e.g. "worksheet.pdf"'),
+      from_page: z.number().int().min(1).optional().describe('First page, 1-based (default 1)'),
+      to_page: z.number().int().min(1).optional().describe('Last page, inclusive (default: the last)'),
+    },
+  },
+  view_source_pages: {
+    description:
+      'Look at pages of a source PDF as pictures: figures, tables, graphs, handwriting, scanned pages, and where things are on the page (for pdf_page crops). Up to 4 pages per call.',
+    shape: {
+      source: z.string().describe('The PDF’s file name in sources/'),
+      pages: z.array(z.number().int().min(1)).min(1).max(4).describe('Page numbers, 1-based'),
+    },
+  },
 }
 
 export const desktopTools = {

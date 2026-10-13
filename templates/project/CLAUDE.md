@@ -38,6 +38,11 @@ One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studi
   - `image("photo.png")` is a picture, already scaled to fit the safe area.
   - `VideoClip("demo.mp4")` plays a video inside the scene, without sound: show it, call `clip.start()`, then `self.wait(clip.duration)`.
   - Use only the files Studio lists for this project; `media_path(name)` raises with the list if a name is wrong.
+- **PDF sources** — PDFs the user added in Studio's Sources panel are in `sources/`: notes, worksheets, textbook chapters to make the video from.
+  - Read their text with `read_source` and look at their pages with `view_source_pages`, not with Read.
+  - Follow the material: its order, notation, examples and numbers. Explain it rather than read it out, and don't add claims it doesn't make.
+  - Rebuild formulas and graphs with `MathTex` and manim so they animate.
+  - Show the page itself when the original matters (the exercise as printed, a figure): `pdf_page("notes.pdf", 3)` is page 3, and `crop=(left, top, right, bottom)` keeps part of it, in fractions of the page from its top-left corner. Find the crop with `view_source_pages`.
 - **Pacing** — a 2–4 minute video is the target. One idea per section. Leave about 0.5 s of stillness after an important result.
 
 ## Checking your work

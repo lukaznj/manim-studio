@@ -13,6 +13,7 @@ Every new project gets `templates/project/CLAUDE.md`, the rules Claude follows i
   - Stay inside `SAFE_W × SAFE_H`; `fit(mobject)` scales anything down into it.
   - Portrait is 8 × 14.2 units and landscape is 14.2 × 8 ([[../04-decisions/0010-fixed-aspect-per-project|ADR 0010]]).
 - **Your pictures and videos.** `image("name.png")` and `VideoClip("name.mp4")` show files from `media/`, which the Media tab fills ([[../04-decisions/0012-own-media-in-scenes|ADR 0012]]).
+- **PDF sources.** The material a video is made from is in `sources/`, which the Sources tab fills. Claude reads it with `read_source` and `view_source_pages`; `pdf_page("notes.pdf", 3, crop=(left, top, right, bottom))` shows a page or part of one ([[../04-decisions/0014-pdf-sources|ADR 0014]]).
 - **Retimable code.** `self.play`/`self.wait` called directly in `construct` with literal `run_time=` values. That's what the timeline can retime.
 
 The checks back these up: the layout checker flags anything off the frame and text overlapping text, and Claude must call `render_preview` and `view_frames` before saying it's done.
