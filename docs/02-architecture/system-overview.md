@@ -50,6 +50,7 @@
 | `<project>/voice/tts/`, `voice/recordings/` | Generated speech and human takes | yes; regenerating costs money or a re-take |
 | `<project>/voice/translations/<lang>.json` | Claude's translations of the narration, for dubbed exports | yes; edit to correct a sentence |
 | `<project>/media/` | Your pictures and videos ([[../04-decisions/0012-own-media-in-scenes\|ADR 0012]]) | pictures yes, videos no |
+| `<project>/sources/` | PDFs the video is made from, indexed into `.studio/sources/` ([[../04-decisions/0014-pdf-sources\|ADR 0014]]) | no |
 | `<project>/.studio/` | Renders, `timeline.json`, frames, chat log, thumbnail | no |
 | `<project>/exports/<name>/` | Videos per theme, audio tracks and subtitles per language, thumbnails ([[../04-decisions/0013-export-versions-and-languages\|ADR 0013]]) | no |
 | `userData/python-env/` | pixi manifest + lock + `.pixi/envs/{default,omnivoice,transcribe}` | – |

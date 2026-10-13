@@ -8,3 +8,5 @@ media/*.mov
 media/*.m4v
 media/*.webm
 media/*.mkv
+# PDF sources can be big; the history keeps scene.py, not the material it came from.
+sources/*.pdf

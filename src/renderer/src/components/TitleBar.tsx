@@ -1,6 +1,7 @@
 import { ArrowDownToLine, ChevronLeft, History, RefreshCw, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { shortcut } from '../lib/platform'
 import { closeProject, openDialog, useStore } from '../store'
 import { HistoryPopover } from './HistoryPopover'
 import { ProgressLine, Ring, Wordmark } from './ui'
@@ -28,7 +29,7 @@ export function TitleBar() {
               <span className="faint">Projects</span>
               <span className="faint">/</span>
               <strong>{project.meta.name}</strong>
-              {dirty && <span className="dirty-dot" title="Unsaved changes (⌘S)" />}
+              {dirty && <span className="dirty-dot" title={`Unsaved changes (${shortcut("S")})`} />}
               <span className="badge">{project.meta.aspect}</span>
             </div>
           </>

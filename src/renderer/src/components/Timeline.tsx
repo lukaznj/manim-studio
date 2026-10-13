@@ -24,6 +24,7 @@ import { editorBridge } from '../lib/editor-bridge'
 import { drawPeaks, peaks } from '../lib/audio'
 import { playback } from '../lib/playback'
 import { timecode } from '../lib/time'
+import { modKey, shortcut } from '../lib/platform'
 import { markEdited, openDialog, saveScene, selectClips, toast, useStore } from '../store'
 
 const LABEL_W = 92
@@ -242,7 +243,7 @@ export function Timeline() {
                 </div>
               </>
             ) : (
-              <div className="tl-empty">The timeline comes from the render. Save the scene (⌘S) to make one.</div>
+              <div className="tl-empty">The timeline comes from the render. Save the scene ({shortcut("S")}) to make one.</div>
             )}
             <div className="playhead" ref={playhead}>
               <div className="playhead-head" />
@@ -337,7 +338,7 @@ function Toolbar(props: {
 
       <div className="tl-right">
         <div className="zoom">
-          <button className="icon-btn" onClick={() => props.zoomTo(props.scale / 1.4)} title="Zoom out (⌘ + scroll)">
+          <button className="icon-btn" onClick={() => props.zoomTo(props.scale / 1.4)} title={`Zoom out (${modKey} + scroll)`}>
             <Minus />
           </button>
           <input
@@ -356,10 +357,10 @@ function Toolbar(props: {
             <Maximize2 />
           </button>
         </div>
-        <button className="btn small" onClick={() => openDialog({ kind: 'booth' })} disabled={!timeline?.voice.length} title="⌘⇧R" data-tour="voice">
+        <button className="btn small" onClick={() => openDialog({ kind: 'booth' })} disabled={!timeline?.voice.length} title={shortcut("R", true)} data-tour="voice">
           <Mic /> Record voice
         </button>
-        <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })} disabled={!timeline} title="⌘E" data-tour="export">
+        <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })} disabled={!timeline} title={shortcut("E")} data-tour="export">
           <Download /> Export
         </button>
       </div>

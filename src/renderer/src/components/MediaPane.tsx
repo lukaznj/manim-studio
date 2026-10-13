@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { MediaItem } from '../../../shared/types'
 import { api } from '../lib/api'
 import { editorBridge } from '../lib/editor-bridge'
+import { revealLabel } from '../lib/platform'
 import { errorText, toast, useStore } from '../store'
 
 /** A Python name for the file: "class-photo-2.png" → class_photo_2. */
@@ -105,7 +106,7 @@ export function MediaPane() {
                 >
                   <Sparkles /> Ask Claude
                 </button>
-                <button className="icon-btn" onClick={() => project && void api.reveal(`${project.path}/media/${item.name}`)} title="Show in Finder">
+                <button className="icon-btn" onClick={() => project && void api.reveal(`${project.path}/media/${item.name}`)} title={revealLabel}>
                   <FolderOpen />
                 </button>
                 <button className="icon-btn" onClick={() => void remove(item)} title="Move to the Trash">

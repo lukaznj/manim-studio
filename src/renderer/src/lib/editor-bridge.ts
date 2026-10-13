@@ -33,6 +33,9 @@ export const editorBridge = {
     const view = editor.saveViewState()
     editor.pushUndoStop()
     m.pushEditOperations([], [{ range: m.getFullModelRange(), text: source }], () => null)
+    // An edit keeps the model's line ending: a CRLF scene (Windows) rewritten with LF (Claude)
+    // would read back as CRLF, unlike the file, and look unsaved forever.
+    if (monaco) m.pushEOL(source.includes('\r\n') ? monaco.editor.EndOfLineSequence.CRLF : monaco.editor.EndOfLineSequence.LF)
     editor.pushUndoStop()
     if (view) editor.restoreViewState(view)
   },
