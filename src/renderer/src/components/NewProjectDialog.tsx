@@ -1,10 +1,11 @@
 import { Clapperboard, FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { Aspect, Theme, VoiceSettings } from "../../../shared/types";
+import { DEFAULT_TONE, TONES } from "../../../shared/tone";
+import type { Aspect, Theme, Tone, VoiceSettings } from "../../../shared/types";
 import { api } from "../lib/api";
 import { closeDialog, createProject, useStore } from "../store";
 import { VoiceForm } from "./SettingsDialog";
-import { Modal } from "./ui";
+import { Modal, Tabs } from "./ui";
 
 const ASPECTS: { value: Aspect; title: string; hint: string }[] = [
   {
@@ -27,6 +28,7 @@ export function NewProjectDialog() {
   const [name, setName] = useState("");
   const [aspect, setAspect] = useState<Aspect>("9:16");
   const [theme, setTheme] = useState<Theme>("dark");
+  const [tone, setTone] = useState<Tone>(DEFAULT_TONE);
   const [voice, setVoice] = useState<VoiceSettings>({
     provider: "elevenlabs",
     language: "en",
@@ -50,6 +52,7 @@ export function NewProjectDialog() {
       name: name.trim(),
       aspect,
       theme,
+      tone,
       language: voice.language,
       voice,
       parentDir,
@@ -175,6 +178,19 @@ export function NewProjectDialog() {
                 </button>
               </div>
             </div>
+          </div>
+          <div className="field">
+            <span className="label">Tone</span>
+            <Tabs
+              radio="Tone"
+              value={tone}
+              onChange={setTone}
+              items={TONES.map((t) => ({ value: t.value, label: t.label }))}
+            />
+            <span className="hint">
+              {TONES.find((t) => t.value === tone)?.hint} You can change it
+              later, or ask for another in the chat.
+            </span>
           </div>
         </div>
 

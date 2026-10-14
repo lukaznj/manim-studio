@@ -20,6 +20,7 @@ import { frameBase64, pauseCommits } from './render'
 import { getTimeline, readSource, renderPreview, viewFrames, viewSourcePages } from './scene-tools'
 import { getSecret, getSettings } from './settings'
 import { sourcesNote } from './sources'
+import { styleBrief } from '../shared/tone'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
@@ -475,12 +476,13 @@ function studioPrompt(dir: string): string {
   const site = join(paths.env(), '.pixi', 'envs', 'default', process.platform === 'win32' ? 'Lib' : 'lib/python3.12', 'site-packages')
   return [
     '# Manim Studio',
-    'You are working inside Manim Studio, a desktop editor for making short educational maths videos with manim.',
+    'You are working inside Manim Studio, a desktop editor for making educational maths videos with manim.',
     `The project folder is ${dir}. The video is scene.py; the app renders it on every save and shows a timeline produced by the render. Read the project's CLAUDE.md first; it holds the conventions.`,
     `Format: ${meta.aspect} (${portrait ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
     'You cannot run shell commands. To see your work: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done.',
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
+    styleBrief(meta),
     mediaNote(dir),
     sourcesNote(dir),
     'To find something in a long PDF, Grep its text in .studio/sources/<name>/text.txt (one "=== Page N ===" line per page).',
