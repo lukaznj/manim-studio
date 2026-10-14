@@ -99,6 +99,8 @@ body.resizing-y .code-host {
   min-width: 0;
 }
 .pane-tabs .file-tab {
+  flex: none;
+  white-space: nowrap;
   height: 28px;
   padding: 0 9px;
   border: none;
@@ -125,6 +127,7 @@ body.resizing-y .code-host {
 }
 .pane-actions {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 4px;
 }
@@ -132,9 +135,29 @@ body.resizing-y .code-host {
   margin-left: 2px;
 }
 
+/* A narrow sidebar (300 px at least) drops the extras first, then the labels of the other tabs. */
+@container (max-width: 500px) {
+  .pane-actions .kbd,
+  .pane-actions .btn-label {
+    display: none;
+  }
+}
+@container (max-width: 420px) {
+  .pane-tabs .file-tab:not([aria-selected='true']) .tab-label {
+    display: none;
+  }
+}
+
+@container (max-width: 360px) {
+  .pane-actions .render-label {
+    display: none;
+  }
+}
+
 /* ---- code ----------------------------------------------------------------------------------- */
 
 .code-pane {
+  container-type: inline-size; /* the head below gets narrower with the sidebar, not the window */
   height: 100%;
   display: flex;
   flex-direction: column;

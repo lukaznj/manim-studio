@@ -192,10 +192,17 @@ export interface PlanUsage {
   checkedAt: number
 }
 
+/** The video's short side in pixels: 1080 is 1920 × 1080 (or 1080 × 1920 in portrait), 1440 is 2560 × 1440. */
+export type ExportSize = 1080 | 1440
+export type ExportFps = 30 | 60
+
 export interface ExportOptions {
   themes: Theme[] // render a version per theme
   languages: string[] // extra narration languages (ISO 639-1), voiced and subtitled
   languageVideos: boolean // also a full video per extra language, for sites without audio tracks
+  size?: ExportSize // unset: 1080 (exports saved before the choice existed)
+  fps?: ExportFps // unset: the project's fps
+  folder?: string // where the export's own <name>/ folder goes; unset: the project's exports/
 }
 
 export interface ExportResult {
@@ -391,7 +398,8 @@ export interface StudioApi {
   createProject(input: NewProjectInput): Promise<string>
   openProject(path: string): Promise<OpenProject>
   pickProject(): Promise<string | null>
-  pickFolder(): Promise<string | null>
+  /** A folder from the system dialog, or null if cancelled. */
+  pickFolder(title?: string, defaultPath?: string): Promise<string | null>
   closeProject(): Promise<void>
   forgetProject(path: string): Promise<void>
   reveal(path: string): Promise<void>

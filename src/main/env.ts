@@ -88,12 +88,15 @@ async function activate(name: EnvName): Promise<Record<string, string>> {
 
 export async function pythonEnv(name: EnvName, extra: Record<string, string> = {}): Promise<NodeJS.ProcessEnv> {
   const vars = await activate(name)
-  const latex = latexBin()
-  const path = [latex, vars.PATH ?? process.env.PATH].filter(Boolean).join(delimiter)
+  // An app started from Explorer has "Path", and pixi answers in the same spelling. Node passes on
+  // only one spelling (PATH wins), so keep exactly one: the activated one. Without the env's
+  // Library\bin, Windows loaded other DLLs and every Text crashed the render (0xC06D007F).
+  const activated = Object.entries(vars).find(([k]) => k.toUpperCase() === 'PATH')?.[1] ?? process.env.PATH
+  const env: NodeJS.ProcessEnv = { ...cleanEnv(), ...vars }
+  for (const k of Object.keys(env)) if (k.toUpperCase() === 'PATH') delete env[k]
   return {
-    ...cleanEnv(),
-    ...vars,
-    PATH: path,
+    ...env,
+    PATH: [latexBin(), activated].filter(Boolean).join(delimiter),
     PYTHONPATH: paths.python(),
     PYTHONUNBUFFERED: '1',
     PYTHONIOENCODING: 'utf-8',

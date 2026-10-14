@@ -9,6 +9,7 @@ This folder is an [Obsidian](https://obsidian.md) vault. Open `docs/` as a vault
   - [[02-architecture/system-overview|processes and data flow]]
   - [[02-architecture/timeline-from-render|the timeline contract]]
   - [[02-architecture/voice-pipeline|voice]]
+  - [[02-architecture/render-performance|render performance]]
 - `03-video-authoring/`: how a video project is written ([[03-video-authoring/scene-conventions|scene conventions]])
 - `04-decisions/`: one note per non-obvious decision. The [[04-decisions/README|index]] lists them with status, and new ones start from [[04-decisions/_template|the template]].
 - `05-design/`: the UI's design language and screenshots
