@@ -2,7 +2,6 @@ import {
   AudioLines,
   Cpu,
   Download,
-  Laptop,
   Lock,
   Maximize2,
   Mic,
@@ -490,7 +489,6 @@ function ClipView(props: {
 
 const SOURCE: Record<VoiceSource, { label: string; icon: ReactNode; cls: string }> = {
   recording: { label: 'Recording', icon: <Mic />, cls: 'rec' },
-  system: { label: 'System voice', icon: <Laptop />, cls: 'tts' },
   elevenlabs: { label: 'ElevenLabs', icon: <AudioLines />, cls: 'tts' },
   omnivoice: { label: 'OmniVoice', icon: <Cpu />, cls: 'tts' },
   silence: { label: 'Silence (speech failed)', icon: <VolumeX />, cls: 'silent' },

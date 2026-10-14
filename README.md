@@ -13,7 +13,6 @@
 - **The timeline comes from the render.** Sections, every `self.play`, the narration and the subtitles, each linked to its line of code. While the video plays, the line producing the frame lights up.
 - **Retime by dragging.** Drag a clip's edge and the `run_time=` in the code changes. Select clips and ask Claude about exactly that part.
 - **Narration and subtitles.** Narration lives in the code ([manim-voiceover](https://github.com/ManimCommunity/manim-voiceover)), and subtitles come from it. Voices:
-  - the free system voice
   - [ElevenLabs](https://elevenlabs.io): the most-used voices for your language, or search their whole library, with samples to play
   - local [OmniVoice](https://github.com/k2-fsa/OmniVoice), which can clone your voice
   - your own recordings, made in the recording booth
@@ -41,7 +40,7 @@ Download the installer for your system from the [latest release](https://github.
 |---|---|---|
 | macOS (Apple Silicon) | `.dmg` | The build isn't notarized yet. Open it once, then **System Settings → Privacy & Security → Open Anyway**. |
 | Windows 10/11 (x64) | `-Setup.exe` | SmartScreen may warn about an unknown publisher: **More info → Run anyway**. |
-| Linux (x64) | `.AppImage` | `chmod +x` it and run it. For the system voice, install `espeak-ng`. |
+| Linux (x64) | `.AppImage` | `chmod +x` it and run it. |
 
 On first launch the app installs what renders need into its own data folder: Python with manim (about 750 MB) and LaTeX (about 250 MB). You don't need Python, Homebrew or Xcode. After that, it updates itself from GitHub Releases. One exception: unsigned macOS builds can't replace themselves, so the app links to the new release instead.
 
