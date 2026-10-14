@@ -2,6 +2,7 @@ import { app, safeStorage } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Settings } from '../shared/types'
+import { migrateVoice } from '../shared/voice'
 import { paths } from './paths'
 
 const defaults = (): Settings => ({
@@ -17,7 +18,7 @@ const defaults = (): Settings => ({
   autoRender: true,
   hasElevenLabsKey: false,
   hasAnthropicKey: false,
-  defaultVoice: { provider: 'system', language: 'en' },
+  defaultVoice: { provider: 'elevenlabs', language: 'en' },
   sidebarWidth: 440,
   chatWidth: 380,
   timelineHeight: 248,
@@ -33,6 +34,7 @@ export function getSettings(): Settings {
     } catch {
       // first run, or a corrupt file: fall back to defaults
     }
+    if (stored.defaultVoice) stored.defaultVoice = migrateVoice(stored.defaultVoice)
     cache = { ...defaults(), ...stored, ...secretFlags() }
   }
   return cache

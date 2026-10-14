@@ -34,9 +34,11 @@ class ElevenLabsTest(unittest.TestCase):
         self.assertEqual(self.bodies[0]["language_code"], "pt")
         self.assertNotIn("language_code", self.bodies[1])
 
-    def test_multilingual_v2_gets_no_language(self):
-        self.speak("eleven_multilingual_v2", [{"audio_base64": ""}])
-        self.assertNotIn("language_code", self.bodies[0])
+    def test_default_model_is_v4(self):
+        settings = {"provider": "elevenlabs", "language": "en", "elevenlabs": {"voiceId": "v"}}
+        with mock.patch.object(voice, "_elevenlabs_post", lambda _v, _k, body: self.bodies.append(dict(body)) or {"audio_base64": ""}):
+            voice.StudioSpeech(self.dir, settings)._elevenlabs("Hello", "k2")
+        self.assertEqual(self.bodies[0]["model_id"], "eleven_v4")
 
     def test_other_errors_are_not_retried(self):
         with self.assertRaisesRegex(RuntimeError, "HTTP 401"):

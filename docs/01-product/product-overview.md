@@ -17,8 +17,7 @@ Each person uses their own Claude plan or Anthropic API key ([[../04-decisions/0
 3. **Watch and adjust.** The preview plays the low-resolution render. The timeline shows sections, every animation, the narration and the subtitles. Each clip links to its line of code, and the line producing what's on screen lights up while the video plays.
 4. **Retime by hand.** Drag a clip's edge and the `run_time=` literal in the code changes. Select clips and ask Claude about exactly that part.
 5. **Voice.**
-   - Drafts use a free voice: the system voice for the project's language, or local OmniVoice.
-   - The final take is ElevenLabs, OmniVoice cloning your voice, or your own recording from the recording booth.
+   - ElevenLabs (v4 by default), local OmniVoice cloning your voice, or your own recording from the recording booth.
    - Animations stretch to the real speech.
 6. **Export.** A 1080p mp4 in the light theme, the dark one, or both, with subtitles and a thumbnail. Add languages and you also get each language's narration as an audio track plus its subtitles: what YouTube needs to offer viewers several languages ([[../04-decisions/0013-export-versions-and-languages|ADR 0013]]).
 

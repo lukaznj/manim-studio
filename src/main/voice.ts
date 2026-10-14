@@ -1,15 +1,12 @@
 // Recordings, voice listings and the local OmniVoice worker.
-import { execFile, type ChildProcess } from 'node:child_process'
+import { type ChildProcess } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { promisify } from 'node:util'
 import type { ProjectMeta, SetupEvent, VoiceOption } from '../shared/types'
 import { setupStatus } from './env'
-import { listRecordings, project, requireProject } from './projects'
+import { listRecordings, requireProject } from './projects'
 import { runRunner } from './runner'
 import { getSecret } from './settings'
-
-const exec = promisify(execFile)
 
 /** STUDIO_VOICE + secrets for a render of the current project. */
 export async function voiceEnv(meta: ProjectMeta, dir: string): Promise<Record<string, string>> {
@@ -107,24 +104,6 @@ export async function elevenLabsLibrary(language: string, search: string): Promi
     preview: v.preview_url,
     users: v.cloned_by_count,
   }))
-}
-
-/** The system's voices, those for `language` (default: the open project's) first. */
-export async function systemVoices(language = project()?.meta.voice.language ?? 'en'): Promise<VoiceOption[]> {
-  if (process.platform !== 'darwin') return []
-  const { stdout } = await exec('say', ['-v', '?'])
-  const voices = stdout
-    .split('\n')
-    .map((line) => line.match(/^(.+?)\s+([a-z]{2}_[A-Z]{2})\s+#\s*(.*)$/))
-    .filter((m): m is RegExpMatchArray => !!m)
-    // Newer voices are listed as "Lana (Croatian (Croatia))"; `say -v` wants just "Lana".
-    .map((m) => ({ id: m[1].replace(/\s*\(.*\)$/, '').trim(), name: m[1].trim(), description: `${m[2]} — ${m[3]}` }))
-  // The project's language first, then the rest; the list repeats some voices.
-  const lang = language.split('-')[0] + '_'
-  const seen = new Set<string>()
-  return [...voices.filter((v) => v.description.startsWith(lang)), ...voices.filter((v) => !v.description.startsWith(lang))].filter(
-    (v) => !seen.has(v.id) && seen.add(v.id),
-  )
 }
 
 // --- OmniVoice worker ------------------------------------------------------------------
