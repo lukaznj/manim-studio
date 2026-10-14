@@ -190,8 +190,8 @@ export async function chatInterrupt(): Promise<void> {
 export async function applyChatSettings(): Promise<void> {
   const { claudeModel, claudeEffort } = getSettings()
   // A session that already ended picks the settings up when the next one starts.
-  await session?.query.setModel(claudeModel || undefined).catch(() => undefined)
-  await session?.query.applyFlagSettings({ effortLevel: claudeEffort || 'medium' }).catch(() => undefined)
+  await session?.query.setModel(claudeModel || 'claude-sonnet-5-5').catch(() => undefined)
+  await session?.query.applyFlagSettings({ effortLevel: claudeEffort || 'high' }).catch(() => undefined)
 }
 
 export async function chatReset(): Promise<void> {
@@ -246,7 +246,7 @@ export async function translateNarration(sentences: string[], from: string, to: 
       settingSources: [],
       tools: [],
       maxTurns: 1,
-      model: getSettings().claudeModel || undefined,
+      model: getSettings().claudeModel || 'claude-sonnet-5-5',
       systemPrompt: 'You translate narration for educational maths videos. You answer with JSON only.',
     },
   })
@@ -366,8 +366,8 @@ async function startSession(dir: string): Promise<void> {
     cwd: dir,
     env: claudeEnv(),
     pathToClaudeCodeExecutable: paths.claude(),
-    model: getSettings().claudeModel || undefined,
-    effort: getSettings().claudeEffort || 'medium',
+    model: getSettings().claudeModel || 'claude-sonnet-5-5',
+    effort: getSettings().claudeEffort || 'high',
     resume: resumable ? meta.claudeSessionId : undefined,
     includePartialMessages: true,
     settingSources: ['project'],
