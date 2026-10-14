@@ -33,6 +33,7 @@ export interface ProjectMeta {
   createdAt: string
   voice: VoiceSettings
   tone?: Tone // unset: warm
+  scriptFirst?: boolean // Claude plans script.md and gets it approved before writing scene.py (ADR 0016)
   claudeSessionId?: string
 }
 
@@ -56,6 +57,7 @@ export interface NewProjectInput {
   /** The project's voice; unset takes Settings → Voice's default (with `language`). */
   voice?: VoiceSettings
   tone?: Tone
+  scriptFirst?: boolean
   parentDir?: string
 }
 
@@ -373,6 +375,7 @@ export interface OpenProject {
   path: string
   meta: ProjectMeta
   source: string
+  script: string | null // script.md, when the project has one
   timeline: Timeline | null
   chat: ChatMessage[]
   recordings: string[]
@@ -394,7 +397,7 @@ export interface VoiceOption {
   users?: number // how many people saved it (ElevenLabs' library)
 }
 
-export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'open-project' | 'menu'
+export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'open-project' | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -426,6 +429,8 @@ export interface StudioApi {
   reveal(path: string): Promise<void>
   saveScene(source: string): Promise<void>
   updateMeta(patch: Partial<ProjectMeta>): Promise<ProjectMeta>
+  /** Writes the open project's script.md. */
+  saveScript(text: string): Promise<void>
 
   render(quality: Quality): Promise<void>
   cancelRender(): Promise<void>
@@ -484,4 +489,6 @@ export interface StudioApi {
   on(channel: 'menu', cb: (e: { action: MenuAction; path?: string; value?: string }) => void): () => void
   on(channel: 'update', cb: (e: UpdateEvent) => void): () => void
   on(channel: 'exports', cb: (jobs: ExportJob[]) => void): () => void
+  /** script.md changed on disk (Claude wrote it), or was removed (null). */
+  on(channel: 'script', cb: (e: { text: string | null }) => void): () => void
 }

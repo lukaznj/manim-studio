@@ -1,12 +1,13 @@
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
-import { FileCode2, FileText, Images, Play, Save, Sparkles } from 'lucide-react'
+import { FileCode2, FileText, Images, NotebookPen, Play, Save, Sparkles } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { editorBridge } from '../lib/editor-bridge'
 import { isDark, onThemeChange } from '../lib/theme'
 import { shortcut } from '../lib/platform'
 import { markEdited, resolveConflict, saveScene, useStore } from '../store'
 import { MediaPane } from './MediaPane'
+import { ScriptPane } from './ScriptPane'
 import { SourcesPane } from './SourcesPane'
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() }
@@ -112,7 +113,8 @@ export function CodePane() {
   const conflict = useStore((s) => s.conflict)
   const chatBusy = useStore((s) => s.chatBusy)
   const tab = useStore((s) => s.leftTab)
-  const setTab = (leftTab: 'code' | 'media' | 'sources') => useStore.setState({ leftTab })
+  const setTab = (leftTab: 'code' | 'script' | 'media' | 'sources') => useStore.setState({ leftTab })
+  const showScript = useStore((s) => !!s.project?.meta.scriptFirst || s.script !== null)
 
   useEffect(() => {
     if (!host.current) return
@@ -175,6 +177,12 @@ export function CodePane() {
             <span className="tab-label">scene.py</span>
             {dirty && <span className="dirty-dot" />}
           </button>
+          {showScript && (
+            <button role="tab" aria-selected={tab === 'script'} className="file-tab" onClick={() => setTab('script')} title="script.md: the plan of the video">
+              <NotebookPen />
+              <span className="tab-label">Script</span>
+            </button>
+          )}
           <button role="tab" aria-selected={tab === 'media'} className="file-tab" onClick={() => setTab('media')} data-tour="media" title="Media: your pictures and videos">
             <Images />
             <span className="tab-label">Media</span>
@@ -206,6 +214,7 @@ export function CodePane() {
       )}
       {/* Monaco stays mounted under the other panels so its undo history and cursor survive the switch. */}
       <div className={`code-host ${tab !== 'code' ? 'hidden' : ''}`} ref={host} />
+      {tab === 'script' && <ScriptPane />}
       {tab === 'media' && <MediaPane />}
       {tab === 'sources' && <SourcesPane />}
       <div className={`claude-editing ${chatBusy ? 'on' : ''}`}>

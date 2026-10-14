@@ -14,11 +14,12 @@ import { z } from 'zod'
 import { desktopTools, type DesktopToolName } from '../shared/studio-tools'
 import type { ClaudeDesktopStatus, ExportResult, Tone } from '../shared/types'
 import { languageName, mediaNote } from './claude'
-import { createProject, listProjects, readScene, requireProject, saveScene } from './projects'
+import { createProject, listProjects, readScene, readScript, requireProject, saveScene, saveScript } from './projects'
 import { getSettings } from './settings'
 import { getTimeline, readSource, renderPreview, textResult, viewFrames, viewSourcePages } from './scene-tools'
 import { slugify } from './slug'
 import { sourcesNote } from './sources'
+import { scriptBrief, scriptStatus } from '../shared/script'
 import { styleBrief } from '../shared/tone'
 
 export interface DesktopHost {
@@ -26,6 +27,8 @@ export interface DesktopHost {
   openInWindow(dir: string): Promise<void>
   /** Tells the window scene.py changed under it (the editor updates; no render, Claude asks for one). */
   sceneWritten(source: string): void
+  /** The same for script.md: the Script tab updates. */
+  scriptWritten(text: string): void
   exportVideo(): Promise<ExportResult>
 }
 
@@ -116,6 +119,14 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
       return textResult(readScene())
     case 'write_scene':
       return writeScene(host, String(args.source))
+    case 'get_script': {
+      const text = readScript(requireProject().path)
+      return textResult(text ? `Status: ${scriptStatus(text)}\n\n${text}` : 'This project has no script.md yet.')
+    }
+    case 'write_script':
+      saveScript(String(args.text))
+      host.scriptWritten(String(args.text))
+      return textResult('Saved script.md; the app shows it in its Script tab.')
     case 'edit_scene': {
       const source = readScene()
       const oldText = String(args.old_text)
@@ -154,6 +165,7 @@ function guide(): string {
     `Format ${meta.aspect} (${meta.aspect === '9:16' ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), video theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
     `Write all narration and on-screen text in ${language}.`,
     styleBrief(meta),
+    scriptBrief(meta, readScript(path) !== null, { desktop: true }),
     mediaNote(path),
     sourcesNote(path),
     'Change scene.py only through write_scene or edit_scene. After each change call render_preview, then view_frames at the moments you changed.',

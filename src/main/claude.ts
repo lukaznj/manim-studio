@@ -15,11 +15,12 @@ import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, C
 import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
-import { mediaNames, project, readChat, readTimeline, requireProject, updateMeta, writeChat } from './projects'
+import { mediaNames, project, readChat, readScript, readTimeline, requireProject, updateMeta, writeChat } from './projects'
 import { frameBase64, pauseCommits } from './render'
 import { getTimeline, readSource, renderPreview, viewFrames, viewSourcePages } from './scene-tools'
 import { getSecret, getSettings } from './settings'
 import { sourcesNote } from './sources'
+import { scriptBrief } from '../shared/script'
 import { styleBrief } from '../shared/tone'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
@@ -483,6 +484,7 @@ function studioPrompt(dir: string): string {
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),
+    scriptBrief(meta, readScript(dir) !== null),
     mediaNote(dir),
     sourcesNote(dir),
     'To find something in a long PDF, Grep its text in .studio/sources/<name>/text.txt (one "=== Page N ===" line per page).',

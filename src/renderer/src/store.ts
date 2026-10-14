@@ -62,7 +62,7 @@ interface State {
   historyOpen: boolean
   chatDraft: string | null // text put into the chat box from elsewhere (the Media and Sources panels)
   tour: boolean // the editor tutorial is showing
-  leftTab: 'code' | 'media' | 'sources'
+  leftTab: 'code' | 'script' | 'media' | 'sources'
   chatSource: SourceRef | null // a PDF (or some of its pages) attached to the next chat message
   projects: ProjectSummary[]
 
@@ -75,6 +75,7 @@ interface State {
   render: RenderState
   finalRender: RenderState
   exports: ExportJob[] // the export queue, newest last (src/main/exports.ts)
+  script: string | null // the open project's script.md (ScriptPane.tsx)
   selection: number[] // clip indices
   recordings: string[]
 
@@ -112,6 +113,7 @@ export const useStore = create<State>(() => ({
   render: { status: 'idle' },
   finalRender: { status: 'idle' },
   exports: [],
+  script: null,
   selection: [],
   recordings: [],
   chat: [],
@@ -185,6 +187,8 @@ export async function boot(): Promise<void> {
     void openProject(path).then(() => toast('Claude Desktop opened this project'))
   })
   api.on('exports', (exports) => set({ exports }))
+  // Claude wrote the script: show it, unless you're in the middle of something else.
+  api.on('script', ({ text }) => set((s) => ({ script: text, leftTab: text && s.leftTab === 'code' && !s.dirty ? 'script' : s.leftTab })))
   void api.exportJobs().then((exports) => set({ exports }))
 }
 
@@ -314,6 +318,7 @@ function applyOpened(o: OpenProject): void {
     screen: 'editor',
     project: { path: o.path, meta: o.meta },
     savedSource: o.source,
+    script: o.script,
     dirty: false,
     stale: false,
     conflict: null,

@@ -19,5 +19,5 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0013-export-versions-and-languages]] | Export light and dark versions, and dubbed audio tracks plus subtitles per language | accepted |
 | [[0014-pdf-sources]] | PDFs are sources in the project, read by Claude through Studio tools and shown with pdf_page() | accepted |
 | [[0015-tone-and-pacing]] | Tone per project (professional, warm, playful); pacing by clarity, no target length | accepted |
-| [[0016-script-first]] | Claude writes script.md and gets it approved before writing scene.py; series share a series.md | proposed |
+| [[0016-script-first]] | Claude writes script.md and gets it approved before writing scene.py; series share a series.md | accepted |
 | [[0017-background-export-queue]] | Exports run in a background queue, one at a time, each on a copy of its project | accepted |
