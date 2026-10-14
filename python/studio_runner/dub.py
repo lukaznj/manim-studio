@@ -35,7 +35,6 @@ def dub(timeline_path: Path, translations_path: Path, lang: str, out_base: Path,
     translations: dict[str, str] = json.loads(translations_path.read_text(encoding="utf-8"))
     project = timeline_path.resolve().parents[2]  # <project>/.studio/<render>/timeline.json
     settings = {**json.loads(os.environ.get("STUDIO_VOICE", "{}") or "{}"), "language": lang}
-    settings.pop("systemVoice", None)  # chosen for the original language; pick one for this one
     speech = StudioSpeech(project / "voice", settings)
 
     duration = float(timeline["duration"])

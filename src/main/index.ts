@@ -18,7 +18,7 @@ import { cancel, frame, onRenderEvent, render } from './render'
 import { runningJobs } from './runner'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
-import { deleteRecording, elevenLabsLibrary, elevenLabsVoices, onWorkerLog, saveRecording, saveReference, stopTtsWorker, systemVoices } from './voice'
+import { deleteRecording, elevenLabsLibrary, elevenLabsVoices, onWorkerLog, saveRecording, saveReference, stopTtsWorker } from './voice'
 
 // Isolated data for automated runs (scripts/drive.mjs); never set in normal use.
 if (process.env.STUDIO_USER_DATA) app.setPath('userData', process.env.STUDIO_USER_DATA)
@@ -212,7 +212,6 @@ function registerIpc(): void {
   })
   handle('elevenLabsVoices', () => elevenLabsVoices())
   handle('elevenLabsLibrary', (language: string, search: string) => elevenLabsLibrary(language, search))
-  handle('systemVoices', (language?: string) => systemVoices(language))
 
   handle('chatSend', (req: Parameters<typeof chatSend>[0]) => chatSend(req))
   handle('chatInterrupt', () => chatInterrupt())

@@ -15,7 +15,7 @@ Manim Studio was built for Maturita's admins: Croatian UI, Croatian narration, a
 - **English everywhere** in the product: UI copy, the project template and the `CLAUDE.md` Claude follows inside projects, docs, and identifiers.
 - **Narration language is per project** (`project.json` `voice.language`), picked in the new-project dialog and in Settings:
   - Claude writes narration and on-screen text in it, and replies in whatever language the user writes in.
-  - The system voice, Whisper alignment and the OmniVoice reference text follow it.
+  - The ElevenLabs voices on offer, Whisper alignment and the OmniVoice reference text follow it.
   - Slugs keep non-English titles readable ("Kvadratna funkcija — tjeme" → `kvadratna-funkcija-tjeme`).
 - **Platform integrations live in forks.** Maturita's "publish to a lesson" goes in a Maturita fork. Upstream accepts small, generic hooks that keep forks thin (an export target, say), not integrations with one platform.
 - **No personal data in the repo.** No e-mail in `package.json` or the installers, and screenshots never show an account.

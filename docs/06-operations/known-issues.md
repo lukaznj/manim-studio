@@ -6,11 +6,9 @@ Each item below was either measured during development, or not verified because 
 
 - **Windows and Linux.** CI builds and tests both (typecheck, unit tests, the Python end-to-end render, packaging), but nobody has run the installed app yet. Untested by hand:
   - TinyTeX unpacking on Windows (a 7-Zip self-extractor, run with `-y -o<dir>`)
-  - the Windows SAPI voice, including a language whose voice pack isn't installed
-  - `espeak-ng` on Linux, and the AppImage's microphone permission for the recording booth
+  - the AppImage's microphone permission for the recording booth
   - the NSIS installer and its auto-update
 - **Dubbed languages can drift.** A translation much longer than the original is sped up at most 1.6× and then pushes the next sentence back. The export lists each sentence that ends up more than 0.5 s behind its picture.
-- **Other-language voices on Windows and Linux.** The system voice needs that language installed: a Windows language pack, or an espeak-ng voice. ElevenLabs and OmniVoice don't.
 - **macOS asks for keychain access after some updates.** Unsigned (ad-hoc signed) builds change their code identity with every build, so the first launch after an update may ask to use "Manim Studio Safe Storage", where the saved API keys are. Choose Always Allow. A Developer ID signature removes this.
 - **Plan usage relies on an experimental SDK call.** `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET` may be renamed in a future Agent SDK. The meter then disappears, nothing breaks. Check it after updating the SDK.
 - **The Claude Desktop extension.**
@@ -20,7 +18,7 @@ Each item below was either measured during development, or not verified because 
   - Windows and Linux start Studio through `manim-studio://`, which is untested. AppImages may not register it, and then the extension asks the user to open Studio.
 - **Signed, notarized macOS build and an actual auto-update.** There's no Developer ID yet, so macOS builds are ad-hoc signed. Release metadata (`app-update.yml`, `latest-mac.yml`) is generated correctly.
 - **ElevenLabs.** The REST call and timestamp alignment are written to the documented API, but no key was available to call it.
-  - Eleven v4 (`eleven_v4`, released September 2026) has not been called; its docs don't say whether `/with-timestamps` and `language_code` work with it. A failure shows as a warning and silence for that block.
+  - Eleven v4 (`eleven_v4`, released September 2026) is the default model but has not been called from the app; its docs don't say whether `/with-timestamps` and `language_code` work with it. A rejected `language_code` is retried without it; any other failure shows as a warning and silence for that block.
   - The voice picker's top ten and search need a key; without one, only the three-voice list was checked.
 
 ## Measured

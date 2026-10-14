@@ -7,7 +7,7 @@ import { revealLabel } from '../lib/platform'
 import { closeDialog, errorText, updateMeta, useStore } from '../store'
 import { Modal, ProgressLine, Tabs } from './ui'
 
-const PROVIDER_NAMES = { system: 'the system voice', elevenlabs: 'ElevenLabs', omnivoice: 'OmniVoice' } as const
+const PROVIDER_NAMES = { elevenlabs: 'ElevenLabs', omnivoice: 'OmniVoice' } as const
 
 /**
  * One video, then an audio track and subtitles per language: what YouTube asks for. Light and dark

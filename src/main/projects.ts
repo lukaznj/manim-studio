@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync,
 import { cp } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { ChatMessage, NewProjectInput, OpenProject, ProjectMeta, ProjectSummary, Timeline } from '../shared/types'
+import { migrateVoice } from '../shared/voice'
 import { initRepo } from './git'
 import { slugify } from './slug'
 import { paths } from './paths'
@@ -34,7 +35,8 @@ const metaFile = (dir: string) => join(dir, 'project.json')
 const chatFile = (dir: string) => join(dir, '.studio', 'chat.json')
 
 export function readMeta(dir: string): ProjectMeta {
-  return JSON.parse(readFileSync(metaFile(dir), 'utf8'))
+  const meta = JSON.parse(readFileSync(metaFile(dir), 'utf8')) as ProjectMeta
+  return meta.voice ? { ...meta, voice: migrateVoice(meta.voice) } : meta
 }
 
 export function readTimeline(dir: string, quality: 'preview' | 'final' = 'preview'): Timeline | null {
