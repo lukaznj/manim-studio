@@ -1,18 +1,17 @@
 import { RefreshCw } from 'lucide-react'
 import type { VoiceSettings } from '../../../shared/types'
+import { DEFAULT_EL_MODEL } from '../../../shared/voice'
 import { renderNow, useStore } from '../store'
 
 /** What makes one voice sound unlike another. Not the language: that needs new narration text. */
 const sound = (v: VoiceSettings) =>
   v.provider === 'elevenlabs'
-    ? `elevenlabs:${v.elevenlabs?.voiceId ?? ''}:${v.elevenlabs?.modelId ?? 'eleven_v3'}`
-    : v.provider === 'system'
-      ? `system:${v.systemVoice ?? ''}`
-      : `${v.provider}:${v.omnivoice?.refText ?? ''}`
+    ? `elevenlabs:${v.elevenlabs?.voiceId ?? ''}:${v.elevenlabs?.modelId ?? DEFAULT_EL_MODEL}`
+    : `${v.provider}:${v.omnivoice?.refText ?? ''}`
 
-/** "Luka" for "Luka - Calm, Narrative"; the provider when there's no name. */
+/** "Luka" for "Luka - Calm, Narrative"; the provider when there's no name. A timeline from before 0.4.0 can still name the system voice. */
 export const voiceLabel = (v: VoiceSettings) =>
-  v.provider === 'elevenlabs' ? (v.elevenlabs?.voiceName?.split(' - ')[0] ?? 'ElevenLabs') : v.provider === 'system' ? (v.systemVoice ?? 'the system voice') : 'OmniVoice'
+  v.provider === 'elevenlabs' ? (v.elevenlabs?.voiceName?.split(' - ')[0] ?? 'ElevenLabs') : v.provider === 'omnivoice' ? 'OmniVoice' : 'the system voice'
 
 /**
  * The narration on screen was spoken by another voice than the project's now: the render that made

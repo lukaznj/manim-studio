@@ -3,13 +3,12 @@
 
 export type Aspect = '16:9' | '9:16'
 export type Theme = 'dark' | 'light'
-export type VoiceProvider = 'system' | 'elevenlabs' | 'omnivoice'
+export type VoiceProvider = 'elevenlabs' | 'omnivoice'
 export type Quality = 'preview' | 'final'
 
 export interface VoiceSettings {
   provider: VoiceProvider
   language: string
-  systemVoice?: string
   elevenlabs?: { voiceId: string; voiceName?: string; modelId: string }
   omnivoice?: { refAudio?: string; refText?: string }
 }
@@ -85,7 +84,7 @@ export interface Section {
   line: number | null
 }
 
-export type VoiceSource = 'recording' | 'system' | 'elevenlabs' | 'omnivoice' | 'silence' | 'unknown'
+export type VoiceSource = 'recording' | 'elevenlabs' | 'omnivoice' | 'silence' | 'unknown'
 
 export interface VoiceBlock {
   start: number
@@ -430,7 +429,6 @@ export interface StudioApi {
   askMicrophone(): Promise<boolean>
   elevenLabsVoices(): Promise<VoiceOption[]>
   elevenLabsLibrary(language: string, search: string): Promise<VoiceOption[]>
-  systemVoices(language?: string): Promise<VoiceOption[]>
 
   chatSend(request: ChatRequest): Promise<void>
   chatInterrupt(): Promise<void>

@@ -2,8 +2,7 @@
 
 Each `with self.voiceover(text=...)` block gets, in order of preference:
 1. a human recording at voice/recordings/<key>.wav (made in the app's recording booth),
-2. the project's TTS provider (the OS voice for the project's language, ElevenLabs or
-   local OmniVoice),
+2. the project's TTS provider (ElevenLabs or local OmniVoice),
 3. silence of an estimated length, if the provider fails, so a render never blocks on TTS.
 
 `key` depends only on the spoken words (bookmarks and whitespace ignored), so moving a
@@ -17,10 +16,7 @@ import base64
 import hashlib
 import json
 import os
-import platform
 import re
-import shutil
-import subprocess
 import urllib.error
 import urllib.request
 import wave
@@ -34,14 +30,8 @@ from manim_voiceover.tracker import AUDIO_OFFSET_RESOLUTION
 WORD = re.compile(r"\S+")
 # Rough speaking rate, only for the silent fallback.
 WORDS_PER_SECOND = 2.5
-# macOS ships joke voices (Bubbles, Zarvox…) and robotic ones; never pick those automatically.
-NOVELTY_VOICES = {
-    "Albert", "Bad News", "Bahh", "Bells", "Boing", "Bubbles", "Cellos", "Good News", "Jester",
-    "Organ", "Superstar", "Trinoids", "Whisper", "Wobble", "Zarvox", "Fred", "Junior", "Kathy", "Ralph",
-    # The Eloquence voices are listed for every language and sound robotic.
-    "Eddy", "Flo", "Grandma", "Grandpa", "Reed", "Rocko", "Sandy", "Shelley",
-}
-PREFERRED_VOICES = {"en": ["Samantha", "Daniel", "Karen", "Moira", "Alex"], "hr": ["Lana"]}
+# The default ElevenLabs model; the app's list (src/shared/voice.ts) starts with it.
+DEFAULT_ELEVENLABS_MODEL = "eleven_v4"
 
 # Read by the runner after the render: which source each block used, and problems.
 USED: dict[str, str] = {}
@@ -97,16 +87,12 @@ class StudioSpeech(SpeechService):
         if recording.exists():
             return f"recordings/{key}.wav", _load_starts(recording.with_suffix(".json")), "recording"
 
-        provider = self.settings.get("provider", "system")
+        provider = self.settings.get("provider", "elevenlabs")
         try:
             if provider == "elevenlabs":
                 return (*self._elevenlabs(words, key), "elevenlabs")
             if provider == "omnivoice":
                 return (*self._omnivoice(words, key), "omnivoice")
-            if provider == "system":
-                result = self._system(words, key)
-                if result:
-                    return (*result, "system")
         except Exception as e:  # noqa: BLE001 - any provider failure degrades to silence
             WARNINGS.append(f"{provider}: {e}")
         return (*self._silence(words, key), "silence")
@@ -131,42 +117,11 @@ class StudioSpeech(SpeechService):
                 w.writeframes(b"\0\0" * int(seconds * 22050))
         return rel, _proportional_starts(words, 0.2, seconds - 0.2)
 
-    def _system(self, words: str, key: str):
-        language = self.settings.get("language", "en")
-        voice = self.settings.get("systemVoice") or _default_system_voice(language)
-        rel, path, starts = self._cached(words, key, ".wav", "system", voice or language)
-        if path.exists():
-            return rel, starts
-        if platform.system() == "Darwin":
-            if not voice:
-                raise RuntimeError(f"no macOS voice installed for '{language}' (System Settings → Accessibility → Spoken Content)")
-            subprocess.run(
-                ["say", "-v", voice, "-o", str(path), "--data-format=LEI16@22050", words],
-                check=True,
-                capture_output=True,
-            )
-        elif platform.system() == "Windows":
-            ps = (
-                "Add-Type -AssemblyName System.Speech;"
-                "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
-                "$v=$s.GetInstalledVoices()|?{$_.VoiceInfo.Culture.Name -like ($env:STUDIO_LANG+'*')}|select -First 1;"
-                "if($v){$s.SelectVoice($v.VoiceInfo.Name)};"
-                "$s.SetOutputToWaveFile($env:STUDIO_OUT);$s.Speak($env:STUDIO_TEXT);$s.Dispose()"
-            )
-            env = {**os.environ, "STUDIO_OUT": str(path), "STUDIO_TEXT": words, "STUDIO_LANG": language.split("-")[0]}
-            subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True, capture_output=True, env=env)
-        else:
-            espeak = shutil.which("espeak-ng") or shutil.which("espeak")
-            if not espeak:
-                raise RuntimeError("no system voice found (install espeak-ng)")
-            subprocess.run([espeak, "-v", language.split("-")[0], "-w", str(path), words], check=True, capture_output=True)
-        return rel, None
-
     def _elevenlabs(self, words: str, key: str):
         s = self.settings.get("elevenlabs", {})
         api_key = os.environ.get("ELEVENLABS_API_KEY", "")
         voice_id = s.get("voiceId", "")
-        model_id = s.get("modelId", "eleven_v3")
+        model_id = s.get("modelId", DEFAULT_ELEVENLABS_MODEL)
         if not api_key:
             raise RuntimeError("no ElevenLabs API key (Settings → Voice)")
         if not voice_id:
@@ -175,10 +130,8 @@ class StudioSpeech(SpeechService):
         if path.exists():
             return rel, starts
 
-        body: dict = {"text": words, "model_id": model_id}
-        # Pins the language (ISO 639-1); every model but Multilingual v2 takes it.
-        if model_id != "eleven_multilingual_v2":
-            body["language_code"] = self.settings.get("language", "en").split("-")[0]
+        # Pins the language (ISO 639-1).
+        body: dict = {"text": words, "model_id": model_id, "language_code": self.settings.get("language", "en").split("-")[0]}
         try:
             data = _elevenlabs_post(voice_id, api_key, body)
         except _HTTPError as e:
@@ -238,23 +191,6 @@ def _elevenlabs_post(voice_id: str, api_key: str, body: dict) -> dict:
         except (ValueError, KeyError, TypeError):
             detail = text[:300]
         raise _HTTPError(e.code, detail) from None
-
-
-def _default_system_voice(language: str) -> str | None:
-    """A natural-sounding installed voice for the language (macOS); None elsewhere or if none."""
-    if platform.system() != "Darwin":
-        return None
-    out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True).stdout
-    # "Daniel   en_GB  # …" or, for newer voices, "Lana (Croatian (Croatia)) hr_HR  # …"
-    voices = re.findall(r"^(.+?)\s+([a-z]{2,3})_([A-Z]{2})\s+#", out, re.M)
-    base, _, region = language.partition("-")
-    names = [(re.sub(r"\s*\(.*\)$", "", name).strip(), lang, reg) for name, lang, reg in voices]
-    matching = [(name, reg) for name, lang, reg in names if lang == base and name not in NOVELTY_VOICES]
-    preferred = PREFERRED_VOICES.get(base, [])
-    rank = lambda name: preferred.index(name) if name in preferred else len(preferred)  # noqa: E731
-    # The requested region first (en-GB → a British voice), then the natural-sounding ones.
-    matching.sort(key=lambda v: (bool(region) and v[1] != region.upper(), rank(v[0])))
-    return matching[0][0] if matching else None
 
 
 # --- word timing helpers -----------------------------------------------------------------

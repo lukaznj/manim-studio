@@ -1,6 +1,7 @@
-import { AudioLines, Check, Circle, Cpu, KeyRound, Laptop, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
+import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Background, ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, MediaItem, PlanUsage, ProjectMeta, Settings, Theme, VoiceOption, VoiceProvider, VoiceSettings } from '../../../shared/types'
+import type { Background, ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, MediaItem, PlanUsage, ProjectMeta, Settings, Theme, VoiceProvider, VoiceSettings } from '../../../shared/types'
+import { DEFAULT_EL_MODEL, EL_MODELS } from '../../../shared/voice'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { encodeWav } from '../lib/audio'
@@ -263,17 +264,8 @@ function ClaudeDesktopRow() {
 }
 
 const PROVIDERS: { value: VoiceProvider; title: string; text: string; icon: ReactNode }[] = [
-  { value: 'system', title: 'System voice', text: 'Free and offline, in the project’s language. Good for drafts and pacing.', icon: <Laptop /> },
   { value: 'elevenlabs', title: 'ElevenLabs', text: 'The most natural voices. Paid per character.', icon: <AudioLines /> },
   { value: 'omnivoice', title: 'OmniVoice', text: 'Local and free, 600+ languages, clones your voice from a short clip.', icon: <Cpu /> },
-]
-
-// The first is the default (python/studio/voice.py uses it too when a project names none).
-const EL_MODELS = [
-  { id: 'eleven_v3', label: 'v3 (expressive, recommended)' },
-  { id: 'eleven_v4', label: 'v4 (newest, most expressive)' },
-  { id: 'eleven_multilingual_v2', label: 'Multilingual v2 (steadiest)' },
-  { id: 'eleven_flash_v2_5', label: 'Flash v2.5 (fast, half the price)' },
 ]
 
 // The themes' own backgrounds (python/studio/brand.py), shown until the project picks its own.
@@ -407,22 +399,18 @@ function RevoiceRow() {
 export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings; onChange: (voice: VoiceSettings) => void; inProject: boolean }) {
   const settings = useStore((s) => s.settings)!
   const setup = useStore((s) => s.setup)
-  const [sysVoices, setSysVoices] = useState<VoiceOption[]>([])
   const save = (patch: Partial<VoiceSettings>) => onChange({ ...voice, ...patch })
   const el = voice.elevenlabs
-  const modelId = el?.modelId ?? EL_MODELS[0].id
+  const modelId = el?.modelId ?? DEFAULT_EL_MODEL
+  // A project made with a model no longer offered (e.g. Multilingual v2) keeps it until changed.
   const models = EL_MODELS.some((m) => m.id === modelId) ? EL_MODELS : [...EL_MODELS, { id: modelId, label: modelId }]
-
-  useEffect(() => {
-    api.systemVoices(voice.language).then(setSysVoices, () => setSysVoices([]))
-  }, [voice.language])
 
   const languages = LANGUAGES.includes(voice.language) ? LANGUAGES : [voice.language, ...LANGUAGES]
 
   return (
     <>
       <Row title="Narration language" text="Claude writes the narration and on-screen text in it; voices and subtitles follow it.">
-        <select className="select" value={voice.language} onChange={(e) => save({ language: e.target.value, systemVoice: undefined })}>
+        <select className="select" value={voice.language} onChange={(e) => save({ language: e.target.value })}>
           {languages.map((code) => (
             <option key={code} value={code}>
               {languageName.of(code)}
@@ -439,19 +427,6 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
           </button>
         ))}
       </div>
-
-      {voice.provider === 'system' && (
-        <Row title="Voice" text={sysVoices.length ? 'Voices for the narration language are listed first.' : 'This system has no voice list; the best match is picked automatically.'}>
-          <select className="select" value={voice.systemVoice ?? ''} onChange={(e) => save({ systemVoice: e.target.value || undefined })}>
-            <option value="">Automatic (best voice for the language)</option>
-            {sysVoices.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name} {v.description ? `— ${v.description}` : ''}
-              </option>
-            ))}
-          </select>
-        </Row>
-      )}
 
       {voice.provider === 'elevenlabs' && (
         <>

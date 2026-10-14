@@ -8,7 +8,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0002-timeline-derived-from-render]] | The timeline is produced by each render; no separate model | accepted |
 | [[0003-python-env-via-pixi]] | Python, manim and LaTeX are installed by the app (pixi + TinyTeX) | accepted |
 | [[0004-claude-via-agent-sdk]] | Claude through the Agent SDK with each user's own sign-in or API key | accepted |
-| [[0005-voice-providers]] | System voice, ElevenLabs, OmniVoice and recordings, chosen per project; sidecar subtitles | accepted |
+| [[0005-voice-providers]] | ElevenLabs, OmniVoice and recordings, chosen per project; sidecar subtitles | accepted |
 | [[0006-auto-update-github-releases]] | Auto-update from this repo's GitHub Releases, three platforms | accepted |
 | [[0007-history-is-git]] | Version history is git, committed automatically | accepted |
 | [[0008-ink-at-night-design]] | "Ink at night" design language with a light twin (System by default), Liquid Glass icon | accepted |

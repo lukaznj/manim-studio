@@ -28,7 +28,7 @@ export function NewProjectDialog() {
   const [aspect, setAspect] = useState<Aspect>("9:16");
   const [theme, setTheme] = useState<Theme>("dark");
   const [voice, setVoice] = useState<VoiceSettings>({
-    provider: "system",
+    provider: "elevenlabs",
     language: "en",
   });
   const [parentDir, setParentDir] = useState("");
