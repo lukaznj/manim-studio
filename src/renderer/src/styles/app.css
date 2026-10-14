@@ -1256,7 +1256,7 @@
   flex: none;
 }
 
-/* Settings → Claude: every plan limit. */
+/* Settings → Agent (Claude): every plan limit. */
 .plan-usage {
   display: grid;
   gap: 8px;

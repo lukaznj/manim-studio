@@ -2,15 +2,15 @@
 
 Nothing here is committed. Each item gets an ADR when it's picked up.
 
-## Next, in this order
+## Done in 0.4.0
 
-1. **Background export queue.** Each export belongs to its own project, the dialog can be closed, progress shows in the status bar, and several exports wait in line. You start the next video while the last one exports. Then release 0.4.0.
-2. **Script first** ([[../04-decisions/0016-script-first|ADR 0016]], proposed). Claude writes `script.md` (the idea, the sections, the narration, the visuals) and the user approves it before any code. The basis for everything below.
-3. **Quick mode.** Describe the video, attach PDFs, and that's it: no editor, no timeline. Studio scripts it, makes it, checks it, and exports it through the queue. The project stays a normal project, so it can be opened and fixed afterwards.
-4. **Series mode.** Upload a batch of PDFs, such as a course's lectures. Claude proposes the episodes (one per PDF, or merged, or split further) and you accept or change the plan. A series bible (`series.md`) keeps the notation and visual language consistent, and lets an episode refer back to earlier ones. With quick mode, a whole mini-series is made unattended. The end goal is series at the level of 3Blue1Brown's *Essence of linear algebra*.
-5. **Parallel exports.** Split an export into chunks by animation and render them on all cores ([[../02-architecture/render-performance|render performance]], option 3).
-6. **Remote render worker.** A Docker image, published as its own repo, that takes export jobs from the queue so a home server does the work and your own computer stays free. The app pairs with it through a code that holds its address and a token. You and friends reach it over Tailscale; anyone else on their own network or through a tunnel. Narration is made on your computer and uploaded with the project, since the worker has no voice of its own.
-7. **Other agents.** Codex and Antigravity next to Claude, behind one agent-provider interface (sign-in, chat with the scene tools, models, usage, translation). Codex can reuse the scene tools over MCP. Needs its own ADR.
+Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017]]), script first ([[../04-decisions/0016-script-first|0016]]), quick mode ([[../04-decisions/0018-quick-mode|0018]]), series mode ([[../04-decisions/0019-series-mode|0019]]), parallel exports ([[../04-decisions/0020-parallel-exports|0020]]), render servers ([[../04-decisions/0021-render-servers|0021]]) and Codex as a second agent ([[../04-decisions/0022-codex-as-second-agent|0022]]).
+
+## Next
+
+- **Run quick and series mode on many real courses** and fix what they get wrong: the quality bar is a series at the level of 3Blue1Brown's *Essence of linear algebra*.
+- **Quick and series mode in the background**, so a whole series doesn't keep the app on its progress screen: the agent's turns would need to work on a project that isn't the open one.
+- **A Linux ARM build of the render server** (a Raspberry Pi or an ARM home server): the locked Python environment would need `linux-aarch64`.
 
 ## Also next
 

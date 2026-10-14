@@ -15,9 +15,13 @@ const defaults = (): Settings => ({
   tutorialDone: false,
   claudeModel: 'claude-sonnet-5-5', // Sonnet 5.5 at high effort writes scenes well enough, faster and cheaper than Opus
   claudeEffort: 'high',
+  agent: 'claude',
+  codexModel: '',
+  codexEffort: 'high',
   autoRender: true,
   hasElevenLabsKey: false,
   hasAnthropicKey: false,
+  hasOpenAIKey: false,
   defaultVoice: { provider: 'elevenlabs', language: 'en' },
   renderServers: [],
   sidebarWidth: 440,
@@ -54,7 +58,7 @@ export function rememberProject(path: string): void {
 
 // --- secrets: encrypted with the OS keychain via safeStorage, never sent to the renderer ---
 
-const secretFlags = () => ({ hasElevenLabsKey: !!getSecret('elevenlabs'), hasAnthropicKey: !!getSecret('anthropic') })
+const secretFlags = () => ({ hasElevenLabsKey: !!getSecret('elevenlabs'), hasAnthropicKey: !!getSecret('anthropic'), hasOpenAIKey: !!getSecret('openai') })
 
 const secretFile = (name: string) => join(app.getPath('userData'), `${name}.secret`)
 

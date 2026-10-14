@@ -7,7 +7,7 @@ const invoke =
     ipcRenderer.invoke(name, ...args)
 
 const methods = [
-  'appInfo', 'setupStatus', 'install', 'getSettings', 'setSettings', 'setElevenLabsKey', 'setAnthropicKey',
+  'appInfo', 'setupStatus', 'install', 'getSettings', 'setSettings', 'setElevenLabsKey', 'setAnthropicKey', 'setOpenAIKey',
   'claudeStatus', 'claudeUsage', 'claudeLogin', 'claudeLoginCode', 'claudeLogout', 'claudeDesktopStatus',
   'listProjects', 'createProject', 'openProject', 'pickProject', 'pickFolder', 'pickPdfs', 'closeProject', 'forgetProject', 'reveal',
   'saveScene', 'updateMeta', 'saveScript', 'render', 'cancelRender', 'frame', 'startQuick', 'quickRun', 'stopQuick', 'planSeries', 'startSeries', 'renderServers', 'addServer', 'removeServer', 'checkServer', 'queueExport', 'exportJobs', 'cancelExport', 'clearExports', 'listMedia', 'importMedia', 'removeMedia',
