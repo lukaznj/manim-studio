@@ -1,4 +1,5 @@
-// Export: everything a video needs to be published, in exports/<name>/ (ADR 0012).
+// Export: everything a video needs to be published, in <folder>/<name>/ (ADR 0013). The folder is
+// the project's exports/ unless the export dialog chose another one.
 //   <name>.mp4 (or <name>.dark.mp4 + <name>.light.mp4)   the video, one per chosen theme
 //   <name>.jpg (per theme)                               the thumbnail
 //   <name>.<lang>.srt / .vtt                             subtitles, the original language and each extra one
@@ -19,10 +20,13 @@ type Progress = (e: { stage: string; percent?: number }) => void
 export async function exportVideo(options: ExportOptions, progress: Progress): Promise<ExportResult> {
   const p = requireProject()
   const slug = slugify(p.meta.name)
-  const folder = join(p.path, 'exports', slug)
+  const folder = join(options.folder ?? p.meta.export?.folder ?? join(p.path, 'exports'), slug)
   mkdirSync(folder, { recursive: true })
   const original = p.meta.voice.language
   const themes = options.themes.length ? options.themes : [p.meta.theme]
+  // Claude Desktop's export_video passes no choices: it gets the project's last ones.
+  const size = options.size ?? p.meta.export?.size ?? 1080
+  const fps = options.fps ?? p.meta.export?.fps ?? p.meta.fps ?? 30
   const files: string[] = []
   const warnings: string[] = []
   const videos: string[] = []
@@ -30,7 +34,7 @@ export async function exportVideo(options: ExportOptions, progress: Progress): P
 
   for (const theme of themes) {
     progress({ stage: themes.length > 1 ? `Rendering the ${theme} version` : 'Rendering at full quality' })
-    const outcome = await render('final', { theme, out: `final-${theme}` })
+    const outcome = await render('final', { theme, out: `final-${theme}`, size, fps })
     if ('error' in outcome) throw new Error(outcome.error.message)
     if ('cancelled' in outcome) throw new Error('The export was cancelled')
     progress({ stage: 'Saving the video' })

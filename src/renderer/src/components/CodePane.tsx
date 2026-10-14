@@ -170,26 +170,26 @@ export function CodePane() {
     <div className="code-pane">
       <div className="pane-head">
         <div className="pane-tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'code'} className="file-tab" onClick={() => setTab('code')}>
+          <button role="tab" aria-selected={tab === 'code'} className="file-tab" onClick={() => setTab('code')} title="scene.py">
             <FileCode2 />
-            scene.py
+            <span className="tab-label">scene.py</span>
             {dirty && <span className="dirty-dot" />}
           </button>
-          <button role="tab" aria-selected={tab === 'media'} className="file-tab" onClick={() => setTab('media')} data-tour="media">
+          <button role="tab" aria-selected={tab === 'media'} className="file-tab" onClick={() => setTab('media')} data-tour="media" title="Media: your pictures and videos">
             <Images />
-            Media
+            <span className="tab-label">Media</span>
           </button>
-          <button role="tab" aria-selected={tab === 'sources'} className="file-tab" onClick={() => setTab('sources')} title="PDFs the video is made from">
+          <button role="tab" aria-selected={tab === 'sources'} className="file-tab" onClick={() => setTab('sources')} title="Sources: PDFs the video is made from">
             <FileText />
-            Sources
+            <span className="tab-label">Sources</span>
           </button>
         </div>
         <div className={`pane-actions ${tab !== 'code' ? 'hidden' : ''}`}>
           <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title="Save without rendering">
-            <Save /> Save
+            <Save /> <span className="btn-label">Save</span>
           </button>
           <button className="btn small" onClick={() => void saveScene({ render: true })} title={`Save and render (${shortcut("S")})`}>
-            <Play /> Render <span className="kbd">{shortcut("S")}</span>
+            <Play /> <span className="render-label">Render</span> <span className="kbd">{shortcut("S")}</span>
           </button>
         </div>
       </div>
