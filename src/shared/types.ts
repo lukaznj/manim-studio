@@ -5,6 +5,8 @@ export type Aspect = '16:9' | '9:16'
 export type Theme = 'dark' | 'light'
 export type VoiceProvider = 'elevenlabs' | 'omnivoice'
 export type Quality = 'preview' | 'final'
+/** How the narration talks: src/shared/tone.ts. */
+export type Tone = 'professional' | 'warm' | 'playful'
 
 export interface VoiceSettings {
   provider: VoiceProvider
@@ -30,6 +32,7 @@ export interface ProjectMeta {
   scene?: string
   createdAt: string
   voice: VoiceSettings
+  tone?: Tone // unset: warm
   claudeSessionId?: string
 }
 
@@ -52,6 +55,7 @@ export interface NewProjectInput {
   language: string
   /** The project's voice; unset takes Settings → Voice's default (with `language`). */
   voice?: VoiceSettings
+  tone?: Tone
   parentDir?: string
 }
 

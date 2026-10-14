@@ -1,6 +1,7 @@
 import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Background, ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, MediaItem, PlanUsage, ProjectMeta, Settings, Theme, VoiceProvider, VoiceSettings } from '../../../shared/types'
+import { DEFAULT_TONE, TONES } from '../../../shared/tone'
 import { DEFAULT_EL_MODEL, EL_MODELS } from '../../../shared/voice'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
@@ -311,6 +312,14 @@ function VideoTab() {
             { value: 'dark', label: 'Dark' },
             { value: 'light', label: 'Light' },
           ]}
+        />
+      </Row>
+      <Row title="Tone" text={`${TONES.find((t) => t.value === (meta.tone ?? DEFAULT_TONE))?.hint} Applies to what Claude writes next.`}>
+        <Tabs
+          radio="Tone"
+          value={meta.tone ?? DEFAULT_TONE}
+          onChange={(tone) => void updateMeta({ tone })}
+          items={TONES.map((t) => ({ value: t.value, label: t.label }))}
         />
       </Row>
       <Row title="Background colour" text="Each theme's background, if you want another than its own. Keep text readable.">

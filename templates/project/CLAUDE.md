@@ -43,7 +43,8 @@ One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studi
   - Follow the material: its order, notation, examples and numbers. Explain it rather than read it out, and don't add claims it doesn't make.
   - Rebuild formulas and graphs with `MathTex` and manim so they animate.
   - Show the page itself when the original matters (the exercise as printed, a figure): `pdf_page("notes.pdf", 3)` is page 3, and `crop=(left, top, right, bottom)` keeps part of it, in fractions of the page from its top-left corner. Find the crop with `view_source_pages`.
-- **Pacing** — a 2–4 minute video is the target. One idea per section. Leave about 0.5 s of stillness after an important result.
+- **Pacing** — take the time each idea needs to be explained clearly; there is no target length. One idea per section. Leave about 0.5 s of stillness after an important result.
+- **Tone** — Studio tells you the project's tone (professional, warm or playful). Follow it unless the user asks otherwise.
 
 ## Checking your work
 

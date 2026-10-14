@@ -52,6 +52,10 @@ export const desktopTools = {
       format: z.enum(['16:9', '9:16']).describe('16:9 for screens, projectors and YouTube; 9:16 for phones, full screen'),
       theme: z.enum(['dark', 'light']).optional().describe('The video’s colour theme (default dark)'),
       language: z.string().optional().describe('Narration language as an ISO 639-1 code, e.g. "en", "hr", "de" (default: the app’s setting)'),
+      tone: z
+        .enum(['professional', 'warm', 'playful'])
+        .optional()
+        .describe('How the narration talks: professional (a neutral lecture), warm (a friendly teacher; the default) or playful (light humour and real-life analogies)'),
     },
   },
   open_project: {
