@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, sh
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
-import type { EventChannel, ExportOptions, ProjectMeta, Quality } from '../shared/types'
+import type { EventChannel, ExportOptions, ProjectMeta, Quality, QuickRequest } from '../shared/types'
 import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, claudeUsage, closeChat, loadChat, onChatEvent } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
 import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, queueExport } from './exports'
@@ -11,6 +11,7 @@ import { importSources, listSources, removeSource, sourcePages } from './sources
 import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
 import { watchMemory } from './memory'
+import { quickRun, setupQuick, startQuick, stopQuick } from './quick'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
@@ -172,6 +173,10 @@ function registerIpc(): void {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'], title: title ?? 'Projects folder', defaultPath })
     return r.filePaths[0] ?? null
   })
+  handle('pickPdfs', async () => {
+    const r = await dialog.showOpenDialog(win!, { properties: ['openFile', 'multiSelections'], title: 'PDFs to make the video from', filters: [{ name: 'PDF documents', extensions: ['pdf'] }] })
+    return r.filePaths
+  })
   handle('closeProject', () => {
     closeChat()
     stopTtsWorker()
@@ -190,6 +195,9 @@ function registerIpc(): void {
   })
   handle('cancelRender', () => cancel('preview'))
   handle('frame', async (t: number, width?: number) => frame(t, width))
+  handle('startQuick', async (req: QuickRequest) => (await startQuick(req)).run)
+  handle('quickRun', () => quickRun())
+  handle('stopQuick', () => stopQuick())
   handle('queueExport', (options: ExportOptions) => queueExport(projects.requireProject().path, options).job)
   handle('exportJobs', () => exportJobs())
   handle('cancelExport', (id: string) => cancelExport(id))
@@ -266,6 +274,7 @@ app.whenReady().then(() => {
   registerIpc()
   onRenderEvent((e) => send('render', e))
   onExportsChanged((jobs) => send('exports', jobs))
+  setupQuick({ send: (run) => send('quick', run), openInWindow })
   onSetupEvent((e) => send('setup', e))
   onWorkerLog((e) => send('setup', e))
   onChatEvent((e) => send('chat', e))

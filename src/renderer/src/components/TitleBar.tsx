@@ -46,6 +46,7 @@ export function TitleBar() {
             Rendering{render.expected ? ` ${render.clips ?? 0}/${render.expected}` : '…'}
           </span>
         )}
+        <QuickPill />
         <ExportsMenu />
         <UpdatePill />
         {screen === 'editor' && (
@@ -65,6 +66,17 @@ export function TitleBar() {
       </div>
       {render.status === 'rendering' && <ProgressLine value={progress} className="titlebar-progress" />}
     </header>
+  )
+}
+
+/** Back to quick mode's progress, when you went to look at the editor meanwhile. */
+function QuickPill() {
+  const show = useStore((s) => s.quickEditor && s.quick?.state === 'working' && s.quick.project === s.project?.path)
+  if (!show) return null
+  return (
+    <button className="exports-pill busy" onClick={() => useStore.setState({ quickEditor: false })}>
+      <span className="spinner" /> Quick mode · Show progress
+    </button>
   )
 }
 
