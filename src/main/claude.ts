@@ -141,8 +141,36 @@ let messages: ChatMessage[] = []
 let turn: { message: ChatMessage; prompt: string } | null = null
 let emit: (e: ChatEvent) => void = () => {}
 
+const observers = new Set<(e: ChatEvent) => void>()
+
 export function onChatEvent(fn: (e: ChatEvent) => void): void {
-  emit = fn
+  emit = (e) => {
+    fn(e)
+    observers.forEach((o) => o(e))
+  }
+}
+
+/** Also tells `fn` what the chat does (quick mode follows Claude's progress); returns the unsubscribe. */
+export function observeChat(fn: (e: ChatEvent) => void): () => void {
+  observers.add(fn)
+  return () => observers.delete(fn)
+}
+
+// Quick and series mode: Claude works unattended, approves its own script and never stops to ask.
+let autopilot = false
+export function setAutopilot(on: boolean): void {
+  if (autopilot === on) return
+  autopilot = on
+  closeChat() // the next turn starts a session with the matching brief
+}
+
+let turnDone: ((r: { ok: boolean; error?: string }) => void) | null = null
+
+/** Sends a message as the user and waits until Claude's turn ends. */
+export async function chatAndWait(text: string): Promise<{ ok: boolean; error?: string }> {
+  const done = new Promise<{ ok: boolean; error?: string }>((resolve) => (turnDone = resolve))
+  await chatSend({ text })
+  return done
 }
 
 export function loadChat(dir: string): void {
@@ -467,6 +495,9 @@ function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
   }
   emit({ type: 'busy', busy: false })
   emit({ type: 'done', ok, error, costUsd })
+  const waiter = turnDone
+  turnDone = null
+  waiter?.({ ok, error })
 }
 
 // --- prompt and tool text --------------------------------------------------------------------
@@ -484,7 +515,10 @@ function studioPrompt(dir: string): string {
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),
-    scriptBrief(meta, readScript(dir) !== null),
+    scriptBrief(meta, readScript(dir) !== null, { auto: autopilot }),
+    autopilot
+      ? 'You are working unattended: the user started this in quick mode and is not watching, so nobody can answer a question. Make every choice yourself, never stop to ask, and finish the whole job: the script, scene.py, a render with no errors and no layout warnings, and a last look at the frames. End with two or three sentences on what the video covers.'
+      : '',
     mediaNote(dir),
     sourcesNote(dir),
     'To find something in a long PDF, Grep its text in .studio/sources/<name>/text.txt (one "=== Page N ===" line per page).',

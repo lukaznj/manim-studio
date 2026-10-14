@@ -1,4 +1,4 @@
-import { Check, CircleAlert, FolderOpen, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2 } from 'lucide-react'
+import { Check, CircleAlert, FolderOpen, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ComponentState, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -34,6 +34,9 @@ export function Home() {
           <div className="home-actions">
             <button className="btn ghost" onClick={() => void pickAndOpenProject()}>
               <FolderOpen /> Open folder…
+            </button>
+            <button className="btn large" onClick={() => openDialog({ kind: 'quick' })} title="Describe it, attach PDFs, and Studio makes and exports it">
+              <Zap /> Quick video
             </button>
             <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
               <Plus /> New project

@@ -4,6 +4,8 @@ import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
 import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
+import { QuickDialog } from './components/QuickDialog'
+import { QuickView } from './components/QuickView'
 import { SettingsDialog } from './components/SettingsDialog'
 import { TitleBar } from './components/TitleBar'
 import { Tour } from './components/Tour'
@@ -13,16 +15,19 @@ export function App() {
   const screen = useStore((s) => s.screen)
   const ready = useStore((s) => !!s.app)
   const toasts = useStore((s) => s.toasts)
+  // Quick mode shows its progress instead of the editor, until you ask for the editor.
+  const quickHere = useStore((s) => !!s.quick && s.quick.project === s.project?.path && !s.quickEditor)
 
   return (
     <div className={`app ${window.studio ? '' : 'no-bridge'}`}>
       <TitleBar />
-      <main className="app-main">{ready && (screen === 'home' ? <Home /> : <Editor />)}</main>
+      <main className="app-main">{ready && (screen === 'home' ? <Home /> : quickHere ? <QuickView /> : <Editor />)}</main>
       <NewProjectDialog />
       <SettingsDialog />
       <BoothDialog />
       <ExportDialog />
-      {screen === 'editor' && <Tour />}
+      <QuickDialog />
+      {screen === 'editor' && !quickHere && <Tour />}
       <div className="toast-stack" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>
