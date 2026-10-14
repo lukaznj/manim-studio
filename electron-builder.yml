@@ -12,6 +12,9 @@ files:
   - '!**/*.map'
   - '!out/mcpb/**'
   - '!out/*.mcpb'
+  # The Codex CLI is installed on demand (src/main/codex.ts), not shipped: it's about 340 MB.
+  - '!node_modules/@openai/codex/**'
+  - '!node_modules/@openai/codex-{darwin,linux,win32}-*/**'
 
 # The Claude Code binary is spawned, so it must live outside the asar archive.
 asarUnpack:
@@ -27,6 +30,8 @@ extraResources:
     to: bin
   - from: out/manim-studio.mcpb # the Claude Desktop extension (scripts/build-mcpb.mjs)
     to: manim-studio.mcpb
+  - from: out/mcpb/server/index.js # the same bridge, run by Codex for Studio's tools (src/main/codex.ts)
+    to: mcp-bridge.js
 
 # Claude Desktop's extension starts Studio with manim-studio:// on Windows and Linux (macOS uses the bundle id).
 protocols:

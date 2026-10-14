@@ -7,11 +7,13 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { app } from 'electron'
-import { basename, isAbsolute, join, relative, resolve } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { pageRanges } from '../shared/pages'
 import { sceneTools } from '../shared/studio-tools'
 import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, ClaudeStatus, ModelOption, PlanUsage, UsageWindow } from '../shared/types'
+import { askCodex, closeCodex, codexLogin, codexLogout, codexModels, codexStatus, codexTurn, interruptCodex } from './codex'
 import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
@@ -28,8 +30,11 @@ type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
 const sdk = () => (sdkPromise ??= import('@anthropic-ai/claude-agent-sdk'))
 
-/** Settings → Claude chooses between the Claude account sign-in and the user's own API key. */
+/** Settings → Agent (Claude) chooses between the Claude account sign-in and the user's own API key. */
 const usingApiKey = () => getSettings().claudeAuth === 'api-key'
+
+/** Settings → Agent: Codex instead of Claude (ADR 0022). The chat, quick mode and translation follow it. */
+const codexChosen = () => getSettings().agent === 'codex'
 
 /** cleanEnv() strips inherited ANTHROPIC_* variables; the key saved in Settings goes back only when it's the chosen method. */
 const claudeEnv = (): NodeJS.ProcessEnv => {
@@ -59,6 +64,11 @@ function runClaude(args: string[]): Promise<{ code: number | null; out: string }
 }
 
 export async function claudeStatus(): Promise<ClaudeStatus> {
+  if (codexChosen()) return { ...(await codexStatus()), agent: 'codex' }
+  return { ...(await claudeOnlyStatus()), agent: 'claude' }
+}
+
+async function claudeOnlyStatus(): Promise<ClaudeStatus> {
   if (usingApiKey()) return { loggedIn: !!getSecret('anthropic'), method: 'api-key', subscription: 'API key' }
   try {
     const { out } = await runClaude(['auth', 'status'])
@@ -77,6 +87,7 @@ export async function claudeStatus(): Promise<ClaudeStatus> {
 let loginChild: ChildProcess | null = null
 
 export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
+  if (codexChosen()) return codexLogin(onEvent).then((st) => ({ ...st, agent: 'codex' }))
   loginChild?.kill()
   return new Promise((resolvePromise) => {
     const child = spawn(paths.claude(), ['auth', 'login', '--claudeai'], { env: claudeEnv(), windowsHide: true })
@@ -103,6 +114,7 @@ export function claudeLoginCode(code: string): void {
 }
 
 export async function claudeLogout(): Promise<ClaudeStatus> {
+  if (codexChosen()) return { ...(await codexLogout()), agent: 'codex' }
   await runClaude(['auth', 'logout'])
   return claudeStatus()
 }
@@ -180,6 +192,7 @@ export function loadChat(dir: string): void {
 }
 
 export function closeChat(): void {
+  closeCodex()
   session?.inbox.close()
   session?.query.close()
   session = null
@@ -209,11 +222,39 @@ export async function chatSend(req: ChatRequest): Promise<void> {
   emit({ type: 'busy', busy: true })
   pauseCommits(true)
 
+  if (codexChosen()) return void codexChat(p.path, contextNote(req) + req.text, frame)
   if (!session || session.dir !== p.path) await startSession(p.path)
   session!.inbox.push({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null, origin: { kind: 'human' } })
 }
 
+/** One turn with Codex: its items become the same chat parts Claude's do. */
+async function codexChat(dir: string, text: string, frame?: string): Promise<void> {
+  const reply = turn!.message
+  const images: string[] = []
+  if (frame) {
+    const file = join(dir, '.studio', 'frames', `chat-${Date.now()}.png`)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, Buffer.from(frame.split(',')[1], 'base64'))
+    images.push(file)
+  }
+  const meta = requireProject().meta
+  const result = await codexTurn(dir, studioPrompt(dir, 'codex'), text, images, meta.codexThreadId, {
+    part: (part) => {
+      reply.parts.push(part)
+      emit({ type: 'part', messageId: reply.id, part })
+    },
+    status: (id, status) => {
+      const part = reply.parts.find((x) => x.kind === 'tool' && x.id === id)
+      if (part && part.kind === 'tool') part.status = status
+      emit({ type: 'tool-status', messageId: reply.id, toolId: id, status })
+    },
+    thread: (id) => project() && project()!.meta.codexThreadId !== id && updateMeta({ codexThreadId: id }),
+  })
+  finishTurn(result.ok, result.error)
+}
+
 export async function chatInterrupt(): Promise<void> {
+  interruptCodex()
   await session?.query.interrupt().catch(() => undefined)
 }
 
@@ -237,6 +278,7 @@ export async function chatReset(): Promise<void> {
 
 /** What this account can use. Not cached: it changes with the sign-in or API key (the renderer asks once per account). */
 export async function chatModels(): Promise<ModelOption[]> {
+  if (codexChosen()) return codexModels()
   const { query } = await sdk()
   const inbox = new Inbox()
   const q = query({ prompt: inbox, options: { env: claudeEnv(), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
@@ -260,6 +302,7 @@ export async function chatModels(): Promise<ModelOption[]> {
  * `what` names it in errors ("Claude couldn't plan: …").
  */
 export async function askClaude(system: string, prompt: string, what: string): Promise<string> {
+  if (codexChosen()) return askCodex(system, prompt, what)
   const { query } = await sdk()
   const q = query({
     prompt,
@@ -323,7 +366,7 @@ type UsageAnswer = {
  * The SDK marks this call experimental, so a missing or renamed method only hides the meter.
  */
 export async function claudeUsage(): Promise<PlanUsage | null> {
-  if (usingApiKey()) return null
+  if (usingApiKey() || codexChosen()) return null
   const read = async (q: Query) => {
     const usage = (q as unknown as Record<string, unknown>).usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET
     if (typeof usage !== 'function') return null
@@ -512,7 +555,7 @@ function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
 
 // --- prompt and tool text --------------------------------------------------------------------
 
-function studioPrompt(dir: string): string {
+function studioPrompt(dir: string, agent: 'claude' | 'codex' = 'claude'): string {
   const meta = requireProject().meta
   const portrait = meta.aspect === '9:16'
   const site = join(paths.env(), '.pixi', 'envs', 'default', process.platform === 'win32' ? 'Lib' : 'lib/python3.12', 'site-packages')
@@ -521,7 +564,9 @@ function studioPrompt(dir: string): string {
     'You are working inside Manim Studio, a desktop editor for making educational maths videos with manim.',
     `The project folder is ${dir}. The video is scene.py; the app renders it on every save and shows a timeline produced by the render. Read the project's CLAUDE.md first; it holds the conventions.`,
     `Format: ${meta.aspect} (${portrait ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
-    'You cannot run shell commands. To see your work: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done.',
+    agent === 'codex'
+      ? 'Edit files in the project yourself. Never run manim or python to render: Studio renders. To see your work, call the studio tools: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done. Read PDF sources with read_source and view_source_pages.'
+      : 'You cannot run shell commands. To see your work: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done.',
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),

@@ -36,6 +36,7 @@ export interface ProjectMeta {
   series?: SeriesRef // an episode of a series
   scriptFirst?: boolean // Claude plans script.md and gets it approved before writing scene.py (ADR 0016)
   claudeSessionId?: string
+  codexThreadId?: string // the project's Codex conversation, resumed after a restart
 }
 
 export interface ProjectSummary {
@@ -193,13 +194,14 @@ export type RenderEvent = { id: number; quality: Quality } & (
 // --- setup ----------------------------------------------------------------------------
 
 export type ComponentState = 'missing' | 'installing' | 'ready' | 'outdated' | 'unsupported' | 'error'
-export type Component = 'env' | 'latex' | 'omnivoice' | 'transcribe'
+export type Component = 'env' | 'latex' | 'omnivoice' | 'transcribe' | 'codex'
 
 export interface SetupStatus {
   env: ComponentState
   latex: ComponentState
   omnivoice: ComponentState
   transcribe: ComponentState
+  codex: ComponentState // the Codex CLI, installed when Codex is chosen (ADR 0022)
   pixi: boolean
   errors: Partial<Record<Component, string>>
 }
@@ -211,13 +213,18 @@ export interface SetupEvent {
   progress?: number
 }
 
+/** The chosen agent's sign-in (Claude's, or Codex's when Settings → Agent says so). */
 export interface ClaudeStatus {
+  agent?: Agent
   loggedIn: boolean
   email?: string
   subscription?: string
   method?: string
   error?: string
 }
+
+/** The agent that writes the scenes: Claude (the Agent SDK) or Codex (OpenAI's CLI). */
+export type Agent = 'claude' | 'codex'
 
 /** How Studio's Claude authenticates: the Claude Code account sign-in, or the user's own API key. */
 export type ClaudeAuth = 'account' | 'api-key'
@@ -381,9 +388,13 @@ export interface Settings {
   tutorialDone: boolean // the first-run tour of the editor was finished or skipped
   claudeModel: string // '' = Claude Code's default for the account
   claudeEffort: Effort | '' // '' (older settings) reads as 'medium'
+  agent: Agent // who writes the scenes (ADR 0022)
+  codexModel: string // '' = Codex's default for the account
+  codexEffort: Effort | ''
   autoRender: boolean
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
+  hasOpenAIKey: boolean
   defaultVoice: VoiceSettings
   renderServers: RenderServer[] // paired render workers (ADR 0021); their tokens are secrets
   sidebarWidth: number
@@ -496,6 +507,8 @@ export interface StudioApi {
   setSettings(patch: Partial<Settings>): Promise<Settings>
   setElevenLabsKey(key: string): Promise<Settings>
   setAnthropicKey(key: string): Promise<Settings>
+  /** Codex uses an OpenAI API key instead of the ChatGPT sign-in while one is saved. */
+  setOpenAIKey(key: string): Promise<Settings>
 
   claudeStatus(): Promise<ClaudeStatus>
   /** Plan limits used, or null with an API key or when Claude Code can't tell. */

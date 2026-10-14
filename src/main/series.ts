@@ -24,7 +24,7 @@ const MAX_TEXT = 40_000
 /** Reads the PDFs and asks Claude for episodes and a bible. */
 export async function planSeries(req: { pdfs: string[]; title?: string; language: string; tone: Tone }): Promise<SeriesPlan> {
   if (!req.pdfs.length) throw new Error('Add the PDFs the series is made from.')
-  if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to Claude first (Settings → Claude): it reads the PDFs and plans the episodes.')
+  if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Agent): it reads the PDFs and plans the episodes.')
   const work = join(tmpdir(), 'manim-studio-series', randomUUID())
   try {
     const material: string[] = []

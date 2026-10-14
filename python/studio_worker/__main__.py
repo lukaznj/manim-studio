@@ -346,7 +346,7 @@ def main() -> int:
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     print(f"Manim Studio render worker {VERSION}, on port {PORT}, {os.cpu_count()} cores.", flush=True)
     print(f"Address the app will use: {public_url()} (set STUDIO_WORKER_URL if it reaches this machine differently)", flush=True)
-    print(f"Pairing code (Manim Studio → Settings → General → Render servers → Add):\n\n    {pairing_code()}\n", flush=True)
+    print(f"Pairing code: paste it in Manim Studio → Settings → General → Render servers, then click Pair.\n\n    {pairing_code()}\n", flush=True)
     server.serve_forever()
     return 0
 

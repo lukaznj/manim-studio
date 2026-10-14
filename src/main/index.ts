@@ -143,12 +143,16 @@ function registerIpc(): void {
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
     // Another sign-in method means another Claude Code process: the next message starts it.
-    if ('claudeAuth' in patch) closeChat()
+    if ('claudeAuth' in patch || 'agent' in patch) closeChat()
     if (patch.appearance || patch.recentProjects) refreshMenu()
     return settings
   })
   handle('setElevenLabsKey', (key: string) => setSecret('elevenlabs', key.trim()))
   handle('setAnthropicKey', (key: string) => setSecret('anthropic', key.trim()))
+  handle('setOpenAIKey', (key: string) => {
+    closeChat() // Codex picks the key up when it starts again
+    return setSecret('openai', key.trim())
+  })
 
   handle('claudeStatus', () => claudeStatus())
   handle('claudeUsage', () => claudeUsage())
