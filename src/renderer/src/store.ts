@@ -49,6 +49,7 @@ export type Dialog =
   | { kind: 'booth'; key?: string }
   | { kind: 'export' }
   | { kind: 'quick' }
+  | { kind: 'series' }
   | null
 
 interface State {
@@ -269,6 +270,8 @@ function onMenu({ action, path, value }: { action: MenuAction; path?: string; va
       return openDialog({ kind: 'new-project' })
     case 'quick':
       return openDialog({ kind: 'quick' })
+    case 'series':
+      return openDialog({ kind: 'series' })
     case 'open-project':
       return void pickAndOpenProject()
     case 'open-recent':
@@ -329,6 +332,8 @@ function applyOpened(o: OpenProject): void {
     screen: 'editor',
     project: { path: o.path, meta: o.meta },
     savedSource: o.source,
+    // An episode made by hand starts with its request ready in the chat; Claude's brief has the rest.
+    ...(o.meta.series && !o.chat.length && get().quick?.project !== o.path ? { chatDraft: 'Make this episode.' } : {}),
     script: o.script,
     dirty: false,
     stale: false,

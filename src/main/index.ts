@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, sh
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
-import type { EventChannel, ExportOptions, ProjectMeta, Quality, QuickRequest } from '../shared/types'
+import type { EventChannel, ExportOptions, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
 import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, claudeUsage, closeChat, loadChat, onChatEvent } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
 import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, queueExport } from './exports'
@@ -12,6 +12,7 @@ import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
 import { watchMemory } from './memory'
 import { quickRun, setupQuick, startQuick, stopQuick } from './quick'
+import { planSeries, startSeries, writeEpisodeBible } from './series'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
@@ -157,6 +158,7 @@ function registerIpc(): void {
   handle('listProjects', () => projects.listProjects())
   handle('createProject', (input: Parameters<typeof projects.createProject>[0]) => projects.createProject(input))
   handle('openProject', (path: string) => {
+    writeEpisodeBible(path) // an episode's series.md picks up what the earlier episodes became
     const opened = projects.openProject(path)
     loadChat(path)
     refreshMenu()
@@ -198,6 +200,8 @@ function registerIpc(): void {
   handle('startQuick', async (req: QuickRequest) => (await startQuick(req)).run)
   handle('quickRun', () => quickRun())
   handle('stopQuick', () => stopQuick())
+  handle('planSeries', (req: Parameters<typeof planSeries>[0]) => planSeries(req))
+  handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
   handle('queueExport', (options: ExportOptions) => queueExport(projects.requireProject().path, options).job)
   handle('exportJobs', () => exportJobs())
   handle('cancelExport', (id: string) => cancelExport(id))

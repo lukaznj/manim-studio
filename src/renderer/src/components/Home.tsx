@@ -1,4 +1,4 @@
-import { Check, CircleAlert, FolderOpen, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
+import { Check, CircleAlert, FolderOpen, Library, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ComponentState, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -34,6 +34,9 @@ export function Home() {
           <div className="home-actions">
             <button className="btn ghost" onClick={() => void pickAndOpenProject()}>
               <FolderOpen /> Open folder…
+            </button>
+            <button className="btn large" onClick={() => openDialog({ kind: 'series' })} title="A series of videos from a course's PDFs">
+              <Library /> New series
             </button>
             <button className="btn large" onClick={() => openDialog({ kind: 'quick' })} title="Describe it, attach PDFs, and Studio makes and exports it">
               <Zap /> Quick video
@@ -82,7 +85,12 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
           ) : (
             <>
               <span className="badge">{p.aspect}</span>
-              <span className="faint">{ago(p.updatedAt)}</span>
+              {p.series && (
+                <span className="badge sun series-badge" title={`Episode ${p.series.episode} of ${p.series.of} · ${p.series.title}`}>
+                  {p.series.episode}/{p.series.of} · {p.series.title}
+                </span>
+              )}
+              <span className="faint project-ago">{ago(p.updatedAt)}</span>
             </>
           )}
         </div>

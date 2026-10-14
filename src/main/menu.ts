@@ -68,6 +68,7 @@ export function refreshMenu(): void {
       submenu: [
         item('New Project…', 'new-project', 'Cmd+N'),
         item('Quick Video…', 'quick', 'Shift+Cmd+N'),
+        item('New Series…', 'series'),
         item('Open Project…', 'open-project', 'Cmd+O'),
         {
           label: 'Open Recent',

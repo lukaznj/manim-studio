@@ -4,7 +4,7 @@
 // queues the export. One run at a time; series mode (series.ts) runs these one after another.
 import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
-import type { ChatEvent, ExportResult, QuickRequest, QuickRun, QuickStep } from '../shared/types'
+import type { ChatEvent, ExportOptions, ExportResult, QuickRequest, QuickRun, QuickStep } from '../shared/types'
 import { chatAndWait, chatInterrupt, claudeStatus, observeChat, setAutopilot } from './claude'
 import { setupStatus } from './env'
 import { cancelExport, queueExport } from './exports'
@@ -37,23 +37,46 @@ const update = (patch: Partial<QuickRun>) => {
 /** Moves the progress forward only: Claude goes back to the script now and then. */
 const reach = (step: QuickStep) => run && STEPS.indexOf(step) > STEPS.indexOf(run.step) && update({ step })
 
-/** Starts a run and returns it at once; it goes on in the background. `finished` settles at the end. */
-export async function startQuick(req: QuickRequest): Promise<{ run: QuickRun; finished: Promise<ExportResult> }> {
+/** Throws, with what to do, when quick mode can't run here: it's busy, or Claude or manim is missing. */
+export async function ensureQuickReady(): Promise<void> {
   if (run?.state === 'working') throw new Error('Quick mode is already making a video. Wait for it, or stop it.')
   if (setupStatus().env !== 'ready') throw new Error('The manim environment isn’t installed yet (Settings → Environment).')
   const claude = await claudeStatus()
   if (!claude.loggedIn) throw new Error('Sign in to Claude first (Settings → Claude): quick mode needs it to write the video.')
-  if (!req.prompt.trim()) throw new Error('Describe the video first.')
+}
 
+/** Starts a run and returns it at once; it goes on in the background. `finished` settles at the end. */
+export async function startQuick(req: QuickRequest): Promise<{ run: QuickRun; finished: Promise<ExportResult> }> {
+  await ensureQuickReady()
+  if (!req.prompt.trim()) throw new Error('Describe the video first.')
   const name = req.name?.trim() || titleFrom(req.prompt)
   const dir = await createProject({ name, aspect: req.aspect, theme: req.theme, tone: req.tone, scriptFirst: true, language: req.language, voice: req.voice })
-  run = { id: randomUUID(), project: dir, name, state: 'working', step: 'setup', warnings: [] }
-  stopping = false
-  send(quickRun())
-  const finished = make(run, req)
-  finished.catch(() => undefined)
+  const finished = makeVideo(dir, name, { prompt: req.prompt, sources: req.sources, export: req.export })
   return { run: quickRun()!, finished }
 }
+
+/** What quick mode makes in a project: the request, PDFs to add as sources, the export's choices. */
+export interface QuickTask {
+  prompt: string
+  sources: string[]
+  export: ExportOptions
+}
+
+/**
+ * Makes the video in an existing project (a fresh quick project, or a series' episode) and exports it.
+ * Returns once the run has started; the promise settles when the export is done or the run ends.
+ */
+export function makeVideo(dir: string, name: string, task: QuickTask, series?: QuickRun['series']): Promise<ExportResult> {
+  run = { id: randomUUID(), project: dir, name, state: 'working', step: 'setup', warnings: [], series }
+  stopping = false
+  send(quickRun())
+  const finished = make(run, task)
+  finished.catch(() => undefined)
+  return finished
+}
+
+/** Whether the last run ended because the user stopped it (a series stops too, then). */
+export const quickStopped = (): boolean => stopping
 
 export function stopQuick(): void {
   if (!run || run.state !== 'working') return
@@ -62,7 +85,7 @@ export function stopQuick(): void {
   if (run.exportJob) cancelExport(run.exportJob)
 }
 
-async function make(r: QuickRun, req: QuickRequest): Promise<ExportResult> {
+async function make(r: QuickRun, req: QuickTask): Promise<ExportResult> {
   const unobserve = observeChat((e) => follow(e))
   try {
     await openInWindow(r.project)
