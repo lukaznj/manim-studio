@@ -1,6 +1,6 @@
 import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Background, ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, MediaItem, PlanUsage, ProjectMeta, Settings, Theme, VoiceProvider, VoiceSettings } from '../../../shared/types'
+import type { Agent, Background, ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, MediaItem, PlanUsage, ProjectMeta, Settings, Theme, VoiceProvider, VoiceSettings } from '../../../shared/types'
 import { DEFAULT_TONE, TONES } from '../../../shared/tone'
 import { DEFAULT_EL_MODEL, EL_MODELS } from '../../../shared/voice'
 import { api } from '../lib/api'
@@ -32,7 +32,7 @@ export function SettingsDialog() {
           value={tab}
           onChange={setTab}
           items={[
-            { value: 'account', label: 'Claude' },
+            { value: 'account', label: 'Agent' },
             { value: 'voice', label: 'Voice' },
             { value: 'video', label: 'Video' },
             { value: 'env', label: 'Environment' },
@@ -111,7 +111,104 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
 
 const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1) : '')
 
+/** Settings → Agent: who writes the scenes, Claude or Codex (ADR 0022), and its sign-in and model. */
 function AccountTab() {
+  const agent = useStore((s) => s.settings!.agent)
+  const pick = async (next: Agent) => {
+    await updateSettings({ agent: next })
+    await refreshClaude()
+  }
+  return (
+    <div className="set-group">
+      <Row title="Agent" text="Who writes the scenes. Quick mode, series planning and translation use it too. Switching starts a new conversation.">
+        <Tabs
+          radio="Agent"
+          value={agent}
+          onChange={(v) => void pick(v)}
+          items={[
+            { value: 'claude', label: 'Claude' },
+            { value: 'codex', label: 'Codex' },
+          ]}
+        />
+      </Row>
+      {agent === 'codex' ? <CodexAccount /> : <ClaudeAccount />}
+      <ClaudeDesktopRow />
+    </div>
+  )
+}
+
+/** Codex: its program, installed once; the ChatGPT sign-in or an OpenAI API key; model and effort. */
+function CodexAccount() {
+  const status = useStore((s) => s.claude)
+  const settings = useStore((s) => s.settings)!
+  const setup = useStore((s) => s.setup)
+  const [busy, setBusy] = useState(false)
+  const installed = setup?.codex === 'ready'
+
+  const login = async () => {
+    setBusy(true)
+    try {
+      await api.claudeLogin()
+      await refreshClaude()
+    } catch (e) {
+      toast(errorText(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <Row title="Codex" text="OpenAI's coding agent. Its program, about 140 MB, is downloaded once from OpenAI's npm package and checked against its published hash.">
+        <InstallButton component="codex" state={setup?.codex ?? 'missing'} />
+      </Row>
+      {installed && !settings.hasOpenAIKey && (
+        <div className={`account-card ${status?.loggedIn ? 'on' : ''}`}>
+          <Sparkles />
+          <div>
+            <strong>{status?.loggedIn ? 'Signed in' : 'Not signed in'}</strong>
+            <div className="hint">{status?.loggedIn ? status.subscription : 'Codex signs in with your ChatGPT account, in your browser. Usage counts against your plan.'}</div>
+          </div>
+          {status?.loggedIn ? (
+            <button
+              className="btn ghost small"
+              onClick={async () => {
+                await api.claudeLogout()
+                await refreshClaude()
+              }}
+            >
+              <LogOut /> Sign out
+            </button>
+          ) : (
+            <button className="btn primary small" disabled={busy} onClick={() => void login()}>
+              {busy && <span className="spinner" />} Sign in with ChatGPT
+            </button>
+          )}
+        </div>
+      )}
+      {installed && (
+        <Row title="OpenAI API key" text={settings.hasOpenAIKey ? 'Saved and encrypted on this computer. Codex uses it, billed per use, instead of a ChatGPT sign-in.' : 'Optional: instead of signing in, a key from platform.openai.com, billed per use.'}>
+          <KeyField
+            saved={settings.hasOpenAIKey}
+            placeholder="sk-…"
+            onSave={async (key) => {
+              useStore.setState({ settings: await api.setOpenAIKey(key) })
+              await refreshClaude()
+              toast(key ? 'API key saved' : 'API key removed', 'ok')
+            }}
+          />
+        </Row>
+      )}
+      {status?.loggedIn && (
+        <Row title="Model and effort" text="Which model writes the scenes and how much it reasons first. Also under the chat box.">
+          <ModelControls />
+        </Row>
+      )}
+    </>
+  )
+}
+
+function ClaudeAccount() {
   const claude = useStore((s) => s.claude)
   const settings = useStore((s) => s.settings)!
   const usage = useStore((s) => s.usage)
@@ -144,7 +241,7 @@ function AccountTab() {
   }
 
   return (
-    <div className="set-group">
+    <>
       <Row
         title="Use Claude with"
         text={
@@ -208,8 +305,7 @@ function AccountTab() {
         </Row>
       )}
 
-      <ClaudeDesktopRow />
-    </div>
+    </>
   )
 }
 

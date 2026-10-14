@@ -28,7 +28,7 @@ export function ScriptPane() {
     if (!script) return
     try {
       await save(withScriptStatus(script, 'approved'))
-      if (!useStore.getState().claude?.loggedIn) return toast('Approved. Sign in to Claude in the chat, then ask it to write the video.', 'info')
+      if (!useStore.getState().claude?.loggedIn) return toast('Approved. Sign in to your agent in the chat, then ask it to write the video.', 'info')
       if (await sendChat('I approved the script. Write scene.py from it, then render and check it.', false)) toast('Approved. Claude is writing the video from it.', 'ok')
     } catch (e) {
       toast(errorText(e), 'error')

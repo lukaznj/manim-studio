@@ -1,10 +1,10 @@
-import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, FileText, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
+import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Download, FileText, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { pageRanges } from '../../../shared/pages'
 import type { ChatMessage, ChatPart, Effort, ModelOption, PlanUsage, SourceRef } from '../../../shared/types'
 import { api } from '../lib/api'
 import { resetTime } from '../lib/time'
-import { openDialog, refreshClaude, selectClips, sendChat, toast, errorText, updateSettings, useStore } from '../store'
+import { errorText, installComponent, openDialog, refreshClaude, selectClips, sendChat, toast, updateSettings, useStore } from '../store'
 import { addSources, attachSource } from './SourcesPane'
 
 /** "notes.pdf · p. 3–5" */
@@ -19,6 +19,7 @@ const SUGGESTIONS = [
 
 export function ChatPane() {
   const claude = useStore((s) => s.claude)
+  const codex = useStore((s) => s.settings?.agent === 'codex')
   const chat = useStore((s) => s.chat)
   const busy = useStore((s) => s.chatBusy)
   const streaming = useStore((s) => s.streaming)
@@ -33,7 +34,7 @@ export function ChatPane() {
     <div className="chat-pane">
       <div className="pane-head">
         <div className="file-tab">
-          <Sparkles className="claude-mark" /> Claude Agent
+          <Sparkles className="claude-mark" /> {codex ? 'Codex' : 'Claude Agent'}
         </div>
         <div className="pane-actions">
           <UsageMeter />
@@ -42,7 +43,7 @@ export function ChatPane() {
             title="New conversation"
             disabled={busy || chat.length === 0}
             onClick={() => {
-              if (confirm('Start a new conversation? Claude forgets the context of this project’s current one.')) void api.chatReset()
+              if (confirm(`Start a new conversation? ${codex ? 'Codex' : 'Claude'} forgets the context of this project’s current one.`)) void api.chatReset()
             }}
           >
             <RotateCcw />
@@ -51,7 +52,7 @@ export function ChatPane() {
       </div>
 
       {!claude?.loggedIn ? (
-        <SignIn />
+        codex ? <CodexSignIn /> : <SignIn />
       ) : (
         <>
           <div className="chat-list" ref={list}>
@@ -89,6 +90,73 @@ function UsageMeter() {
       </span>
       {Math.round(top.percent)}%
     </button>
+  )
+}
+
+/** Codex instead of Claude (Settings → Agent): install its CLI, then sign in with ChatGPT or use an API key. */
+function CodexSignIn() {
+  const setup = useStore((s) => s.setup)
+  const progress = useStore((s) => s.setupProgress.codex)
+  const [busy, setBusy] = useState(false)
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => api.on('claude-login', (e) => e.url && setUrl(e.url)), [])
+  const state = setup?.codex ?? 'missing'
+
+  const login = async () => {
+    setBusy(true)
+    setUrl(null)
+    try {
+      const status = await api.claudeLogin()
+      await refreshClaude()
+      if (!status.loggedIn) toast('Sign-in wasn’t completed.', 'error')
+    } catch (e) {
+      toast(errorText(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (state !== 'ready')
+    return (
+      <div className="chat-signin">
+        <Sparkles className="signin-mark" />
+        <h3>Install Codex</h3>
+        <p className="muted">Studio is set to use Codex, OpenAI's agent, instead of Claude. Its program is a one-time download of about 140 MB, straight from OpenAI's npm package.</p>
+        <button className="btn primary" disabled={state === 'installing'} onClick={() => void installComponent('codex').then(refreshClaude)}>
+          {state === 'installing' ? <span className="spinner" /> : <Download />}{' '}
+          {state === 'installing' ? `Installing…${progress !== undefined ? ` ${Math.round(progress * 100)}%` : ''}` : 'Install Codex'}
+        </button>
+        {state === 'error' && <p className="hint">{setup?.errors.codex}</p>}
+        <button className="link-btn" onClick={() => void updateSettings({ agent: 'claude' }).then(refreshClaude)}>
+          Use Claude instead
+        </button>
+      </div>
+    )
+
+  return (
+    <div className="chat-signin">
+      <Sparkles className="signin-mark" />
+      <h3>Sign in to use Codex</h3>
+      <p className="muted">
+        Codex writes and fixes the scene, renders it and looks at the frames. It signs in with your ChatGPT account in your browser, and usage counts against your plan; Studio never sees your password or tokens.
+      </p>
+      <button className="btn primary" disabled={busy} onClick={() => void login()}>
+        {busy ? <span className="spinner" /> : <Sparkles />} {busy ? 'Waiting for the browser…' : 'Sign in with ChatGPT'}
+      </button>
+      {busy && url && (
+        <p className="hint">
+          Didn’t a browser open?{' '}
+          <a href="#" onClick={() => void api.openExternal(url)}>
+            Open the sign-in link
+          </a>
+        </p>
+      )}
+      {!busy && (
+        <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
+          Use an OpenAI API key instead
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -134,7 +202,7 @@ function SignIn() {
       <div className="chat-signin">
         <Sparkles className="signin-mark" />
         <h3>Add your Anthropic API key</h3>
-        <p className="muted">Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Claude.</p>
+        <p className="muted">Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Agent.</p>
         <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
           Open Claude settings
         </button>
@@ -391,30 +459,29 @@ export function ModelControls() {
   const settings = useStore((s) => s.settings)
   const models = useStore((s) => s.models)
   if (!settings) return null
-  const { claudeModel } = settings
+  // The chosen agent's own model and effort (Settings → Agent).
+  const codex = settings.agent === 'codex'
+  const model = codex ? settings.codexModel : settings.claudeModel
+  const savedEffort = (codex ? settings.codexEffort : settings.claudeEffort) || 'high'
+  const save = (m: string, e: Effort | null) =>
+    void updateSettings(codex ? { codexModel: m, ...(e ? { codexEffort: e } : {}) } : { claudeModel: m, ...(e ? { claudeEffort: e } : {}) })
   const list: ModelOption[] = models.length ? [...models] : [{ value: '', label: 'Default model', description: '', efforts: [] }]
   // A model picked under another account still shows, so the picker never claims the wrong one.
-  if (!list.some((m) => m.value === claudeModel)) list.push({ value: claudeModel, label: claudeModel, description: '', efforts: [] })
-  const current = list.find((m) => m.value === claudeModel)!
-  const effortFor = (efforts: Effort[]): Effort | null => {
-    const wanted = settings.claudeEffort || 'high'
-    return efforts.includes(wanted) ? wanted : efforts.includes('medium') ? 'medium' : (efforts[0] ?? null)
-  }
+  if (!list.some((m) => m.value === model)) list.push({ value: model, label: model, description: '', efforts: [] })
+  const current = list.find((m) => m.value === model)!
+  const effortFor = (efforts: Effort[]): Effort | null => (efforts.includes(savedEffort) ? savedEffort : efforts.includes('medium') ? 'medium' : (efforts[0] ?? null))
   // Until the account's models load, show the saved level rather than "no effort setting".
-  const efforts: Effort[] = models.length ? current.efforts : [settings.claudeEffort || 'high']
+  const efforts: Effort[] = models.length ? current.efforts : [savedEffort]
   const effort = effortFor(efforts)
 
-  const pickModel = (value: string) => {
-    // Claude Code would quietly lower an effort the new model doesn't offer; pick one it does.
-    const next = effortFor(list.find((m) => m.value === value)?.efforts ?? [])
-    void updateSettings({ claudeModel: value, ...(next ? { claudeEffort: next } : {}) })
-  }
+  // The agent would quietly lower an effort the new model doesn't offer; pick one it does.
+  const pickModel = (value: string) => save(value, effortFor(list.find((m) => m.value === value)?.efforts ?? []))
 
   return (
     <div className="model-controls">
       <label className="chip-select" title={current.description || 'Model'}>
         <Sparkles />
-        <select aria-label="Model" value={claudeModel} onChange={(e) => pickModel(e.target.value)}>
+        <select aria-label="Model" value={model} onChange={(e) => pickModel(e.target.value)}>
           {list.map((m) => (
             <option key={m.value} value={m.value} title={m.description}>
               {m.label}
@@ -423,9 +490,9 @@ export function ModelControls() {
         </select>
         <ChevronDown className="chev" />
       </label>
-      <label className="chip-select" title={effort ? 'How much Claude thinks before acting. Higher is slower and uses more of your plan.' : 'This model has no effort setting'}>
+      <label className="chip-select" title={effort ? 'How much the agent thinks before acting. Higher is slower and uses more of your plan.' : 'This model has no effort setting'}>
         <Gauge />
-        <select aria-label="Effort" value={effort ?? ''} disabled={!effort} onChange={(e) => void updateSettings({ claudeEffort: e.target.value as Effort })}>
+        <select aria-label="Effort" value={effort ?? ''} disabled={!effort} onChange={(e) => save(model, e.target.value as Effort)}>
           {effort ? (
             efforts.map((e) => (
               <option key={e} value={e}>
