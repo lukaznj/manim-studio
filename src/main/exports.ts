@@ -12,7 +12,9 @@ import { readMeta } from './projects'
 
 const jobs: ExportJob[] = []
 const done = new Map<string, { resolve: (r: ExportResult) => void; reject: (e: Error) => void }>()
-let current: { id: string; abort: AbortController } | null = null
+// One export at a time per machine: this computer, and each render server (ADR 0021).
+const running = new Map<string, { id: string; abort: AbortController }>()
+const slot = (job: ExportJob) => job.options.server ?? 'local'
 let send: (jobs: ExportJob[]) => void = () => {}
 
 export function onExportsChanged(fn: (jobs: ExportJob[]) => void): void {
@@ -39,7 +41,7 @@ export function queueExport(project: string, options: ExportOptions): { job: Exp
 export function cancelExport(id: string): void {
   const job = jobs.find((j) => j.id === id)
   if (!job) return
-  if (job.state === 'running') current?.abort.abort()
+  if (job.state === 'running') running.get(slot(job))?.abort.abort()
   else if (job.state === 'waiting') finish(job, { state: 'cancelled' })
   else jobs.splice(jobs.indexOf(job), 1)
   changed()
@@ -52,12 +54,12 @@ export function clearExports(): void {
 }
 
 async function next(): Promise<void> {
-  if (current) return
-  const job = jobs.find((j) => j.state === 'waiting')
+  const job = jobs.find((j) => j.state === 'waiting' && !running.has(slot(j)))
   if (!job) return
   const abort = new AbortController()
-  current = { id: job.id, abort }
+  running.set(slot(job), { id: job.id, abort })
   job.state = 'running'
+  void next() // another machine may be free for the next job
   changed()
   const work = join(app.getPath('userData'), 'export-jobs', job.id)
   mkdirSync(work, { recursive: true })
@@ -83,7 +85,7 @@ async function next(): Promise<void> {
     }
   } finally {
     rmSync(work, { recursive: true, force: true })
-    current = null
+    running.delete(slot(job))
     changed()
     void next()
   }

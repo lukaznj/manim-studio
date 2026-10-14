@@ -1577,3 +1577,27 @@
 .series-bible .textarea {
   font: 12.5px/1.55 var(--font-mono);
 }
+
+/* ---- render servers (Settings → General) ----------------------------------------------------- */
+
+.render-servers {
+  display: grid;
+  gap: 10px;
+}
+.render-server {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.render-server > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-3);
+}
+.render-servers .inline-form .input {
+  flex: 1;
+}

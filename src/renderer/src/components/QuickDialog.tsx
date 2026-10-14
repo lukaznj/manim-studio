@@ -5,6 +5,7 @@ import type { Aspect, Theme, Tone } from '../../../shared/types'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, errorText, openDialog, toast, useStore } from '../store'
+import { ExportOn } from './ExportDialog'
 import { Modal, Tabs } from './ui'
 
 /**
@@ -20,6 +21,7 @@ export function QuickDialog() {
   const [aspect, setAspect] = useState<Aspect>('16:9')
   const [theme, setTheme] = useState<Theme>('dark')
   const [both, setBoth] = useState(false)
+  const [server, setServer] = useState<string | undefined>()
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
   const [language, setLanguage] = useState('en')
   const [dragging, setDragging] = useState(false)
@@ -47,7 +49,7 @@ export function QuickDialog() {
         tone,
         language,
         voice: defaultVoice ? { ...defaultVoice, language } : undefined,
-        export: { themes: both ? ['dark', 'light'] : [theme], languages: [], languageVideos: false },
+        export: { themes: both ? ['dark', 'light'] : [theme], languages: [], languageVideos: false, server },
       })
       closeDialog()
     } catch (e) {
@@ -165,6 +167,7 @@ export function QuickDialog() {
         <label className="export-check">
           <input type="checkbox" checked={both} onChange={(e) => setBoth(e.target.checked)} /> Export both a light and a dark version
         </label>
+        <ExportOn value={server} onChange={setServer} />
         {voiceMissing && (
           <div className="quick-warning">
             The default voice isn't set up, so the narration would be silent.{' '}

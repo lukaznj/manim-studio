@@ -26,6 +26,7 @@
 - **Version history.** Every render and every Claude turn is a commit you can go back to. No git install needed.
 - **Your own pictures and videos.** Drop them into the Media tab, then insert them into the scene or ask Claude to use them.
 - **Export for YouTube, in any language.** A 1080p mp4 (light, dark or both), plus subtitles and a dubbed audio track for every language you add. Claude translates, and your chosen voice speaks it over the same video. Exports run in the background, so you can start the next video meanwhile.
+- **Render on another computer.** Run the render server on a home server ([manim-studio-renderer](https://github.com/lukaznj/manim-studio-renderer)), pair it with the code it prints, and exports render there while your computer stays free.
 - **A short tour** the first time you open a project (Help → Show Tutorial brings it back).
 
 | | |

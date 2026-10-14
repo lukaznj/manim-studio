@@ -246,6 +246,24 @@ export interface ExportOptions {
   size?: ExportSize // unset: 1080 (exports saved before the choice existed)
   fps?: ExportFps // unset: the project's fps
   folder?: string // where the export's own <name>/ folder goes; unset: the project's exports/
+  server?: string // a paired render server's id: render there (ADR 0021); unset: this computer
+}
+
+/** A render worker this app is paired with (src/main/remote.ts). */
+export interface RenderServer {
+  id: string
+  name: string
+  url: string
+  cores?: number
+}
+
+/** What a render worker says about itself (GET /info). */
+export interface WorkerInfo {
+  version: string
+  cores: number
+  slices: number
+  busy: boolean
+  waiting: number
 }
 
 export interface ExportResult {
@@ -367,6 +385,7 @@ export interface Settings {
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
   defaultVoice: VoiceSettings
+  renderServers: RenderServer[] // paired render workers (ADR 0021); their tokens are secrets
   sidebarWidth: number
   chatWidth: number
   timelineHeight: number
@@ -512,6 +531,11 @@ export interface StudioApi {
   planSeries(request: { pdfs: string[]; title?: string; language: string; tone: Tone }): Promise<SeriesPlan>
   /** Creates the series' projects; unattended, makes them one after another in quick mode. */
   startSeries(start: SeriesStart): Promise<void>
+  renderServers(): Promise<RenderServer[]>
+  /** Pairs with a render worker from the code it printed; checks that it answers first. */
+  addServer(code: string): Promise<RenderServer[]>
+  removeServer(id: string): Promise<RenderServer[]>
+  checkServer(id: string): Promise<WorkerInfo>
   /** Queues an export of the open project; it runs in the background, one at a time. */
   queueExport(options: ExportOptions): Promise<ExportJob>
   exportJobs(): Promise<ExportJob[]>

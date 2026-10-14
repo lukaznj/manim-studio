@@ -34,7 +34,7 @@ const commands = {
     app = await electron.launch({
       executablePath: process.env.DRIVE_EXECUTABLE ?? bin,
       args: process.env.DRIVE_EXECUTABLE ? [] : [APP_DIR],
-      env: { ...process.env, STUDIO_USER_DATA: DATA, STUDIO_PROJECTS_DIR: PROJECTS },
+      env: { ...process.env, STUDIO_USER_DATA: DATA, STUDIO_PROJECTS_DIR: PROJECTS, STUDIO_PLAIN_SECRETS: '1' },
       colorScheme: null, // Playwright would pin prefers-color-scheme to light; let Settings → Appearance drive it
       timeout: 30_000,
     })
