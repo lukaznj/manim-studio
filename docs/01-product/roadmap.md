@@ -29,7 +29,7 @@ Nothing here is committed. Each item gets an ADR when it's picked up.
 - Several scene files per project, with helper modules opened as editor tabs.
 - Music and sound effects: an audio lane backed by `self.add_sound()`.
 - Translated subtitles and narration, for one video in several languages.
-- A real-time preview through manim's OpenGL renderer, only if render latency becomes the bottleneck. Today, cached 480p renders take 2–10 s.
+- Faster renders: profile first, then a warm render worker and parallel exports. The OpenGL renderer comes last, only if render latency stays the bottleneck. Today, cached 480p renders take 2–10 s ([[../02-architecture/render-performance|render performance]]).
 
 ## In forks, not here
 
