@@ -58,6 +58,8 @@ export function listProjects(): ProjectSummary[] {
     for (const name of readdirSync(projectsDir)) {
       const dir = join(projectsDir, name)
       if (existsSync(metaFile(dir))) found.add(dir)
+      // A series folder (series.ts) holds its episodes one level down.
+      else if (existsSync(join(dir, 'series.json'))) for (const ep of readdirSync(dir)) if (existsSync(metaFile(join(dir, ep)))) found.add(join(dir, ep))
     }
   }
   const out: ProjectSummary[] = []
@@ -78,6 +80,7 @@ export function listProjects(): ProjectSummary[] {
         updatedAt: statSync(sceneFile(dir)).mtimeMs,
         duration: timeline?.duration,
         thumbnail: existsSync(thumb) ? thumb : undefined,
+        series: meta.series,
       })
     } catch {
       // unreadable project.json: skip it
@@ -103,6 +106,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
     theme: input.theme,
     tone: input.tone ?? DEFAULT_TONE,
     scriptFirst: input.scriptFirst ?? true,
+    series: input.series,
     fps: 30,
     createdAt: new Date().toISOString(),
     voice: { ...(input.voice ?? getSettings().defaultVoice), language: input.language || input.voice?.language || getSettings().defaultVoice.language },
@@ -110,7 +114,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
   writeFileSync(metaFile(dir), JSON.stringify(meta, null, 2))
   mkdirSync(join(dir, 'voice', 'recordings'), { recursive: true })
   await initRepo(dir)
-  if (input.parentDir) setSettings({ projectsDir: input.parentDir })
+  if (input.parentDir && !input.series) setSettings({ projectsDir: input.parentDir }) // an episode's folder isn't a choice to remember
   return dir
 }
 

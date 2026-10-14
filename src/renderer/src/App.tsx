@@ -6,6 +6,7 @@ import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
 import { QuickDialog } from './components/QuickDialog'
 import { QuickView } from './components/QuickView'
+import { SeriesDialog } from './components/SeriesDialog'
 import { SettingsDialog } from './components/SettingsDialog'
 import { TitleBar } from './components/TitleBar'
 import { Tour } from './components/Tour'
@@ -27,6 +28,7 @@ export function App() {
       <BoothDialog />
       <ExportDialog />
       <QuickDialog />
+      <SeriesDialog />
       {screen === 'editor' && !quickHere && <Tour />}
       <div className="toast-stack" aria-live="polite">
         {toasts.map((t) => (

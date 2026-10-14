@@ -507,6 +507,18 @@
   display: grid;
   gap: 6px;
 }
+.series-badge {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  line-height: 20px;
+}
+.project-ago {
+  white-space: nowrap;
+  flex: none;
+}
 .project-name {
   font: 750 15px/1.25 var(--font-display);
   padding-right: 26px;
@@ -518,6 +530,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   font-size: 12px;
 }
 .card-menu {
@@ -1483,4 +1496,84 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* ---- series (SeriesDialog.tsx) --------------------------------------------------------------- */
+
+.series-pdfs {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+}
+.series-pdfs.dragging {
+  border-color: var(--sun);
+  background: var(--sun-soft);
+}
+.series-pdf {
+  display: grid;
+  grid-template-columns: 22px auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+}
+.series-pdf > svg {
+  width: 15px;
+  height: 15px;
+  color: var(--text-3);
+}
+.series-pdf-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.series-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px;
+}
+.series-plan {
+  display: grid;
+  gap: 14px;
+}
+.series-episodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.series-episode {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.series-number {
+  font-weight: 700;
+  color: var(--sun-text);
+  padding-top: 7px;
+}
+.series-episode-body {
+  display: grid;
+  gap: 6px;
+}
+.series-episode-body .textarea {
+  resize: vertical;
+}
+.series-episode-actions {
+  display: flex;
+  flex-direction: column;
+}
+.series-bible summary {
+  cursor: pointer;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+.series-bible .textarea {
+  font: 12.5px/1.55 var(--font-mono);
 }

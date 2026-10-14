@@ -22,6 +22,7 @@ import { getSecret, getSettings } from './settings'
 import { sourcesNote } from './sources'
 import { scriptBrief } from '../shared/script'
 import { styleBrief } from '../shared/tone'
+import { seriesBrief } from './series'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
@@ -255,19 +256,11 @@ export async function chatModels(): Promise<ModelOption[]> {
 }
 
 /**
- * Translates narration sentences for dubbing (export.ts). A one-off request with no tools, on the
- * same sign-in and model as the chat. Returns one translation per sentence, in order.
+ * A one-off request with no tools, on the chat's sign-in and model: translation, series planning.
+ * `what` names it in errors ("Claude couldn't plan: …").
  */
-export async function translateNarration(sentences: string[], from: string, to: string): Promise<string[]> {
-  if (!sentences.length) return []
+export async function askClaude(system: string, prompt: string, what: string): Promise<string> {
   const { query } = await sdk()
-  const prompt = [
-    `Translate this narration of a maths explainer video from ${languageName(from)} to ${languageName(to)}.`,
-    `It will be spoken by a text-to-speech voice over the same animation, so keep each sentence about as long as the original, keep the maths exact, and write maths the way a teacher says it aloud in ${languageName(to)}.`,
-    `Answer with only a JSON array of ${sentences.length} strings, one per sentence, in order.`,
-    '',
-    JSON.stringify(sentences, null, 1),
-  ].join('\n')
   const q = query({
     prompt,
     options: {
@@ -277,15 +270,32 @@ export async function translateNarration(sentences: string[], from: string, to: 
       tools: [],
       maxTurns: 1,
       model: getSettings().claudeModel || 'claude-sonnet-5-5',
-      systemPrompt: 'You translate narration for educational maths videos. You answer with JSON only.',
+      systemPrompt: system,
     },
   })
   let answer = ''
   for await (const msg of q) {
     if (msg.type !== 'result') continue
-    if (msg.subtype !== 'success' || msg.is_error) throw new Error(`Claude couldn’t translate: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
+    if (msg.subtype !== 'success' || msg.is_error) throw new Error(`Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
     answer = msg.result
   }
+  return answer
+}
+
+/**
+ * Translates narration sentences for dubbing (export.ts). A one-off request with no tools, on the
+ * same sign-in and model as the chat. Returns one translation per sentence, in order.
+ */
+export async function translateNarration(sentences: string[], from: string, to: string): Promise<string[]> {
+  if (!sentences.length) return []
+  const prompt = [
+    `Translate this narration of a maths explainer video from ${languageName(from)} to ${languageName(to)}.`,
+    `It will be spoken by a text-to-speech voice over the same animation, so keep each sentence about as long as the original, keep the maths exact, and write maths the way a teacher says it aloud in ${languageName(to)}.`,
+    `Answer with only a JSON array of ${sentences.length} strings, one per sentence, in order.`,
+    '',
+    JSON.stringify(sentences, null, 1),
+  ].join('\n')
+  const answer = await askClaude('You translate narration for educational maths videos. You answer with JSON only.', prompt, 'translate')
   let parsed: unknown
   try {
     parsed = JSON.parse(answer.slice(answer.indexOf('['), answer.lastIndexOf(']') + 1))
@@ -515,6 +525,7 @@ function studioPrompt(dir: string): string {
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),
+    seriesBrief(meta),
     scriptBrief(meta, readScript(dir) !== null, { auto: autopilot }),
     autopilot
       ? 'You are working unattended: the user started this in quick mode and is not watching, so nobody can answer a question. Make every choice yourself, never stop to ask, and finish the whole job: the script, scene.py, a render with no errors and no layout warnings, and a last look at the frames. End with two or three sentences on what the video covers.'
