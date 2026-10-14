@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { Quality, RenderError, RenderEvent, Theme, Timeline } from '../shared/types'
+import type { ProjectMeta, Quality, RenderError, RenderEvent, Theme, Timeline } from '../shared/types'
 import { commitAll } from './git'
 import { readTimeline, requireProject } from './projects'
 import { runRunner } from './runner'
@@ -103,6 +103,37 @@ export function render(quality: Quality, variant: RenderVariant = {}): Promise<R
     }
   })()
   return entry.outcome
+}
+
+/**
+ * A full-quality render of the project in `dir` (an export's own copy), outside the preview's
+ * one-at-a-time rule. `cacheDir` shares the original project's partial movies, so unchanged
+ * animations aren't drawn again. Throws the render's error, with its line when it has one.
+ */
+export async function renderFinal(
+  dir: string,
+  meta: ProjectMeta,
+  variant: RenderVariant,
+  opts: { cacheDir?: string; signal?: AbortSignal; onProgress?: (t: number) => void } = {},
+): Promise<Timeline> {
+  const args = ['render', dir, '--quality', 'final']
+  if (variant.theme) args.push('--theme', variant.theme)
+  if (variant.out) args.push('--out', variant.out)
+  if (variant.size) args.push('--size', String(variant.size))
+  if (variant.fps) args.push('--fps', String(variant.fps))
+  const job = await runRunner<{ result: Timeline }>('default', args, {
+    extraEnv: { ...(await voiceEnv(meta, dir)), ...(opts.cacheDir ? { STUDIO_CACHE_DIR: opts.cacheDir } : {}) },
+    onEvent: (e) => e.type === 'progress' && opts.onProgress?.(Number(e.t)),
+    signal: opts.signal,
+  })
+  try {
+    return (await job.done).result
+  } catch (e) {
+    const err = e as Error & { cancelled?: boolean; event?: { message?: string; line?: number | null } }
+    if (err.cancelled) throw err
+    const line = err.event?.line
+    throw new Error(`${line ? `scene.py line ${line}: ` : ''}${err.event?.message ?? err.message}`)
+  }
 }
 
 export function cancel(quality: Quality = 'preview'): void {

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { shortcut } from '../lib/platform'
 import { closeProject, openDialog, useStore } from '../store'
+import { ExportsMenu } from './ExportsMenu'
 import { HistoryPopover } from './HistoryPopover'
 import { ProgressLine, Ring, Wordmark } from './ui'
 
@@ -45,6 +46,7 @@ export function TitleBar() {
             Rendering{render.expected ? ` ${render.clips ?? 0}/${render.expected}` : '…'}
           </span>
         )}
+        <ExportsMenu />
         <UpdatePill />
         {screen === 'editor' && (
           <div className="popover-anchor">

@@ -22,7 +22,7 @@ export interface RunnerJob<T> {
 export async function runRunner<T = RunnerEvent>(
   env: EnvName,
   args: string[],
-  opts: { extraEnv?: Record<string, string>; onEvent?: (e: RunnerEvent) => void; cwd?: string } = {},
+  opts: { extraEnv?: Record<string, string>; onEvent?: (e: RunnerEvent) => void; cwd?: string; signal?: AbortSignal } = {},
 ): Promise<RunnerJob<T>> {
   const child = await spawnPython(env, args, opts.extraEnv, opts.cwd)
   const log: string[] = []
@@ -46,6 +46,12 @@ export async function runRunner<T = RunnerEvent>(
   child.stdout?.on('data', onStdout)
   child.stderr?.on('data', (b: Buffer) => b.toString('utf8').split('\n').forEach((l) => l.trim() && pushLog(log, l)))
 
+  // Aborting kills the process; `done` then rejects with { cancelled: true }.
+  const stop = () => child.kill()
+  opts.signal?.addEventListener('abort', stop)
+  if (opts.signal?.aborted) stop()
+  child.on('close', () => opts.signal?.removeEventListener('abort', stop))
+
   const pid = child.pid
   if (pid) runningJobs.set(pid, { what: `${env}: ${args.join(' ')}`.slice(0, 400), since: new Date().toISOString(), log: () => log.join('\n') })
 
@@ -56,7 +62,7 @@ export async function runRunner<T = RunnerEvent>(
       const event = final as RunnerEvent | null
       if (event?.type === 'done') resolve(event as T)
       else if (event?.type === 'error') reject(Object.assign(new Error(String(event.message)), { event, log: log.join('\n') }))
-      else if (signal) reject(Object.assign(new Error('cancelled'), { cancelled: true }))
+      else if (signal || opts.signal?.aborted) reject(Object.assign(new Error('cancelled'), { cancelled: true })) // Windows reports a kill as an exit code
       else reject(Object.assign(new Error(`Python exited with code ${code}`), { log: log.join('\n') }))
     })
   })
