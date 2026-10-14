@@ -37,6 +37,8 @@ export function pauseCommits(paused: boolean): void {
 export interface RenderVariant {
   theme?: Theme
   out?: string
+  size?: number // short side in pixels
+  fps?: number
 }
 
 export function render(quality: Quality, variant: RenderVariant = {}): Promise<RenderOutcome> {
@@ -64,7 +66,12 @@ export function render(quality: Quality, variant: RenderVariant = {}): Promise<R
       const options =
         quality === 'preview'
           ? ['--size', String(previewSize), '--fps', String(previewFps)]
-          : [...(variant.theme ? ['--theme', variant.theme] : []), ...(variant.out ? ['--out', variant.out] : [])]
+          : [
+              ...(variant.theme ? ['--theme', variant.theme] : []),
+              ...(variant.out ? ['--out', variant.out] : []),
+              ...(variant.size ? ['--size', String(variant.size)] : []),
+              ...(variant.fps ? ['--fps', String(variant.fps)] : []),
+            ]
       const job = await runRunner<{ result: Timeline }>('default', ['render', p.path, '--quality', quality, ...options], {
         extraEnv: await voiceEnv(p.meta, p.path),
         onEvent: (e) => {

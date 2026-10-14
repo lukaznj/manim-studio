@@ -1101,6 +1101,12 @@
 .export-option .hint {
   margin-top: 2px;
 }
+.export-quality {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .language-picker {
   grid-column: 1 / -1;
   display: flex;

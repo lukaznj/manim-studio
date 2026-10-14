@@ -1,11 +1,11 @@
 import { AudioLines, Captions, Check, CircleAlert, Download, FileVideo, FolderOpen, Image, Languages, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { ExportOptions, ExportResult, Theme } from '../../../shared/types'
+import type { ExportFps, ExportOptions, ExportResult, ExportSize, Theme } from '../../../shared/types'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { revealLabel } from '../lib/platform'
 import { closeDialog, errorText, updateMeta, useStore } from '../store'
-import { Modal, ProgressLine } from './ui'
+import { Modal, ProgressLine, Tabs } from './ui'
 
 const PROVIDER_NAMES = { system: 'the system voice', elevenlabs: 'ElevenLabs', omnivoice: 'OmniVoice' } as const
 
@@ -32,7 +32,15 @@ export function ExportDialog() {
     setResult(null)
     setError(null)
     useStore.setState({ exportState: null })
-    if (meta) setOptions(meta.export ?? { themes: [meta.theme], languages: [], languageVideos: false })
+    if (meta)
+      setOptions({
+        themes: [meta.theme],
+        languages: [],
+        languageVideos: false,
+        ...meta.export,
+        size: meta.export?.size ?? 1080,
+        fps: meta.export?.fps ?? (meta.fps === 60 ? 60 : 30),
+      })
   }, [open])
 
   const toggleTheme = (theme: Theme) =>
@@ -56,11 +64,27 @@ export function ExportDialog() {
   }
 
   const portrait = meta?.aspect === '9:16'
-  const res = portrait ? '1080 × 1920' : '1920 × 1080'
+  const size = options.size ?? 1080
+  const fps = options.fps ?? 30
+  const long = Math.round((size * 16) / 9 / 2) * 2 // as the runner computes it
+  const res = portrait ? `${size} × ${long}` : `${long} × ${size}`
+  // Measured on a 46 s scene: 1440p or 60 fps about 1.5×, both about 2× (docs/02-architecture/render-performance.md).
+  const slower = size === 1440 && fps === 60 ? 'about twice as long' : size === 1440 || fps === 60 ? 'about 1.5× as long' : null
   const both = options.themes.length > 1
   const extra = options.languages.filter((l) => l !== original)
   const rendering = final.status === 'rendering' && timeline?.duration ? (final.t ?? 0) / timeline.duration : undefined
   const offered = LANGUAGES.filter((l) => l !== original && !options.languages.includes(l))
+  const sep = project?.path.includes('\\') ? '\\' : '/'
+  const projectExports = project ? `${project.path}${sep}exports` : ''
+  const destination = options.folder ?? projectExports
+  const chooseFolder = async () => {
+    const dir = await api.pickFolder('Export to', destination)
+    // The project's own exports/ folder is the default, not a choice to remember.
+    if (dir) setOptions((o) => ({ ...o, folder: dir === projectExports ? undefined : dir }))
+  }
+  /** Inside the project, the path from there (exports/<name>); anywhere else, the whole path. */
+  const shown = (folder: string) =>
+    project && folder.startsWith(project.path + sep) ? folder.slice(project.path.length + 1).replaceAll('\\', '/') : folder
 
   return (
     <Modal
@@ -117,6 +141,38 @@ export function ExportDialog() {
 
             <div className="export-option">
               <div>
+                <strong>Quality</strong>
+                <div className="hint">
+                  1440p keeps thin lines and small text sharp, also after YouTube compresses the video. 60 fps makes motion smoother.
+                  {slower && ` Exporting takes ${slower}.`}
+                </div>
+              </div>
+              <div className="export-quality">
+                <Tabs
+                  radio="Resolution"
+                  value={String(size)}
+                  disabled={running}
+                  onChange={(v) => setOptions((o) => ({ ...o, size: Number(v) as ExportSize }))}
+                  items={[
+                    { value: '1080', label: '1080p' },
+                    { value: '1440', label: '1440p' },
+                  ]}
+                />
+                <Tabs
+                  radio="Frame rate"
+                  value={String(fps)}
+                  disabled={running}
+                  onChange={(v) => setOptions((o) => ({ ...o, fps: Number(v) as ExportFps }))}
+                  items={[
+                    { value: '30', label: '30 fps' },
+                    { value: '60', label: '60 fps' },
+                  ]}
+                />
+              </div>
+            </div>
+
+            <div className="export-option">
+              <div>
                 <strong>Narration languages</strong>
                 <div className="hint">
                   {languageName.of(original)} plus any you add: Claude translates the narration (kept in voice/translations/, so you can correct it), and{' '}
@@ -165,7 +221,7 @@ export function ExportDialog() {
               <li>
                 <FileVideo /> <strong>{both ? 'Two videos' : 'Video'}</strong>{' '}
                 <span className="mono faint">
-                  .mp4 · {res} · {meta?.fps ?? 30} fps{both ? ' · dark and light' : ''}
+                  .mp4 · {res} · {fps} fps{both ? ' · dark and light' : ''}
                 </span>
               </li>
               {extra.length > 0 && (
@@ -186,6 +242,24 @@ export function ExportDialog() {
                 <Image /> <strong>Thumbnail</strong> <span className="mono faint">.jpg, the busiest frame</span>
               </li>
             </ul>
+
+            <div className="field">
+              <span className="label">Save to</span>
+              <div className="path-pick">
+                <span className="mono path-text" title={destination}>
+                  {destination}
+                </span>
+                {options.folder && (
+                  <button className="btn small ghost" disabled={running} onClick={() => setOptions((o) => ({ ...o, folder: undefined }))}>
+                    Use project folder
+                  </button>
+                )}
+                <button className="btn small" disabled={running} onClick={() => void chooseFolder()}>
+                  <FolderOpen /> Change
+                </button>
+              </div>
+              <span className="hint">The files go in a folder named after the video.</span>
+            </div>
           </>
         )}
 
@@ -202,7 +276,7 @@ export function ExportDialog() {
         {result && (
           <div className="export-result">
             <div className="export-done">
-              <Check /> Saved {result.files.length} files in <span className="mono">exports/{result.folder.split(/[\\/]/).pop()}</span>
+              <Check /> Saved {result.files.length} files in <span className="mono">{shown(result.folder)}</span>
             </div>
             <ul className="export-list mono">
               {result.files.map((f) => (

@@ -168,8 +168,8 @@ function registerIpc(): void {
     if (!existsSync(join(dir, 'project.json'))) throw new Error('That folder has no project.json, so it is not a Manim Studio project.')
     return dir
   })
-  handle('pickFolder', async () => {
-    const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'], title: 'Projects folder' })
+  handle('pickFolder', async (title?: string, defaultPath?: string) => {
+    const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'], title: title ?? 'Projects folder', defaultPath })
     return r.filePaths[0] ?? null
   })
   handle('closeProject', () => {

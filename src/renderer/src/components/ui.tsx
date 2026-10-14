@@ -51,7 +51,13 @@ export function Modal(props: {
 }
 
 /** Segmented control. Pass `radio` (the group's label) when it picks a setting instead of switching a view. */
-export function Tabs<T extends string>(props: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[]; radio?: string }) {
+export function Tabs<T extends string>(props: {
+  value: T
+  onChange: (v: T) => void
+  items: { value: T; label: ReactNode }[]
+  radio?: string
+  disabled?: boolean
+}) {
   return (
     <div className="tabs" role={props.radio ? 'radiogroup' : 'tablist'} aria-label={props.radio}>
       {props.items.map((it) => (
@@ -59,6 +65,7 @@ export function Tabs<T extends string>(props: { value: T; onChange: (v: T) => vo
           key={it.value}
           role={props.radio ? 'radio' : 'tab'}
           {...(props.radio ? { 'aria-checked': props.value === it.value } : { 'aria-selected': props.value === it.value })}
+          disabled={props.disabled}
           onClick={() => props.onChange(it.value)}
         >
           {it.label}
