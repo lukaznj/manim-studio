@@ -29,6 +29,7 @@ export function NewProjectDialog() {
   const [aspect, setAspect] = useState<Aspect>('9:16')
   const [theme, setTheme] = useState<Theme>('dark')
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
+  const [scriptFirst, setScriptFirst] = useState(true)
   const [voice, setVoice] = useState<VoiceSettings>({
     provider: 'elevenlabs',
     language: 'en',
@@ -53,6 +54,7 @@ export function NewProjectDialog() {
       aspect,
       theme,
       tone,
+      scriptFirst,
       language: voice.language,
       voice,
       parentDir,
@@ -163,6 +165,12 @@ export function NewProjectDialog() {
             <Tabs radio="Tone" value={tone} onChange={setTone} items={TONES.map((t) => ({ value: t.value, label: t.label }))} />
             <span className="hint">{TONES.find((t) => t.value === tone)?.hint} You can change it later, or ask for another in the chat.</span>
           </div>
+          <label className="export-check">
+            <input type="checkbox" checked={scriptFirst} onChange={(e) => setScriptFirst(e.target.checked)} />
+            <span>
+              Plan a script first <span className="hint">Claude writes the plan (the idea, each section's narration and visuals) for you to approve before the code.</span>
+            </span>
+          </label>
         </div>
 
         <div className="np-voice set-group">

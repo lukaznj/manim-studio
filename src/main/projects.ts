@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync,
 import { cp } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { ChatMessage, NewProjectInput, OpenProject, ProjectMeta, ProjectSummary, Timeline } from '../shared/types'
+import { SCRIPT_FILE } from '../shared/script'
 import { DEFAULT_TONE } from '../shared/tone'
 import { migrateVoice } from '../shared/voice'
 import { initRepo } from './git'
@@ -15,6 +16,7 @@ export interface Current {
   path: string
   meta: ProjectMeta
   lastWritten: string
+  lastScript?: string | null // script.md as last written or seen, to tell Claude's edits from ours
   watcher?: FSWatcher
 }
 
@@ -100,6 +102,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
     aspect: input.aspect,
     theme: input.theme,
     tone: input.tone ?? DEFAULT_TONE,
+    scriptFirst: input.scriptFirst ?? true,
     fps: 30,
     createdAt: new Date().toISOString(),
     voice: { ...(input.voice ?? getSettings().defaultVoice), language: input.language || input.voice?.language || getSettings().defaultVoice.language },
@@ -115,13 +118,14 @@ export function openProject(dir: string): OpenProject {
   closeProject()
   const meta = readMeta(dir)
   const source = readFileSync(sceneFile(dir), 'utf8')
-  current = { path: dir, meta, lastWritten: source }
+  current = { path: dir, meta, lastWritten: source, lastScript: readScript(dir) }
   current.watcher = watchProject(dir)
   rememberProject(dir)
   return {
     path: dir,
     meta,
     source,
+    script: readScript(dir),
     timeline: readTimeline(dir),
     chat: readChat(dir),
     recordings: listRecordings(dir),
@@ -178,9 +182,34 @@ export function writeChat(messages: ChatMessage[]): void {
   writeFileSync(chatFile(p.path), JSON.stringify(messages.slice(-300)))
 }
 
+export const readScript = (dir: string): string | null => (existsSync(join(dir, SCRIPT_FILE)) ? readFileSync(join(dir, SCRIPT_FILE), 'utf8') : null)
+
+export function saveScript(text: string): void {
+  const dir = requireProject().path
+  writeFileSync(join(dir, SCRIPT_FILE), text)
+  current!.lastScript = text
+}
+
+let onScriptChange: (text: string | null) => void = () => {}
+export function onScriptChangedOnDisk(fn: (text: string | null) => void): void {
+  onScriptChange = fn
+}
+
 function watchProject(dir: string): FSWatcher {
   let timer: NodeJS.Timeout | undefined
+  let scriptTimer: NodeJS.Timeout | undefined
   return watch(dir, (_event, filename) => {
+    if (filename === SCRIPT_FILE) {
+      clearTimeout(scriptTimer)
+      scriptTimer = setTimeout(() => {
+        if (!current || current.path !== dir) return
+        const text = readScript(dir)
+        if (text === current.lastScript) return
+        current.lastScript = text
+        onScriptChange(text)
+      }, 120)
+      return
+    }
     if (filename !== 'scene.py') return
     clearTimeout(timer)
     timer = setTimeout(() => {
