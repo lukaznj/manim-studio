@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync,
 import { cp } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { ChatMessage, NewProjectInput, OpenProject, ProjectMeta, ProjectSummary, Timeline } from '../shared/types'
+import { DEFAULT_TONE } from '../shared/tone'
 import { migrateVoice } from '../shared/voice'
 import { initRepo } from './git'
 import { slugify } from './slug'
@@ -98,6 +99,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
     name: input.name.trim() || 'Untitled video',
     aspect: input.aspect,
     theme: input.theme,
+    tone: input.tone ?? DEFAULT_TONE,
     fps: 30,
     createdAt: new Date().toISOString(),
     voice: { ...(input.voice ?? getSettings().defaultVoice), language: input.language || input.voice?.language || getSettings().defaultVoice.language },
