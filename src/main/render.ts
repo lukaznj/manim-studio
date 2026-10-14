@@ -39,6 +39,8 @@ export interface RenderVariant {
   out?: string
   size?: number // short side in pixels
   fps?: number
+  from?: number // a slice of a parallel export: the animations to draw (0-based, inclusive)
+  upto?: number
 }
 
 export function render(quality: Quality, variant: RenderVariant = {}): Promise<RenderOutcome> {
@@ -114,15 +116,17 @@ export async function renderFinal(
   dir: string,
   meta: ProjectMeta,
   variant: RenderVariant,
-  opts: { cacheDir?: string; signal?: AbortSignal; onProgress?: (t: number) => void } = {},
+  opts: { cacheDir?: string; partialDir?: string; signal?: AbortSignal; onProgress?: (t: number) => void; offlineVoice?: boolean } = {},
 ): Promise<Timeline> {
   const args = ['render', dir, '--quality', 'final']
   if (variant.theme) args.push('--theme', variant.theme)
   if (variant.out) args.push('--out', variant.out)
   if (variant.size) args.push('--size', String(variant.size))
   if (variant.fps) args.push('--fps', String(variant.fps))
+  if (variant.from !== undefined) args.push('--from', String(variant.from))
+  if (variant.upto !== undefined) args.push('--upto', String(variant.upto))
   const job = await runRunner<{ result: Timeline }>('default', args, {
-    extraEnv: { ...(await voiceEnv(meta, dir)), ...(opts.cacheDir ? { STUDIO_CACHE_DIR: opts.cacheDir } : {}) },
+    extraEnv: { ...(await voiceEnv(meta, dir)), ...(opts.cacheDir ? { STUDIO_CACHE_DIR: opts.cacheDir } : {}), ...(opts.partialDir ? { STUDIO_PARTIAL_DIR: opts.partialDir } : {}), ...(opts.offlineVoice ? { STUDIO_VOICE_OFFLINE: '1' } : {}) },
     onEvent: (e) => e.type === 'progress' && opts.onProgress?.(Number(e.t)),
     signal: opts.signal,
   })

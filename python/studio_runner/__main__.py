@@ -22,6 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--fps", type=int)
     r.add_argument("--theme", choices=["dark", "light"], help="instead of the project's (for exporting both)")
     r.add_argument("--out", help="output folder under .studio/ (default: the quality)")
+    # A slice of a parallel export (src/main/export.ts): only these animations are drawn, into the cache.
+    r.add_argument("--from", dest="from_anim", type=int, help="first animation to draw (0-based)")
+    r.add_argument("--upto", type=int, help="last animation to draw, inclusive")
 
     f = sub.add_parser("frame")
     f.add_argument("video")
@@ -76,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "render":
         from .render import render
 
-        return render(args.project, args.quality, size=args.size, fps=args.fps, theme=args.theme, out_name=args.out)
+        return render(args.project, args.quality, size=args.size, fps=args.fps, theme=args.theme, out_name=args.out, from_anim=args.from_anim, upto=args.upto)
 
     if args.cmd == "dub":
         from .dub import dub

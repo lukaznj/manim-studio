@@ -13,7 +13,7 @@ Notes for when render time becomes worth working on. Nothing here is planned yet
 
 There's no GPU anywhere in this. The caches:
 
-- **Partial movies** in `.studio/cache/`. An animation with the same hash as last time is reused, not drawn again.
+- **Partial movies** in `.studio/cache/partial/<width>x<height>@<fps>/`, shared by every render of the project (previews, exports of its copies, slices of a parallel export). An animation with the same hash as before is reused, not drawn again.
 - **LaTeX** (`MathTex` → latex → dvisvgm → SVG), once per formula.
 - **Text** (Pango → SVG), once per string and style.
 - **Narration**, once per sentence and voice (`voice/tts/`).
@@ -46,7 +46,9 @@ Preview: 854×480 at 15 fps (Settings → Preview). Export: 1080p or 1440p at 30
 
 1. **Profile first.** `py-spy record` on one preview and one export, on Windows and macOS. It decides which of the next items is worth doing.
 2. **A warm render worker.** A Python process that stays up between renders, like the TTS worker (`studio_runner tts-worker`). It saves interpreter start and the manim import on every preview. manim keeps global state between scenes, so the worker needs a clean `config` per render, or a restart when that isn't possible.
-3. **Parallel exports.** manim can run `construct` while skipping animations, rendering only a range of them (`from_animation_number` / `upto_animation_number`). N processes could each render a slice of a final export and the app concatenates the partial movies. With 6–8 cores that could make exports several times faster, without changing scenes. Sections are the natural cut points.
+3. **Parallel exports. Done** ([[../04-decisions/0020-parallel-exports|ADR 0020]]). Slices of the animations are drawn by separate processes (`--from`/`--upto`, manim's `from_animation_number`/`upto_animation_number`), each into its own folders; their pieces move into the shared cache, and the normal final render only joins them.
+   - Measured on a 10-core M1 Pro, 1080p30, from an empty cache: a 1-minute, 40-animation scene took 21 s instead of 27 s (4 slices); a 3-minute, 120-animation scene 39 s instead of 72 s (4 slices), and 40 s in the app with 5.
+   - One render already uses about two cores (the video encoder is threaded), which is why the gain is about 2× rather than the number of slices. Short videos gain little: each slice starts Python and manim and fast-forwards to its first animation.
 4. **Keep the cache hitting.** Randomness, time-dependent values and some updaters change an animation's hash, so manim draws it again. A layout warning or a note in the project's CLAUDE.md could steer Claude away from those.
 5. **Hardware encoding for exports.** NVENC, Quick Sync or VideoToolbox through ffmpeg, where available. It speeds up the encode only, so it's a modest gain.
 6. **The OpenGL renderer** (`--renderer=opengl`, GPU through moderngl). It's less mature in manim Community Edition: partial-movie caching doesn't work, some mobjects behave differently, and `render.Recorder`'s hooks assume Cairo. It also depends on each user's graphics drivers. It would help crowded or 3D scenes more than typical 2D ones. Worth it only if render latency becomes the bottleneck after the items above.
