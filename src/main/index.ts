@@ -183,6 +183,7 @@ function registerIpc(): void {
   handle('reveal', (path: string) => shell.showItemInFolder(normalize(path))) // the renderer joins with /
   handle('saveScene', (source: string) => projects.saveScene(source))
   handle('updateMeta', (patch: Partial<ProjectMeta>) => projects.updateMeta(patch))
+  handle('saveScript', (text: string) => projects.saveScript(text))
 
   handle('render', async (quality: Quality) => {
     await render(quality)
@@ -269,10 +270,12 @@ app.whenReady().then(() => {
   onWorkerLog((e) => send('setup', e))
   onChatEvent((e) => send('chat', e))
   projects.onSceneChangedOnDisk((source) => send('file-changed', { source, external: true }))
+  projects.onScriptChangedOnDisk((text) => send('script', { text }))
   setupUpdater((e) => send('update', e))
   startDesktopEndpoint({
     openInWindow,
     sceneWritten: (source) => send('file-changed', { source, external: true, agent: true }),
+    scriptWritten: (text) => send('script', { text }),
     exportVideo: () => queueExport(projects.requireProject().path, { themes: [], languages: [], languageVideos: false }).finished,
   })
   if (app.isPackaged) app.setAsDefaultProtocolClient('manim-studio')

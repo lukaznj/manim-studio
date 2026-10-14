@@ -77,6 +77,15 @@ export const desktopTools = {
       new_text: z.string().describe('What to put in its place'),
     },
   },
+  get_script: {
+    description: 'The open project’s script.md (the plan of the video: sections, narration, visuals) and whether the user approved it. Empty when there is none.',
+    shape: {},
+  },
+  write_script: {
+    description:
+      'Replace the open project’s script.md. The app shows it in its Script tab, where the user approves it. Write it as the guide describes, with status: draft.',
+    shape: { text: z.string().describe('The complete script.md, front matter included') },
+  },
   ...sceneTools,
   export_video: {
     description:
