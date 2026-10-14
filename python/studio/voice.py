@@ -122,14 +122,15 @@ class StudioSpeech(SpeechService):
         api_key = os.environ.get("ELEVENLABS_API_KEY", "")
         voice_id = s.get("voiceId", "")
         model_id = s.get("modelId", DEFAULT_ELEVENLABS_MODEL)
-        if not api_key:
-            raise RuntimeError("no ElevenLabs API key (Settings → Voice)")
         if not voice_id:
             raise RuntimeError("no ElevenLabs voice chosen (Settings → Voice)")
+        # Narration already made needs no key: a render worker (studio_worker) has none.
         rel, path, starts = self._cached(words, key, ".mp3", "elevenlabs", voice_id, model_id)
         if path.exists():
             return rel, starts
         _offline()
+        if not api_key:
+            raise RuntimeError("no ElevenLabs API key (Settings → Voice)")
 
         # Pins the language (ISO 639-1).
         body: dict = {"text": words, "model_id": model_id, "language_code": self.settings.get("language", "en").split("-")[0]}
@@ -155,13 +156,17 @@ class StudioSpeech(SpeechService):
     def _omnivoice(self, words: str, key: str):
         s = self.settings.get("omnivoice", {})
         url = os.environ.get("STUDIO_TTS_URL", "")
-        if not url:
-            raise RuntimeError("the local OmniVoice worker isn't running")
         ref = s.get("refAudio") or ""
-        rel, path, starts = self._cached(words, key, ".wav", "omnivoice", ref, s.get("refText", ""))
+        # The reference is keyed by its place in the project, so a copy of the project (an export,
+        # a render worker) finds the same narration.
+        project = Path(self.cache_dir).parent
+        ref_key = Path(os.path.relpath(ref, project)).as_posix() if ref and Path(ref).is_relative_to(project) else ref
+        rel, path, starts = self._cached(words, key, ".wav", "omnivoice", ref_key, s.get("refText", ""))
         if path.exists():
             return rel, starts
         _offline()
+        if not url:
+            raise RuntimeError("the local OmniVoice worker isn't running")
         payload = {"text": words, "out": str(path), "refAudio": ref, "refText": s.get("refText", "")}
         req = urllib.request.Request(
             url + "/synthesize", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}
@@ -175,7 +180,7 @@ def _offline() -> None:
     """A slice of a parallel export uses only narration that exists: several slices generating the
     same sentence at once would pay for it several times. The final pass makes what's missing."""
     if os.environ.get("STUDIO_VOICE_OFFLINE"):
-        raise RuntimeError("not generated in a parallel slice")
+        raise RuntimeError("narration missing: made by the app before a parallel or remote render, not here")
 
 
 class _HTTPError(RuntimeError):

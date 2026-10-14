@@ -605,6 +605,67 @@ function InstallButton({ component, state }: { component: Component; state: Comp
   )
 }
 
+/**
+ * Render servers (ADR 0021): other machines that render exports, so this one stays free. Paired
+ * with the code the server prints; each is checked when the tab opens.
+ */
+function RenderServers() {
+  const servers = useStore((s) => s.settings?.renderServers ?? [])
+  const [status, setStatus] = useState<Record<string, string>>({})
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    for (const s of servers)
+      api.checkServer(s.id).then(
+        (i) => setStatus((st) => ({ ...st, [s.id]: `${i.cores} cores · ${i.busy ? `busy${i.waiting ? `, ${i.waiting} waiting` : ''}` : 'ready'} · version ${i.version}` })),
+        (e) => setStatus((st) => ({ ...st, [s.id]: errorText(e) })),
+      )
+  }, [servers.length])
+
+  const refresh = async () => useStore.setState({ settings: await api.getSettings() })
+  const add = async () => {
+    setBusy(true)
+    try {
+      await api.addServer(code)
+      setCode('')
+      await refresh()
+      toast('Paired. Exports can now run there (Export → Export on).', 'ok')
+    } catch (e) {
+      toast(errorText(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="render-servers">
+      <Row
+        title="Render servers"
+        text="Another computer renders your exports, so this one stays free. Run Manim Studio's render server there (github.com/lukaznj/manim-studio-renderer), then paste the pairing code it prints."
+      />
+      {servers.map((s) => (
+        <div key={s.id} className="render-server">
+          <Cpu />
+          <div>
+            <strong>{s.name}</strong> <span className="mono faint">{s.url}</span>
+            <div className="hint">{status[s.id] ?? 'Checking…'}</div>
+          </div>
+          <button className="btn small ghost" onClick={() => void api.removeServer(s.id).then(refresh)}>
+            Remove
+          </button>
+        </div>
+      ))}
+      <div className="inline-form">
+        <input className="input mono" placeholder="msw1.… (the pairing code)" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code.trim() && void add()} />
+        <button className="btn" disabled={!code.trim() || busy} onClick={() => void add()}>
+          {busy && <span className="spinner" />} Pair
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function AboutTab() {
   const app = useStore((s) => s.app)!
   const update = useStore((s) => s.update)
@@ -681,6 +742,7 @@ function AboutTab() {
           Restart and update
         </button>
       )}
+      <RenderServers />
       <Row title="Projects folder" text={<span className="mono">{settings.projectsDir}</span>}>
         <button
           className="btn small"

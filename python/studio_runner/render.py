@@ -33,6 +33,7 @@ def configure(
     out_name: str | None = None,
     from_anim: int | None = None,
     upto: int | None = None,
+    voice_only: bool = False,
 ) -> tuple[dict, Path]:
     from manim import config
 
@@ -69,6 +70,12 @@ def configure(
         config.from_animation_number = from_anim
     if upto is not None:
         config.upto_animation_number = upto
+    if voice_only:
+        # Every animation skipped and nothing written: construct still runs, so every voiceover
+        # block makes its narration. A remote worker then finds it all in voice/tts/.
+        config.dry_run = True
+        config.from_animation_number = 10**9
+        out.mkdir(parents=True, exist_ok=True)  # manim still writes the subtitles there
 
     theme = theme or meta.get("theme", "dark")
     background = meta.get("background") or {}
@@ -202,7 +209,7 @@ def render(project: Path, quality: str, **options) -> int:
     writer = scene.renderer.file_writer
     duration = scene.renderer.time
     result = {
-        "video": str(writer.movie_file_path),
+        "video": str(getattr(writer, "movie_file_path", "")),  # none in a voice-only render
         "quality": quality,
         "duration": duration,
         "width": config_value("pixel_width"),

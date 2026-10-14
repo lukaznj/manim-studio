@@ -10,7 +10,7 @@ const methods = [
   'appInfo', 'setupStatus', 'install', 'getSettings', 'setSettings', 'setElevenLabsKey', 'setAnthropicKey',
   'claudeStatus', 'claudeUsage', 'claudeLogin', 'claudeLoginCode', 'claudeLogout', 'claudeDesktopStatus',
   'listProjects', 'createProject', 'openProject', 'pickProject', 'pickFolder', 'pickPdfs', 'closeProject', 'forgetProject', 'reveal',
-  'saveScene', 'updateMeta', 'saveScript', 'render', 'cancelRender', 'frame', 'startQuick', 'quickRun', 'stopQuick', 'planSeries', 'startSeries', 'queueExport', 'exportJobs', 'cancelExport', 'clearExports', 'listMedia', 'importMedia', 'removeMedia',
+  'saveScene', 'updateMeta', 'saveScript', 'render', 'cancelRender', 'frame', 'startQuick', 'quickRun', 'stopQuick', 'planSeries', 'startSeries', 'renderServers', 'addServer', 'removeServer', 'checkServer', 'queueExport', 'exportJobs', 'cancelExport', 'clearExports', 'listMedia', 'importMedia', 'removeMedia',
   'listSources', 'importSources', 'removeSource', 'sourcePages',
   'saveRecording', 'deleteRecording', 'saveVoiceReference', 'askMicrophone', 'elevenLabsVoices', 'elevenLabsLibrary',
   'chatSend', 'chatInterrupt', 'chatReset', 'chatModels', 'installClaudeExtension', 'history', 'restore',

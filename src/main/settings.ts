@@ -19,6 +19,7 @@ const defaults = (): Settings => ({
   hasElevenLabsKey: false,
   hasAnthropicKey: false,
   defaultVoice: { provider: 'elevenlabs', language: 'en' },
+  renderServers: [],
   sidebarWidth: 440,
   chatWidth: 380,
   timelineHeight: 248,
@@ -57,8 +58,13 @@ const secretFlags = () => ({ hasElevenLabsKey: !!getSecret('elevenlabs'), hasAnt
 
 const secretFile = (name: string) => join(app.getPath('userData'), `${name}.secret`)
 
+// Automated runs (scripts/drive.mjs) keep secrets as plain files in their isolated data folder: the
+// unsigned dev build would otherwise block on a keychain prompt. Never on without STUDIO_USER_DATA.
+const plain = () => !!process.env.STUDIO_PLAIN_SECRETS && !!process.env.STUDIO_USER_DATA
+
 export function getSecret(name: string): string {
   const file = secretFile(name)
+  if (plain()) return existsSync(file) ? readFileSync(file, 'utf8') : ''
   if (!existsSync(file) || !safeStorage.isEncryptionAvailable()) return ''
   try {
     return safeStorage.decryptString(readFileSync(file))
@@ -68,6 +74,11 @@ export function getSecret(name: string): string {
 }
 
 export function setSecret(name: string, value: string): Settings {
+  if (plain()) {
+    writeFileSync(secretFile(name), value)
+    cache = { ...getSettings(), ...secretFlags() }
+    return cache
+  }
   if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure storage is not available on this computer')
   writeFileSync(secretFile(name), value ? safeStorage.encryptString(value) : Buffer.alloc(0))
   cache = { ...getSettings(), ...secretFlags() }

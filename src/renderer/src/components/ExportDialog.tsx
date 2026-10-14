@@ -16,6 +16,27 @@ const PROVIDER_NAMES = {
  * versions come from the same scene. Everything lands in exports/<name>/ (see src/main/export.ts).
  * Export queues it and closes: it runs in the background, listed under the title bar's Exports.
  */
+/** Where an export renders: this computer, or a paired render server (ADR 0021). Hidden until one is paired. */
+export function ExportOn({ value, onChange }: { value?: string; onChange: (server: string | undefined) => void }) {
+  const servers = useStore((s) => s.settings?.renderServers ?? [])
+  if (!servers.length) return null
+  const current = servers.some((s) => s.id === value) ? value : undefined
+  return (
+    <div className="field">
+      <label htmlFor="export-on">Render on</label>
+      <select id="export-on" className="select" value={current ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
+        <option value="">This computer</option>
+        {servers.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+            {s.cores ? ` (${s.cores} cores)` : ''}: this computer stays free
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 export function ExportDialog() {
   const open = useStore((s) => s.dialog?.kind === 'export')
   const project = useStore((s) => s.project)
@@ -239,6 +260,8 @@ export function ExportDialog() {
             <Image /> <strong>Thumbnail</strong> <span className="mono faint">.jpg, the busiest frame</span>
           </li>
         </ul>
+
+        <ExportOn value={options.server} onChange={(server) => setOptions((o) => ({ ...o, server }))} />
 
         <div className="field">
           <span className="label">Save to</span>
