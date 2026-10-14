@@ -5,7 +5,7 @@ import { Readable } from 'node:stream'
 import type { EventChannel, ExportOptions, ProjectMeta, Quality } from '../shared/types'
 import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, claudeUsage, closeChat, loadChat, onChatEvent } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
-import { exportVideo } from './export'
+import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, queueExport } from './exports'
 import { importMedia, listMedia, removeMedia } from './media'
 import { importSources, listSources, removeSource, sourcePages } from './sources'
 import { history, restore } from './git'
@@ -189,7 +189,10 @@ function registerIpc(): void {
   })
   handle('cancelRender', () => cancel('preview'))
   handle('frame', async (t: number, width?: number) => frame(t, width))
-  handle('exportVideo', (options: ExportOptions) => exportWithProgress(options))
+  handle('queueExport', (options: ExportOptions) => queueExport(projects.requireProject().path, options).job)
+  handle('exportJobs', () => exportJobs())
+  handle('cancelExport', (id: string) => cancelExport(id))
+  handle('clearExports', () => clearExports())
   handle('listMedia', () => listMedia())
   handle('importMedia', (paths: string[]) => importMedia(paths))
   handle('removeMedia', (name: string) => removeMedia(name))
@@ -244,8 +247,6 @@ async function installClaudeExtension(): Promise<void> {
 }
 
 /** The export, with its progress shown in the window (the dialog, or Claude Desktop's export). */
-const exportWithProgress = (options: ExportOptions) => exportVideo(options, (e) => send('export', e))
-
 app.whenReady().then(() => {
   app.setAppUserModelId('cc.razem.manimstudio')
   // The recording booth needs the microphone; nothing else asks for permissions.
@@ -263,6 +264,7 @@ app.whenReady().then(() => {
   registerMediaProtocol()
   registerIpc()
   onRenderEvent((e) => send('render', e))
+  onExportsChanged((jobs) => send('exports', jobs))
   onSetupEvent((e) => send('setup', e))
   onWorkerLog((e) => send('setup', e))
   onChatEvent((e) => send('chat', e))
@@ -271,7 +273,7 @@ app.whenReady().then(() => {
   startDesktopEndpoint({
     openInWindow,
     sceneWritten: (source) => send('file-changed', { source, external: true, agent: true }),
-    exportVideo: () => exportWithProgress({ themes: [], languages: [], languageVideos: false }),
+    exportVideo: () => queueExport(projects.requireProject().path, { themes: [], languages: [], languageVideos: false }).finished,
   })
   if (app.isPackaged) app.setAsDefaultProtocolClient('manim-studio')
   watchMemory(join(app.getPath('logs'), 'memory.log'), () => ({
@@ -294,7 +296,23 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', (e) => {
+  // Exports live in memory: quitting would stop them, so ask first.
+  if (exportsBusy()) {
+    const choice = dialog.showMessageBoxSync({
+      type: 'warning',
+      message: 'Exports are still running',
+      detail: 'Quitting stops them and drops the ones waiting.',
+      buttons: ['Keep exporting', 'Quit anyway'],
+      defaultId: 0,
+      cancelId: 0,
+    })
+    if (choice === 0) {
+      e.preventDefault()
+      void showWindow()
+      return
+    }
+  }
   stopTtsWorker()
   closeChat()
 })

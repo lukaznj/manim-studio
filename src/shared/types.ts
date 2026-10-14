@@ -214,6 +214,24 @@ export interface ExportResult {
   warnings: string[]
 }
 
+/**
+ * One export in the queue (src/main/exports.ts). It works on its own copy of the project, so the
+ * project can be edited, closed or swapped for another while it runs.
+ */
+export interface ExportJob {
+  id: string
+  project: string // the project's folder
+  name: string // its title when the export was queued
+  options: ExportOptions
+  state: 'waiting' | 'running' | 'done' | 'failed' | 'cancelled'
+  stage?: string // what it's doing now, e.g. "Rendering the dark version"
+  percent?: number // 0–1 for the current stage, when known
+  result?: ExportResult
+  error?: string
+  queuedAt: number
+  finishedAt?: number
+}
+
 export interface MediaItem {
   name: string // file name in the project's media/ folder
   kind: 'image' | 'video'
@@ -376,7 +394,7 @@ export interface VoiceOption {
   users?: number // how many people saved it (ElevenLabs' library)
 }
 
-export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'export' | 'open-project' | 'menu'
+export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'open-project' | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -412,7 +430,12 @@ export interface StudioApi {
   render(quality: Quality): Promise<void>
   cancelRender(): Promise<void>
   frame(t: number, width?: number): Promise<string>
-  exportVideo(options: ExportOptions): Promise<ExportResult>
+  /** Queues an export of the open project; it runs in the background, one at a time. */
+  queueExport(options: ExportOptions): Promise<ExportJob>
+  exportJobs(): Promise<ExportJob[]>
+  /** Stops a waiting or running export, or removes a finished one from the list. */
+  cancelExport(id: string): Promise<void>
+  clearExports(): Promise<void>
   listMedia(): Promise<MediaItem[]>
   /** Copies files (from a drop, or a dialog when `paths` is empty) into the project's media/. */
   importMedia(paths: string[]): Promise<MediaItem[]>
@@ -460,5 +483,5 @@ export interface StudioApi {
   on(channel: 'open-project', cb: (e: { path: string }) => void): () => void
   on(channel: 'menu', cb: (e: { action: MenuAction; path?: string; value?: string }) => void): () => void
   on(channel: 'update', cb: (e: UpdateEvent) => void): () => void
-  on(channel: 'export', cb: (e: { stage: string; percent?: number }) => void): () => void
+  on(channel: 'exports', cb: (jobs: ExportJob[]) => void): () => void
 }

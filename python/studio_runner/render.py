@@ -39,7 +39,8 @@ def configure(
     config.pixel_width, config.pixel_height = (short, long) if portrait else (long, short)
     config.frame_rate = fps or q["fps"] or int(meta.get("fps", 30))
     config.frame_width, config.frame_height = (8.0, LONG_UNITS) if portrait else (LONG_UNITS, 8.0)
-    config.media_dir = str(project / ".studio" / "cache")
+    # An export renders a copy of the project; STUDIO_CACHE_DIR points it at the original's cache.
+    config.media_dir = os.environ.get("STUDIO_CACHE_DIR") or str(project / ".studio" / "cache")
     config.video_dir = str(out)
     config.output_file = str(out / f"video-{int(time.time() * 1000)}")
     config.progress_bar = "none"

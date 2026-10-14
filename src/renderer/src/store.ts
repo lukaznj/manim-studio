@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   ClaudeStatus,
   Component,
+  ExportJob,
   MenuAction,
   ModelOption,
   PlanUsage,
@@ -73,7 +74,7 @@ interface State {
   timeline: Timeline | null
   render: RenderState
   finalRender: RenderState
-  exportState: { stage: string; percent?: number } | null
+  exports: ExportJob[] // the export queue, newest last (src/main/exports.ts)
   selection: number[] // clip indices
   recordings: string[]
 
@@ -110,7 +111,7 @@ export const useStore = create<State>(() => ({
   timeline: null,
   render: { status: 'idle' },
   finalRender: { status: 'idle' },
-  exportState: null,
+  exports: [],
   selection: [],
   recordings: [],
   chat: [],
@@ -183,7 +184,8 @@ export async function boot(): Promise<void> {
     if (get().project?.path === path) return
     void openProject(path).then(() => toast('Claude Desktop opened this project'))
   })
-  api.on('export', (e) => set({ exportState: e }))
+  api.on('exports', (exports) => set({ exports }))
+  void api.exportJobs().then((exports) => set({ exports }))
 }
 
 export async function refreshProjects(): Promise<void> {
