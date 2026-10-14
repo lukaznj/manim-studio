@@ -27,7 +27,7 @@ export function QuickView() {
     <div className="quick-view">
       <div className="quick-card">
         <div className="eyebrow">
-          <Zap /> Quick mode
+          <Zap /> {run.series ? `${run.series.title} · episode ${run.series.episode} of ${run.series.of}` : 'Quick mode'}
         </div>
         <h1>{run.name}</h1>
         <p className="muted">

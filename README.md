@@ -8,6 +8,7 @@
 
 ## What it does
 
+- **A whole series from a course.** Add a course's lecture PDFs: Claude proposes the episodes and a series bible (notation, visual vocabulary), you edit the plan, and Studio makes the episodes one after another, each referring back to the ones before.
 - **Quick video.** Describe it, attach the lecture notes, and Studio makes and exports the video without the editor: Claude writes a script and the scenes, Studio checks the render and sends Claude back to fix what's wrong.
 - **Claude writes the scene.** Describe what the video should show. Claude edits `scene.py`, renders it, looks at frames, and fixes layout problems before it answers. It uses your own Claude plan or an Anthropic API key.
 - **Or ask Claude Desktop.** Add the Manim Studio extension from Settings, then ask Claude in the Claude desktop app for a maths video. Manim Studio opens and Claude makes it there.

@@ -33,6 +33,7 @@ export interface ProjectMeta {
   createdAt: string
   voice: VoiceSettings
   tone?: Tone // unset: warm
+  series?: SeriesRef // an episode of a series
   scriptFirst?: boolean // Claude plans script.md and gets it approved before writing scene.py (ADR 0016)
   claudeSessionId?: string
 }
@@ -46,6 +47,42 @@ export interface ProjectSummary {
   duration?: number
   thumbnail?: string
   missing?: boolean
+  series?: SeriesRef
+}
+
+/** Where an episode sits in its series (src/main/series.ts). */
+export interface SeriesRef {
+  title: string
+  folder: string // the series folder, holding series.md, series.json and the episodes
+  episode: number // 1-based
+  of: number
+  brief: string // what this episode covers and which source pages it uses
+}
+
+export interface SeriesEpisode {
+  title: string
+  summary: string // what it covers, and its one central idea
+  sources: { file: string; pages?: string }[] // file names as given; pages like "3-9"
+  buildsOn?: number[] // 1-based episode numbers
+}
+
+/** Claude's proposal for a series, which the user edits and accepts. */
+export interface SeriesPlan {
+  title: string
+  bible: string // series.md: audience, arc, notation, visual vocabulary
+  episodes: SeriesEpisode[]
+}
+
+export interface SeriesStart {
+  plan: SeriesPlan
+  pdfs: string[] // paths on this computer; episodes refer to them by file name
+  aspect: Aspect
+  theme: Theme
+  tone: Tone
+  language: string
+  voice?: VoiceSettings
+  export: ExportOptions
+  unattended: boolean // make every episode now in quick mode; else open the first to make by hand
 }
 
 export interface NewProjectInput {
@@ -58,6 +95,7 @@ export interface NewProjectInput {
   voice?: VoiceSettings
   tone?: Tone
   scriptFirst?: boolean
+  series?: SeriesRef
   parentDir?: string
 }
 
@@ -242,6 +280,7 @@ export interface QuickRun {
   result?: ExportResult
   error?: string
   warnings: string[] // what couldn't be fixed (e.g. a voice problem); the video was still made
+  series?: { title: string; episode: number; of: number }
 }
 
 /**
@@ -301,7 +340,7 @@ export interface ClaudeDesktopStatus {
 /** Commands from the macOS menu bar, carried out in the window. */
 export type MenuAction =
   | 'settings' | 'claude-settings' | 'new-project' | 'open-project' | 'open-recent' | 'save' | 'render' | 'play'
-  | 'booth' | 'history' | 'export' | 'quick' | 'close-project' | 'new-conversation' | 'appearance' | 'tutorial'
+  | 'booth' | 'history' | 'export' | 'quick' | 'series' | 'close-project' | 'new-conversation' | 'appearance' | 'tutorial'
 
 export interface ClaudeLoginEvent {
   line?: string
@@ -469,6 +508,10 @@ export interface StudioApi {
   startQuick(request: QuickRequest): Promise<QuickRun>
   quickRun(): Promise<QuickRun | null>
   stopQuick(): Promise<void>
+  /** Reads the PDFs and asks Claude for a series plan (a minute or two). */
+  planSeries(request: { pdfs: string[]; title?: string; language: string; tone: Tone }): Promise<SeriesPlan>
+  /** Creates the series' projects; unattended, makes them one after another in quick mode. */
+  startSeries(start: SeriesStart): Promise<void>
   /** Queues an export of the open project; it runs in the background, one at a time. */
   queueExport(options: ExportOptions): Promise<ExportJob>
   exportJobs(): Promise<ExportJob[]>

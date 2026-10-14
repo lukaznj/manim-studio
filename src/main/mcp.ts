@@ -21,6 +21,7 @@ import { slugify } from './slug'
 import { sourcesNote } from './sources'
 import { scriptBrief, scriptStatus } from '../shared/script'
 import { styleBrief } from '../shared/tone'
+import { seriesBrief } from './series'
 
 export interface DesktopHost {
   /** Shows the window and opens the project in it, the same way a click on Home does. */
@@ -165,6 +166,7 @@ function guide(): string {
     `Format ${meta.aspect} (${meta.aspect === '9:16' ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), video theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
     `Write all narration and on-screen text in ${language}.`,
     styleBrief(meta),
+    seriesBrief(meta),
     scriptBrief(meta, readScript(path) !== null, { desktop: true }),
     mediaNote(path),
     sourcesNote(path),
