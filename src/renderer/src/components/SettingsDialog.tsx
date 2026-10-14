@@ -322,6 +322,17 @@ function VideoTab() {
           items={TONES.map((t) => ({ value: t.value, label: t.label }))}
         />
       </Row>
+      <Row title="Script first" text="Claude plans the video in a script (the idea, each section's narration and visuals) and waits for your approval before writing the code.">
+        <Tabs
+          radio="Script first"
+          value={meta.scriptFirst ? 'on' : 'off'}
+          onChange={(v) => void updateMeta({ scriptFirst: v === 'on' })}
+          items={[
+            { value: 'on', label: 'On' },
+            { value: 'off', label: 'Off' },
+          ]}
+        />
+      </Row>
       <Row title="Background colour" text="Each theme's background, if you want another than its own. Keep text readable.">
         <div className="bg-colours">
           {(['dark', 'light'] as Theme[]).map((t) => (
