@@ -397,11 +397,11 @@ export function ModelControls() {
   if (!list.some((m) => m.value === claudeModel)) list.push({ value: claudeModel, label: claudeModel, description: '', efforts: [] })
   const current = list.find((m) => m.value === claudeModel)!
   const effortFor = (efforts: Effort[]): Effort | null => {
-    const wanted = settings.claudeEffort || 'medium'
+    const wanted = settings.claudeEffort || 'high'
     return efforts.includes(wanted) ? wanted : efforts.includes('medium') ? 'medium' : (efforts[0] ?? null)
   }
   // Until the account's models load, show the saved level rather than "no effort setting".
-  const efforts: Effort[] = models.length ? current.efforts : [settings.claudeEffort || 'medium']
+  const efforts: Effort[] = models.length ? current.efforts : [settings.claudeEffort || 'high']
   const effort = effortFor(efforts)
 
   const pickModel = (value: string) => {
