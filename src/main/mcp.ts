@@ -12,13 +12,14 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { z } from 'zod'
 import { desktopTools, type DesktopToolName } from '../shared/studio-tools'
-import type { ClaudeDesktopStatus, ExportResult } from '../shared/types'
+import type { ClaudeDesktopStatus, ExportResult, Tone } from '../shared/types'
 import { languageName, mediaNote } from './claude'
 import { createProject, listProjects, readScene, requireProject, saveScene } from './projects'
 import { getSettings } from './settings'
 import { getTimeline, readSource, renderPreview, textResult, viewFrames, viewSourcePages } from './scene-tools'
 import { slugify } from './slug'
 import { sourcesNote } from './sources'
+import { styleBrief } from '../shared/tone'
 
 export interface DesktopHost {
   /** Shows the window and opens the project in it, the same way a click on Home does. */
@@ -102,8 +103,8 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
       return textResult(lines.join('\n'))
     }
     case 'create_project': {
-      const a = args as { title: string; format: '16:9' | '9:16'; theme?: 'dark' | 'light'; language?: string }
-      const dir = await createProject({ name: a.title, aspect: a.format, theme: a.theme ?? 'dark', language: a.language ?? getSettings().defaultVoice.language })
+      const a = args as { title: string; format: '16:9' | '9:16'; theme?: 'dark' | 'light'; language?: string; tone?: Tone }
+      const dir = await createProject({ name: a.title, aspect: a.format, theme: a.theme ?? 'dark', language: a.language ?? getSettings().defaultVoice.language, tone: a.tone })
       await host.openInWindow(dir)
       return textResult(guide())
     }
@@ -152,6 +153,7 @@ function guide(): string {
     `"${meta.name}" is open in Manim Studio (${path}).`,
     `Format ${meta.aspect} (${meta.aspect === '9:16' ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), video theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
     `Write all narration and on-screen text in ${language}.`,
+    styleBrief(meta),
     mediaNote(path),
     sourcesNote(path),
     'Change scene.py only through write_scene or edit_scene. After each change call render_preview, then view_frames at the moments you changed.',

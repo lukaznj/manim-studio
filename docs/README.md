@@ -4,7 +4,7 @@ This folder is an [Obsidian](https://obsidian.md) vault. Open `docs/` as a vault
 
 ## Layout
 
-- `01-product/`: what the app is, who uses it, what's next ([[01-product/product-overview|overview]], [[01-product/roadmap|roadmap]])
+- `01-product/`: what the app is, who uses it, what's next ([[01-product/product-overview|overview]], [[01-product/roadmap|roadmap]], [[01-product/web-service|web service idea]])
 - `02-architecture/`: how it works
   - [[02-architecture/system-overview|processes and data flow]]
   - [[02-architecture/timeline-from-render|the timeline contract]]
