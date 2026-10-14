@@ -23,3 +23,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0017-background-export-queue]] | Exports run in a background queue, one at a time, each on a copy of its project | accepted |
 | [[0018-quick-mode]] | Quick mode: Claude makes the video on autopilot, Studio checks the render and exports it | accepted |
 | [[0019-series-mode]] | Series mode: Claude plans episodes and a series bible from a course's PDFs; episodes refer back through series.md | accepted |
+| [[0020-parallel-exports]] | Exports draw slices of the animations in parallel into the shared cache, then render once | accepted |

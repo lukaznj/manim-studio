@@ -129,6 +129,7 @@ class StudioSpeech(SpeechService):
         rel, path, starts = self._cached(words, key, ".mp3", "elevenlabs", voice_id, model_id)
         if path.exists():
             return rel, starts
+        _offline()
 
         # Pins the language (ISO 639-1).
         body: dict = {"text": words, "model_id": model_id, "language_code": self.settings.get("language", "en").split("-")[0]}
@@ -160,6 +161,7 @@ class StudioSpeech(SpeechService):
         rel, path, starts = self._cached(words, key, ".wav", "omnivoice", ref, s.get("refText", ""))
         if path.exists():
             return rel, starts
+        _offline()
         payload = {"text": words, "out": str(path), "refAudio": ref, "refText": s.get("refText", "")}
         req = urllib.request.Request(
             url + "/synthesize", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}
@@ -167,6 +169,13 @@ class StudioSpeech(SpeechService):
         with urllib.request.urlopen(req, timeout=600) as r:
             json.load(r)
         return rel, None
+
+
+def _offline() -> None:
+    """A slice of a parallel export uses only narration that exists: several slices generating the
+    same sentence at once would pay for it several times. The final pass makes what's missing."""
+    if os.environ.get("STUDIO_VOICE_OFFLINE"):
+        raise RuntimeError("not generated in a parallel slice")
 
 
 class _HTTPError(RuntimeError):

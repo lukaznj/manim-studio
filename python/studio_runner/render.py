@@ -25,7 +25,14 @@ QUALITY = {
 
 
 def configure(
-    project: Path, quality: str, size: int | None = None, fps: int | None = None, theme: str | None = None, out_name: str | None = None
+    project: Path,
+    quality: str,
+    size: int | None = None,
+    fps: int | None = None,
+    theme: str | None = None,
+    out_name: str | None = None,
+    from_anim: int | None = None,
+    upto: int | None = None,
 ) -> tuple[dict, Path]:
     from manim import config
 
@@ -41,6 +48,13 @@ def configure(
     config.frame_width, config.frame_height = (8.0, LONG_UNITS) if portrait else (LONG_UNITS, 8.0)
     # An export renders a copy of the project; STUDIO_CACHE_DIR points it at the original's cache.
     config.media_dir = os.environ.get("STUDIO_CACHE_DIR") or str(project / ".studio" / "cache")
+    # Finished animations (partial movies) live in the cache, one folder per size and frame rate, so
+    # every render of the project reuses them: previews, exports of its copies, and the final pass
+    # of a parallel export. A slice of one draws into its own folder (STUDIO_PARTIAL_DIR), and the
+    # app moves what it made into the shared one only when it succeeded.
+    config.partial_movie_dir = os.environ.get("STUDIO_PARTIAL_DIR") or str(
+        Path(config.media_dir) / "partial" / f"{config.pixel_width}x{config.pixel_height}@{int(config.frame_rate)}"
+    )
     config.video_dir = str(out)
     config.output_file = str(out / f"video-{int(time.time() * 1000)}")
     config.progress_bar = "none"
@@ -48,6 +62,13 @@ def configure(
     config.write_to_movie = True
     config.save_last_frame = False
     config.preview = False
+    # manim deletes the oldest partial movies beyond 100; a long video, or an export split into
+    # slices that fill the cache for the final pass, needs them all.
+    config.max_files_cached = 100_000
+    if from_anim is not None:
+        config.from_animation_number = from_anim
+    if upto is not None:
+        config.upto_animation_number = upto
 
     theme = theme or meta.get("theme", "dark")
     background = meta.get("background") or {}
