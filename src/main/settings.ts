@@ -12,8 +12,8 @@ const defaults = (): Settings => ({
   previewSize: 480,
   previewFps: 15,
   tutorialDone: false,
-  claudeModel: '',
-  claudeEffort: 'medium',
+  claudeModel: 'claude-sonnet-5-5', // Sonnet 5.5 at high effort writes scenes well enough, faster and cheaper than Opus
+  claudeEffort: 'high',
   autoRender: true,
   hasElevenLabsKey: false,
   hasAnthropicKey: false,
