@@ -13,6 +13,7 @@ import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
 import { watchMemory } from './memory'
 import { quickRun, setupQuick, startQuick, stopQuick } from './quick'
 import { planSeries, startSeries, writeEpisodeBible } from './series'
+import { addServer, checkServer, listServers, removeServer } from './remote'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
@@ -202,6 +203,10 @@ function registerIpc(): void {
   handle('stopQuick', () => stopQuick())
   handle('planSeries', (req: Parameters<typeof planSeries>[0]) => planSeries(req))
   handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
+  handle('renderServers', () => listServers())
+  handle('addServer', (code: string) => addServer(code))
+  handle('removeServer', (id: string) => removeServer(id))
+  handle('checkServer', (id: string) => checkServer(id))
   handle('queueExport', (options: ExportOptions) => queueExport(projects.requireProject().path, options).job)
   handle('exportJobs', () => exportJobs())
   handle('cancelExport', (id: string) => cancelExport(id))

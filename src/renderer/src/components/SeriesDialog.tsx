@@ -5,6 +5,7 @@ import type { Aspect, SeriesPlan, Theme, Tone } from '../../../shared/types'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, errorText, toast, useStore } from '../store'
+import { ExportOn } from './ExportDialog'
 import { Modal, Tabs } from './ui'
 
 /**
@@ -21,6 +22,7 @@ export function SeriesDialog() {
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
   const [language, setLanguage] = useState('en')
   const [unattended, setUnattended] = useState(true)
+  const [server, setServer] = useState<string | undefined>()
   const [plan, setPlan] = useState<SeriesPlan | null>(null)
   const [busy, setBusy] = useState<'planning' | 'starting' | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -66,7 +68,7 @@ export function SeriesDialog() {
         tone,
         language,
         voice: defaultVoice ? { ...defaultVoice, language } : undefined,
-        export: { themes: [theme], languages: [], languageVideos: false },
+        export: { themes: [theme], languages: [], languageVideos: false, server },
         unattended,
       })
       closeDialog()
@@ -198,6 +200,7 @@ export function SeriesDialog() {
               />
             </div>
           </div>
+          {unattended && <ExportOn value={server} onChange={setServer} />}
           <label className="export-check">
             <input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} />
             <span>
