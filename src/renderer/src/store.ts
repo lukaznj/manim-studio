@@ -13,6 +13,7 @@ import type {
   ProjectMeta,
   ProjectSummary,
   Quality,
+  QuickRun,
   RenderError,
   RenderEvent,
   SetupStatus,
@@ -47,6 +48,7 @@ export type Dialog =
   | { kind: 'settings'; tab?: 'account' | 'voice' | 'video' | 'env' | 'about' }
   | { kind: 'booth'; key?: string }
   | { kind: 'export' }
+  | { kind: 'quick' }
   | null
 
 interface State {
@@ -76,6 +78,8 @@ interface State {
   finalRender: RenderState
   exports: ExportJob[] // the export queue, newest last (src/main/exports.ts)
   script: string | null // the open project's script.md (ScriptPane.tsx)
+  quick: QuickRun | null // quick mode's run (QuickView.tsx)
+  quickEditor: boolean // show the editor instead of quick mode's progress
   selection: number[] // clip indices
   recordings: string[]
 
@@ -114,6 +118,8 @@ export const useStore = create<State>(() => ({
   finalRender: { status: 'idle' },
   exports: [],
   script: null,
+  quick: null,
+  quickEditor: false,
   selection: [],
   recordings: [],
   chat: [],
@@ -184,9 +190,12 @@ export async function boot(): Promise<void> {
   window.addEventListener('focus', () => void refreshUsage())
   api.on('open-project', ({ path }) => {
     if (get().project?.path === path) return
-    void openProject(path).then(() => toast('Claude Desktop opened this project'))
+    // Quick mode opens its project the same way, with its own screen; only Claude Desktop needs saying.
+    void openProject(path).then(() => get().quick?.project !== path && toast('Claude Desktop opened this project'))
   })
   api.on('exports', (exports) => set({ exports }))
+  api.on('quick', (quick) => set((s) => ({ quick, quickEditor: quick?.id === s.quick?.id ? s.quickEditor : false })))
+  void api.quickRun().then((quick) => set({ quick }))
   // Claude wrote the script: show it, unless you're in the middle of something else.
   api.on('script', ({ text }) => set((s) => ({ script: text, leftTab: text && s.leftTab === 'code' && !s.dirty ? 'script' : s.leftTab })))
   void api.exportJobs().then((exports) => set({ exports }))
@@ -258,6 +267,8 @@ function onMenu({ action, path, value }: { action: MenuAction; path?: string; va
       return openDialog({ kind: 'settings', tab: 'account' })
     case 'new-project':
       return openDialog({ kind: 'new-project' })
+    case 'quick':
+      return openDialog({ kind: 'quick' })
     case 'open-project':
       return void pickAndOpenProject()
     case 'open-recent':

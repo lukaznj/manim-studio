@@ -1345,3 +1345,142 @@
   display: flex;
   gap: 6px;
 }
+
+/* ---- quick mode (QuickDialog.tsx, QuickView.tsx) --------------------------------------------- */
+
+.quick-form {
+  display: grid;
+  gap: 16px;
+}
+.quick-prompt {
+  min-height: 96px;
+  resize: vertical;
+}
+.quick-pdfs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+}
+.quick-pdfs.dragging {
+  border-color: var(--sun);
+  background: var(--sun-soft);
+}
+.quick-pdfs .lang-chip svg {
+  width: 13px;
+  height: 13px;
+}
+.quick-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.quick-warning {
+  font-size: 13px;
+  color: var(--sun-text);
+}
+.quick-view {
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  padding: 48px 24px;
+}
+.quick-card {
+  width: min(640px, 100%);
+  display: grid;
+  gap: 14px;
+}
+.quick-card .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.quick-card .eyebrow svg {
+  width: 13px;
+  height: 13px;
+  color: var(--sun-text);
+}
+.quick-card h1 {
+  margin: 0;
+  font: 800 30px/1.15 var(--font-display);
+  letter-spacing: -0.01em;
+}
+.quick-card > p {
+  margin: 0;
+}
+.quick-steps {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.quick-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-3);
+}
+.quick-steps li svg,
+.quick-steps li .spinner {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.quick-steps li.done {
+  color: var(--text-2);
+}
+.quick-steps li.done svg {
+  color: var(--mint);
+}
+.quick-steps li.now {
+  color: var(--text);
+  font-weight: 600;
+}
+.quick-activity {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick-error,
+.quick-warnings li {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+}
+.quick-error {
+  color: light-dark(#c4321f, #ff9a8a);
+}
+.quick-warnings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  color: var(--sun-text);
+}
+.quick-error svg,
+.quick-warnings svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+}
+.quick-preview {
+  width: 100%;
+  max-height: 44vh;
+  border-radius: var(--r-lg);
+  background: #000;
+}
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}

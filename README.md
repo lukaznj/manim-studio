@@ -8,6 +8,7 @@
 
 ## What it does
 
+- **Quick video.** Describe it, attach the lecture notes, and Studio makes and exports the video without the editor: Claude writes a script and the scenes, Studio checks the render and sends Claude back to fix what's wrong.
 - **Claude writes the scene.** Describe what the video should show. Claude edits `scene.py`, renders it, looks at frames, and fixes layout problems before it answers. It uses your own Claude plan or an Anthropic API key.
 - **Or ask Claude Desktop.** Add the Manim Studio extension from Settings, then ask Claude in the Claude desktop app for a maths video. Manim Studio opens and Claude makes it there.
 - **The timeline comes from the render.** Sections, every `self.play`, the narration and the subtitles, each linked to its line of code. While the video plays, the line producing the frame lights up.
