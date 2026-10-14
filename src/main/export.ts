@@ -12,11 +12,14 @@
 // copied back, so it's never paid for twice.
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { availableParallelism, totalmem } from 'node:os'
-import { join, relative, sep } from 'node:path'
+import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { dirname, join, relative, sep } from 'node:path'
 import type { ExportOptions, ExportResult, ProjectMeta, Timeline } from '../shared/types'
 import { languageName, translateNarration } from './claude'
 import { readMeta, readTimeline, slugify } from './projects'
 import { renderFinal, type RenderVariant } from './render'
+import { renderRemote } from './remote'
 import { runRunner } from './runner'
 import { voiceEnv } from './voice'
 
@@ -50,29 +53,51 @@ export async function exportVideo(project: string, work: string, options: Export
   const videos: string[] = []
   let timelinePath = ''
 
-  try {
-    for (const theme of themes) {
-      const stage = themes.length > 1 ? `Rendering the ${theme} version` : 'Rendering at full quality'
-      const parts = await renderSlices(snap, meta, { theme, size, fps }, join(project, '.studio', 'cache'), animations, (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }), signal)
-      progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage })
-      await renderFinal(snap, meta, { theme, out: `final-${theme}`, size, fps }, {
-        cacheDir: join(project, '.studio', 'cache'),
-        signal,
-        onProgress: (t) => progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, percent: duration ? Math.min(t / duration, 1) : undefined }),
-      })
-      progress({ stage: 'Saving the video' })
-      const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
-      const base = join(folder, themes.length > 1 ? `${slug}.${theme}` : slug)
-      await (await runRunner('default', ['export', timeline, base], { signal })).done
-      videos.push(`${base}.mp4`)
-      files.push(`${base}.mp4`, `${base}.jpg`)
-      // Subtitles don't depend on the theme: keep one set, named by language.
-      for (const ext of ['srt', 'vtt']) {
-        if (!timelinePath) renameSync(`${base}.${ext}`, join(folder, `${slug}.${original}.${ext}`))
-        else rmSync(`${base}.${ext}`, { force: true })
-      }
-      timelinePath ||= timeline
+  /** A theme's rendered video in `base`: keep it, and one set of subtitles named by language. */
+  const keep = (theme: string, base: string, timeline: string) => {
+    videos.push(`${base}.mp4`)
+    files.push(`${base}.mp4`, `${base}.jpg`)
+    // Subtitles don't depend on the theme.
+    for (const ext of ['srt', 'vtt']) {
+      if (!timelinePath) renameSync(`${base}.${ext}`, join(folder, `${slug}.${original}.${ext}`))
+      else rmSync(`${base}.${ext}`, { force: true })
     }
+    timelinePath ||= timeline
+  }
+
+  try {
+    if (options.server) {
+      // On a render server (ADR 0021): the narration is made here first, since the server has no voice.
+      progress({ stage: 'Making the narration' })
+      await (await runRunner('default', ['render', snap, '--quality', 'preview', '--voice-only', '--out', 'voice-only'], { extraEnv: await voiceEnv(meta, snap), signal })).done
+      progress({ stage: 'Packing the project' })
+      const archive = join(work, 'project.tar.gz')
+      await packProject(snap, archive)
+      // project.json's voice as is: narration is keyed by paths inside the project, so the server finds it.
+      await renderRemote(options.server, archive, { themes, size, fps, slug, voice: meta.voice, animations, duration, cacheKey: createHash('sha1').update(project).digest('hex').slice(0, 16) }, folder, progress, signal)
+      for (const theme of themes) {
+        // The server's timeline goes where a local render's would, for dubbing below.
+        const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
+        mkdirSync(dirname(timeline), { recursive: true })
+        renameSync(join(folder, `timeline.${theme}.json`), timeline)
+        keep(theme, join(folder, themes.length > 1 ? `${slug}.${theme}` : slug), timeline)
+      }
+    } else
+      for (const theme of themes) {
+        const stage = themes.length > 1 ? `Rendering the ${theme} version` : 'Rendering at full quality'
+        const parts = await renderSlices(snap, meta, { theme, size, fps }, join(project, '.studio', 'cache'), animations, (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }), signal)
+        progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage })
+        await renderFinal(snap, meta, { theme, out: `final-${theme}`, size, fps }, {
+          cacheDir: join(project, '.studio', 'cache'),
+          signal,
+          onProgress: (t) => progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, percent: duration ? Math.min(t / duration, 1) : undefined }),
+        })
+        progress({ stage: 'Saving the video' })
+        const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
+        const base = join(folder, themes.length > 1 ? `${slug}.${theme}` : slug)
+        await (await runRunner('default', ['export', timeline, base], { signal })).done
+        keep(theme, base, timeline)
+      }
     files.push(join(folder, `${slug}.${original}.srt`), join(folder, `${slug}.${original}.vtt`))
 
     const narration = [...new Set((JSON.parse(readFileSync(timelinePath, 'utf8')) as Timeline).voice.map((v) => v.text))]
@@ -154,6 +179,17 @@ async function renderSlices(
  */
 export function sliceCount(animations: number, cores: number, totalBytes: number): number {
   return Math.max(1, Math.min(Math.floor(cores / 2), Math.floor(totalBytes / 2.5e9), Math.floor(animations / 8), 6))
+}
+
+/** The project copy as a tar.gz for a render server, without the copy's own caches. tar ships with macOS, Linux and Windows 10+. */
+function packProject(snap: string, archive: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tar = spawn('tar', ['-czf', archive, '--exclude', './.studio', '-C', snap, '.'], { windowsHide: true })
+    let err = ''
+    tar.stderr.on('data', (b: Buffer) => (err += b.toString()))
+    tar.on('error', reject)
+    tar.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`Packing the project failed: ${err.trim() || `tar exited with ${code}`}`))))
+  })
 }
 
 /** Narration the copy generated (any language) goes back to the project, so it isn't made again. */

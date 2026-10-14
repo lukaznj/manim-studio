@@ -25,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     # A slice of a parallel export (src/main/export.ts): only these animations are drawn, into the cache.
     r.add_argument("--from", dest="from_anim", type=int, help="first animation to draw (0-based)")
     r.add_argument("--upto", type=int, help="last animation to draw, inclusive")
+    r.add_argument("--voice-only", action="store_true", help="make the narration, draw nothing (before a remote export)")
 
     f = sub.add_parser("frame")
     f.add_argument("video")
@@ -79,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "render":
         from .render import render
 
-        return render(args.project, args.quality, size=args.size, fps=args.fps, theme=args.theme, out_name=args.out, from_anim=args.from_anim, upto=args.upto)
+        return render(args.project, args.quality, size=args.size, fps=args.fps, theme=args.theme, out_name=args.out, from_anim=args.from_anim, upto=args.upto, voice_only=args.voice_only)
 
     if args.cmd == "dub":
         from .dub import dub
