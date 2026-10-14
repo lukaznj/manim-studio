@@ -216,6 +216,34 @@ export interface ExportResult {
   warnings: string[]
 }
 
+/** Quick mode (src/main/quick.ts): describe a video, attach PDFs, and Studio makes and exports it unattended. */
+export interface QuickRequest {
+  prompt: string // what the video should show
+  sources: string[] // PDFs to make it from (paths on this computer)
+  name?: string // the title; unset: taken from the prompt
+  aspect: Aspect
+  theme: Theme
+  tone: Tone
+  language: string
+  voice?: VoiceSettings // unset: Settings → Voice's default
+  export: ExportOptions
+}
+
+export type QuickStep = 'setup' | 'sources' | 'script' | 'scene' | 'check' | 'export' | 'done'
+
+export interface QuickRun {
+  id: string
+  project: string
+  name: string
+  state: 'working' | 'done' | 'failed' | 'stopped'
+  step: QuickStep
+  activity?: string // what Claude is doing right now
+  exportJob?: string // the ExportJob id once it's queued
+  result?: ExportResult
+  error?: string
+  warnings: string[] // what couldn't be fixed (e.g. a voice problem); the video was still made
+}
+
 /**
  * One export in the queue (src/main/exports.ts). It works on its own copy of the project, so the
  * project can be edited, closed or swapped for another while it runs.
@@ -273,7 +301,7 @@ export interface ClaudeDesktopStatus {
 /** Commands from the macOS menu bar, carried out in the window. */
 export type MenuAction =
   | 'settings' | 'claude-settings' | 'new-project' | 'open-project' | 'open-recent' | 'save' | 'render' | 'play'
-  | 'booth' | 'history' | 'export' | 'close-project' | 'new-conversation' | 'appearance' | 'tutorial'
+  | 'booth' | 'history' | 'export' | 'quick' | 'close-project' | 'new-conversation' | 'appearance' | 'tutorial'
 
 export interface ClaudeLoginEvent {
   line?: string
@@ -397,7 +425,7 @@ export interface VoiceOption {
   users?: number // how many people saved it (ElevenLabs' library)
 }
 
-export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'open-project' | 'menu'
+export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'open-project' | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -424,6 +452,8 @@ export interface StudioApi {
   pickProject(): Promise<string | null>
   /** A folder from the system dialog, or null if cancelled. */
   pickFolder(title?: string, defaultPath?: string): Promise<string | null>
+  /** PDFs from the system dialog; empty if cancelled. */
+  pickPdfs(): Promise<string[]>
   closeProject(): Promise<void>
   forgetProject(path: string): Promise<void>
   reveal(path: string): Promise<void>
@@ -435,6 +465,10 @@ export interface StudioApi {
   render(quality: Quality): Promise<void>
   cancelRender(): Promise<void>
   frame(t: number, width?: number): Promise<string>
+  /** Starts quick mode: creates the project, opens it, and Claude makes and exports the video. */
+  startQuick(request: QuickRequest): Promise<QuickRun>
+  quickRun(): Promise<QuickRun | null>
+  stopQuick(): Promise<void>
   /** Queues an export of the open project; it runs in the background, one at a time. */
   queueExport(options: ExportOptions): Promise<ExportJob>
   exportJobs(): Promise<ExportJob[]>
@@ -489,6 +523,7 @@ export interface StudioApi {
   on(channel: 'menu', cb: (e: { action: MenuAction; path?: string; value?: string }) => void): () => void
   on(channel: 'update', cb: (e: UpdateEvent) => void): () => void
   on(channel: 'exports', cb: (jobs: ExportJob[]) => void): () => void
+  on(channel: 'quick', cb: (run: QuickRun | null) => void): () => void
   /** script.md changed on disk (Claude wrote it), or was removed (null). */
   on(channel: 'script', cb: (e: { text: string | null }) => void): () => void
 }
