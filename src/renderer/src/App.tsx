@@ -9,6 +9,7 @@ import { QuickView } from './components/QuickView'
 import { SeriesDialog } from './components/SeriesDialog'
 import { SettingsDialog } from './components/SettingsDialog'
 import { TitleBar } from './components/TitleBar'
+import { UsageDialog } from './components/UsageDialog'
 import { Tour } from './components/Tour'
 import { useStore } from './store'
 
@@ -29,6 +30,7 @@ export function App() {
       <ExportDialog />
       <QuickDialog />
       <SeriesDialog />
+      <UsageDialog />
       {screen === 'editor' && !quickHere && <Tour />}
       <div className="toast-stack" aria-live="polite">
         {toasts.map((t) => (
