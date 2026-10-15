@@ -52,7 +52,8 @@ export function SeriesDialog() {
 
   const language = voice.language
   // Checked before planning, so a series never gets made without a voice.
-  const voiceIssue = voiceProblem(voice, hasKey, omnivoice)
+  const elevenLabsCheck = useStore((s) => s.elevenLabsCheck)
+  const voiceIssue = voiceProblem(voice, hasKey, omnivoice, elevenLabsCheck)
 
   const add = (paths: string[]) => setPdfs((p) => [...p, ...paths.filter((x) => /\.pdf$/i.test(x) && !p.includes(x))])
   const move = <T,>(list: T[], i: number, by: number) => {

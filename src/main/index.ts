@@ -47,7 +47,18 @@ import { cancel, frame, onRenderEvent, render } from './render'
 import { pauseTag, resumeAll, runningJobs } from './runner'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
-import { deleteRecording, elevenLabsLibrary, elevenLabsVoices, onWorkerLog, saveRecording, saveReference, stopTtsWorker } from './voice'
+import {
+  checkElevenLabsKey,
+  deleteRecording,
+  elevenLabsLibrary,
+  elevenLabsUsage,
+  elevenLabsVoices,
+  onWorkerLog,
+  saveElevenLabsKey,
+  saveRecording,
+  saveReference,
+  stopTtsWorker,
+} from './voice'
 
 // Isolated data for automated runs (scripts/drive.mjs); never set in normal use.
 if (process.env.STUDIO_USER_DATA) app.setPath('userData', process.env.STUDIO_USER_DATA)
@@ -187,7 +198,12 @@ function registerIpc(): void {
     if (patch.appearance || patch.recentProjects) refreshMenu()
     return settings
   })
-  handle('setElevenLabsKey', (key: string) => setSecret('elevenlabs', key.trim()))
+  handle('setElevenLabsKey', async (key: string) => {
+    await saveElevenLabsKey(key)
+    return getSettings()
+  })
+  handle('checkElevenLabsKey', (again?: boolean) => checkElevenLabsKey(undefined, again))
+  handle('elevenLabsUsage', () => elevenLabsUsage())
   handle('setAnthropicKey', (key: string) => setSecret('anthropic', key.trim()))
   handle('setOpenAIKey', (key: string) => {
     closeChat() // Codex picks the key up when it starts again
