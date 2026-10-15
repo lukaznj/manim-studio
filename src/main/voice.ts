@@ -2,11 +2,12 @@
 import { type ChildProcess } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ProjectMeta, SetupEvent, VoiceOption } from '../shared/types'
+import type { ElevenLabsCheck, ElevenLabsUsage, ProjectMeta, SetupEvent, VoiceOption } from '../shared/types'
+import { DEFAULT_EL_MODEL } from '../shared/voice'
 import { setupStatus } from './env'
 import { listRecordings, requireProject } from './projects'
 import { runRunner } from './runner'
-import { getSecret } from './settings'
+import { getSecret, setSecret } from './settings'
 
 /** STUDIO_VOICE + secrets for a render of the current project. */
 export async function voiceEnv(meta: ProjectMeta, dir: string): Promise<Record<string, string>> {
@@ -56,6 +57,76 @@ async function elevenLabs<T>(path: string, key: string): Promise<T> {
     throw new Error(`ElevenLabs: ${body?.detail?.message ?? `HTTP ${res.status}`}`)
   }
   return (await res.json()) as T
+}
+
+/** One ElevenLabs request with `key`; a failure comes back with ElevenLabs' own status ("missing_permissions") and message. */
+async function call(key: string, path: string, init: RequestInit = {}): Promise<{ ok: true; res: Response } | { ok: false; status?: string; message: string }> {
+  const res = await fetch(`https://api.elevenlabs.io${path}`, { ...init, headers: { 'xi-api-key': key, ...(init.headers ?? {}) } })
+  if (res.ok) return { ok: true, res }
+  const body = (await res.json().catch(() => null)) as { detail?: { status?: string; message?: string } } | null
+  const message = body?.detail?.message ?? `HTTP ${res.status}`
+  return { ok: false, status: body?.detail?.status, message: /[.!?]$/.test(message) ? message : `${message}.` } // a sentence, for what follows it
+}
+
+const SOME_VOICE = '21m00Tcm4TlvDq8ikWAM' // a premade voice, when the account lists none
+let checked: { key: string; result: ElevenLabsCheck } | null = null
+
+/**
+ * What a key may do, tried for real: list the voices (Voices: Read), speak one character (Text to
+ * Speech; it costs that one character) and read the subscription (User, for the usage meter).
+ */
+export async function checkElevenLabsKey(key = getSecret('elevenlabs'), again = false): Promise<ElevenLabsCheck> {
+  if (!again && checked?.key === key) return checked.result // once per key and session: each check speaks a character
+  if (!key) return { voices: false, tts: false, user: false, problem: 'No ElevenLabs key is saved.' }
+  const voices = await call(key, '/v1/voices')
+  if (!voices.ok && voices.status !== 'missing_permissions') return { voices: false, tts: false, user: false, problem: `ElevenLabs: ${voices.message}` }
+  const list = voices.ok ? ((await voices.res.json()) as { voices?: { voice_id: string }[] }) : {}
+  const tts = await call(key, `/v1/text-to-speech/${list.voices?.[0]?.voice_id ?? SOME_VOICE}?output_format=mp3_22050_32`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: '.', model_id: DEFAULT_EL_MODEL }),
+  })
+  if (tts.ok) await tts.res.arrayBuffer() // the one character of audio, unused
+  const user = await call(key, '/v1/user/subscription')
+  const result: ElevenLabsCheck = {
+    voices: voices.ok,
+    tts: tts.ok || tts.status !== 'missing_permissions',
+    user: user.ok,
+    // Allowed, but it still can't speak (no characters left, for example).
+    problem: !tts.ok && tts.status !== 'missing_permissions' ? `ElevenLabs: ${tts.message}` : undefined,
+  }
+  checked = { key, result }
+  return result
+}
+
+/** Saves the key once it can list voices and speak; otherwise says which permissions to switch on. */
+export async function saveElevenLabsKey(key: string): Promise<void> {
+  key = key.trim()
+  if (key) {
+    const check = await checkElevenLabsKey(key, true)
+    if (check.problem && !check.voices && !check.tts) throw new Error(check.problem)
+    const missing = [!check.tts && 'Text to Speech', !check.voices && 'Voices (Read)'].filter(Boolean)
+    if (missing.length)
+      throw new Error(
+        `This key is missing ${missing.join(' and ')}. Edit it at elevenlabs.io → Developers → API keys, switch ${missing.length > 1 ? 'them' : 'it'} on, and save it here again.`,
+      )
+  }
+  setSecret('elevenlabs', key)
+}
+
+/** This month's ElevenLabs characters, or null without a key or the key's User permission. */
+export async function elevenLabsUsage(): Promise<ElevenLabsUsage | null> {
+  const key = getSecret('elevenlabs')
+  if (!key) return null
+  const r = await call(key, '/v1/user/subscription')
+  if (!r.ok) return null
+  const s = (await r.res.json()) as { character_count: number; character_limit: number; next_character_count_reset_unix?: number | null; tier: string }
+  return {
+    used: s.character_count,
+    limit: s.character_limit,
+    resetsAt: s.next_character_count_reset_unix ? s.next_character_count_reset_unix * 1000 : undefined,
+    tier: s.tier,
+  }
 }
 
 /** The voices in the user's ElevenLabs account: their own, saved ones and ElevenLabs' defaults. */

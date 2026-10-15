@@ -1,4 +1,4 @@
-import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
+import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
   Agent,
@@ -7,6 +7,8 @@ import type {
   ClaudeDesktopStatus,
   Component,
   ComponentState,
+  ElevenLabsCheck,
+  ElevenLabsUsage,
   MediaItem,
   PlanUsage,
   ProjectMeta,
@@ -94,6 +96,8 @@ function Row(props: { title: ReactNode; text?: ReactNode; children?: ReactNode }
 function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: string) => Promise<void> }) {
   const [key, setKey] = useState('')
   const [replacing, setReplacing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   if (props.saved && !replacing)
     return (
       <div className="inline-form">
@@ -109,30 +113,41 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
       </div>
     )
   const save = async () => {
-    await props.onSave(key.trim())
-    setKey('')
-    setReplacing(false)
+    setBusy(true)
+    setError(null)
+    try {
+      await props.onSave(key.trim())
+      setKey('')
+      setReplacing(false)
+    } catch (e) {
+      setError(errorText(e)) // the key stays typed in, to fix its permissions and save it again
+    } finally {
+      setBusy(false)
+    }
   }
   return (
-    <div className="inline-form">
-      <input
-        className="input"
-        type="password"
-        placeholder={props.placeholder}
-        value={key}
-        autoFocus={replacing}
-        onChange={(e) => setKey(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && key.trim() && void save()}
-      />
-      <button className="btn" disabled={!key.trim()} onClick={() => void save()}>
-        <KeyRound /> Save
-      </button>
-      {replacing && (
-        <button className="btn ghost" onClick={() => setReplacing(false)}>
-          Cancel
+    <>
+      <div className="inline-form">
+        <input
+          className="input"
+          type="password"
+          placeholder={props.placeholder}
+          value={key}
+          autoFocus={replacing}
+          onChange={(e) => setKey(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && key.trim() && !busy && void save()}
+        />
+        <button className="btn" disabled={!key.trim() || busy} onClick={() => void save()}>
+          {busy ? <span className="spinner" /> : <KeyRound />} {busy ? 'Checking…' : 'Save'}
         </button>
-      )}
-    </div>
+        {replacing && (
+          <button className="btn ghost" onClick={() => setReplacing(false)}>
+            Cancel
+          </button>
+        )}
+      </div>
+      {error && <p className="key-error">{error}</p>}
+    </>
   )
 }
 
@@ -580,9 +595,12 @@ function RevoiceRow() {
 
 /** Language, provider and voice: in Settings → Voice and in the new-project dialog. */
 /** What's missing before this voice can speak, or null when it's ready. */
-export function voiceProblem(voice: VoiceSettings | undefined, hasKey: boolean, omnivoice?: ComponentState): string | null {
+export function voiceProblem(voice: VoiceSettings | undefined, hasKey: boolean, omnivoice?: ComponentState, check?: ElevenLabsCheck | null): string | null {
   if (!voice) return 'Choose a voice for the narration.'
   if (voice.provider === 'elevenlabs' && !hasKey) return 'Add your ElevenLabs API key for the narration.'
+  if (voice.provider === 'elevenlabs' && check?.problem && !check.voices && !check.tts) return `${check.problem} Replace the key in the voice settings.`
+  if (voice.provider === 'elevenlabs' && check && (!check.tts || !check.voices))
+    return `Your ElevenLabs key is missing ${[!check.tts && 'Text to Speech', !check.voices && 'Voices (Read)'].filter(Boolean).join(' and ')}: switch ${!check.tts && !check.voices ? 'them' : 'it'} on at elevenlabs.io → Developers → API keys, then check again in the voice settings.`
   if (voice.provider === 'elevenlabs' && !voice.elevenlabs?.voiceId) return 'Choose an ElevenLabs voice for the narration.'
   if (voice.provider === 'omnivoice' && omnivoice !== 'ready') return 'Install the OmniVoice model for the narration.'
   return null
@@ -633,18 +651,19 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
             text={
               settings.hasElevenLabsKey
                 ? 'Saved and encrypted on this computer.'
-                : 'elevenlabs.io → Developers → API keys. If you restrict the key, allow Text to Speech and Voices (read).'
+                : 'elevenlabs.io → Developers → API keys. Give the key Text to Speech (Access) and Voices (Read); User (Access) adds the usage meter. Saving tries them.'
             }
           >
             <KeyField
               saved={settings.hasElevenLabsKey}
               placeholder="sk_…"
               onSave={async (key) => {
-                useStore.setState({ settings: await api.setElevenLabsKey(key) })
+                useStore.setState({ settings: await api.setElevenLabsKey(key), elevenLabsCheck: null })
                 toast(key ? 'Key saved' : 'Key removed', 'ok')
               }}
             />
           </Row>
+          {settings.hasElevenLabsKey && <ElevenLabsStatus />}
           <Row title="Voice" text={`The most used voices in ${languageName.of(voice.language)}, or search the library. ▶ plays a sample.`}>
             <VoicePicker
               language={voice.language}
@@ -989,6 +1008,67 @@ function AboutTab() {
       <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'env' })}>
         Environment →
       </button>
+    </div>
+  )
+}
+
+const PERMISSIONS: { key: 'tts' | 'voices' | 'user'; label: string; why: string }[] = [
+  { key: 'tts', label: 'Text to Speech', why: 'speaks the narration' },
+  { key: 'voices', label: 'Voices: Read', why: 'lists the voices' },
+  { key: 'user', label: 'User', why: 'the usage meter; optional' },
+]
+
+/** The saved ElevenLabs key's permissions, tried for real, and this month's characters. */
+function ElevenLabsStatus() {
+  const check = useStore((s) => s.elevenLabsCheck)
+  const [usage, setUsage] = useState<ElevenLabsUsage | null>(null)
+  const [busy, setBusy] = useState(false)
+  const run = async (again = false) => {
+    setBusy(true)
+    try {
+      const [c, u] = await Promise.all([api.checkElevenLabsKey(again), api.elevenLabsUsage()])
+      useStore.setState({ elevenLabsCheck: c }) // voiceProblem stops a series or quick video on it
+      setUsage(u)
+    } finally {
+      setBusy(false)
+    }
+  }
+  useEffect(() => void (!check && run()), [check]) // again after a new key (cleared when it's saved)
+  const nf = new Intl.NumberFormat()
+  const rejected = !!check?.problem && !check.voices && !check.tts // the key itself, not a permission
+  return (
+    <div className="el-status">
+      <div className="el-permissions">
+        {PERMISSIONS.map((p) => (
+          <span key={p.key} className={!check ? 'faint' : check[p.key] ? 'ok' : p.key === 'user' ? 'faint' : 'bad'} title={p.why}>
+            {!check ? <span className="spinner" /> : check[p.key] ? <Check /> : <X />} {p.label}
+          </span>
+        ))}
+        <button className="link-btn" disabled={busy} onClick={() => void run(true)} title="Tries the key again (speaks one character)">
+          Check again
+        </button>
+      </div>
+      {rejected ? (
+        <p className="key-error">{check.problem} Replace it with a key from elevenlabs.io → Developers → API keys.</p>
+      ) : (
+        <>
+          {check?.problem && <p className="key-error">{check.problem}</p>}
+          {check && (!check.tts || !check.voices) && (
+            <p className="key-error">Edit the key at elevenlabs.io → Developers → API keys and switch on what’s crossed out, then check again.</p>
+          )}
+        </>
+      )}
+      {usage ? (
+        <div className="el-usage" title={`ElevenLabs ${usage.tier} plan`}>
+          <ProgressLine value={usage.limit ? usage.used / usage.limit : 0} />
+          <span className="hint">
+            {nf.format(usage.used)} of {nf.format(usage.limit)} characters this month
+            {usage.resetsAt ? ` · resets ${new Date(usage.resetsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : ''}
+          </span>
+        </div>
+      ) : (
+        check && !check.user && !rejected && <span className="hint">Give the key the User permission to see how many characters are left this month.</span>
+      )}
     </div>
   )
 }

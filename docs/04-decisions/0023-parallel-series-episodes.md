@@ -16,7 +16,9 @@ An unattended series (ADR 0019) made its episodes one after another, each in the
 - **Per-project renders.** Preview renders, frames and the PDF-source tools take a project folder; the open project's renders still report to the window, the others run unseen. While an agent works on an episode, the chat in that project waits.
 - **Studio's check** (`quick.ts` `checkAndFix`) runs on each episode as in quick mode; a passing episode is queued for export at once and its agent slot goes to the next episode.
 - **Usage limits** pause an agent until the reset, then it carries on (`turnPastLimits`).
-- **Home shows the run** (SeriesPanel): each episode's state and what its agent is doing, Stop, and Dismiss when it's over.
+- **Home shows the run** (SeriesPanel): each episode's state, what its agent is doing and what it cost, with Pause and Stop for the series and Pause for an episode.
+- **The run is its states.** A loop (`series.ts` `drive`) hands out the work from each episode's state, and the run is saved in the series folder (`.studio/series-run.json`) on every change. So pausing (the series, or one episode, whose script the writer then skips), stopping and continuing are only states. Stopped also cancels the exports. Continue, also after quitting the app, gives an interrupted step its agent session back with "carry on where you stopped", exports again what didn't finish, and retries what failed.
+- **Its own model and effort** (New series), for planning and every episode; the chat keeps the Settings choice.
 - **Codex** keeps the old one-at-a-time path: its tools reach Studio through the MCP bridge, which works on the open project only.
 
 ## Consequences

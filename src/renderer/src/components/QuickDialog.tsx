@@ -61,7 +61,12 @@ export function QuickDialog() {
   }
 
   // The default voice decides whether the video speaks: without one, the narration stays silent.
-  const voiceIssue = voiceProblem(defaultVoice, hasKey, omnivoice)
+  const elevenLabsCheck = useStore((s) => s.elevenLabsCheck)
+  const voiceIssue = voiceProblem(defaultVoice, hasKey, omnivoice, elevenLabsCheck)
+  // No voice form here: check the key's permissions when it narrates with ElevenLabs.
+  useEffect(() => {
+    if (open && hasKey && defaultVoice?.provider === 'elevenlabs') void api.checkElevenLabsKey().then((c) => useStore.setState({ elevenLabsCheck: c }))
+  }, [open, hasKey])
   const languages = LANGUAGES.includes(language) ? LANGUAGES : [language, ...LANGUAGES]
 
   return (

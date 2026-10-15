@@ -3,32 +3,45 @@
 // its own project (claude.ts studioOptions), records its conversation in the episode's chat.json
 // (opening the episode shows what it did) and keeps the session id, so the chat can carry on later.
 import { randomUUID } from 'node:crypto'
-import type { ChatMessage } from '../shared/types'
+import type { ChatMessage, Effort } from '../shared/types'
+import type { UsageEntry } from '../shared/usage'
 import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
 import { Inbox, sdk, studioOptions, summarize, type TurnResult } from './claude'
 import { fakeAgent, fakeAgents } from './agent-fake'
 import { commitAll } from './git'
 import { readChat, updateMetaAt, writeChat } from './projects'
+import { recordTurn } from './usage'
 
 export interface EpisodeAgent {
-  /** One turn: sends `text` and waits for Claude to finish. */
-  turn(text: string): Promise<TurnResult>
+  /** One turn: sends `text` and waits for Claude to finish. `step` labels its usage ("Script", "Video"…). */
+  turn(text: string, step: string): Promise<TurnResult>
   close(): void
+}
+
+export interface AgentOptions {
+  onTool: (summary: string) => void
+  onUsage: (entry: UsageEntry) => void
+  model?: string // the series' own choice; otherwise the chat's (Settings)
+  effort?: Effort
 }
 
 /** Projects a background agent is working on: the chat leaves them alone until it's done. */
 export const agentBusy = new Set<string>()
 
-export async function episodeAgent(dir: string, onTool: (summary: string) => void): Promise<EpisodeAgent> {
-  if (fakeAgents()) return fakeAgent(dir, onTool) // driving the app in tests
+export async function episodeAgent(dir: string, opts: AgentOptions): Promise<EpisodeAgent> {
+  if (fakeAgents()) return fakeAgent(dir, opts) // driving the app in tests
+  const { onTool } = opts
   const { query } = await sdk()
   const inbox = new Inbox()
-  const q = query({ prompt: inbox, options: await studioOptions(dir, { autopilot: true }) })
+  const q = query({ prompt: inbox, options: await studioOptions(dir, { autopilot: true, model: opts.model, effort: opts.effort }) })
   agentBusy.add(dir)
   const messages = readChat(dir)
   let reply = null as ChatMessage | null // the turn being answered (set by turn())
   let done: ((r: TurnResult) => void) | null = null
   let limit: Limit | null = null
+  let step = '' // the turn's label and its tool calls, for the usage log
+  let tools: Record<string, number> = {}
+  let started = 0
 
   const finish = (ok: boolean, error?: string) => {
     const resolve = done
@@ -52,6 +65,7 @@ export async function episodeAgent(dir: string, onTool: (summary: string) => voi
             if (block.type === 'tool_use') {
               const summary = summarize(block.name, block.input)
               reply.parts.push({ kind: 'tool', id: block.id, name: block.name, summary, status: 'running' })
+              tools[block.name] = (tools[block.name] ?? 0) + 1
               onTool(summary)
             }
           }
@@ -64,6 +78,7 @@ export async function episodeAgent(dir: string, onTool: (summary: string) => voi
         } else if (msg.type === 'result') {
           const ok = msg.subtype === 'success' && !msg.is_error
           if (!ok && msg.subtype === 'success') limit = limitFromText(msg.result) ?? limit
+          if (step) opts.onUsage(recordTurn(dir, step, msg, tools, Date.now() - started))
           finish(ok, ok ? undefined : msg.subtype === 'success' ? msg.result : msg.errors?.join('\n'))
         }
       }
@@ -75,8 +90,11 @@ export async function episodeAgent(dir: string, onTool: (summary: string) => voi
   })()
 
   return {
-    async turn(text) {
+    async turn(text, label) {
       const result = new Promise<TurnResult>((resolve) => (done = resolve))
+      step = label
+      tools = {}
+      started = Date.now()
       messages.push({ id: randomUUID(), role: 'user', parts: [{ kind: 'text', text }], at: Date.now() })
       reply = { id: randomUUID(), role: 'assistant', parts: [], at: Date.now() }
       messages.push(reply)
