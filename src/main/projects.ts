@@ -113,6 +113,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
     scriptFirst: input.scriptFirst ?? true,
     series: input.series,
     exercise: input.exercise,
+    captionBand: true,
     fps: 30,
     createdAt: new Date().toISOString(),
     voice: { ...(input.voice ?? getSettings().defaultVoice), language: input.language || input.voice?.language || getSettings().defaultVoice.language },
