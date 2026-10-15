@@ -34,15 +34,15 @@ function readInfo(name: string, dir = requireProject().path): SourceInfo | null 
   return JSON.parse(readFileSync(file, 'utf8')) as SourceInfo
 }
 
-async function info(name: string): Promise<SourceInfo> {
-  const ready = readInfo(name)
+async function info(name: string, dir = requireProject().path): Promise<SourceInfo> {
+  const ready = readInfo(name, dir)
   if (ready) return ready
-  const pdf = join(folder(), name)
+  const pdf = join(folder(dir), name)
   let running = indexing.get(pdf)
   if (!running) {
     running = (async () => {
       try {
-        const done = await (await runRunner<{ info: SourceInfo }>('default', ['pdf-index', pdf, cache(name)])).done
+        const done = await (await runRunner<{ info: SourceInfo }>('default', ['pdf-index', pdf, cache(name, dir)])).done
         return done.info
       } catch (e) {
         throw new Error(friendly(e as Error, name))
@@ -67,7 +67,9 @@ export async function listSources(): Promise<SourceItem[]> {
   const dir = folder()
   if (!existsSync(dir)) return []
   const items: SourceItem[] = []
-  for (const name of readdirSync(dir).filter((n) => PDF.test(n)).sort()) {
+  for (const name of readdirSync(dir)
+    .filter((n) => PDF.test(n))
+    .sort()) {
     const item: SourceItem = { name, size: statSync(join(dir, name)).size }
     try {
       const i = await info(name)
@@ -121,27 +123,37 @@ export async function removeSource(name: string): Promise<SourceItem[]> {
   return listSources()
 }
 
-export async function sourcePageCount(name: string): Promise<number> {
-  return (await info(requireSource(name))).pages
+export async function sourcePageCount(name: string, dir = requireProject().path): Promise<number> {
+  return (await info(requireSource(name, dir), dir)).pages
 }
 
 /** Page images (1-based page numbers), rendered once per width and kept in the index folder. */
-export async function sourcePages(name: string, pages: number[], width: number): Promise<string[]> {
-  name = requireSource(name)
-  const { pages: count } = await info(name)
+export async function sourcePages(name: string, pages: number[], width: number, dir = requireProject().path): Promise<string[]> {
+  name = requireSource(name, dir)
+  const { pages: count } = await info(name, dir)
   const wanted = pages.filter((n) => Number.isInteger(n) && n >= 1 && n <= count)
   if (!wanted.length) return []
-  const done = await (await runRunner<{ paths: string[] }>('default', ['pdf-pages', join(folder(), name), cache(name), '--pages', wanted.join(','), '--width', String(width)])).done
+  const done = await (
+    await runRunner<{ paths: string[] }>('default', [
+      'pdf-pages',
+      join(folder(dir), name),
+      cache(name, dir),
+      '--pages',
+      wanted.join(','),
+      '--width',
+      String(width),
+    ])
+  ).done
   return done.paths
 }
 
 /** The text of pages from..to (1-based, inclusive), each after its "=== Page N ===" line. */
-export async function sourceText(name: string, from = 1, to = Infinity): Promise<string> {
-  name = requireSource(name)
-  const i = await info(name)
+export async function sourceText(name: string, from = 1, to = Infinity, dir = requireProject().path): Promise<string> {
+  name = requireSource(name, dir)
+  const i = await info(name, dir)
   const last = Math.min(to, i.pages)
   if (from > last) throw new Error(`${name} has ${i.pages} pages.`)
-  const text = readFileSync(join(cache(name), 'text.txt'), 'utf8')
+  const text = readFileSync(join(cache(name, dir), 'text.txt'), 'utf8')
   const start = text.indexOf(`=== Page ${from} ===`)
   const end = last < i.pages ? text.indexOf(`=== Page ${last + 1} ===`) : text.length
   let out = text.slice(start, end).trimEnd()
@@ -157,15 +169,19 @@ export async function sourceText(name: string, from = 1, to = Infinity): Promise
 }
 
 /** The PDF named by Claude, forgiving a "sources/" prefix; or an error that lists what is there. */
-export function requireSource(name: string): string {
+export function requireSource(name: string, dir = requireProject().path): string {
   const clean = basename(name.replace(/\\/g, '/'))
-  if (existsSync(join(folder(), clean)) && PDF.test(clean)) return clean
-  const there = sourceNames().join(', ')
+  if (existsSync(join(folder(dir), clean)) && PDF.test(clean)) return clean
+  const there = sourceNames(dir).join(', ')
   throw new Error(`No source "${name}". In sources/: ${there || 'nothing yet'}`)
 }
 
 export function sourceNames(dir = requireProject().path): string[] {
-  return existsSync(folder(dir)) ? readdirSync(folder(dir)).filter((n) => PDF.test(n)).sort() : []
+  return existsSync(folder(dir))
+    ? readdirSync(folder(dir))
+        .filter((n) => PDF.test(n))
+        .sort()
+    : []
 }
 
 /** What Claude is told about the PDFs (in-app chat and Claude Desktop alike). */

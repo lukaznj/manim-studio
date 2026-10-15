@@ -1,5 +1,6 @@
-// One preview render at a time: a new request cancels the one in flight (the newest
-// source always wins). Final renders run separately for export.
+// One preview render at a time per project: a new request cancels the one in flight (the newest
+// source always wins). The open project's renders report to the window; a series' episodes render
+// in the background. Final renders run separately for export.
 import type { ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync } from 'node:fs'
@@ -7,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { ProjectMeta, Quality, RenderError, RenderEvent, Theme, Timeline } from '../shared/types'
 import { commitAll } from './git'
-import { readTimeline, requireProject } from './projects'
+import { project, readMeta, readTimeline, requireProject } from './projects'
 import { killJob, pauseTag, runRunner } from './runner'
 import { getSettings } from './settings'
 import { voiceEnv } from './voice'
@@ -19,13 +20,14 @@ interface Running {
   outcome: Promise<RenderOutcome>
 }
 
-const running = new Map<Quality, Running>()
+const running = new Map<string, Running>() // by project folder and quality
+const key = (dir: string, quality: Quality) => `${dir}\n${quality}`
 let nextId = 1
-let send: (e: RenderEvent) => void = () => {}
+let sendEvent: (e: RenderEvent) => void = () => {}
 let commitsPaused = false
 
 export function onRenderEvent(fn: (e: RenderEvent) => void): void {
-  send = fn
+  sendEvent = fn
 }
 
 /** While Claude works, renders don't commit; the turn commits once at the end. */
@@ -43,12 +45,15 @@ export interface RenderVariant {
   upto?: number
 }
 
-export function render(quality: Quality, variant: RenderVariant = {}): Promise<RenderOutcome> {
-  running.get(quality)?.cancel()
-  if (quality === 'preview') pauseTag('preview', false) // asking for a render means you want it to run
-  const p = requireProject()
+export function render(quality: Quality, variant: RenderVariant = {}, dir = requireProject().path): Promise<RenderOutcome> {
+  const k = key(dir, quality)
+  running.get(k)?.cancel()
+  const open = project()?.path === dir
+  const send: typeof sendEvent = open ? sendEvent : () => {} // only the window's project shows its renders
+  if (quality === 'preview' && open) pauseTag('preview', false) // asking for a render means you want it to run
+  const meta = open ? project()!.meta : readMeta(dir)
   const id = nextId++
-  const expectedClips = readTimeline(p.path, quality)?.clips.length ?? readTimeline(p.path)?.clips.length ?? 0
+  const expectedClips = readTimeline(dir, quality)?.clips.length ?? readTimeline(dir)?.clips.length ?? 0
   send({ id, quality, type: 'start', expectedClips })
 
   let cancelled = false
@@ -60,7 +65,7 @@ export function render(quality: Quality, variant: RenderVariant = {}): Promise<R
     },
     outcome: Promise.resolve({ cancelled: true }),
   }
-  running.set(quality, entry)
+  running.set(k, entry)
 
   entry.outcome = (async (): Promise<RenderOutcome> => {
     let log = ''
@@ -75,9 +80,9 @@ export function render(quality: Quality, variant: RenderVariant = {}): Promise<R
               ...(variant.size ? ['--size', String(variant.size)] : []),
               ...(variant.fps ? ['--fps', String(variant.fps)] : []),
             ]
-      const job = await runRunner<{ result: Timeline }>('default', ['render', p.path, '--quality', quality, ...options], {
-        extraEnv: await voiceEnv(p.meta, p.path),
-        tag: quality === 'preview' ? 'preview' : undefined,
+      const job = await runRunner<{ result: Timeline }>('default', ['render', dir, '--quality', quality, ...options], {
+        extraEnv: await voiceEnv(meta, dir),
+        tag: quality === 'preview' && open ? 'preview' : undefined,
         onEvent: (e) => {
           if (e.type === 'progress') send({ id, quality, type: 'progress', clips: Number(e.clips), t: Number(e.t) })
         },
@@ -86,7 +91,7 @@ export function render(quality: Quality, variant: RenderVariant = {}): Promise<R
       if (cancelled) killJob(child)
       const { result } = await job.done.finally(() => (log = job.log()))
       send({ id, quality, type: 'done', timeline: result })
-      if (quality === 'preview') void afterPreview(p.path, result)
+      if (quality === 'preview') void afterPreview(dir, open)
       return { timeline: result }
     } catch (e) {
       const err = e as Error & { cancelled?: boolean; event?: Record<string, unknown>; log?: string }
@@ -103,7 +108,7 @@ export function render(quality: Quality, variant: RenderVariant = {}): Promise<R
       send({ id, quality, type: 'error', error })
       return { error }
     } finally {
-      if (running.get(quality) === entry) running.delete(quality)
+      if (running.get(k) === entry) running.delete(k)
     }
   })()
   return entry.outcome
@@ -128,7 +133,12 @@ export async function renderFinal(
   if (variant.from !== undefined) args.push('--from', String(variant.from))
   if (variant.upto !== undefined) args.push('--upto', String(variant.upto))
   const job = await runRunner<{ result: Timeline }>('default', args, {
-    extraEnv: { ...(await voiceEnv(meta, dir)), ...(opts.cacheDir ? { STUDIO_CACHE_DIR: opts.cacheDir } : {}), ...(opts.partialDir ? { STUDIO_PARTIAL_DIR: opts.partialDir } : {}), ...(opts.offlineVoice ? { STUDIO_VOICE_OFFLINE: '1' } : {}) },
+    extraEnv: {
+      ...(await voiceEnv(meta, dir)),
+      ...(opts.cacheDir ? { STUDIO_CACHE_DIR: opts.cacheDir } : {}),
+      ...(opts.partialDir ? { STUDIO_PARTIAL_DIR: opts.partialDir } : {}),
+      ...(opts.offlineVoice ? { STUDIO_VOICE_OFFLINE: '1' } : {}),
+    },
     onEvent: (e) => e.type === 'progress' && opts.onProgress?.(Number(e.t)),
     signal: opts.signal,
     tag: opts.tag,
@@ -143,13 +153,13 @@ export async function renderFinal(
   }
 }
 
-export function cancel(quality: Quality = 'preview'): void {
-  running.get(quality)?.cancel()
+export function cancel(quality: Quality = 'preview', dir = project()?.path): void {
+  if (dir) running.get(key(dir, quality))?.cancel()
 }
 
-/** The render in flight, or a fresh one. */
-export function currentOrNewRender(): Promise<RenderOutcome> {
-  return running.get('preview')?.outcome ?? render('preview')
+/** The project's preview render in flight, or a fresh one. */
+export function currentOrNewRender(dir = requireProject().path): Promise<RenderOutcome> {
+  return running.get(key(dir, 'preview'))?.outcome ?? render('preview', {}, dir)
 }
 
 export async function frame(t: number, width?: number): Promise<string> {
@@ -159,21 +169,19 @@ export async function frame(t: number, width?: number): Promise<string> {
 
 /** Frames of the latest preview, extracted by one runner call into a fresh folder (parallel
  *  calls once shared a Date.now() filename and handed Claude each other's half-written PNGs). */
-async function frames(times: number[], width: number | undefined, parent: string): Promise<string[]> {
-  const p = requireProject()
-  const timeline = readTimeline(p.path)
+async function frames(times: number[], width: number | undefined, parent: string, dir = requireProject().path): Promise<string[]> {
+  const timeline = readTimeline(dir)
   if (!timeline) throw new Error('Nothing has been rendered yet')
-  const dir = join(parent, randomUUID())
-  mkdirSync(dir, { recursive: true })
+  const out = join(parent, randomUUID())
+  mkdirSync(out, { recursive: true })
   const clamped = times.map((t) => Math.min(Math.max(t, 0), Math.max(timeline.duration - 0.01, 0)))
-  const args = ['frames', timeline.video, dir, '--times', clamped.join(','), ...(width ? ['--width', String(width)] : [])]
+  const args = ['frames', timeline.video, out, '--times', clamped.join(','), ...(width ? ['--width', String(width)] : [])]
   const { paths } = await (await runRunner<{ paths: string[] }>('default', args)).done
   return paths
 }
 
-export async function framesBase64(times: number[], width?: number): Promise<string[]> {
-  const dir = join(tmpdir(), 'manim-studio-frames')
-  const outs = await frames(times, width, dir)
+export async function framesBase64(times: number[], width?: number, dir = requireProject().path): Promise<string[]> {
+  const outs = await frames(times, width, join(tmpdir(), 'manim-studio-frames'), dir)
   try {
     return outs.map((f) => readFileSync(f).toString('base64'))
   } finally {
@@ -185,12 +193,15 @@ export async function frameBase64(t: number, width?: number): Promise<string> {
   return (await framesBase64([t], width))[0]
 }
 
-async function afterPreview(dir: string, _timeline: Timeline): Promise<void> {
+/** The thumbnail, and a commit for the user's own edits (Claude's turns commit once at their end). */
+async function afterPreview(dir: string, open: boolean): Promise<void> {
   try {
     const out = join(dir, '.studio', 'thumbnail.jpg')
-    await (await runRunner('default', ['thumbnail', join(dir, '.studio', 'preview', 'timeline.json'), out, '--width', '480'])).done
+    await (
+      await runRunner('default', ['thumbnail', join(dir, '.studio', 'preview', 'timeline.json'), out, '--width', '480'])
+    ).done
   } catch {
     // a missing thumbnail is cosmetic
   }
-  if (!commitsPaused) await commitAll(dir, 'Edit', 'user').catch(() => null)
+  if (open && !commitsPaused) await commitAll(dir, 'Edit', 'user').catch(() => null)
 }

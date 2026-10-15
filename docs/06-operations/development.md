@@ -46,6 +46,7 @@ The commands are `launch`, `ss`, `click`, `click-text`, `mouse`, `drag <sel> <dx
 Things that bit during development:
 
 - Scope selectors to `dialog[open]`. Closed dialogs stay in the DOM.
+- `STUDIO_FAKE_AGENT=1 node scripts/drive.mjs` makes a series' background agents stand-ins (`src/main/agent-fake.ts`): they write a script and a scene and render them, so a whole unattended series runs without a signed-in agent. `limit` also hits one usage limit. Honored only with `STUDIO_USER_DATA`.
 - Secrets (API keys, render server tokens) are plain files in the driver's data folder (`STUDIO_PLAIN_SECRETS`, honored only with `STUDIO_USER_DATA`). Otherwise `safeStorage` would use the installed app's keychain item, macOS would ask the generic "Electron" binary for access, and the main process would block until someone answers.
 - The driver leaves `prefers-color-scheme` to the app (Playwright would pin it to light). Switch themes with `eval window.studio.setSettings({appearance:'light'})`.
 - Monaco has no `Cmd+End`; click a line and type.

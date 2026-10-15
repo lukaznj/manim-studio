@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { ago, timecode } from '../lib/time'
 import { installComponent, openDialog, openProject, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
 import { ProgressLine } from './ui'
+import { SeriesPanel } from './SeriesPanel'
 
 export function Home() {
   const projects = useStore((s) => s.projects)
@@ -48,6 +49,7 @@ export function Home() {
         </header>
 
         {needsSetup && <SetupPanel />}
+        <SeriesPanel />
 
         {projects.length === 0 ? (
           <EmptyState />
@@ -219,7 +221,7 @@ function SetupPanel() {
           <span className="step-icon">{claude?.loggedIn ? <Check /> : <Sparkles />}</span>
           <div className="step-body">
             <div className="step-title">
-              Claude <span className="faint">· {claude?.loggedIn ? claude.email ?? claude.subscription ?? 'Signed in' : 'Not signed in'}</span>
+              Claude <span className="faint">· {claude?.loggedIn ? (claude.email ?? claude.subscription ?? 'Signed in') : 'Not signed in'}</span>
             </div>
             <div className="hint">
               {loggingIn

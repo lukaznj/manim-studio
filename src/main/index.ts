@@ -26,7 +26,7 @@ import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
 import { watchMemory } from './memory'
 import { quickRun, setupQuick, startQuick, stopQuick } from './quick'
-import { planSeries, startSeries, writeEpisodeBible } from './series'
+import { dismissSeries, planSeries, seriesRun, setupSeries, startSeries, stopSeries, writeEpisodeBible } from './series'
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
@@ -251,6 +251,9 @@ function registerIpc(): void {
   })
   handle('cancelSeriesPlan', () => planning?.abort())
   handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
+  handle('seriesRun', () => seriesRun())
+  handle('stopSeries', () => stopSeries())
+  handle('dismissSeries', () => dismissSeries())
   handle('renderServers', () => listServers())
   handle('addServer', (code: string) => addServer(code))
   handle('removeServer', (id: string) => removeServer(id))
@@ -330,6 +333,7 @@ app.whenReady().then(() => {
   onRenderEvent((e) => send('render', e))
   onExportsChanged((jobs) => send('exports', jobs))
   setupQuick({ send: (run) => send('quick', run), openInWindow })
+  setupSeries((run) => send('series', run))
   onSetupEvent((e) => send('setup', e))
   onWorkerLog((e) => send('setup', e))
   onChatEvent((e) => send('chat', e))
@@ -364,13 +368,14 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', (e) => {
-  // Exports live in memory: quitting would stop them, so ask first.
-  if (exportsBusy()) {
+  // Exports and a series being made live in memory: quitting would stop them, so ask first.
+  const making = seriesRun()?.state === 'working'
+  if (exportsBusy() || making) {
     const choice = dialog.showMessageBoxSync({
       type: 'warning',
-      message: 'Exports are still running',
-      detail: 'Quitting stops them and drops the ones waiting.',
-      buttons: ['Keep exporting', 'Quit anyway'],
+      message: making ? 'A series is still being made' : 'Exports are still running',
+      detail: making ? 'Quitting stops its agents and exports. The episodes keep what was made so far.' : 'Quitting stops them and drops the ones waiting.',
+      buttons: [making ? 'Keep making it' : 'Keep exporting', 'Quit anyway'],
       defaultId: 0,
       cancelId: 0,
     })
@@ -381,6 +386,7 @@ app.on('before-quit', (e) => {
     }
   }
   resumeAll() // nothing stays stopped behind the app
+  stopSeries()
   stopTtsWorker()
   closeChat()
 })

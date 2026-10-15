@@ -4,7 +4,7 @@ import { api } from '../lib/api'
 import { editorBridge } from '../lib/editor-bridge'
 import { playback } from '../lib/playback'
 import { shortcut } from '../lib/platform'
-import { openDialog, renderNow, saveScene, sendChat, useStore } from '../store'
+import { openDialog, renderNow, renderProgress, saveScene, sendChat, useStore } from '../store'
 
 export function PreviewPane() {
   const timeline = useStore((s) => s.timeline)
@@ -65,9 +65,8 @@ export function PreviewPane() {
           )}
           {captions && timeline && <CaptionOverlay />}
           {render.status === 'rendering' && src && (
-            <div className="frame-status">
-              {render.paused ? <Pause /> : <span className="spinner" />} {render.paused ? 'Paused' : 'Rendering'}
-              {render.expected ? ` ${render.clips ?? 0}${(render.clips ?? 0) <= render.expected ? `/${render.expected}` : ''}` : '…'}
+            <div className="frame-status" title={renderProgress(render).title}>
+              {render.paused ? <Pause /> : <span className="spinner" />} {renderProgress(render).label} {renderProgress(render).detail}
             </div>
           )}
         </div>

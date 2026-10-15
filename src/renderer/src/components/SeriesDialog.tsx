@@ -17,6 +17,8 @@ export function SeriesDialog() {
   const defaultVoice = useStore((s) => s.settings?.defaultVoice)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
   const omnivoice = useStore((s) => s.setup?.omnivoice)
+  const codex = useStore((s) => s.settings?.agent === 'codex')
+  const agents = useStore((s) => s.settings?.seriesAgents || 3)
   const [pdfs, setPdfs] = useState<string[]>([])
   const [title, setTitle] = useState('')
   const [aspect, setAspect] = useState<Aspect>('16:9')
@@ -88,7 +90,14 @@ export function SeriesDialog() {
         unattended,
       })
       closeDialog()
-      toast(unattended ? `Making ${plan.episodes.length} episodes, one after another.` : `Created ${plan.episodes.length} episodes. Here's the first.`, 'ok')
+      toast(
+        unattended
+          ? codex
+            ? `Making ${plan.episodes.length} episodes, one after another.`
+            : `Making ${plan.episodes.length} episodes. Home shows how each one is going.`
+          : `Created ${plan.episodes.length} episodes. Here's the first.`,
+        'ok',
+      )
     } catch (e) {
       toast(errorText(e), 'error')
       setBusy(null)
@@ -231,7 +240,10 @@ export function SeriesDialog() {
             <span>
               Make every episode now, unattended{' '}
               <span className="hint">
-                In quick mode, one after another, each exported when it's done. Off: the episodes are created, and you make each in the editor.
+                {codex
+                  ? 'One after another, each exported when it’s done.'
+                  : `First every script, one after another, then the videos ${agents} at a time (Settings → Agent), each exported when it’s done.`}{' '}
+                Off: the episodes are created, and you make each in the editor.
               </span>
             </span>
           </label>
