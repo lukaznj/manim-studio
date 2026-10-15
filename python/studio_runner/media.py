@@ -41,14 +41,21 @@ def frames(video: str, times: list[float], outs: list[str], width: int | None = 
 def thumbnail(timeline: dict, out: str, width: int) -> float:
     """Saves the most "contentful" frame among a few candidates and returns its time.
 
-    Candidates are section ends and late points in the video, where diagrams are most
-    complete; the score is pixel variation, which an empty background doesn't have."""
+    Candidates are section ends (past the title) and late points in the video, where diagrams
+    are most complete; the score is pixel variation, which an empty background doesn't have."""
     import av
     from PIL import ImageStat
 
     d = timeline["duration"]
+    if timeline.get("thumbnail"):  # the scene marked the moment showing its core idea
+        from .card import concept_time
+
+        t = concept_time(timeline)
+        with av.open(timeline["video"]) as container:
+            _fit(_grab(container, container.streams.video[0], t), width).convert("RGB").save(out, quality=88)
+        return t
     times = sorted({round(min(max(t, 0), d - 0.05), 2) for t in
-                    [s["end"] - 0.05 for s in timeline["sections"] if s["end"] > s["start"]]
+                    [s["end"] - 0.05 for s in (timeline["sections"][1:] or timeline["sections"]) if s["end"] > s["start"]]
                     + [d * 0.5, d * 0.75, d - 0.05]})
     best, best_score, best_t = None, -1.0, 0.0
     with av.open(timeline["video"]) as container:

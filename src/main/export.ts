@@ -31,6 +31,13 @@ export function snapshotProject(project: string, to: string): void {
   cpSync(project, to, { recursive: true, filter: (src) => !skip.has(relative(project, src).split(sep)[0]) })
 }
 
+/** The thumbnail's words: a series episode or an exercise gets its number and its series' or set's name. */
+function cardArgs(meta: ProjectMeta): string[] {
+  const badge = meta.series ? `#${meta.series.episode}` : meta.exercise ? `#${meta.exercise.number}` : ''
+  const kicker = meta.series?.title ?? meta.exercise?.title ?? ''
+  return ['--text', meta.name, ...(badge ? ['--badge', badge] : []), ...(kicker ? ['--kicker', kicker] : [])]
+}
+
 /** Exports `project` by rendering a copy of it in `work` (an empty folder the caller removes). */
 export async function exportVideo(project: string, work: string, options: ExportOptions, progress: Progress, signal?: AbortSignal, tag?: string): Promise<ExportResult> {
   progress({ stage: 'Copying the project' })
@@ -54,7 +61,9 @@ export async function exportVideo(project: string, work: string, options: Export
   let timelinePath = ''
 
   /** A theme's rendered video in `base`: keep it, and one set of subtitles named by language. */
+  const cards: { base: string; timeline: string }[] = []
   const keep = (theme: string, base: string, timeline: string) => {
+    cards.push({ base, timeline })
     videos.push(`${base}.mp4`)
     files.push(`${base}.mp4`, `${base}.jpg`)
     // Subtitles don't depend on the theme.
@@ -100,6 +109,17 @@ export async function exportVideo(project: string, work: string, options: Export
         keep(theme, base, timeline)
       }
     files.push(join(folder, `${slug}.${original}.srt`), join(folder, `${slug}.${original}.vtt`))
+
+    // The thumbnail made for publishing (card.py): the key picture, its hook, number and series.
+    progress({ stage: 'Making the thumbnail' })
+    for (const c of cards) {
+      try {
+        await (await runRunner('default', ['thumbnail-card', c.timeline, `${c.base}.jpg`, ...cardArgs(meta)], { signal, tag })).done
+      } catch (e) {
+        if (signal?.aborted) throw e
+        warnings.push(`The thumbnail stayed a plain frame: ${(e as Error).message}`)
+      }
+    }
 
     const narration = [...new Set((JSON.parse(readFileSync(timelinePath, 'utf8')) as Timeline).voice.map((v) => v.text))]
     for (const lang of options.languages.filter((l) => l !== original)) {

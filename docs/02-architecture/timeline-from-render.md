@@ -4,13 +4,14 @@ The central idea ([[../04-decisions/0002-timeline-derived-from-render|ADR 0002]]
 
 ## How the runner records it
 
-`python/studio_runner/render.py` monkeypatches three things before the scene is built:
+`python/studio_runner/render.py` monkeypatches four things before the scene is built:
 
 | Patched | Recorded |
 |---|---|
 | `Scene.play`, which `wait()` also goes through | start/end time (`renderer.time`), the animations and their targets, and the **innermost `scene.py` line** on the call stack |
 | `Scene.next_section` | name, start time, line |
 | `VoiceoverScene._add_voiceover_text` | start/end, spoken text, the recording key, the audio source used, bookmark times |
+| `StudioScene.thumbnail` (a no-op outside a render) | the moment marked as the video's key picture and its hook text, for the exported thumbnail ([[../04-decisions/0026-thumbnail-card\|ADR 0026]]) |
 
 Subtitles come from `file_writer.subcaptions`. Layout warnings come from `layout.py`, which runs after every `play()` and flags text outside the frame and text overlapping text.
 

@@ -52,6 +52,11 @@ class StudioScene(VoiceoverScene):
             bg.scale(max(FRAME_W / bg.width, FRAME_H / bg.height)).set_z_index(-1000)
             self.add(bg)
 
+    def thumbnail(self, text: str | None = None) -> None:
+        """Marks this moment for the video's thumbnail: call it right after the animation that
+        completes the key picture. `text` is the hook printed on it (2 to 5 words). The renderer
+        records it; outside a Studio render it does nothing."""
+
 
 def fit(mobject: Mobject, width: float = SAFE_W, height: float = SAFE_H) -> Mobject:
     """Scale `mobject` down (never up) so it fits in width x height. Returns it."""
