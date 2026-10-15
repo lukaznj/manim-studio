@@ -8,6 +8,7 @@ import { closeDialog, errorText, openDialog, toast, useStore } from '../store'
 import { ExportOn } from './ExportDialog'
 import { voiceProblem } from './SettingsDialog'
 import { Modal, Tabs } from './ui'
+import { useVoiceFor } from './VoicePicker'
 
 /**
  * Quick mode: say what the video should show, attach PDFs, and Studio makes it and exports it
@@ -26,6 +27,7 @@ export function QuickDialog() {
   const [server, setServer] = useState<string | undefined>()
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
   const [language, setLanguage] = useState('en')
+  const voice = useVoiceFor(language)
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -50,7 +52,7 @@ export function QuickDialog() {
         theme,
         tone,
         language,
-        voice: defaultVoice ? { ...defaultVoice, language } : undefined,
+        voice,
         export: { themes: both ? ['dark', 'light'] : [theme], languages: [], languageVideos: false, server },
       })
       closeDialog()
@@ -62,7 +64,7 @@ export function QuickDialog() {
 
   // The default voice decides whether the video speaks: without one, the narration stays silent.
   const elevenLabsCheck = useStore((s) => s.elevenLabsCheck)
-  const voiceIssue = voiceProblem(defaultVoice, hasKey, omnivoice, elevenLabsCheck)
+  const voiceIssue = voiceProblem(voice, hasKey, omnivoice, elevenLabsCheck)
   // No voice form here: check the key's permissions when it narrates with ElevenLabs.
   useEffect(() => {
     if (open && hasKey && defaultVoice?.provider === 'elevenlabs') void api.checkElevenLabsKey().then((c) => useStore.setState({ elevenLabsCheck: c }))
@@ -154,6 +156,7 @@ export function QuickDialog() {
                 </option>
               ))}
             </select>
+            {voice?.provider === 'elevenlabs' && voice.elevenlabs?.voiceName && <span className="hint">Voice: {voice.elevenlabs.voiceName}</span>}
           </div>
         </div>
         <div className="quick-row">

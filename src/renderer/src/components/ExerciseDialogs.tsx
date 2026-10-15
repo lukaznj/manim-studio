@@ -7,6 +7,7 @@ import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, createExerciseSet, errorText, openDialog, toast, useStore } from '../store'
 import { voiceProblem } from './SettingsDialog'
 import { Modal, Tabs } from './ui'
+import { useVoiceFor } from './VoicePicker'
 
 const FILE = /\.(png|jpe?g|gif|webp|pdf)$/i
 const fileName = (p: string) => p.split(/[\\/]/).pop() ?? p
@@ -86,6 +87,7 @@ export function NewExerciseSetDialog() {
   const [theme, setTheme] = useState<Theme>('dark')
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
   const [language, setLanguage] = useState('en')
+  const voice = useVoiceFor(language)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -99,7 +101,7 @@ export function NewExerciseSetDialog() {
     if (open && hasKey && defaultVoice?.provider === 'elevenlabs') void api.checkElevenLabsKey().then((c) => useStore.setState({ elevenLabsCheck: c }))
   }, [open, hasKey])
 
-  const voiceIssue = voiceProblem(defaultVoice, hasKey, omnivoice, elevenLabsCheck)
+  const voiceIssue = voiceProblem(voice, hasKey, omnivoice, elevenLabsCheck)
   const languages = LANGUAGES.includes(language) ? LANGUAGES : [language, ...LANGUAGES]
   const start = async () => {
     if (!hasInput(input) || busy || voiceIssue) return
@@ -111,7 +113,7 @@ export function NewExerciseSetDialog() {
       aspect,
       theme,
       tone,
-      voice: defaultVoice ? { ...defaultVoice, language } : undefined,
+      voice,
       input,
     })
     if (!ok) setBusy(false)
@@ -161,6 +163,7 @@ export function NewExerciseSetDialog() {
                 </option>
               ))}
             </select>
+            {voice?.provider === 'elevenlabs' && voice.elevenlabs?.voiceName && <span className="hint">Voice: {voice.elevenlabs.voiceName}</span>}
           </div>
           <div className="field">
             <span className="label">Format</span>

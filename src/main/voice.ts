@@ -152,6 +152,7 @@ interface LibraryVoice {
   use_case?: string
   preview_url?: string
   cloned_by_count?: number
+  verified_languages?: { language?: string; preview_url?: string | null }[]
 }
 
 /**
@@ -165,6 +166,7 @@ export async function elevenLabsLibrary(language: string, search: string): Promi
   const query = new URLSearchParams({ language: language.split('-')[0], sort: 'usage_character_count_1y', page_size: key ? '10' : '3' })
   if (search.trim()) query.set('search', search.trim())
   const data = await elevenLabs<{ voices: LibraryVoice[] }>(`/v1/shared-voices?${query}`, key)
+  const lang = language.split('-')[0]
   return data.voices.map((v) => ({
     id: v.voice_id,
     name: v.name,
@@ -172,9 +174,47 @@ export async function elevenLabsLibrary(language: string, search: string): Promi
       .filter(Boolean)
       .map((label) => String(label).replace(/_/g, ' ')) // "middle_aged" → "middle aged"
       .join(' · '),
-    preview: v.preview_url,
+    // The sample in the chosen language when the voice has one: the top-level one is often English.
+    preview: v.verified_languages?.find((l) => l.language === lang && l.preview_url)?.preview_url ?? v.preview_url,
     users: v.cloned_by_count,
   }))
+}
+
+/** Voices users picked as the best for a language, by the start of their library name. */
+const PREFERRED: Record<string, string> = {
+  hr: 'Slobodan - Persuasive',
+}
+
+/** The voice a language starts with: the preferred one when the library has it, else its most used. */
+export async function elevenLabsDefaultVoice(language: string): Promise<VoiceOption | null> {
+  const lang = language.split('-')[0]
+  const preferred = PREFERRED[lang]
+  if (preferred && getSecret('elevenlabs')) {
+    const found = (await elevenLabsLibrary(lang, preferred.split(' ')[0]).catch(() => [])).find((v) => v.name.startsWith(preferred))
+    if (found) return found
+  }
+  return (await elevenLabsLibrary(lang, '').catch(() => []))[0] ?? null
+}
+
+const previews = new Map<string, Promise<Uint8Array>>()
+
+/**
+ * A voice sample's audio, fetched here and played from memory: samples live on several hosts, and
+ * the window may load media only from Studio itself. Only ElevenLabs' own hosts are fetched.
+ */
+export function voicePreview(url: string): Promise<Uint8Array> {
+  const host = new URL(url).hostname
+  if (!url.startsWith('https://') || !/(^|\.)(elevenlabs\.io|googleapis\.com)$/.test(host)) return Promise.reject(new Error('That sample isn’t from ElevenLabs.'))
+  let p = previews.get(url)
+  if (!p) {
+    p = fetch(url).then(async (res) => {
+      if (!res.ok) throw new Error(`The sample didn’t load (HTTP ${res.status}).`)
+      return new Uint8Array(await res.arrayBuffer())
+    })
+    p.catch(() => previews.delete(url))
+    previews.set(url, p)
+  }
+  return p
 }
 
 // --- OmniVoice worker ------------------------------------------------------------------

@@ -79,6 +79,13 @@ export interface ElevenLabsCheck {
   problem?: string // it's allowed, but something else stops it (an invalid key, no characters left)
 }
 
+/** What an Anthropic or OpenAI key may do (src/main/keys.ts), tried for real. */
+export interface KeyCheck {
+  items: { label: string; ok: boolean; why?: string }[]
+  problem?: string // something stops it: an invalid key, no credit left
+  rejected?: boolean // the key itself isn't accepted
+}
+
 export interface ElevenLabsUsage {
   used: number // characters this period
   limit: number
@@ -683,9 +690,12 @@ export interface StudioApi {
   checkElevenLabsKey(again?: boolean): Promise<ElevenLabsCheck>
   /** This month's characters, or null without a key or its User permission. */
   elevenLabsUsage(): Promise<ElevenLabsUsage | null>
+  /** Saves the key once it's accepted and may send messages; throws what to change otherwise. */
   setAnthropicKey(key: string): Promise<Settings>
+  checkAnthropicKey(again?: boolean): Promise<KeyCheck>
   /** Codex uses an OpenAI API key instead of the ChatGPT sign-in while one is saved. */
   setOpenAIKey(key: string): Promise<Settings>
+  checkOpenAIKey(again?: boolean): Promise<KeyCheck>
 
   claudeStatus(): Promise<ClaudeStatus>
   /** Plan limits used, or null with an API key or when Claude Code can't tell. */
@@ -801,6 +811,10 @@ export interface StudioApi {
   askMicrophone(): Promise<boolean>
   elevenLabsVoices(): Promise<VoiceOption[]>
   elevenLabsLibrary(language: string, search: string): Promise<VoiceOption[]>
+  /** The voice a language starts with: a preferred one (Croatian: Slobodan), else the library's most used. */
+  elevenLabsDefaultVoice(language: string): Promise<VoiceOption | null>
+  /** A voice sample's audio, to play from memory. */
+  voicePreview(url: string): Promise<Uint8Array>
 
   chatSend(request: ChatRequest): Promise<void>
   chatInterrupt(): Promise<void>
