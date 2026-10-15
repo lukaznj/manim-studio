@@ -102,12 +102,12 @@ async function make(r: QuickRun, req: QuickTask): Promise<ExportResult> {
       req.prompt.trim(),
       names.length ? `\nMake it from these sources (in sources/): ${names.join(', ')}. Follow them, as the guide says.` : '',
     ].join('')
-    await turn(brief)
+    await turn(brief, 'Quick video')
 
     // Claude says it's done; check for ourselves and send it back for what's left.
     reach('check')
     update({ activity: 'Checking the render' })
-    update({ warnings: await checkAndFix(r.project, turn, check) })
+    update({ warnings: await checkAndFix(r.project, (text) => turn(text, 'Fixing the render'), check) })
     setAutopilot(false)
 
     reach('export')
@@ -131,11 +131,11 @@ function check(): void {
   if (stopping) throw new Error('Stopped')
 }
 
-async function turn(text: string): Promise<void> {
+async function turn(text: string, step: string): Promise<void> {
   check()
   let before: string | undefined
   const result = await turnPastLimits(
-    chatAndWait,
+    (t) => chatAndWait(t, step),
     text,
     (note) => {
       if (note) before = run?.activity
