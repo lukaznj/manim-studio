@@ -81,6 +81,7 @@ export function listProjects(): ProjectSummary[] {
         duration: timeline?.duration,
         thumbnail: existsSync(thumb) ? thumb : undefined,
         series: meta.series,
+        exercise: meta.exercise,
       })
     } catch {
       // unreadable project.json: skip it
@@ -107,6 +108,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
     tone: input.tone ?? DEFAULT_TONE,
     scriptFirst: input.scriptFirst ?? true,
     series: input.series,
+    exercise: input.exercise,
     fps: 30,
     createdAt: new Date().toISOString(),
     voice: { ...(input.voice ?? getSettings().defaultVoice), language: input.language || input.voice?.language || getSettings().defaultVoice.language },
@@ -114,7 +116,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
   writeFileSync(metaFile(dir), JSON.stringify(meta, null, 2))
   mkdirSync(join(dir, 'voice', 'recordings'), { recursive: true })
   await initRepo(dir)
-  if (input.parentDir && !input.series) setSettings({ projectsDir: input.parentDir }) // an episode's folder isn't a choice to remember
+  if (input.parentDir && !input.series && !input.exercise) setSettings({ projectsDir: input.parentDir }) // an episode's or exercise's folder isn't a choice to remember
   return dir
 }
 

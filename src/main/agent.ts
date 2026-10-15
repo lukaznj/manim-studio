@@ -49,7 +49,7 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
     if (!resolve) return
     const limited = !ok && limit && (!limit.until || limit.until > Date.now()) ? limit : null
     if (limited) error = limitText(limited)
-    if (!ok && error) messages.push({ id: randomUUID(), role: 'error', parts: [{ kind: 'text', text: error }], at: Date.now() })
+    if (!ok && error) messages.push({ id: randomUUID(), role: 'error', parts: [{ kind: 'text', text: error }], auto: true, at: Date.now() })
     writeChat(messages, dir)
     resolve({ ok, error, limitedUntil: limited?.until })
   }
@@ -95,8 +95,8 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
       step = label
       tools = {}
       started = Date.now()
-      messages.push({ id: randomUUID(), role: 'user', parts: [{ kind: 'text', text }], at: Date.now() })
-      reply = { id: randomUUID(), role: 'assistant', parts: [], at: Date.now() }
+      messages.push({ id: randomUUID(), role: 'user', parts: [{ kind: 'text', text }], auto: true, at: Date.now() })
+      reply = { id: randomUUID(), role: 'assistant', parts: [], auto: true, at: Date.now() }
       messages.push(reply)
       inbox.push({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] }, parent_tool_use_id: null, origin: { kind: 'human' } })
       const r = await result

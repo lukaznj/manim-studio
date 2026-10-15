@@ -1,5 +1,5 @@
 import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Download, FileText, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { pageRanges } from '../../../shared/pages'
 import type { ChatMessage, ChatPart, Effort, ModelOption, PlanUsage, SourceRef } from '../../../shared/types'
 import { modelName } from '../../../shared/usage'
@@ -8,6 +8,7 @@ import { ProjectCost } from './UsageDialog'
 import { resetTime } from '../lib/time'
 import { errorText, installComponent, openDialog, refreshClaude, selectClips, sendChat, toast, updateSettings, useStore } from '../store'
 import { addSources, attachSource } from './SourcesPane'
+import { Markdown } from './Markdown'
 
 /** "notes.pdf · p. 3–5" */
 const sourceLabel = (s: SourceRef) => (s.pages?.length ? `${s.name} · p. ${pageRanges(s.pages)}` : s.name)
@@ -22,7 +23,10 @@ const SUGGESTIONS = [
 export function ChatPane() {
   const claude = useStore((s) => s.claude)
   const codex = useStore((s) => s.settings?.agent === 'codex')
-  const chat = useStore((s) => s.chat)
+  const all = useStore((s) => s.chat)
+  // On the exercises screen the chat is the student's: the agents' own turns stay out of it.
+  const exercise = useStore((s) => s.screen === 'exercises')
+  const chat = useMemo(() => (exercise ? all.filter((m) => !m.auto) : all), [all, exercise])
   const busy = useStore((s) => s.chatBusy)
   const streaming = useStore((s) => s.streaming)
   const list = useRef<HTMLDivElement>(null)
@@ -63,7 +67,7 @@ export function ChatPane() {
       ) : (
         <>
           <div className="chat-list" ref={list}>
-            {chat.length === 0 && <Intro />}
+            {chat.length === 0 && (exercise ? <ExerciseIntro /> : <Intro />)}
             {chat.map((m) => (
               <Message key={m.id} message={m} streaming={streaming[m.id]} busy={busy} />
             ))}
@@ -269,6 +273,28 @@ function Intro() {
   )
 }
 
+const EXERCISE_QUESTIONS = [
+  'Why does this method work here?',
+  'Explain the hardest step more slowly.',
+  'What would change if the numbers were different?',
+  'Give me a similar exercise to practise on.',
+]
+
+function ExerciseIntro() {
+  return (
+    <div className="chat-intro">
+      <p className="muted">Ask anything about this exercise: a step you don’t follow, why a method works, a similar one to practise. The answer comes right away, without a new video.</p>
+      <div className="suggestions">
+        {EXERCISE_QUESTIONS.map((q) => (
+          <button key={q} className="suggestion" onClick={() => useStore.setState({ chatDraft: q })}>
+            {q}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Message({ message: m, streaming, busy }: { message: ChatMessage; streaming?: string; busy: boolean }) {
   if (m.role === 'user') {
     const text = m.parts.find((p) => p.kind === 'text')
@@ -346,6 +372,7 @@ function Composer() {
   const selection = useStore((s) => s.selection)
   const [text, setText] = useState('')
   const [frame, setFrame] = useState(true)
+  const exercise = useStore((s) => s.screen === 'exercises') // a student's questions: no frames, no clips
   const area = useRef<HTMLTextAreaElement>(null)
   const draft = useStore((s) => s.chatDraft)
   const source = useStore((s) => s.chatSource)
@@ -375,13 +402,13 @@ function Composer() {
 
   const send = async (value = text) => {
     if (!value.trim() || busy) return
-    const ok = await sendChat(value.trim(), frame && !!timeline)
+    const ok = await sendChat(value.trim(), frame && !!timeline && !exercise)
     if (ok) setText('')
   }
 
   return (
     <div className="composer">
-      {useStore.getState().chat.length === 0 && (
+      {useStore.getState().chat.length === 0 && useStore.getState().screen !== 'exercises' && (
         <div className="suggestions">
           {SUGGESTIONS.map((s) => (
             <button key={s} className="suggestion" onClick={() => setText(s)}>
@@ -423,7 +450,7 @@ function Composer() {
               </button>
             </span>
           )}
-          {timeline && (
+          {timeline && !exercise && (
             <button className={`attach-toggle ${frame ? 'on' : ''}`} onClick={() => setFrame((f) => !f)} title="Attach the current preview frame">
               <Camera /> Frame
             </button>
@@ -433,7 +460,7 @@ function Composer() {
           ref={area}
           className="composer-input"
           rows={2}
-          placeholder={busy ? 'Claude is working…' : 'What should I make? (Enter sends, Shift+Enter for a new line)'}
+          placeholder={busy ? 'Claude is working…' : exercise ? 'Ask about this exercise (Enter sends)' : 'What should I make? (Enter sends, Shift+Enter for a new line)'}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -539,65 +566,4 @@ export function ModelPicker({
       </label>
     </div>
   )
-}
-
-/** Just enough markdown for Claude's replies: paragraphs, lists, code, bold, inline code. */
-function Markdown({ text }: { text: string }) {
-  const blocks: ReactNode[] = []
-  const lines = text.split('\n')
-  let i = 0
-  while (i < lines.length) {
-    const line = lines[i]
-    if (line.startsWith('```')) {
-      const code: string[] = []
-      i++
-      while (i < lines.length && !lines[i].startsWith('```')) code.push(lines[i++])
-      i++
-      blocks.push(
-        <pre key={blocks.length} className="md-code mono">
-          {code.join('\n')}
-        </pre>,
-      )
-      continue
-    }
-    if (/^\s*([-*]|\d+\.)\s/.test(line)) {
-      const items: string[] = []
-      const ordered = /^\s*\d+\./.test(line)
-      while (i < lines.length && /^\s*([-*]|\d+\.)\s/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s/, ''))
-      const List = ordered ? 'ol' : 'ul'
-      blocks.push(
-        <List key={blocks.length}>
-          {items.map((it, k) => (
-            <li key={k}>{inline(it)}</li>
-          ))}
-        </List>,
-      )
-      continue
-    }
-    if (/^#{1,4}\s/.test(line)) {
-      blocks.push(
-        <p key={blocks.length} className="md-h">
-          {inline(line.replace(/^#+\s/, ''))}
-        </p>,
-      )
-      i++
-      continue
-    }
-    if (!line.trim()) {
-      i++
-      continue
-    }
-    const para: string[] = []
-    while (i < lines.length && lines[i].trim() && !lines[i].startsWith('```') && !/^\s*([-*]|\d+\.)\s/.test(lines[i])) para.push(lines[i++])
-    blocks.push(<p key={blocks.length}>{inline(para.join(' '))}</p>)
-  }
-  return <>{blocks}</>
-}
-
-function inline(text: string): ReactNode[] {
-  return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((seg, k) => {
-    if (seg.startsWith('`') && seg.endsWith('`')) return <code key={k}>{seg.slice(1, -1)}</code>
-    if (seg.startsWith('**') && seg.endsWith('**')) return <strong key={k}>{seg.slice(2, -2)}</strong>
-    return seg
-  })
 }

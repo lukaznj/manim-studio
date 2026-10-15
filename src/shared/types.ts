@@ -36,6 +36,7 @@ export interface ProjectMeta {
   voice: VoiceSettings
   tone?: Tone // unset: warm
   series?: SeriesRef // an episode of a series
+  exercise?: ExerciseRef // an exercise in an exercise set (ADR 0025)
   scriptFirst?: boolean // Claude plans script.md and gets it approved before writing scene.py (ADR 0016)
   claudeSessionId?: string
   codexThreadId?: string // the project's Codex conversation, resumed after a restart
@@ -51,6 +52,7 @@ export interface ProjectSummary {
   thumbnail?: string
   missing?: boolean
   series?: SeriesRef
+  exercise?: ExerciseRef
 }
 
 /** Where an episode sits in its series (src/main/series.ts). */
@@ -82,6 +84,92 @@ export interface ElevenLabsUsage {
   limit: number
   resetsAt?: number
   tier: string
+}
+
+// --- exercise sets (src/main/exercises.ts, ADR 0025) ----------------------------------------------
+
+/** Where an exercise sits in its set. */
+export interface ExerciseRef {
+  set: string // the set's folder, holding exercises.json and one project per exercise
+  title: string // the set's title
+  number: number // 1-based
+}
+
+/** What the user hands over: typed exercises and files (pictures, PDFs), one or many exercises in each. */
+export interface ExerciseInput {
+  text: string
+  files: string[]
+}
+
+export interface NewExerciseSet {
+  title?: string // unset: from the first exercises
+  level?: string // who it's for, e.g. "Croatian matura" or "first-year university"
+  language: string
+  aspect: Aspect
+  theme: Theme
+  tone: Tone
+  voice?: VoiceSettings
+  input: ExerciseInput
+}
+
+/**
+ * One exercise's progress: waiting → solving → solved (the written solution is there) → video →
+ * export → done. Videos wait until every exercise has its written solution.
+ */
+export type ExerciseState = 'waiting' | 'solving' | 'solved' | 'video' | 'export' | 'done' | 'failed'
+
+export interface ExerciseItem {
+  dir: string
+  number: number
+  title: string
+  state: ExerciseState
+  activity?: string // what its agent is doing right now
+  error?: string
+  warnings: string[]
+  topic?: string // from solution.md
+  answer?: string
+  video?: string // the exported mp4, once there is one
+  subtitles?: string // its .vtt
+}
+
+export interface ExerciseSet {
+  folder: string
+  title: string
+  level?: string
+  createdAt: string
+  /** Reading new exercises out of what the user gave (files: how many pictures and PDFs). */
+  intake?: { state: 'reading' | 'failed'; files: number; error?: string }
+  paused?: boolean // its agents are stopped until it's resumed
+  items: ExerciseItem[]
+  lecture?: { state: 'making' | 'done' | 'failed'; file?: string; error?: string }
+}
+
+/** solution.md, read for the screen: the steps are its ## sections. */
+export interface ExerciseSolution {
+  topic?: string
+  tags: string[]
+  answer?: string
+  intro: string // anything before the first step
+  steps: { title: string; body: string }[]
+}
+
+export interface ExerciseDetail {
+  item: ExerciseItem
+  problem: string // problem.md, Markdown with $…$ maths
+  pictures: string[] // the original pictures, in media/
+  solution: ExerciseSolution | null
+  preview?: string // the preview render, until the export is there
+  chapters: Section[] // the video's sections, one per step
+}
+
+export interface ExerciseHit {
+  set: string
+  setTitle: string
+  dir: string
+  number: number
+  title: string
+  topic?: string
+  snippet: string
 }
 
 /** What series planning is doing, step by step (src/main/series.ts planSeries). */
@@ -161,6 +249,7 @@ export interface NewProjectInput {
   tone?: Tone
   scriptFirst?: boolean
   series?: SeriesRef
+  exercise?: ExerciseRef
   parentDir?: string
 }
 
@@ -471,6 +560,7 @@ export interface Settings {
   agent: Agent // who writes the scenes (ADR 0022)
   codexModel: string // '' = Codex's default for the account
   codexEffort: Effort | ''
+  exerciseSets?: string[] // exercise set folders (Home lists them; search looks in them)
   seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed
   seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
   autoRender: boolean
@@ -509,6 +599,7 @@ export interface ChatMessage {
   context?: ChatContext
   frame?: string // data URL thumbnail sent with the message
   source?: SourceRef
+  auto?: boolean // a background agent's turn (series, exercises), not the user's conversation
   at: number
 }
 
@@ -575,7 +666,7 @@ export interface VoiceOption {
 }
 
 export type EventChannel =
-  'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'series-plan' | 'series' | 'open-project' | 'menu'
+  'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'series-plan' | 'series' | 'exercises' | 'open-project' | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -653,6 +744,28 @@ export interface StudioApi {
   /** What the open project's agent turns used, one entry per turn. */
   projectUsage(): Promise<UsageEntry[]>
   dismissSeries(): Promise<void>
+
+  /** Creates an exercise set from the first exercises and starts solving them; returns its folder. */
+  createExerciseSet(request: NewExerciseSet): Promise<string>
+  exerciseSet(folder: string): Promise<ExerciseSet>
+  exerciseSets(): Promise<ExerciseSet[]>
+  /** Reads the exercises out of the text and files, adds them to the set and solves them. */
+  addExercises(folder: string, input: ExerciseInput): Promise<void>
+  /** Pictures or PDFs of exercises, from the system dialog. */
+  pickExerciseFiles(): Promise<string[]>
+  /** A pasted picture, saved where the next addExercises can take it; returns its path. */
+  savePastedImage(data: Uint8Array, ext: string): Promise<string>
+  exerciseDetail(dir: string): Promise<ExerciseDetail>
+  /** Has the video redone, explaining what the user asks about more thoroughly. */
+  reviseExercise(dir: string, request: string): Promise<void>
+  retryExercise(dir: string): Promise<void>
+  /** Stops the set's agents, or lets them carry on. */
+  pauseExercises(folder: string, paused: boolean): Promise<void>
+  /** Takes the exercise out of its set, to the Trash. */
+  removeExercise(dir: string): Promise<void>
+  searchExercises(query: string): Promise<ExerciseHit[]>
+  /** Joins the exercises' videos, in order, into one lecture video in the set's folder. */
+  makeLecture(folder: string, dirs: string[]): Promise<void>
   renderServers(): Promise<RenderServer[]>
   /** Pairs with a render worker from the code it printed; checks that it answers first. */
   addServer(code: string): Promise<RenderServer[]>
@@ -719,6 +832,7 @@ export interface StudioApi {
   on(channel: 'quick', cb: (run: QuickRun | null) => void): () => void
   on(channel: 'series-plan', cb: (p: SeriesPlanProgress) => void): () => void
   on(channel: 'series', cb: (run: SeriesRun | null) => void): () => void
+  on(channel: 'exercises', cb: (set: ExerciseSet) => void): () => void
   /** script.md changed on disk (Claude wrote it), or was removed (null). */
   on(channel: 'script', cb: (e: { text: string | null }) => void): () => void
 }

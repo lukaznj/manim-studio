@@ -4,7 +4,7 @@ Nothing here is committed. Each item gets an ADR when it's picked up.
 
 ## Done in 0.4.0
 
-Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017]]), script first ([[../04-decisions/0016-script-first|0016]]), quick mode ([[../04-decisions/0018-quick-mode|0018]]), series mode ([[../04-decisions/0019-series-mode|0019]]), parallel exports ([[../04-decisions/0020-parallel-exports|0020]]), render servers ([[../04-decisions/0021-render-servers|0021]]) and Codex as a second agent ([[../04-decisions/0022-codex-as-second-agent|0022]]).
+Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017]]), script first ([[../04-decisions/0016-script-first|0016]]), quick mode ([[../04-decisions/0018-quick-mode|0018]]), series mode ([[../04-decisions/0019-series-mode|0019]]), parallel exports ([[../04-decisions/0020-parallel-exports|0020]]), render servers ([[../04-decisions/0021-render-servers|0021]]) Codex as a second agent ([[../04-decisions/0022-codex-as-second-agent|0022]]) and exercise sets ([[../04-decisions/0025-exercise-sets|0025]]).
 
 ## Next
 
