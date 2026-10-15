@@ -2,7 +2,7 @@
 
 The scene marks the moment that shows its core idea with `self.thumbnail("hook")`; without a
 mark, the end of its longest middle section. The picture is zoomed a little and moved right,
-so the text on the left never covers it."""
+so the text on the left (below, in portrait) never covers it."""
 
 from __future__ import annotations
 
@@ -88,17 +88,6 @@ def card(timeline: dict, out: str, *, text: str, badge: str = "", kicker: str = 
     cx, cy = (W * 0.5, H * 0.4) if portrait else (W * 0.68, H * 0.5)
     canvas.paste(pic, (round(cx - pic.width / 2), round(cy - pic.height / 2)))
 
-    # A shade from the background colour, under the text: left in landscape, bottom in portrait.
-    shade = Image.new("L", (W, H), 0)
-    sd = ImageDraw.Draw(shade)
-    span = H * 0.55 if portrait else W * 0.62
-    for i in range(int(span)):
-        a = int(245 * (1 - i / span) ** 1.6)
-        if portrait:
-            sd.line([(0, H - 1 - i), (W, H - 1 - i)], fill=a)
-        else:
-            sd.line([(i, 0), (i, H)], fill=a)
-    canvas = Image.composite(Image.new("RGB", (W, H), bg), canvas, shade)
     draw = ImageDraw.Draw(canvas)
 
     pad = round(W * 0.045) if not portrait else 44
