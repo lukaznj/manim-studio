@@ -327,6 +327,8 @@ export interface Timeline {
   renderedAt: number
   renderSeconds: number
   sections: Section[]
+  /** Where the scene called self.thumbnail("hook"): the moment showing its core idea. */
+  thumbnail?: { t: number; text: string | null; line: number | null } | null
   clips: Clip[]
   voice: VoiceBlock[]
   subtitles: Subtitle[]

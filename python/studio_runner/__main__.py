@@ -75,6 +75,13 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("check")
     sub.add_parser("tts-worker")
 
+    tc = sub.add_parser("thumbnail-card")
+    tc.add_argument("timeline", type=Path)
+    tc.add_argument("out")
+    tc.add_argument("--text", required=True, help="the hook when the scene marks none")
+    tc.add_argument("--badge", default="")
+    tc.add_argument("--kicker", default="")
+
     j = sub.add_parser("concat")
     j.add_argument("out", type=Path)
     j.add_argument("videos", type=Path, nargs="+")
@@ -122,6 +129,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "export":
         return export(args.timeline, args.dest)
+
+    if args.cmd == "thumbnail-card":
+        from .card import card
+
+        timeline = json.loads(args.timeline.read_text(encoding="utf-8"))
+        text = (timeline.get("thumbnail") or {}).get("text") or args.text
+        t = card(timeline, args.out, text=text, badge=args.badge, kicker=args.kicker)
+        emit("done", path=args.out, t=t)
+        return 0
 
     if args.cmd == "concat":
         from .concat import concat
