@@ -40,6 +40,16 @@ export function fakeAgent(dir: string, { onTool, onUsage, model }: AgentOptions)
   return {
     async turn(text, step) {
       await sleep(1000)
+      if (/^Solve the exercise/.test(text)) {
+        onTool('Checking a calculation')
+        await sleep(1200)
+        used(step, { Read: 2, mcp__studio__calculate: 2, Write: 1 }, 0.4)
+        writeFileSync(
+          join(dir, 'solution.md'),
+          `---\ntopic: Quadratic equations\ntags: [roots, factoring, parabola]\nanswer: $x = 2$ or $x = 3$\n---\n# ${meta.name}\n\nWe factor the quadratic and read off the roots.\n\n## Factor\nWe look for two numbers with sum $5$ and product $6$: they are $2$ and $3$, so\n$$x^2 - 5x + 6 = (x - 2)(x - 3).$$\n\n## Zero product\nA product is zero when one factor is: $x - 2 = 0$ or $x - 3 = 0$.\n\n## Answer\n$x = 2$ or $x = 3$. Check: $2^2 - 5 \\cdot 2 + 6 = 0$.\n`,
+        )
+        return { ok: true }
+      }
       if (/only the script/.test(text)) {
         onTool('Writing script.md')
         await sleep(1500)
@@ -57,7 +67,7 @@ export function fakeAgent(dir: string, { onTool, onUsage, model }: AgentOptions)
       onTool('Writing scene.py')
       writeFileSync(
         join(dir, 'scene.py'),
-        `from manim import *\nfrom studio import *\n\n\nclass Video(StudioScene):\n    def construct(self):\n        self.next_section("Opening")\n        t = Text("Episode ${n}", font_size=56)\n        self.play(Write(t))\n        for i in range(14):\n            self.play(t.animate.shift(UP * 0.2 if i % 2 else DOWN * 0.2), run_time=0.5)\n        self.wait(1)\n`,
+        `from manim import *\nfrom studio import *\n\n\nclass Video(StudioScene):\n    def construct(self):\n        self.next_section("${meta.exercise ? 'Exercise' : 'Opening'}")\n        t = Text("${meta.exercise ? `Exercise ${meta.exercise.number}` : `Episode ${n}`}", font_size=56)\n        self.play(Write(t))\n        for i in range(14):\n            ${meta.exercise ? 'if i % 4 == 3:\n                self.next_section(["Factor", "Zero product", "Answer"][i // 4])\n            ' : ''}self.play(t.animate.shift(UP * 0.2 if i % 2 else DOWN * 0.2), run_time=0.5)\n        self.wait(1)\n`,
       )
       onTool('Rendering the preview')
       await currentOrNewRender(dir)

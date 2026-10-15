@@ -15,6 +15,7 @@ import type {
   Quality,
   QuickRun,
   ElevenLabsCheck,
+  ExerciseSet,
   SeriesRun,
   RenderError,
   RenderEvent,
@@ -76,10 +77,13 @@ export type Dialog =
   | { kind: 'quick' }
   | { kind: 'series' }
   | { kind: 'usage' }
+  | { kind: 'exercises' } // a new exercise set
+  | { kind: 'add-exercises' } // more exercises for the open set
+  | { kind: 'lecture' }
   | null
 
 interface State {
-  screen: 'home' | 'editor'
+  screen: 'home' | 'editor' | 'exercises'
   app: AppInfo | null
   settings: Settings | null
   setup: SetupStatus | null
@@ -109,6 +113,8 @@ interface State {
   quickEditor: boolean // show the editor instead of quick mode's progress
   series: SeriesRun | null // a series being made unattended (SeriesPanel.tsx on Home)
   homeSeries: string | null // the series folder Home has open, or null for all projects
+  exerciseSets: ExerciseSet[] // Home's cards
+  exerciseSet: ExerciseSet | null // the set on the exercises screen (ExercisesView.tsx)
   elevenLabsCheck: ElevenLabsCheck | null // the saved key's permissions, once checked this session
   selection: number[] // clip indices
   recordings: string[]
@@ -152,6 +158,8 @@ export const useStore = create<State>(() => ({
   quickEditor: false,
   series: null,
   homeSeries: null,
+  exerciseSets: [],
+  exerciseSet: null,
   elevenLabsCheck: null,
   selection: [],
   recordings: [],
@@ -230,6 +238,15 @@ export async function boot(): Promise<void> {
   api.on('quick', (quick) => set((s) => ({ quick, quickEditor: quick?.id === s.quick?.id ? s.quickEditor : false })))
   void api.quickRun().then((quick) => set({ quick }))
   api.on('series', (series) => set({ series }))
+  api.on('exercises', (s) => {
+    set((st) => ({
+      exerciseSet: st.exerciseSet?.folder === s.folder ? s : st.exerciseSet,
+      exerciseSets: st.exerciseSets.some((x) => x.folder === s.folder) ? st.exerciseSets.map((x) => (x.folder === s.folder ? s : x)) : [s, ...st.exerciseSets],
+    }))
+    // The first exercises of a new set are in: show the first one.
+    const st = get()
+    if (st.screen === 'exercises' && st.exerciseSet?.folder === s.folder && s.items.length && st.project?.meta.exercise?.set !== s.folder) void selectExercise(s.items[0].dir)
+  })
   void api.seriesRun().then((series) => set({ series }))
   // Claude wrote the script: show it, unless you're in the middle of something else.
   api.on('script', ({ text }) => set((s) => ({ script: text, leftTab: text && s.leftTab === 'code' && !s.dirty ? 'script' : s.leftTab })))
@@ -237,7 +254,35 @@ export async function boot(): Promise<void> {
 }
 
 export async function refreshProjects(): Promise<void> {
-  set({ projects: await api.listProjects() })
+  const [projects, exerciseSets] = await Promise.all([api.listProjects(), api.exerciseSets()])
+  set({ projects, exerciseSets })
+}
+
+// --- exercise sets (ExercisesView.tsx, src/main/exercises.ts) ------------------------------------------
+
+/** Shows a set; with `dir`, that exercise (else the first), which becomes the open project for the chat. */
+export async function openExerciseSet(folder: string, dir?: string): Promise<void> {
+  const exerciseSet = await guard(api.exerciseSet(folder))
+  if (!exerciseSet) return
+  withTransition(() => set({ screen: 'exercises', exerciseSet }))
+  const pick = dir ?? (get().project?.meta.exercise?.set === folder ? get().project!.path : exerciseSet.items[0]?.dir)
+  if (pick) await selectExercise(pick)
+}
+
+/** Opens the exercise as the project (for the chat), staying on the exercises screen. */
+export async function selectExercise(dir: string): Promise<void> {
+  if (get().project?.path === dir) return
+  if (get().dirty) await saveScene()
+  const opened = await guard(api.openProject(dir))
+  if (opened) applyOpened(opened, 'exercises')
+}
+
+export async function createExerciseSet(req: Parameters<typeof api.createExerciseSet>[0]): Promise<boolean> {
+  const folder = await guard(api.createExerciseSet(req))
+  if (!folder) return false
+  closeDialog()
+  await openExerciseSet(folder)
+  return true
 }
 
 /** Asks where a missing project went; the others that moved with it come back too. */
@@ -373,9 +418,9 @@ export async function openProject(path: string): Promise<void> {
   if (!opened.timeline && get().setup?.env === 'ready') void renderNow()
 }
 
-function applyOpened(o: OpenProject): void {
+function applyOpened(o: OpenProject, screen: State['screen'] = 'editor'): void {
   set({
-    screen: 'editor',
+    screen,
     project: { path: o.path, meta: o.meta },
     savedSource: o.source,
     // An episode made by hand starts with its request ready in the chat; Claude's brief has the rest.
@@ -411,7 +456,7 @@ function firstRunTour(): void {
 export async function closeProject(): Promise<void> {
   if (get().dirty) await saveScene()
   await api.closeProject()
-  withTransition(() => set({ screen: 'home', project: null, timeline: null, chat: [], selection: [], historyOpen: false, chatSource: null }))
+  withTransition(() => set({ screen: 'home', exerciseSet: null, project: null, timeline: null, chat: [], selection: [], historyOpen: false, chatSource: null }))
   void refreshProjects()
 }
 

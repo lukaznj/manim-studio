@@ -1,15 +1,17 @@
-import { Check, ChevronLeft, CircleAlert, FolderOpen, FolderSearch, Library, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import type { ComponentState, ProjectSummary } from '../../../shared/types'
+import { Check, ChevronLeft, CircleAlert, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import type { ComponentState, ExerciseSet, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { ago, timecode } from '../lib/time'
-import { installComponent, locateProject, openDialog, openProject, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
+import { installComponent, locateProject, openDialog, openExerciseSet, openProject, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
 import { ProgressLine } from './ui'
 import { SeriesPanel } from './SeriesPanel'
 
 export function Home() {
-  const projects = useStore((s) => s.projects)
+  const all = useStore((s) => s.projects)
+  const projects = useMemo(() => all.filter((p) => !p.exercise), [all]) // exercises show in their set's card
+  const sets = useStore((s) => s.exerciseSets)
   const setup = useStore((s) => s.setup)
   const claude = useStore((s) => s.claude)
   const needsSetup = !!setup && (setup.env !== 'ready' || setup.latex !== 'ready' || (claude && !claude.loggedIn))
@@ -42,6 +44,9 @@ export function Home() {
             <button className="btn ghost" onClick={() => void pickAndOpenProject()}>
               <FolderOpen /> Open folder…
             </button>
+            <button className="btn large" onClick={() => openDialog({ kind: 'exercises' })} title="Exercises in, worked solutions and short videos out">
+              <GraduationCap /> Exercises
+            </button>
             <button className="btn large" onClick={() => openDialog({ kind: 'series' })} title="A series of videos from a course's PDFs">
               <Library /> New series
             </button>
@@ -57,7 +62,7 @@ export function Home() {
         {needsSetup && <SetupPanel />}
         <SeriesPanel />
 
-        {projects.length === 0 ? (
+        {projects.length === 0 && !sets.length ? (
           <EmptyState />
         ) : inSeries.length ? (
           <>
@@ -80,6 +85,9 @@ export function Home() {
           </>
         ) : (
           <section className="project-grid">
+            {sets.map((set, i) => (
+              <ExerciseSetCard key={set.folder} set={set} index={i} />
+            ))}
             {items.map((item, i) =>
               'episodes' in item ? (
                 <SeriesCard key={item.folder} folder={item.folder} episodes={item.episodes} index={i} />
@@ -112,6 +120,37 @@ function homeItems(projects: ProjectSummary[]): (ProjectSummary | { folder: stri
   }
   for (const episodes of folders.values()) episodes.sort((a, b) => a.series!.episode - b.series!.episode)
   return items
+}
+
+/** An exercise set on Home: how many exercises it has and whether its agents are at work. */
+function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
+  const done = set.items.filter((i) => i.state === 'done').length
+  const working = !!set.intake || set.items.some((i) => ['solving', 'video', 'export'].includes(i.state))
+  const open = () => void openExerciseSet(set.folder)
+  return (
+    <article
+      className="project-card exercise-card"
+      style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
+      onClick={open}
+      onKeyDown={(e) => e.key === 'Enter' && open()}
+      tabIndex={0}
+      aria-label={`Exercise set ${set.title}, ${set.items.length} exercises`}
+    >
+      <div className="thumb landscape exercise-thumb">
+        <GraduationCap />
+        <span className="mono">{set.items.length}</span>
+      </div>
+      <div className="project-meta">
+        <div className="project-name">{set.title}</div>
+        <div className="project-sub">
+          <span className="badge sun">
+            <GraduationCap /> Exercises
+          </span>
+          <span className="faint">{working ? 'Solving…' : `${done} of ${set.items.length} with a video`}</span>
+        </div>
+      </div>
+    </article>
+  )
 }
 
 /** A series on Home: its first episodes' pictures stacked, the title and how many episodes it has. */

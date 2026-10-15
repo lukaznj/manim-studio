@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, sh
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
-import type { EventChannel, ExportOptions, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
+import type { EventChannel, ExerciseInput, ExportOptions, NewExerciseSet, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
 import {
   applyChatSettings,
   chatInterrupt,
@@ -41,6 +41,7 @@ import {
 } from './series'
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
+import * as ex from './exercises'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
@@ -137,7 +138,7 @@ async function openInWindow(dir: string): Promise<void> {
 function registerMediaProtocol(): void {
   protocol.handle('studio-media', async (req) => {
     const file = decodeURIComponent(new URL(req.url).pathname.slice(1))
-    const allowed = [projects.project()?.path, ...getSettings().recentProjects, paths.userData()].filter(Boolean) as string[]
+    const allowed = [projects.project()?.path, ...getSettings().recentProjects, ...(getSettings().exerciseSets ?? []), paths.userData()].filter(Boolean) as string[]
     const full = resolve(file)
     if (!allowed.some((root) => full === resolve(root) || full.startsWith(resolve(root) + sep)) || !existsSync(full)) {
       return new Response('not found', { status: 404 })
@@ -303,6 +304,26 @@ function registerIpc(): void {
   handle('pauseSeries', (paused: boolean) => pauseSeries(paused))
   handle('pauseEpisode', (dir: string, paused: boolean) => pauseEpisode(dir, paused))
   handle('projectUsage', () => projectUsage())
+  handle('createExerciseSet', (req: NewExerciseSet) => ex.createExerciseSet(req))
+  handle('exerciseSet', (folder: string) => ex.exerciseSet(folder))
+  handle('exerciseSets', () => ex.exerciseSets())
+  handle('addExercises', (folder: string, input: ExerciseInput) => ex.addExercises(folder, input))
+  handle('pickExerciseFiles', async () => {
+    const r = await dialog.showOpenDialog(win!, {
+      properties: ['openFile', 'multiSelections'],
+      title: 'Pictures or PDFs of exercises',
+      filters: [{ name: 'Pictures and PDFs', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'] }],
+    })
+    return r.filePaths
+  })
+  handle('savePastedImage', (data: Uint8Array, ext: string) => ex.savePastedImage(data, ext))
+  handle('exerciseDetail', (dir: string) => ex.exerciseDetail(dir))
+  handle('reviseExercise', (dir: string, request: string) => ex.reviseExercise(dir, request))
+  handle('retryExercise', (dir: string) => ex.retryExercise(dir))
+  handle('pauseExercises', (folder: string, paused: boolean) => ex.pauseExercises(folder, paused))
+  handle('removeExercise', (dir: string) => ex.removeExercise(dir))
+  handle('searchExercises', (query: string) => ex.searchExercises(query))
+  handle('makeLecture', (folder: string, dirs: string[]) => ex.makeLecture(folder, dirs))
   handle('renderServers', () => listServers())
   handle('addServer', (code: string) => addServer(code))
   handle('removeServer', (id: string) => removeServer(id))
@@ -383,6 +404,7 @@ app.whenReady().then(() => {
   onExportsChanged((jobs) => send('exports', jobs))
   setupQuick({ send: (run) => send('quick', run), openInWindow })
   setupSeries((run) => send('series', run))
+  ex.setupExercises((set) => send('exercises', set))
   onSetupEvent((e) => send('setup', e))
   onWorkerLog((e) => send('setup', e))
   onChatEvent((e) => send('chat', e))

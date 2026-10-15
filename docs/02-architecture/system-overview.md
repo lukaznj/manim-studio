@@ -53,6 +53,8 @@
 | `<project>/sources/` | PDFs the video is made from, indexed into `.studio/sources/` ([[../04-decisions/0014-pdf-sources\|ADR 0014]]) | no |
 | `<project>/.studio/` | Renders, `timeline.json`, frames, chat log, thumbnail | no |
 | `<project>/exports/<name>/` | Videos per theme, audio tracks and subtitles per language, thumbnails ([[../04-decisions/0013-export-versions-and-languages\|ADR 0013]]) | no |
+| `<set>/exercises.json`, `<set>/NN-<slug>/problem.md`, `solution.md` | An exercise set: its exercises in order, each a project with its statement and worked solution ([[../04-decisions/0025-exercise-sets\|ADR 0025]]) | the projects are their own repos |
+| `<set>/lecture/` | The lecture video joined from the exercises' exports, its subtitles and chapter list | no |
 | `userData/python-env/` | pixi manifest + lock + `.pixi/envs/{default,omnivoice,transcribe}` | – |
 | `userData/tinytex/` | LaTeX | – |
 | `userData/settings.json`, `elevenlabs.secret`, `anthropic.secret` | Settings; API keys encrypted with the OS keychain | – |

@@ -75,6 +75,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("check")
     sub.add_parser("tts-worker")
 
+    j = sub.add_parser("concat")
+    j.add_argument("out", type=Path)
+    j.add_argument("videos", type=Path, nargs="+")
+
     args = p.parse_args(argv)
 
     if args.cmd == "render":
@@ -118,6 +122,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "export":
         return export(args.timeline, args.dest)
+
+    if args.cmd == "concat":
+        from .concat import concat
+
+        try:
+            emit("done", durations=concat(args.out, args.videos))
+        except Exception as e:  # noqa: BLE001 - videos that don't fit together are reported, not a traceback
+            emit("error", message=f"{type(e).__name__}: {e}")
+            return 1
+        return 0
 
     if args.cmd == "align":
         from .align import align

@@ -29,6 +29,11 @@ export const sceneTools = {
       to_page: z.number().int().min(1).optional().describe('Last page, inclusive (default: the last)'),
     },
   },
+  calculate: {
+    description:
+      'Run a short Python program (python 3.12 with math, fractions, decimal and numpy) and get what it prints. Use it to check computations: plug a solution back into the equation, compare a derivative or integral numerically at a few points, recompute a result. Nothing else is installed, it can’t render, and it stops after 30 seconds.',
+    shape: { code: z.string().min(1).describe('The program; print() what you want to see') },
+  },
   view_source_pages: {
     description:
       'Look at pages of a source PDF as pictures: figures, tables, graphs, handwriting, scanned pages, and where things are on the page (for pdf_page crops). Up to 4 pages per call.',

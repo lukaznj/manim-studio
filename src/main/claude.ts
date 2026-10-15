@@ -31,7 +31,7 @@ import { commitAll } from './git'
 import { paths } from './paths'
 import { mediaNames, project, readChat, readMeta, readScript, readTimeline, requireProject, updateMeta, writeChat } from './projects'
 import { frameBase64, pauseCommits } from './render'
-import { getTimeline, readSource, renderPreview, viewFrames, viewSourcePages } from './scene-tools'
+import { calculate, getTimeline, readSource, renderPreview, viewFrames, viewSourcePages } from './scene-tools'
 import { getSecret, getSettings } from './settings'
 import { sourcesNote } from './sources'
 import { scriptBrief } from '../shared/script'
@@ -40,6 +40,7 @@ import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage
 import type { UsageEntry } from '../shared/usage'
 import { entryFrom, readUsage, recordTurn } from './usage'
 import { seriesBrief } from './series'
+import { exerciseBrief } from './exercises'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
@@ -233,7 +234,7 @@ export function closeChat(): void {
 export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
   const p = requireProject()
   if (turn) throw new Error('Claude is still working on the previous message')
-  if (agentBusy.has(p.path)) throw new Error('A series agent is making this episode. Chat here once it’s done (Home shows its progress).')
+  if (agentBusy.has(p.path)) throw new Error('A background agent is working on this project. Chat here once it’s done.')
 
   const content: Exclude<SDKUserMessage['message']['content'], string> = []
   let frame: string | undefined
@@ -344,12 +345,31 @@ export async function askClaude(
   system: string,
   prompt: string,
   what: string,
-  opts: { onText?: (soFar: string) => void; signal?: AbortSignal; model?: string; effort?: Effort; onUsage?: (entry: UsageEntry) => void } = {},
+  opts: {
+    onText?: (soFar: string) => void
+    signal?: AbortSignal
+    model?: string
+    effort?: Effort
+    onUsage?: (entry: UsageEntry) => void
+    images?: { name: string; mediaType: string; data: string }[] // pictures to read along with the prompt
+  } = {},
 ): Promise<string> {
-  if (codexChosen()) return askCodex(system, prompt, what) // Codex answers at once at the end
+  if (codexChosen()) {
+    if (opts.images?.length) throw new Error(`Codex can’t ${what} from pictures here. Choose Claude in Settings → Agent.`)
+    return askCodex(system, prompt, what) // Codex answers at once at the end
+  }
   const { query } = await sdk()
+  const images = opts.images ?? []
+  async function* withImages(): AsyncGenerator<SDKUserMessage> {
+    const content: Exclude<SDKUserMessage['message']['content'], string> = images.flatMap((img) => [
+      { type: 'text' as const, text: `Picture: ${img.name}` },
+      { type: 'image' as const, source: { type: 'base64' as const, media_type: img.mediaType as 'image/png', data: img.data } },
+    ])
+    content.push({ type: 'text', text: prompt })
+    yield { type: 'user', message: { role: 'user', content }, parent_tool_use_id: null }
+  }
   const q = query({
-    prompt,
+    prompt: images.length ? withImages() : prompt,
     options: {
       includePartialMessages: !!opts.onText, // the answer as it's written, for progress
       env: claudeEnv(),
@@ -512,6 +532,7 @@ export async function studioOptions(dir: string, opts: { autopilot: boolean; mod
       tool('view_source_pages', sceneTools.view_source_pages.description, sceneTools.view_source_pages.shape, ({ source, pages }) =>
         viewSourcePages(dir, source, pages),
       ),
+      tool('calculate', sceneTools.calculate.description, sceneTools.calculate.shape, ({ code }) => calculate(dir, code)),
     ],
   })
 
@@ -656,6 +677,7 @@ function studioPrompt(dir: string, agent: 'claude' | 'codex', autopilot: boolean
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),
     seriesBrief(meta),
+    exerciseBrief(meta),
     scriptBrief(meta, readScript(dir) !== null, { auto: autopilot }),
     autopilot
       ? 'You are working unattended: the user started this in quick mode and is not watching, so nobody can answer a question. Make every choice yourself, never stop to ask, and finish the whole job: the script, scene.py, a render with no errors and no layout warnings, and a last look at the frames. End with two or three sentences on what the video covers.'
@@ -698,6 +720,8 @@ export function summarize(name: string, input: unknown): string {
       return `Reading ${String(i.source ?? '')}${i.from_page ? ` from page ${i.from_page}` : ''}`
     case 'mcp__studio__view_source_pages':
       return `Looking at ${String(i.source ?? '')}, page ${Array.isArray(i.pages) ? pageRanges(i.pages.map(Number)) : ''}`
+    case 'mcp__studio__calculate':
+      return 'Checking a calculation'
     case 'mcp__studio__view_frames':
       return `Looking at frames ${Array.isArray(i.times) ? i.times.map((t) => `${Number(t).toFixed(1)}s`).join(', ') : ''}`
     default:
