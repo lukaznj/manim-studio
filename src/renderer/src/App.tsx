@@ -4,6 +4,7 @@ import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
 import { AddExercisesDialog, LectureDialog, NewExerciseSetDialog } from './components/ExerciseDialogs'
 import { ExercisesView } from './components/ExercisesView'
+import { WatchView } from './components/WatchView'
 import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
 import { QuickDialog } from './components/QuickDialog'
@@ -25,7 +26,7 @@ export function App() {
   return (
     <div className={`app ${window.studio ? '' : 'no-bridge'}`}>
       <TitleBar />
-      <main className="app-main">{ready && (screen === 'home' ? <Home /> : screen === 'exercises' ? <ExercisesView /> : quickHere ? <QuickView /> : <Editor />)}</main>
+      <main className="app-main">{ready && (screen === 'home' ? <Home /> : screen === 'exercises' ? <ExercisesView /> : screen === 'watch' ? <WatchView /> : quickHere ? <QuickView /> : <Editor />)}</main>
       <NewProjectDialog />
       <SettingsDialog />
       <BoothDialog />

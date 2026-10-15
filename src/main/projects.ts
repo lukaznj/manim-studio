@@ -86,6 +86,7 @@ export function listProjects(): ProjectSummary[] {
         thumbnail: existsSync(thumb) ? thumb : undefined,
         series: meta.series,
         exercise: meta.exercise,
+        extra: !!meta.extra,
       })
     } catch {
       // unreadable project.json: skip it

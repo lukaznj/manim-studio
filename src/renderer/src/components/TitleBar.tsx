@@ -11,6 +11,7 @@ export function TitleBar() {
   const project = useStore((s) => s.project)
   const screen = useStore((s) => s.screen)
   const exerciseSet = useStore((s) => s.exerciseSet)
+  const watchSeries = useStore((s) => s.watchSeries)
   const render = useStore((s) => s.render)
   const dirty = useStore((s) => s.dirty)
   const platform = useStore((s) => s.app?.platform)
@@ -23,7 +24,19 @@ export function TitleBar() {
   return (
     <header className={`titlebar ${platform === 'darwin' ? 'mac' : 'other'}`}>
       <div className="titlebar-left">
-        {screen === 'exercises' && exerciseSet ? (
+        {screen === 'watch' && watchSeries ? (
+          <>
+            <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
+              <ChevronLeft />
+            </button>
+            <div className="crumb">
+              <span className="faint">Projects</span>
+              <span className="faint">/</span>
+              <strong>{watchSeries.title}</strong>
+              <span className="badge">Watching</span>
+            </div>
+          </>
+        ) : screen === 'exercises' && exerciseSet ? (
           <>
             <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
               <ChevronLeft />
