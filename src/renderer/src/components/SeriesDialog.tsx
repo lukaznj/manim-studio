@@ -21,6 +21,7 @@ export function SeriesDialog() {
   const agents = useStore((s) => s.settings?.seriesAgents || 3)
   const [pdfs, setPdfs] = useState<string[]>([])
   const [title, setTitle] = useState('')
+  const [instructions, setInstructions] = useState('')
   const [aspect, setAspect] = useState<Aspect>('16:9')
   const [theme, setTheme] = useState<Theme>('dark')
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
@@ -37,6 +38,7 @@ export function SeriesDialog() {
     if (!open) return
     setPdfs([])
     setTitle('')
+    setInstructions('')
     setPlan(null)
     setBusy(null)
     if (defaultVoice) setVoice(defaultVoice)
@@ -61,7 +63,7 @@ export function SeriesDialog() {
     cancelled.current = false
     const off = api.on('series-plan', setProgress)
     try {
-      setPlan(await api.planSeries({ pdfs, title: title.trim() || undefined, language, tone }))
+      setPlan(await api.planSeries({ pdfs, title: title.trim() || undefined, instructions: instructions.trim() || undefined, language, tone }))
     } catch (e) {
       if (!cancelled.current) toast(errorText(e), 'error')
     } finally {
@@ -79,7 +81,7 @@ export function SeriesDialog() {
     setBusy('starting')
     try {
       await api.startSeries({
-        plan,
+        plan: { ...plan, instructions: instructions.trim() || undefined },
         pdfs,
         aspect,
         theme,
@@ -160,6 +162,18 @@ export function SeriesDialog() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
+          </div>
+          <div className="field">
+            <label htmlFor="series-instructions">How to make it</label>
+            <textarea
+              id="series-instructions"
+              className="textarea series-instructions"
+              rows={3}
+              placeholder="Optional. For example: I'm revising this before a new subject, so keep it intuitive and don't go deep into the formulas."
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+            />
+            <span className="hint">Claude plans the episodes with it, and every episode follows it (series.md keeps it).</span>
           </div>
           <div
             className={`series-pdfs ${dragging ? 'dragging' : ''}`}
