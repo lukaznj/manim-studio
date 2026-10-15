@@ -27,7 +27,7 @@ const MAX_TEXT = 40_000
 /** Reads the PDFs and asks Claude for episodes and a bible. */
 /** Reads the PDFs and asks the agent for episodes and a bible, reporting each step as it goes. */
 export async function planSeries(
-  req: { pdfs: string[]; title?: string; language: string; tone: Tone },
+  req: { pdfs: string[]; title?: string; instructions?: string; language: string; tone: Tone },
   report: (p: SeriesPlanProgress) => void = () => {},
   signal?: AbortSignal,
 ): Promise<SeriesPlan> {
@@ -52,6 +52,11 @@ export async function planSeries(
       `Plan an educational video series from this course material, in ${languageName(req.language)}.${req.title ? ` The series is called "${req.title}".` : ''}`,
       `Its tone: ${tone.brief}`,
       'Episodes: usually one per file, in the given order. Split a file that holds several big ideas into several episodes; merge files too thin for a video of their own. Each episode has one central idea and fits a focused video (typically 3 to 10 minutes). Name the pages each episode uses.',
+      ...(req.instructions?.trim()
+        ? [
+            `The user's own instructions for this series come before the guidance here: the episodes' depth and length, and what the bible says about the audience and the approach, follow them.\n---\n${req.instructions.trim()}\n---`,
+          ]
+        : []),
       'The bible (series.md, Markdown) has: who the series is for and what it assumes; the arc (how the episodes build on each other); the notation used throughout (follow the material); the visual vocabulary, saying which colour (palette names TEXT, MUTED, ACCENT, HIGHLIGHT, POSITIVE, NEGATIVE) and which shape always stands for what; recurring visual devices. Aim for the clarity and consistency of 3Blue1Brown’s series.',
       // Episodes before the bible: they stream first, so the user sees the plan take shape.
       'Answer with only JSON, in this order: {"title": string, "episodes": [{"title": string, "summary": string, "sources": [{"file": string, "pages": string}], "buildsOn": [1-based episode numbers]}], "bible": string}',
@@ -63,11 +68,12 @@ export async function planSeries(
       signal,
       onText: (soFar) => report({ ...progress, stage: /"bible"\s*:/.test(soFar) ? 'bible' : 'planning', episodes: titlesSoFar(soFar) }),
     })
-    return parsePlan(
+    const plan = parsePlan(
       answer,
       req.pdfs.map((p) => basename(p)),
       req.title,
     )
+    return { ...plan, instructions: req.instructions?.trim() || undefined }
   } finally {
     rmSync(work, { recursive: true, force: true })
   }
@@ -84,7 +90,7 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
   let folder = join(root, slugify(plan.title))
   for (let i = 2; existsSync(folder); i++) folder = join(root, `${slugify(plan.title)}-${i}`)
   mkdirSync(folder, { recursive: true })
-  writeFileSync(join(folder, 'series.md'), `# ${plan.title}\n\n${plan.bible}\n`)
+  writeFileSync(join(folder, 'series.md'), bibleText(plan))
 
   const byName = new Map(start.pdfs.map((p) => [basename(p), p]))
   const dirs: string[] = []
@@ -285,7 +291,14 @@ export function seriesBrief(meta: ProjectMeta): string {
   return [
     `This video is episode ${s.episode} of ${s.of} of the series "${s.title}". ${s.brief}`,
     'series.md in this project is the series bible, with what each episode covers: follow its notation and visual vocabulary exactly, assume what the earlier episodes taught, refer back to them where it helps ("in episode 2 we saw…") instead of explaining again, and leave later episodes’ topics to them.',
+    'When series.md has a "What the user asked for" section, that is how the user wants the whole series made: it comes before the usual guidance (how deep to go, how long, the style).',
   ].join('\n')
+}
+
+/** The series folder's series.md: the title, the user's own instructions when there are some, then the bible. */
+function bibleText(plan: SeriesPlan): string {
+  const asked = plan.instructions?.trim() ? `## What the user asked for\n\n${plan.instructions.trim()}\n\n` : ''
+  return `# ${plan.title}\n\n${asked}${plan.bible}\n`
 }
 
 /**
@@ -297,7 +310,7 @@ export function writeEpisodeBible(dir: string): void {
   const s = meta.series
   if (!s || !existsSync(join(s.folder, 'series.json'))) return
   const { plan, episodes } = JSON.parse(readFileSync(join(s.folder, 'series.json'), 'utf8')) as { plan: SeriesPlan; episodes: string[] }
-  const bible = existsSync(join(s.folder, 'series.md')) ? readFileSync(join(s.folder, 'series.md'), 'utf8') : `# ${plan.title}\n\n${plan.bible}\n`
+  const bible = existsSync(join(s.folder, 'series.md')) ? readFileSync(join(s.folder, 'series.md'), 'utf8') : bibleText(plan)
   const list = plan.episodes.map((ep, i) => {
     const here = i + 1 === s.episode
     const script = join(s.folder, episodes[i] ?? '', SCRIPT_FILE)
