@@ -164,7 +164,7 @@ function AccountTab() {
         text={
           agent === 'codex'
             ? 'With Codex, a series is made one episode at a time.'
-            : 'An unattended series makes this many videos at the same time, one Claude agent each. More is faster, but uses your plan’s limits faster and renders more at once on this computer.'
+            : 'How many Claude agents an unattended series runs at once: one writes the scripts in order, the others make each video as soon as its script is ready. More is faster, but uses your plan’s limits faster and renders more at once on this computer.'
         }
       >
         <Tabs
