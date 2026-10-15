@@ -99,6 +99,7 @@ class Recorder:
         self.clips: list[dict] = []
         self.sections: list[dict] = []
         self.voice: list[dict] = []
+        self.thumbnail: dict | None = None  # self.thumbnail("hook"): the moment showing the core idea
         self.layout = LayoutChecker()
 
     def line(self) -> int | None:
@@ -150,9 +151,15 @@ class Recorder:
             )
             return tracker
 
+        def recorded_thumbnail(scene, text: str | None = None):
+            rec.thumbnail = {"t": scene.renderer.time, "text": (text or "").strip() or None, "line": rec.line()}
+
+        from studio import StudioScene
+
         Scene.play = recorded_play
         Scene.next_section = recorded_section
         VoiceoverScene._add_voiceover_text = recorded_voiceover
+        StudioScene.thumbnail = recorded_thumbnail
 
 
 def _anim(a) -> dict:
@@ -219,6 +226,7 @@ def render(project: Path, quality: str, **options) -> int:
         "renderedAt": time.time(),
         "renderSeconds": round(time.time() - started, 2),
         "sections": _close_sections(recorder.sections, duration),
+        "thumbnail": recorder.thumbnail,
         "clips": recorder.clips,
         "voice": recorder.voice,
         "subtitles": [

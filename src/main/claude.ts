@@ -676,6 +676,7 @@ function studioPrompt(dir: string, agent: 'claude' | 'codex', autopilot: boolean
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),
+    'Mark the thumbnail once in scene.py: self.thumbnail("a 2 to 5 word hook") right after the animation that completes the key picture (the core idea fully on screen). The hook is in the narration language and makes someone want to watch; it is not the title. The exported thumbnail puts the hook and the episode number on the left of that frame.',
     seriesBrief(meta),
     exerciseBrief(meta),
     scriptBrief(meta, readScript(dir) !== null, { auto: autopilot }),

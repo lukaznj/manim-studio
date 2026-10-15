@@ -10,6 +10,7 @@ Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017
 
 - **Run quick and series mode on many real courses** and fix what they get wrong: the quality bar is a series at the level of 3Blue1Brown's *Essence of linear algebra*.
 - **Quick and series mode in the background**, so a whole series doesn't keep the app on its progress screen: the agent's turns would need to work on a project that isn't the open one.
+- **Mass production, ready to publish.** The exported thumbnail card ([[../04-decisions/0026-thumbnail-card|ADR 0026]]) is a first step. Next could be: thumbnail variants to choose from; the agent writing each video's YouTube title, description, chapters and tags; a series-wide thumbnail style; uploading a whole series straight to a channel on a schedule.
 - **A Linux ARM build of the render server** (a Raspberry Pi or an ARM home server): the locked Python environment would need `linux-aarch64`.
 
 ## Also next
