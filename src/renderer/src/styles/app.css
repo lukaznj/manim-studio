@@ -1810,3 +1810,46 @@
   font-size: 13px;
   margin-bottom: 6px;
 }
+
+/* ---- ElevenLabs key (SettingsDialog.tsx ElevenLabsStatus, KeyField) ---------------------------- */
+
+.key-error {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--coral);
+}
+.el-status {
+  display: grid;
+  gap: 8px;
+  margin: -4px 0 4px;
+}
+.el-permissions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  font-size: 12.5px;
+}
+.el-permissions > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.el-permissions svg,
+.el-permissions .spinner {
+  width: 13px;
+  height: 13px;
+}
+.el-permissions .ok svg {
+  color: var(--mint);
+}
+.el-permissions .bad {
+  color: var(--coral);
+}
+.el-permissions .link-btn {
+  margin-left: auto;
+}
+.el-usage {
+  display: grid;
+  gap: 4px;
+}
