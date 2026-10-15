@@ -83,6 +83,34 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.render-pill > svg {
+  width: 12px;
+  height: 12px;
+}
+.render-pill.paused {
+  background: var(--raised);
+  color: var(--text-2);
+}
+/* Pause and stop inside a pill: small round buttons that don't grow it. */
+.pill-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: -4px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.pill-btn:hover {
+  background: light-dark(rgb(0 0 0 / 0.08), rgb(255 255 255 / 0.12));
+}
+.pill-btn svg {
+  width: 11px;
+  height: 11px;
+}
 .render-pill .spinner {
   width: 11px;
   height: 11px;
@@ -489,6 +517,47 @@
 .thumb-empty {
   background: #0b1626;
 }
+/* A series on Home: the cover with two more episodes stacked behind it. */
+.thumb.stack img,
+.thumb.stack .thumb-empty {
+  transform: translate(-7px, 7px);
+  box-shadow:
+    7px -7px 0 -1px light-dark(#c4ccd9, #1b2a44),
+    14px -14px 0 -2px light-dark(#d3d9e3, #142139),
+    0 6px 18px -6px light-dark(rgb(15 30 55 / 0.25), rgb(0 0 0 / 0.7));
+}
+.series-card .badge svg {
+  width: 11px;
+  height: 11px;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+.home-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  min-width: 0;
+}
+.home-crumbs strong {
+  font-size: 18px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-crumbs .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.home-crumbs .link-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.home-crumbs .btn {
+  margin-left: auto;
+}
 .thumb.theme-light .thumb-empty {
   background: #f7f8fa;
 }
@@ -506,14 +575,6 @@
   padding: 12px 14px 14px;
   display: grid;
   gap: 6px;
-}
-.series-badge {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: inline-block;
-  line-height: 20px;
 }
 .project-ago {
   white-space: nowrap;
@@ -1455,6 +1516,83 @@
   color: var(--text);
   font-weight: 600;
 }
+.quick-steps li.failed svg {
+  color: var(--coral);
+}
+.series-panel .quick-steps {
+  margin-top: 14px;
+}
+.series-run li {
+  align-items: flex-start;
+}
+.series-run li > svg,
+.series-run li > .spinner {
+  margin-top: 2px;
+}
+.series-run-body {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.series-run-state {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.series-run .btn {
+  flex: none;
+}
+.series-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.quick-series {
+  margin-top: 8px;
+}
+.quick-series summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.series-progress {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 320px;
+}
+.series-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.series-progress-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.series-progress-episodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.series-progress-episodes li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  animation: fade-up 0.25s ease;
+}
 .quick-activity {
   font-size: 12.5px;
   overflow: hidden;
@@ -1576,6 +1714,11 @@
 }
 .series-bible .textarea {
   font: 12.5px/1.55 var(--font-mono);
+}
+/* The plan's texts grow to fit, so nothing has to be scrolled inside its box. */
+.series-plan .textarea {
+  field-sizing: content;
+  min-height: 56px;
 }
 
 /* ---- render servers (Settings → General) ----------------------------------------------------- */

@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import type { ExportJob, ExportOptions, ExportResult } from '../shared/types'
 import { exportVideo } from './export'
 import { readMeta } from './projects'
+import { pauseTag } from './runner'
 
 const jobs: ExportJob[] = []
 const done = new Map<string, { resolve: (r: ExportResult) => void; reject: (e: Error) => void }>()
@@ -47,6 +48,15 @@ export function cancelExport(id: string): void {
   changed()
 }
 
+/** Pauses or resumes a running export on this computer (a render server's can only be stopped). */
+export function pauseExport(id: string, on: boolean): void {
+  const job = jobs.find((j) => j.id === id)
+  if (!job || job.state !== 'running' || job.options.server) return
+  pauseTag(job.id, on)
+  job.paused = on
+  changed()
+}
+
 /** Takes every finished export off the list. */
 export function clearExports(): void {
   for (let i = jobs.length - 1; i >= 0; i--) if (!['waiting', 'running'].includes(jobs[i].state)) jobs.splice(i, 1)
@@ -74,6 +84,7 @@ async function next(): Promise<void> {
         changed()
       },
       abort.signal,
+      job.id,
     )
     finish(job, { state: 'done', result })
     notify(`Exported “${job.name}”`, result.warnings.length ? result.warnings[0] : 'Click to show the files.', () => shell.showItemInFolder(result.files[0] ?? result.folder))
@@ -92,7 +103,8 @@ async function next(): Promise<void> {
 }
 
 function finish(job: ExportJob, patch: Partial<ExportJob>): void {
-  Object.assign(job, patch, { finishedAt: Date.now(), stage: undefined, percent: undefined })
+  pauseTag(job.id, false)
+  Object.assign(job, patch, { finishedAt: Date.now(), stage: undefined, percent: undefined, paused: undefined })
   const waiter = done.get(job.id)
   done.delete(job.id)
   if (job.state === 'done' && job.result) waiter?.resolve(job.result)

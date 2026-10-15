@@ -147,6 +147,12 @@ export function saveScene(source: string): void {
   writeFileSync(sceneFile(p.path), source)
 }
 
+/** updateMeta for any project: the open one in memory too, any other only on disk. */
+export function updateMetaAt(dir: string, patch: Partial<ProjectMeta>): void {
+  if (current?.path === dir) return void updateMeta(patch)
+  writeFileSync(metaFile(dir), JSON.stringify({ ...readMeta(dir), ...patch }, null, 2))
+}
+
 export function updateMeta(patch: Partial<ProjectMeta>): ProjectMeta {
   const p = requireProject()
   p.meta = { ...p.meta, ...patch }
@@ -157,7 +163,11 @@ export function updateMeta(patch: Partial<ProjectMeta>): ProjectMeta {
 /** The pictures and videos in the open project's media/, for Claude's instructions. */
 export function mediaNames(dir = requireProject().path): string[] {
   const media = join(dir, 'media')
-  return existsSync(media) ? readdirSync(media).filter((n) => !n.startsWith('.')).sort() : []
+  return existsSync(media)
+    ? readdirSync(media)
+        .filter((n) => !n.startsWith('.'))
+        .sort()
+    : []
 }
 
 export function readScene(): string {
@@ -180,10 +190,9 @@ export function readChat(dir: string): ChatMessage[] {
   }
 }
 
-export function writeChat(messages: ChatMessage[]): void {
-  const p = requireProject()
-  mkdirSync(join(p.path, '.studio'), { recursive: true })
-  writeFileSync(chatFile(p.path), JSON.stringify(messages.slice(-300)))
+export function writeChat(messages: ChatMessage[], dir = requireProject().path): void {
+  mkdirSync(join(dir, '.studio'), { recursive: true })
+  writeFileSync(chatFile(dir), JSON.stringify(messages.slice(-300)))
 }
 
 export const readScript = (dir: string): string | null => (existsSync(join(dir, SCRIPT_FILE)) ? readFileSync(join(dir, SCRIPT_FILE), 'utf8') : null)

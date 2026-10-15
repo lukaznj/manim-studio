@@ -14,6 +14,7 @@ import type {
   ProjectSummary,
   Quality,
   QuickRun,
+  SeriesRun,
   RenderError,
   RenderEvent,
   SetupStatus,
@@ -41,6 +42,29 @@ export interface RenderState {
   t?: number
   error?: RenderError
   startedAt?: number
+  paused?: boolean // the preview render's processes are stopped (TitleBar's pause)
+}
+
+/**
+ * A render's progress in words. Manim draws one animation (self.play) at a time; the last render's
+ * count is the only estimate of the total, so it gives a percentage only while it still fits.
+ */
+export function renderProgress(r: RenderState): { label: string; detail: string; title: string; fraction?: number } {
+  const clips = r.clips ?? 0
+  const fits = !!r.expected && clips <= r.expected
+  const fraction = fits ? clips / r.expected! : undefined
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+  return {
+    label: r.paused ? 'Preview paused' : 'Rendering preview',
+    detail: fraction !== undefined ? `${Math.round(fraction * 100)}%` : r.t ? `${clock(r.t)} so far` : '',
+    title: [
+      `Manim draws the video one animation at a time: ${clips} done`,
+      fits ? `, of about ${r.expected} (as many as the last render had)` : '',
+      r.t ? `, ${clock(r.t)} of video` : '',
+      '.',
+    ].join(''),
+    fraction,
+  }
 }
 
 export type Dialog =
@@ -81,6 +105,8 @@ interface State {
   script: string | null // the open project's script.md (ScriptPane.tsx)
   quick: QuickRun | null // quick mode's run (QuickView.tsx)
   quickEditor: boolean // show the editor instead of quick mode's progress
+  series: SeriesRun | null // a series being made unattended (SeriesPanel.tsx on Home)
+  homeSeries: string | null // the series folder Home has open, or null for all projects
   selection: number[] // clip indices
   recordings: string[]
 
@@ -121,6 +147,8 @@ export const useStore = create<State>(() => ({
   script: null,
   quick: null,
   quickEditor: false,
+  series: null,
+  homeSeries: null,
   selection: [],
   recordings: [],
   chat: [],
@@ -197,6 +225,8 @@ export async function boot(): Promise<void> {
   api.on('exports', (exports) => set({ exports }))
   api.on('quick', (quick) => set((s) => ({ quick, quickEditor: quick?.id === s.quick?.id ? s.quickEditor : false })))
   void api.quickRun().then((quick) => set({ quick }))
+  api.on('series', (series) => set({ series }))
+  void api.seriesRun().then((series) => set({ series }))
   // Claude wrote the script: show it, unless you're in the middle of something else.
   api.on('script', ({ text }) => set((s) => ({ script: text, leftTab: text && s.leftTab === 'code' && !s.dirty ? 'script' : s.leftTab })))
   void api.exportJobs().then((exports) => set({ exports }))
@@ -393,6 +423,12 @@ export async function saveScene(opts: { render?: boolean } = {}): Promise<void> 
   await api.saveScene(source)
   set({ savedSource: source, dirty: false, conflict: null })
   if (opts.render ?? get().settings?.autoRender ?? true) void renderNow()
+}
+
+/** Pauses or resumes the preview render in progress. */
+export async function pausePreview(paused: boolean): Promise<void> {
+  await api.pauseRender(paused)
+  set((s) => (s.render.status === 'rendering' ? { render: { ...s.render, paused } } : {}))
 }
 
 export async function renderNow(quality: Quality = 'preview'): Promise<void> {

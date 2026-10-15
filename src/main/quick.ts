@@ -7,6 +7,8 @@ import { basename } from 'node:path'
 import type { ChatEvent, ExportOptions, ExportResult, QuickRequest, QuickRun, QuickStep } from '../shared/types'
 import { chatAndWait, chatInterrupt, claudeStatus, observeChat, setAutopilot } from './claude'
 import { setupStatus } from './env'
+import { turnPastLimits } from './agent'
+import { fakeAgents } from './agent-fake'
 import { cancelExport, queueExport } from './exports'
 import { createProject } from './projects'
 import { currentOrNewRender } from './render'
@@ -42,7 +44,7 @@ export async function ensureQuickReady(): Promise<void> {
   if (run?.state === 'working') throw new Error('Quick mode is already making a video. Wait for it, or stop it.')
   if (setupStatus().env !== 'ready') throw new Error('The manim environment isn’t installed yet (Settings → Environment).')
   const claude = await claudeStatus()
-  if (!claude.loggedIn) throw new Error('Sign in to your agent first (Settings → Agent): quick mode needs Claude or Codex to write the video.')
+  if (!claude.loggedIn && !fakeAgents()) throw new Error('Sign in to your agent first (Settings → Agent): quick mode needs Claude or Codex to write the video.')
 }
 
 /** Starts a run and returns it at once; it goes on in the background. `finished` settles at the end. */
@@ -104,24 +106,8 @@ async function make(r: QuickRun, req: QuickTask): Promise<ExportResult> {
 
     // Claude says it's done; check for ourselves and send it back for what's left.
     reach('check')
-    for (let round = 0; ; round++) {
-      check()
-      update({ activity: 'Checking the render' })
-      const outcome = await currentOrNewRender()
-      check()
-      if ('cancelled' in outcome) throw new Error('The render was cancelled')
-      const problems = 'error' in outcome ? [`fails: ${outcome.error.message}${outcome.error.line ? ` (scene.py line ${outcome.error.line})` : ''}`] : outcome.timeline.warnings.map((w) => w.message)
-      if (!problems.length) {
-        if ('timeline' in outcome) update({ warnings: outcome.timeline.voiceWarnings })
-        break
-      }
-      if (round === FIX_ROUNDS) {
-        if ('error' in outcome) throw new Error(`The video still doesn’t render after ${FIX_ROUNDS} fixes: ${outcome.error.message}`)
-        update({ warnings: [...outcome.timeline.warnings.map((w) => w.message), ...outcome.timeline.voiceWarnings] })
-        break
-      }
-      await turn(`I rendered it, and the render ${problems.length === 1 ? problems[0] : `has these problems:\n- ${problems.join('\n- ')}`}\nFix ${problems.length === 1 ? 'it' : 'them'}, render again and look at the frames.`)
-    }
+    update({ activity: 'Checking the render' })
+    update({ warnings: await checkAndFix(r.project, turn, check) })
     setAutopilot(false)
 
     reach('export')
@@ -147,9 +133,44 @@ function check(): void {
 
 async function turn(text: string): Promise<void> {
   check()
-  const result = await chatAndWait(text)
+  let before: string | undefined
+  const result = await turnPastLimits(
+    chatAndWait,
+    text,
+    (note) => {
+      if (note) before = run?.activity
+      update({ activity: note ?? before })
+    },
+    check,
+  )
   check()
   if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
+}
+
+/**
+ * Studio's own check after Claude says it's done: renders, and sends Claude back for an error or
+ * layout warnings, up to FIX_ROUNDS times. Returns what's left to tell the user (voice problems,
+ * warnings it couldn't fix); throws when the video still doesn't render. Series episodes use it too.
+ */
+export async function checkAndFix(dir: string, turn: (text: string) => Promise<void>, check: () => void): Promise<string[]> {
+  for (let round = 0; ; round++) {
+    check()
+    const outcome = await currentOrNewRender(dir)
+    check()
+    if ('cancelled' in outcome) throw new Error('The render was cancelled')
+    const problems =
+      'error' in outcome
+        ? [`fails: ${outcome.error.message}${outcome.error.line ? ` (scene.py line ${outcome.error.line})` : ''}`]
+        : outcome.timeline.warnings.map((w) => w.message)
+    if (!problems.length) return 'timeline' in outcome ? outcome.timeline.voiceWarnings : []
+    if (round === FIX_ROUNDS) {
+      if ('error' in outcome) throw new Error(`The video still doesn’t render after ${FIX_ROUNDS} fixes: ${outcome.error.message}`)
+      return [...outcome.timeline.warnings.map((w) => w.message), ...outcome.timeline.voiceWarnings]
+    }
+    await turn(
+      `I rendered it, and the render ${problems.length === 1 ? problems[0] : `has these problems:\n- ${problems.join('\n- ')}`}\nFix ${problems.length === 1 ? 'it' : 'them'}, render again and look at the frames.`,
+    )
+  }
 }
 
 /** Progress from what Claude does: the files it writes and the tools it calls. */

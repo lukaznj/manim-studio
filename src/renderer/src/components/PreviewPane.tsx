@@ -1,10 +1,10 @@
-import { Captions, ChevronDown, CircleAlert, Code2, Sparkles, TriangleAlert, Wrench } from 'lucide-react'
+import { Captions, ChevronDown, CircleAlert, Code2, Pause, Sparkles, TriangleAlert, Wrench } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { editorBridge } from '../lib/editor-bridge'
 import { playback } from '../lib/playback'
 import { shortcut } from '../lib/platform'
-import { openDialog, renderNow, saveScene, sendChat, useStore } from '../store'
+import { openDialog, renderNow, renderProgress, saveScene, sendChat, useStore } from '../store'
 
 export function PreviewPane() {
   const timeline = useStore((s) => s.timeline)
@@ -54,7 +54,7 @@ export function PreviewPane() {
                 <>
                   <Code2 />
                   <p>
-                    Save the scene (<span className="kbd">{shortcut("S")}</span>) to render the first preview.
+                    Save the scene (<span className="kbd">{shortcut('S')}</span>) to render the first preview.
                   </p>
                   <button className="btn" onClick={() => void saveScene({ render: true })}>
                     Render
@@ -65,8 +65,8 @@ export function PreviewPane() {
           )}
           {captions && timeline && <CaptionOverlay />}
           {render.status === 'rendering' && src && (
-            <div className="frame-status">
-              <span className="spinner" /> Rendering{render.expected ? ` ${render.clips ?? 0}/${render.expected}` : '…'}
+            <div className="frame-status" title={renderProgress(render).title}>
+              {render.paused ? <Pause /> : <span className="spinner" />} {renderProgress(render).label} {renderProgress(render).detail}
             </div>
           )}
         </div>
@@ -77,7 +77,7 @@ export function PreviewPane() {
         <div className="preview-flags">
           {(dirty || stale) && render.status !== 'rendering' && (
             <button className="flag sun" onClick={() => void saveScene({ render: true })} title="Save and render">
-              Preview is out of date · <span className="kbd">{shortcut("S")}</span>
+              Preview is out of date · <span className="kbd">{shortcut('S')}</span>
             </button>
           )}
           {warnings.length > 0 && (
@@ -136,10 +136,7 @@ export function PreviewPane() {
 function CaptionOverlay() {
   const subtitles = useStore((s) => s.timeline?.subtitles ?? [])
   const [text, setText] = useState('')
-  useEffect(
-    () => playback.subscribe((t) => setText(subtitles.find((s) => t >= s.start && t <= s.end)?.text ?? '')),
-    [subtitles],
-  )
+  useEffect(() => playback.subscribe((t) => setText(subtitles.find((s) => t >= s.start && t <= s.end)?.text ?? '')), [subtitles])
   return <div className={`captions ${text ? 'on' : ''}`}>{text && <span>{text}</span>}</div>
 }
 
@@ -167,7 +164,9 @@ function ErrorCard() {
         <button
           className="btn small primary"
           disabled={chatBusy}
-          onClick={() => void sendChat(`The render failed${error.line ? ` on line ${error.line}` : ''}:\n${error.message}\n\nFix it and check the render.`, false)}
+          onClick={() =>
+            void sendChat(`The render failed${error.line ? ` on line ${error.line}` : ''}:\n${error.message}\n\nFix it and check the render.`, false)
+          }
         >
           <Sparkles /> Fix with Claude
         </button>

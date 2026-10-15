@@ -55,6 +55,25 @@ export function QuickView() {
         </ol>
         {working && run.step === 'export' && <ProgressLine value={job?.percent} />}
         {working && run.activity && <div className="quick-activity faint">{run.activity}</div>}
+        {run.series?.episodes && (
+          <details className="quick-series" open>
+            <summary>
+              Episode {run.series.episode} of {run.series.of} · {run.series.episodes.filter((e) => e.state === 'done').length} made
+            </summary>
+            <ol className="quick-steps">
+              {run.series.episodes.map((ep, i) => {
+                const state = ep.state === 'now' && run.state !== 'working' ? (run.state === 'done' ? 'done' : 'failed') : ep.state
+                return (
+                  <li key={i} className={state}>
+                    {state === 'done' ? <Check /> : state === 'now' ? <span className="spinner" /> : state === 'failed' ? <CircleAlert /> : <Circle />}
+                    <span className="mono faint">{i + 1}</span>
+                    <span>{ep.title}</span>
+                  </li>
+                )
+              })}
+            </ol>
+          </details>
+        )}
         {run.error && (
           <div className="quick-error">
             <CircleAlert /> {run.error}

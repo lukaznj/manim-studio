@@ -15,6 +15,7 @@ An export blocked the app: the dialog stayed open until it finished, and the exp
 - **Each job works on a copy of its project** (`snapshotProject` in `export.ts`): everything but `.git`, `.studio` and earlier exports, in `<userData>/export-jobs/<id>/`, deleted afterwards. The project can be edited, closed or swapped for another while it exports, and every theme of one export renders the same source.
 - **The copy shares the project's render cache** (`STUDIO_CACHE_DIR`), so unchanged animations aren't drawn again. Narration the copy generates is copied back into the project, so it's never paid for twice.
 - **The title bar's Exports button** shows the running export's progress on every screen, and opens the list: stop, show the files, remove. A system notification says when an export is done or failed.
+- **Pause suspends the processes** (`runner.ts` `pauseTag`): every process a job (or the preview render) starts carries its tag, and pausing stops them where they are, with SIGSTOP/SIGCONT on macOS and Linux and NtSuspendProcess on Windows. Nothing is lost or redone, and a stop or quit resumes them first. Exports on a render server can't be paused, only stopped.
 - **Jobs live in memory.** Quitting while exports run or wait asks first.
 - Claude Desktop's `export_video` queues a job the same way and waits for it.
 

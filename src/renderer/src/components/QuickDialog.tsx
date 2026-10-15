@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, errorText, openDialog, toast, useStore } from '../store'
 import { ExportOn } from './ExportDialog'
+import { voiceProblem } from './SettingsDialog'
 import { Modal, Tabs } from './ui'
 
 /**
@@ -16,6 +17,7 @@ export function QuickDialog() {
   const open = useStore((s) => s.dialog?.kind === 'quick')
   const defaultVoice = useStore((s) => s.settings?.defaultVoice)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
+  const omnivoice = useStore((s) => s.setup?.omnivoice)
   const [prompt, setPrompt] = useState('')
   const [pdfs, setPdfs] = useState<string[]>([])
   const [aspect, setAspect] = useState<Aspect>('16:9')
@@ -38,7 +40,7 @@ export function QuickDialog() {
   const add = (paths: string[]) => setPdfs((p) => [...p, ...paths.filter((x) => /\.pdf$/i.test(x) && !p.includes(x))])
 
   const start = async () => {
-    if (!prompt.trim() || busy) return
+    if (!prompt.trim() || busy || voiceIssue) return
     setBusy(true)
     try {
       await api.startQuick({
@@ -59,7 +61,7 @@ export function QuickDialog() {
   }
 
   // The default voice decides whether the video speaks: without one, the narration stays silent.
-  const voiceMissing = defaultVoice?.provider === 'elevenlabs' && (!hasKey || !defaultVoice.elevenlabs?.voiceId)
+  const voiceIssue = voiceProblem(defaultVoice, hasKey, omnivoice)
   const languages = LANGUAGES.includes(language) ? LANGUAGES : [language, ...LANGUAGES]
 
   return (
@@ -74,14 +76,17 @@ export function QuickDialog() {
           <button className="btn ghost" onClick={closeDialog}>
             Cancel
           </button>
-          <button className="btn primary" disabled={!prompt.trim() || busy} onClick={() => void start()}>
+          <button className="btn primary" disabled={!prompt.trim() || busy || !!voiceIssue} title={voiceIssue ?? undefined} onClick={() => void start()}>
             {busy ? <span className="spinner" /> : <Zap />} Make the video
           </button>
         </>
       }
     >
       <div className="modal-body quick-form">
-        <p className="hint">Describe it, attach the material, and Studio does the rest: Claude writes the script and the scenes, checks the render and exports the video. You don't need the editor; it's there if you want to look.</p>
+        <p className="hint">
+          Describe it, attach the material, and Studio does the rest: Claude writes the script and the scenes, checks the render and exports the video. You
+          don't need the editor; it's there if you want to look.
+        </p>
         <div className="field">
           <label htmlFor="quick-prompt">What should the video show?</label>
           <textarea
@@ -168,9 +173,9 @@ export function QuickDialog() {
           <input type="checkbox" checked={both} onChange={(e) => setBoth(e.target.checked)} /> Export both a light and a dark version
         </label>
         <ExportOn value={server} onChange={setServer} />
-        {voiceMissing && (
+        {voiceIssue && (
           <div className="quick-warning">
-            The default voice isn't set up, so the narration would be silent.{' '}
+            {voiceIssue}{' '}
             <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'voice' })}>
               Choose one in Settings → Voice
             </button>
