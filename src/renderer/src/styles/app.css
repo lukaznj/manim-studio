@@ -476,9 +476,16 @@
   border-color: rgb(255 209 102 / 0.55);
   box-shadow: 0 16px 36px -18px light-dark(rgb(15 30 55 / 0.3), rgb(0 0 0 / 0.8));
 }
-.project-card.missing {
+.project-card.missing .thumb,
+.project-card.missing .project-name {
   opacity: 0.55;
-  cursor: default;
+}
+.missing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 14px;
+  margin-top: -4px;
 }
 @keyframes rise {
   from {
