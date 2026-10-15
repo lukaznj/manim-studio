@@ -67,6 +67,17 @@ export interface SeriesEpisode {
   buildsOn?: number[] // 1-based episode numbers
 }
 
+/** What series planning is doing, step by step (src/main/series.ts planSeries). */
+export interface SeriesPlanProgress {
+  stage: 'reading' | 'planning' | 'bible'
+  total: number // PDFs
+  file?: string // the PDF being read
+  index?: number // 1-based
+  read: { file: string; pages: number }[] // PDFs read so far
+  episodes: string[] // episode titles planned so far
+  startedAt: number
+}
+
 /** Claude's proposal for a series, which the user edits and accepts. */
 export interface SeriesPlan {
   title: string
@@ -305,7 +316,7 @@ export interface QuickRun {
   result?: ExportResult
   error?: string
   warnings: string[] // what couldn't be fixed (e.g. a voice problem); the video was still made
-  series?: { title: string; episode: number; of: number }
+  series?: { title: string; episode: number; of: number; episodes?: { title: string; state: 'done' | 'failed' | 'now' | 'todo' }[] }
 }
 
 /**
@@ -320,6 +331,7 @@ export interface ExportJob {
   state: 'waiting' | 'running' | 'done' | 'failed' | 'cancelled'
   stage?: string // what it's doing now, e.g. "Rendering the dark version"
   percent?: number // 0–1 for the current stage, when known
+  paused?: boolean
   result?: ExportResult
   error?: string
   queuedAt: number
@@ -364,8 +376,23 @@ export interface ClaudeDesktopStatus {
 
 /** Commands from the macOS menu bar, carried out in the window. */
 export type MenuAction =
-  | 'settings' | 'claude-settings' | 'new-project' | 'open-project' | 'open-recent' | 'save' | 'render' | 'play'
-  | 'booth' | 'history' | 'export' | 'quick' | 'series' | 'close-project' | 'new-conversation' | 'appearance' | 'tutorial'
+  | 'settings'
+  | 'claude-settings'
+  | 'new-project'
+  | 'open-project'
+  | 'open-recent'
+  | 'save'
+  | 'render'
+  | 'play'
+  | 'booth'
+  | 'history'
+  | 'export'
+  | 'quick'
+  | 'series'
+  | 'close-project'
+  | 'new-conversation'
+  | 'appearance'
+  | 'tutorial'
 
 export interface ClaudeLoginEvent {
   line?: string
@@ -418,9 +445,7 @@ export interface ChatRequest {
   source?: SourceRef
 }
 
-export type ChatPart =
-  | { kind: 'text'; text: string }
-  | { kind: 'tool'; id: string; name: string; summary: string; status: 'running' | 'ok' | 'error' }
+export type ChatPart = { kind: 'text'; text: string } | { kind: 'tool'; id: string; name: string; summary: string; status: 'running' | 'ok' | 'error' }
 
 export interface ChatMessage {
   id: string
@@ -494,7 +519,8 @@ export interface VoiceOption {
   users?: number // how many people saved it (ElevenLabs' library)
 }
 
-export type EventChannel = 'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'open-project' | 'menu'
+export type EventChannel =
+  'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'series-plan' | 'open-project' | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -542,6 +568,8 @@ export interface StudioApi {
   stopQuick(): Promise<void>
   /** Reads the PDFs and asks Claude for a series plan (a minute or two). */
   planSeries(request: { pdfs: string[]; title?: string; language: string; tone: Tone }): Promise<SeriesPlan>
+  /** Stops series planning (reading the PDFs or the agent's answer). */
+  cancelSeriesPlan(): Promise<void>
   /** Creates the series' projects; unattended, makes them one after another in quick mode. */
   startSeries(start: SeriesStart): Promise<void>
   renderServers(): Promise<RenderServer[]>
@@ -552,6 +580,10 @@ export interface StudioApi {
   /** Queues an export of the open project; it runs in the background, one at a time. */
   queueExport(options: ExportOptions): Promise<ExportJob>
   exportJobs(): Promise<ExportJob[]>
+  /** Pauses or resumes a running export on this computer. */
+  pauseExport(id: string, paused: boolean): Promise<void>
+  /** Pauses or resumes the preview render in progress. */
+  pauseRender(paused: boolean): Promise<void>
   /** Stops a waiting or running export, or removes a finished one from the list. */
   cancelExport(id: string): Promise<void>
   clearExports(): Promise<void>
@@ -604,6 +636,7 @@ export interface StudioApi {
   on(channel: 'update', cb: (e: UpdateEvent) => void): () => void
   on(channel: 'exports', cb: (jobs: ExportJob[]) => void): () => void
   on(channel: 'quick', cb: (run: QuickRun | null) => void): () => void
+  on(channel: 'series-plan', cb: (p: SeriesPlanProgress) => void): () => void
   /** script.md changed on disk (Claude wrote it), or was removed (null). */
   on(channel: 'script', cb: (e: { text: string | null }) => void): () => void
 }

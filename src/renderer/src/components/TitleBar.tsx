@@ -1,8 +1,8 @@
-import { ArrowDownToLine, ChevronLeft, History, RefreshCw, Settings } from 'lucide-react'
+import { ArrowDownToLine, ChevronLeft, History, Pause, Play, RefreshCw, Settings, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { shortcut } from '../lib/platform'
-import { closeProject, openDialog, useStore } from '../store'
+import { closeProject, openDialog, pausePreview, useStore } from '../store'
 import { ExportsMenu } from './ExportsMenu'
 import { HistoryPopover } from './HistoryPopover'
 import { ProgressLine, Ring, Wordmark } from './ui'
@@ -30,7 +30,7 @@ export function TitleBar() {
               <span className="faint">Projects</span>
               <span className="faint">/</span>
               <strong>{project.meta.name}</strong>
-              {dirty && <span className="dirty-dot" title={`Unsaved changes (${shortcut("S")})`} />}
+              {dirty && <span className="dirty-dot" title={`Unsaved changes (${shortcut('S')})`} />}
               <span className="badge">{project.meta.aspect}</span>
             </div>
           </>
@@ -41,9 +41,21 @@ export function TitleBar() {
 
       <div className="titlebar-right no-drag">
         {render.status === 'rendering' && (
-          <span className="render-pill">
-            <span className="spinner" />
-            Rendering{render.expected ? ` ${render.clips ?? 0}/${render.expected}` : '…'}
+          <span className={`render-pill ${render.paused ? 'paused' : ''}`}>
+            {render.paused ? <Pause /> : <span className="spinner" />}
+            {render.paused ? 'Paused' : 'Rendering'}
+            {render.expected ? ` ${render.clips ?? 0}${(render.clips ?? 0) <= render.expected ? `/${render.expected}` : ''}` : render.paused ? '' : '…'}
+            <button
+              className="pill-btn"
+              onClick={() => void pausePreview(!render.paused)}
+              title={render.paused ? 'Resume the render' : 'Pause the render'}
+              aria-label={render.paused ? 'Resume the render' : 'Pause the render'}
+            >
+              {render.paused ? <Play /> : <Pause />}
+            </button>
+            <button className="pill-btn" onClick={() => void api.cancelRender()} title="Stop the render" aria-label="Stop the render">
+              <X />
+            </button>
           </span>
         )}
         <QuickPill />
@@ -107,7 +119,12 @@ function UpdatePill() {
     )
   if (update.state === 'error' && update.manualUrl)
     return (
-      <button className="update-pill" onClick={() => void api.openExternal(update.manualUrl ?? releasesUrl ?? '')} onContextMenu={() => setDismissed(true)} title={update.message}>
+      <button
+        className="update-pill"
+        onClick={() => void api.openExternal(update.manualUrl ?? releasesUrl ?? '')}
+        onContextMenu={() => setDismissed(true)}
+        title={update.message}
+      >
         <ArrowDownToLine /> Download the update manually
       </button>
     )

@@ -600,7 +600,8 @@ body.resizing-y .code-host {
   font-weight: 600;
   animation: fade-up 0.2s var(--ease-out);
 }
-.frame-status .spinner {
+.frame-status .spinner,
+.frame-status svg {
   width: 11px;
   height: 11px;
 }

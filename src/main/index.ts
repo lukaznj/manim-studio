@@ -3,9 +3,23 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import type { EventChannel, ExportOptions, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
-import { applyChatSettings, chatInterrupt, chatModels, chatReset, chatSend, claudeLogin, claudeLoginCode, claudeLogout, claudeStatus, claudeUsage, closeChat, loadChat, onChatEvent } from './claude'
+import {
+  applyChatSettings,
+  chatInterrupt,
+  chatModels,
+  chatReset,
+  chatSend,
+  claudeLogin,
+  claudeLoginCode,
+  claudeLogout,
+  claudeStatus,
+  claudeUsage,
+  closeChat,
+  loadChat,
+  onChatEvent,
+} from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
-import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, queueExport } from './exports'
+import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, pauseExport, queueExport } from './exports'
 import { importMedia, listMedia, removeMedia } from './media'
 import { importSources, listSources, removeSource, sourcePages } from './sources'
 import { history, restore } from './git'
@@ -18,7 +32,7 @@ import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
 import { cancel, frame, onRenderEvent, render } from './render'
-import { runningJobs } from './runner'
+import { pauseTag, resumeAll, runningJobs } from './runner'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
 import { deleteRecording, elevenLabsLibrary, elevenLabsVoices, onWorkerLog, saveRecording, saveReference, stopTtsWorker } from './voice'
@@ -105,14 +119,28 @@ function registerMediaProtocol(): void {
       return new Response('not found', { status: 404 })
     }
     const size = statSync(full).size
-    const type = full.endsWith('.mp4') ? 'video/mp4' : full.endsWith('.wav') ? 'audio/wav' : full.endsWith('.mp3') ? 'audio/mpeg' : full.endsWith('.png') ? 'image/png' : 'image/jpeg'
+    const type = full.endsWith('.mp4')
+      ? 'video/mp4'
+      : full.endsWith('.wav')
+        ? 'audio/wav'
+        : full.endsWith('.mp3')
+          ? 'audio/mpeg'
+          : full.endsWith('.png')
+            ? 'image/png'
+            : 'image/jpeg'
     const range = req.headers.get('range')?.match(/bytes=(\d*)-(\d*)/)
     if (range) {
       const start = range[1] ? Number(range[1]) : 0
       const end = range[2] ? Math.min(Number(range[2]), size - 1) : size - 1
       return new Response(Readable.toWeb(createReadStream(full, { start, end })) as ReadableStream, {
         status: 206,
-        headers: { 'Content-Type': type, 'Content-Length': String(end - start + 1), 'Content-Range': `bytes ${start}-${end}/${size}`, 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*' },
+        headers: {
+          'Content-Type': type,
+          'Content-Length': String(end - start + 1),
+          'Content-Range': `bytes ${start}-${end}/${size}`,
+          'Accept-Ranges': 'bytes',
+          'Access-Control-Allow-Origin': '*',
+        },
       })
     }
     return new Response(Readable.toWeb(createReadStream(full)) as ReadableStream, {
@@ -181,7 +209,11 @@ function registerIpc(): void {
     return r.filePaths[0] ?? null
   })
   handle('pickPdfs', async () => {
-    const r = await dialog.showOpenDialog(win!, { properties: ['openFile', 'multiSelections'], title: 'PDFs to make the video from', filters: [{ name: 'PDF documents', extensions: ['pdf'] }] })
+    const r = await dialog.showOpenDialog(win!, {
+      properties: ['openFile', 'multiSelections'],
+      title: 'PDFs to make the video from',
+      filters: [{ name: 'PDF documents', extensions: ['pdf'] }],
+    })
     return r.filePaths
   })
   handle('closeProject', () => {
@@ -201,11 +233,23 @@ function registerIpc(): void {
     await render(quality)
   })
   handle('cancelRender', () => cancel('preview'))
+  handle('pauseRender', (on: boolean) => pauseTag('preview', on))
+  handle('pauseExport', (id: string, on: boolean) => pauseExport(id, on))
   handle('frame', async (t: number, width?: number) => frame(t, width))
   handle('startQuick', async (req: QuickRequest) => (await startQuick(req)).run)
   handle('quickRun', () => quickRun())
   handle('stopQuick', () => stopQuick())
-  handle('planSeries', (req: Parameters<typeof planSeries>[0]) => planSeries(req))
+  let planning: AbortController | null = null
+  handle('planSeries', async (req: Parameters<typeof planSeries>[0]) => {
+    planning?.abort()
+    planning = new AbortController()
+    try {
+      return await planSeries(req, (p) => send('series-plan', p), planning.signal)
+    } finally {
+      planning = null
+    }
+  })
+  handle('cancelSeriesPlan', () => planning?.abort())
   handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
   handle('renderServers', () => listServers())
   handle('addServer', (code: string) => addServer(code))
@@ -257,9 +301,7 @@ function registerIpc(): void {
   handle('downloadUpdate', () => downloadUpdate())
   handle('installUpdate', () => installUpdate())
   handle('openExternal', (url: string) => (/^https:\/\//.test(url) ? shell.openExternal(url) : undefined))
-  handle('askMicrophone', async () =>
-    process.platform === 'darwin' ? systemPreferences.askForMediaAccess('microphone') : true,
-  )
+  handle('askMicrophone', async () => (process.platform === 'darwin' ? systemPreferences.askForMediaAccess('microphone') : true))
 }
 
 /** Claude Desktop owns .mcpb files and shows its own install (or update) dialog. */
@@ -338,6 +380,7 @@ app.on('before-quit', (e) => {
       return
     }
   }
+  resumeAll() // nothing stays stopped behind the app
   stopTtsWorker()
   closeChat()
 })

@@ -93,7 +93,10 @@ export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<Cla
     const child = spawn(paths.claude(), ['auth', 'login', '--claudeai'], { env: claudeEnv(), windowsHide: true })
     loginChild = child
     const onData = (b: Buffer) => {
-      for (const line of b.toString().split('\n').map((l) => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim())) {
+      for (const line of b
+        .toString()
+        .split('\n')
+        .map((l) => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim())) {
         if (!line) continue
         const url = line.match(/https:\/\/\S+/)?.[0]
         onEvent({ line, url, needsCode: /paste|code/i.test(line) && !url })
@@ -213,7 +216,15 @@ export async function chatSend(req: ChatRequest): Promise<void> {
   }
   content.push({ type: 'text', text: contextNote(req) + req.text })
 
-  const user: ChatMessage = { id: randomUUID(), role: 'user', parts: [{ kind: 'text', text: req.text }], context: req.context, frame, source: req.source, at: Date.now() }
+  const user: ChatMessage = {
+    id: randomUUID(),
+    role: 'user',
+    parts: [{ kind: 'text', text: req.text }],
+    context: req.context,
+    frame,
+    source: req.source,
+    at: Date.now(),
+  }
   const reply: ChatMessage = { id: randomUUID(), role: 'assistant', parts: [], at: Date.now() }
   messages.push(user, reply)
   turn = { message: reply, prompt: req.text }
@@ -301,12 +312,18 @@ export async function chatModels(): Promise<ModelOption[]> {
  * A one-off request with no tools, on the chat's sign-in and model: translation, series planning.
  * `what` names it in errors ("Claude couldn't plan: …").
  */
-export async function askClaude(system: string, prompt: string, what: string): Promise<string> {
-  if (codexChosen()) return askCodex(system, prompt, what)
+export async function askClaude(
+  system: string,
+  prompt: string,
+  what: string,
+  opts: { onText?: (soFar: string) => void; signal?: AbortSignal } = {},
+): Promise<string> {
+  if (codexChosen()) return askCodex(system, prompt, what) // Codex answers at once at the end
   const { query } = await sdk()
   const q = query({
     prompt,
     options: {
+      includePartialMessages: !!opts.onText, // the answer as it's written, for progress
       env: claudeEnv(),
       pathToClaudeCodeExecutable: paths.claude(),
       settingSources: [],
@@ -316,12 +333,23 @@ export async function askClaude(system: string, prompt: string, what: string): P
       systemPrompt: system,
     },
   })
+  const stop = () => q.close()
+  opts.signal?.addEventListener('abort', stop)
   let answer = ''
+  let soFar = ''
   for await (const msg of q) {
+    if (opts.signal?.aborted) break
+    if (msg.type === 'stream_event' && msg.event.type === 'content_block_delta' && msg.event.delta.type === 'text_delta') {
+      soFar += msg.event.delta.text
+      opts.onText?.(soFar)
+      continue
+    }
     if (msg.type !== 'result') continue
     if (msg.subtype !== 'success' || msg.is_error) throw new Error(`Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
     answer = msg.result
   }
+  opts.signal?.removeEventListener('abort', stop)
+  if (opts.signal?.aborted) throw Object.assign(new Error('cancelled'), { cancelled: true })
   return answer
 }
 
@@ -345,7 +373,8 @@ export async function translateNarration(sentences: string[], from: string, to: 
   } catch {
     parsed = null
   }
-  if (!Array.isArray(parsed) || parsed.length !== sentences.length) throw new Error(`Claude’s ${languageName(to)} translation didn’t match the narration. Try the export again.`)
+  if (!Array.isArray(parsed) || parsed.length !== sentences.length)
+    throw new Error(`Claude’s ${languageName(to)} translation didn’t match the narration. Try the export again.`)
   return parsed.map(String)
 }
 
@@ -358,7 +387,7 @@ const WINDOW_LABELS: Record<string, string> = {
 
 type UsageAnswer = {
   rate_limits_available: boolean
-  rate_limits: Record<string, unknown> & { model_scoped?: { display_name: string; utilization: number | null; resets_at: string | null }[] } | null
+  rate_limits: (Record<string, unknown> & { model_scoped?: { display_name: string; utilization: number | null; resets_at: string | null }[] }) | null
 }
 
 /**
@@ -438,8 +467,12 @@ async function startSession(dir: string): Promise<void> {
       tool('render_preview', sceneTools.render_preview.description, sceneTools.render_preview.shape, () => renderPreview()),
       tool('get_timeline', sceneTools.get_timeline.description, sceneTools.get_timeline.shape, async () => getTimeline()),
       tool('view_frames', sceneTools.view_frames.description, sceneTools.view_frames.shape, ({ times }) => viewFrames(times)),
-      tool('read_source', sceneTools.read_source.description, sceneTools.read_source.shape, ({ source, from_page, to_page }) => readSource(source, from_page, to_page)),
-      tool('view_source_pages', sceneTools.view_source_pages.description, sceneTools.view_source_pages.shape, ({ source, pages }) => viewSourcePages(source, pages)),
+      tool('read_source', sceneTools.read_source.description, sceneTools.read_source.shape, ({ source, from_page, to_page }) =>
+        readSource(source, from_page, to_page),
+      ),
+      tool('view_source_pages', sceneTools.view_source_pages.description, sceneTools.view_source_pages.shape, ({ source, pages }) =>
+        viewSourcePages(source, pages),
+      ),
     ],
   })
 
@@ -464,7 +497,8 @@ async function startSession(dir: string): Promise<void> {
       const writes = name === 'Edit' || name === 'Write'
       if (!writes && !target && ['Glob', 'Grep'].includes(name)) return { behavior: 'allow', updatedInput: input }
       // Claude Code opens PDF pages only with poppler installed; our tools work everywhere.
-      if (name === 'Read' && /\.pdf$/i.test(target)) return { behavior: 'deny', message: 'Use read_source for a PDF’s text and view_source_pages to look at its pages.' }
+      if (name === 'Read' && /\.pdf$/i.test(target))
+        return { behavior: 'deny', message: 'Use read_source for a PDF’s text and view_source_pages to look at its pages.' }
       const roots = writes ? [dir] : readRoots
       if (target && roots.some((r) => inside(r, isAbsolute(target) ? target : resolve(dir, target)))) {
         return { behavior: 'allow', updatedInput: input }
@@ -598,7 +632,11 @@ function summarize(name: string, input: unknown): string {
     case 'WebSearch':
       return `Searching the web: ${String(i.query ?? '')}`.slice(0, 70)
     case 'WebFetch':
-      return `Opening ${String(i.url ?? '').replace(/^https?:\/\//, '').split('/')[0]}`
+      return `Opening ${
+        String(i.url ?? '')
+          .replace(/^https?:\/\//, '')
+          .split('/')[0]
+      }`
     case 'TodoWrite':
       return 'Planning steps'
     case 'mcp__studio__render_preview':

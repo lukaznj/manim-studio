@@ -9,10 +9,10 @@ import { basename, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { SCRIPT_FILE } from '../shared/script'
 import { TONES } from '../shared/tone'
-import type { ProjectMeta, SeriesPlan, SeriesRef, SeriesStart, Tone } from '../shared/types'
+import type { ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesStart, Tone } from '../shared/types'
 import { askClaude, claudeStatus, languageName } from './claude'
 import { createProject, readMeta } from './projects'
-import { parsePlan } from '../shared/series-plan'
+import { parsePlan, titlesSoFar } from '../shared/series-plan'
 import { ensureQuickReady, makeVideo, quickStopped } from './quick'
 import { runRunner } from './runner'
 import { getSettings, setSettings } from './settings'
@@ -22,17 +22,27 @@ import { slugify } from './slug'
 const MAX_TEXT = 40_000
 
 /** Reads the PDFs and asks Claude for episodes and a bible. */
-export async function planSeries(req: { pdfs: string[]; title?: string; language: string; tone: Tone }): Promise<SeriesPlan> {
+/** Reads the PDFs and asks the agent for episodes and a bible, reporting each step as it goes. */
+export async function planSeries(
+  req: { pdfs: string[]; title?: string; language: string; tone: Tone },
+  report: (p: SeriesPlanProgress) => void = () => {},
+  signal?: AbortSignal,
+): Promise<SeriesPlan> {
   if (!req.pdfs.length) throw new Error('Add the PDFs the series is made from.')
   if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Agent): it reads the PDFs and plans the episodes.')
   const work = join(tmpdir(), 'manim-studio-series', randomUUID())
   try {
     const material: string[] = []
+    const progress: SeriesPlanProgress = { stage: 'reading', total: req.pdfs.length, read: [], episodes: [], startedAt: Date.now() }
     for (const [i, pdf] of req.pdfs.entries()) {
+      report({ ...progress, file: basename(pdf), index: i + 1 })
       const out = join(work, String(i))
-      const { info } = await (await runRunner<{ info: { pages: number } }>('default', ['pdf-index', pdf, out])).done
+      const { info } = await (await runRunner<{ info: { pages: number } }>('default', ['pdf-index', pdf, out], { signal })).done
+      progress.read.push({ file: basename(pdf), pages: info.pages })
       const text = readFileSync(join(out, 'text.txt'), 'utf8')
-      material.push(`=== FILE: ${basename(pdf)} (${info.pages} pages) ===\n${text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\n[… the rest is cut here]` : text}`)
+      material.push(
+        `=== FILE: ${basename(pdf)} (${info.pages} pages) ===\n${text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\n[… the rest is cut here]` : text}`,
+      )
     }
     const tone = TONES.find((t) => t.value === req.tone) ?? TONES[1]
     const prompt = [
@@ -40,12 +50,21 @@ export async function planSeries(req: { pdfs: string[]; title?: string; language
       `Its tone: ${tone.brief}`,
       'Episodes: usually one per file, in the given order. Split a file that holds several big ideas into several episodes; merge files too thin for a video of their own. Each episode has one central idea and fits a focused video (typically 3 to 10 minutes). Name the pages each episode uses.',
       'The bible (series.md, Markdown) has: who the series is for and what it assumes; the arc (how the episodes build on each other); the notation used throughout (follow the material); the visual vocabulary, saying which colour (palette names TEXT, MUTED, ACCENT, HIGHLIGHT, POSITIVE, NEGATIVE) and which shape always stands for what; recurring visual devices. Aim for the clarity and consistency of 3Blue1Brown’s series.',
-      'Answer with only JSON: {"title": string, "bible": string, "episodes": [{"title": string, "summary": string, "sources": [{"file": string, "pages": string}], "buildsOn": [1-based episode numbers]}]}',
+      // Episodes before the bible: they stream first, so the user sees the plan take shape.
+      'Answer with only JSON, in this order: {"title": string, "episodes": [{"title": string, "summary": string, "sources": [{"file": string, "pages": string}], "buildsOn": [1-based episode numbers]}], "bible": string}',
       '',
       ...material,
     ].join('\n')
-    const answer = await askClaude('You plan educational maths and engineering video series. You answer with JSON only.', prompt, 'plan the series')
-    return parsePlan(answer, req.pdfs.map((p) => basename(p)), req.title)
+    report({ ...progress, stage: 'planning' })
+    const answer = await askClaude('You plan educational maths and engineering video series. You answer with JSON only.', prompt, 'plan the series', {
+      signal,
+      onText: (soFar) => report({ ...progress, stage: /"bible"\s*:/.test(soFar) ? 'bible' : 'planning', episodes: titlesSoFar(soFar) }),
+    })
+    return parsePlan(
+      answer,
+      req.pdfs.map((p) => basename(p)),
+      req.title,
+    )
   } finally {
     rmSync(work, { recursive: true, force: true })
   }
@@ -97,10 +116,16 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
     return
   }
   void (async () => {
+    const episodes = plan.episodes.map((ep) => ({ title: ep.title, state: 'todo' as 'done' | 'failed' | 'now' | 'todo' }))
     for (const [i, dir] of dirs.entries()) {
       writeEpisodeBible(dir)
       const meta = readMeta(dir)
-      await makeVideo(dir, meta.name, { prompt: episodePrompt(meta), sources: [], export: start.export }, { title: plan.title, episode: i + 1, of: dirs.length }).catch(() => undefined)
+      episodes[i].state = 'now'
+      const series = { title: plan.title, episode: i + 1, of: dirs.length, episodes: episodes.map((e) => ({ ...e })) }
+      episodes[i].state = await makeVideo(dir, meta.name, { prompt: episodePrompt(meta), sources: [], export: start.export }, series).then(
+        () => 'done' as const,
+        () => 'failed' as const,
+      )
       if (quickStopped()) break
     }
   })()
@@ -111,7 +136,11 @@ const sourceName = (file: string) => `${slugify(basename(file, extname(file))) |
 
 function episodeBrief(ep: SeriesPlan['episodes'][number]): string {
   const sources = ep.sources.map((s) => `sources/${sourceName(s.file)}${s.pages ? ` pages ${s.pages}` : ''}`)
-  return [ep.summary, sources.length ? `Its material: ${sources.join('; ')}.` : '', ep.buildsOn?.length ? `It builds on episode ${ep.buildsOn.join(', ')}.` : '']
+  return [
+    ep.summary,
+    sources.length ? `Its material: ${sources.join('; ')}.` : '',
+    ep.buildsOn?.length ? `It builds on episode ${ep.buildsOn.join(', ')}.` : '',
+  ]
     .filter(Boolean)
     .join(' ')
 }
