@@ -617,10 +617,30 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
 
   const languages = LANGUAGES.includes(voice.language) ? LANGUAGES : [voice.language, ...LANGUAGES]
 
+  // A new language, or no voice yet: start with the language's own voice (elevenLabsDefaultVoice).
+  const latest = useRef(voice)
+  latest.current = voice
+  const pickFor = async (language: string) => {
+    const v = await api.elevenLabsDefaultVoice(language).catch(() => null)
+    const now = latest.current
+    if (!v || now.language !== language || now.provider !== 'elevenlabs') return
+    onChange({ ...now, elevenlabs: { modelId: now.elevenlabs?.modelId ?? DEFAULT_EL_MODEL, voiceId: v.id, voiceName: v.name } })
+  }
+  useEffect(() => {
+    if (voice.provider === 'elevenlabs' && !el?.voiceId && settings.hasElevenLabsKey) void pickFor(voice.language)
+  }, [voice.provider, el?.voiceId, settings.hasElevenLabsKey])
+
   return (
     <>
       <Row title="Narration language" text="Claude writes the narration and on-screen text in it; voices and subtitles follow it.">
-        <select className="select" value={voice.language} onChange={(e) => save({ language: e.target.value })}>
+        <select
+          className="select"
+          value={voice.language}
+          onChange={(e) => {
+            save({ language: e.target.value })
+            if (voice.provider === 'elevenlabs') void pickFor(e.target.value)
+          }}
+        >
           {languages.map((code) => (
             <option key={code} value={code}>
               {languageName.of(code)}

@@ -52,9 +52,11 @@ import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpda
 import {
   checkElevenLabsKey,
   deleteRecording,
+  elevenLabsDefaultVoice,
   elevenLabsLibrary,
   elevenLabsUsage,
   elevenLabsVoices,
+  voicePreview,
   onWorkerLog,
   saveElevenLabsKey,
   saveRecording,
@@ -354,6 +356,8 @@ function registerIpc(): void {
   })
   handle('elevenLabsVoices', () => elevenLabsVoices())
   handle('elevenLabsLibrary', (language: string, search: string) => elevenLabsLibrary(language, search))
+  handle('elevenLabsDefaultVoice', (language: string) => elevenLabsDefaultVoice(language))
+  handle('voicePreview', (url: string) => voicePreview(url))
 
   handle('chatSend', (req: Parameters<typeof chatSend>[0]) => chatSend(req))
   handle('chatInterrupt', () => chatInterrupt())

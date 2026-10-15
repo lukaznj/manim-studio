@@ -801,6 +801,10 @@ export interface StudioApi {
   askMicrophone(): Promise<boolean>
   elevenLabsVoices(): Promise<VoiceOption[]>
   elevenLabsLibrary(language: string, search: string): Promise<VoiceOption[]>
+  /** The voice a language starts with: a preferred one (Croatian: Slobodan), else the library's most used. */
+  elevenLabsDefaultVoice(language: string): Promise<VoiceOption | null>
+  /** A voice sample's audio, to play from memory. */
+  voicePreview(url: string): Promise<Uint8Array>
 
   chatSend(request: ChatRequest): Promise<void>
   chatInterrupt(): Promise<void>

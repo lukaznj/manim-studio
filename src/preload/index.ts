@@ -12,7 +12,7 @@ const methods = [
   'listProjects', 'createProject', 'openProject', 'pickProject', 'pickFolder', 'pickPdfs', 'closeProject', 'forgetProject', 'locateProject', 'reveal',
   'saveScene', 'updateMeta', 'saveScript', 'render', 'cancelRender', 'frame', 'startQuick', 'quickRun', 'stopQuick', 'planSeries', 'cancelSeriesPlan', 'startSeries', 'seriesRun', 'stopSeries', 'continueSeries', 'pauseSeries', 'pauseEpisode', 'projectUsage', 'dismissSeries', 'createExerciseSet', 'exerciseSet', 'exerciseSets', 'addExercises', 'pickExerciseFiles', 'savePastedImage', 'exerciseDetail', 'reviseExercise', 'retryExercise', 'pauseExercises', 'removeExercise', 'searchExercises', 'makeLecture', 'renderServers', 'addServer', 'removeServer', 'checkServer', 'queueExport', 'exportJobs', 'cancelExport', 'pauseExport', 'pauseRender', 'clearExports', 'listMedia', 'importMedia', 'removeMedia',
   'listSources', 'importSources', 'removeSource', 'sourcePages',
-  'saveRecording', 'deleteRecording', 'saveVoiceReference', 'askMicrophone', 'elevenLabsVoices', 'elevenLabsLibrary',
+  'saveRecording', 'deleteRecording', 'saveVoiceReference', 'askMicrophone', 'elevenLabsVoices', 'elevenLabsLibrary', 'elevenLabsDefaultVoice', 'voicePreview',
   'chatSend', 'chatInterrupt', 'chatReset', 'chatModels', 'installClaudeExtension', 'history', 'restore',
   'checkForUpdates', 'downloadUpdate', 'installUpdate', 'openExternal',
 ] as const
