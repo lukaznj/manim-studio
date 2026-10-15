@@ -83,6 +83,7 @@ def configure(
     os.environ["STUDIO_BG"] = background.get(theme) or ""  # a custom colour for this theme
     os.environ["STUDIO_BG_IMAGE"] = str(project / "media" / background["image"]) if background.get("image") else ""
     os.environ["STUDIO_PROJECT"] = str(project)
+    os.environ["STUDIO_CAPTION_BAND"] = "1" if meta.get("captionBand") else ""
     from studio.brand import apply_theme
 
     apply_theme()

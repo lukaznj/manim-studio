@@ -27,7 +27,8 @@ One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studi
 - **Colours** — use only the palette names: `TEXT`, `MUTED`, `ACCENT`, `HIGHLIGHT`, `POSITIVE`, `NEGATIVE`. They follow the project's light/dark theme, so never hardcode hex colours.
 - **Layout** — keep everything inside the safe area:
   - Use `fit(mobject)` to scale anything wide down into `SAFE_W × SAFE_H`.
-  - Use `MARGIN` with `to_edge`.
+  - Use `MARGIN` with `to_edge`, but `BOTTOM_BUFF` at the bottom: `to_edge(DOWN, buff=BOTTOM_BUFF)`.
+  - The bottom of the frame (and in portrait its right edge) is kept clear for viewers' subtitles and phone apps' buttons. Centre a full layout on `SAFE_CENTER`, not `ORIGIN`; text and formulas in that band get a layout warning. Pictures, shapes and axes may cross it.
   - Portrait projects (`PORTRAIT` is True; frame 8 wide × 14.2 tall) stack content vertically.
   - Landscape projects (14.2 × 8) can place things side by side.
 - **Timing the timeline can edit**:

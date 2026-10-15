@@ -6,6 +6,8 @@ imported, so the frame constants below match the project's aspect ratio."""
 import os
 from pathlib import Path
 
+import numpy as np
+
 from manim import ImageMobject, Mobject, config
 from manim_voiceover import VoiceoverScene
 
@@ -35,8 +37,16 @@ FRAME_H = config.frame_height
 PORTRAIT = FRAME_H > FRAME_W
 # Keep content this far from the edges; phones crop and overlay UI near them.
 MARGIN = 0.5
-SAFE_W = FRAME_W - 2 * MARGIN
-SAFE_H = FRAME_H - 2 * MARGIN
+# Projects made since 0.6 keep a band clear for the viewer's subtitles (project.json captionBand):
+# the bottom, where players draw them, and in portrait also the right, where Shorts and TikTok put
+# their buttons. Older projects keep the even margin they were made with.
+CAPTION_BAND = os.environ.get("STUDIO_CAPTION_BAND") == "1"
+BOTTOM_BUFF = (2.6 if PORTRAIT else 1.1) if CAPTION_BAND else MARGIN  # to_edge(DOWN, buff=BOTTOM_BUFF)
+RIGHT_BUFF = 0.9 if CAPTION_BAND and PORTRAIT else MARGIN
+SAFE_W = FRAME_W - MARGIN - RIGHT_BUFF
+SAFE_H = FRAME_H - MARGIN - BOTTOM_BUFF
+# The middle of the safe area: centre a full layout here rather than at ORIGIN.
+SAFE_CENTER = np.array([(MARGIN - RIGHT_BUFF) / 2, (BOTTOM_BUFF - MARGIN) / 2, 0.0])
 
 
 class StudioScene(VoiceoverScene):
@@ -81,6 +91,10 @@ __all__ = [
     "MARGIN",
     "SAFE_W",
     "SAFE_H",
+    "SAFE_CENTER",
+    "BOTTOM_BUFF",
+    "RIGHT_BUFF",
+    "CAPTION_BAND",
     "THEME",
     "FONT",
     "BG",
