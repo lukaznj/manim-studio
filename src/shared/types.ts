@@ -37,6 +37,7 @@ export interface ProjectMeta {
   tone?: Tone // unset: warm
   series?: SeriesRef // an episode of a series
   exercise?: ExerciseRef // an exercise in an exercise set (ADR 0025)
+  captionBand?: boolean // keeps text out of the bottom band, where viewers' subtitles go (ADR 0027); projects made since 0.6
   scriptFirst?: boolean // Claude plans script.md and gets it approved before writing scene.py (ADR 0016)
   claudeSessionId?: string
   codexThreadId?: string // the project's Codex conversation, resumed after a restart

@@ -1,5 +1,7 @@
 import { Captions, ChevronDown, CircleAlert, Code2, Pause, Sparkles, TriangleAlert, Wrench } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { captionBand } from '../../../shared/caption'
+import type { Aspect } from '../../../shared/types'
 import { api } from '../lib/api'
 import { editorBridge } from '../lib/editor-bridge'
 import { playback } from '../lib/playback'
@@ -13,6 +15,7 @@ export function PreviewPane() {
   const dirty = useStore((s) => s.dirty)
   const stale = useStore((s) => s.stale)
   const aspect = useStore((s) => s.project?.meta.aspect ?? '16:9')
+  const captionBand = useStore((s) => !!s.project?.meta.captionBand)
   const stage = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const [captions, setCaptions] = useState(true)
@@ -63,6 +66,7 @@ export function PreviewPane() {
               )}
             </div>
           )}
+          {captionBand && <CaptionBand aspect={aspect} />}
           {captions && timeline && <CaptionOverlay />}
           {render.status === 'rendering' && src && (
             <div className="frame-status" title={renderProgress(render).title}>
@@ -130,6 +134,17 @@ export function PreviewPane() {
         </div>
       </div>
     </div>
+  )
+}
+
+/** The band kept clear for viewers' subtitles (and, in portrait, phone apps' buttons): a faint outline. */
+function CaptionBand({ aspect }: { aspect: Aspect }) {
+  const band = captionBand(aspect)
+  return (
+    <>
+      <div className="caption-band bottom" style={{ height: `${band.bottom * 100}%` }} title="Kept clear for subtitles" />
+      {band.right > 0 && <div className="caption-band right" style={{ width: `${band.right * 100}%`, bottom: `${band.bottom * 100}%` }} title="Kept clear for the app's buttons" />}
+    </>
   )
 }
 
