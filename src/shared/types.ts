@@ -1,6 +1,8 @@
 // Types shared by the main process, the preload bridge and the renderer.
 // Timeline shapes mirror what python/studio_runner/render.py emits.
 
+import type { UsageEntry } from './usage'
+
 export type Aspect = '16:9' | '9:16'
 export type Theme = 'dark' | 'light'
 export type VoiceProvider = 'elevenlabs' | 'omnivoice'
@@ -67,6 +69,21 @@ export interface SeriesEpisode {
   buildsOn?: number[] // 1-based episode numbers
 }
 
+/** What an ElevenLabs key may do (src/main/voice.ts checkElevenLabsKey). */
+export interface ElevenLabsCheck {
+  voices: boolean // Voices: Read
+  tts: boolean // Text to Speech
+  user: boolean // User: for the usage meter
+  problem?: string // it's allowed, but something else stops it (an invalid key, no characters left)
+}
+
+export interface ElevenLabsUsage {
+  used: number // characters this period
+  limit: number
+  resetsAt?: number
+  tier: string
+}
+
 /** What series planning is doing, step by step (src/main/series.ts planSeries). */
 export interface SeriesPlanProgress {
   stage: 'reading' | 'planning' | 'bible'
@@ -88,6 +105,9 @@ export interface EpisodeRun {
   exportJob?: string
   error?: string
   warnings: string[]
+  held?: boolean // paused by the user: its agent stops, and it waits until resumed
+  tried?: boolean // its current step was started before and interrupted: it carries on from there
+  costUSD?: number // what its agent turns cost so far, at API prices (.studio/usage.json has the detail)
 }
 
 /**
@@ -98,8 +118,13 @@ export interface SeriesRun {
   title: string
   folder: string
   agents: number
-  state: 'working' | 'done' | 'stopped'
+  model?: string // the series' own model and effort; otherwise the chat's
+  effort?: Effort
+  // paused: its agents stop until resumed; stopped: also its exports, and it carries on with Continue,
+  // even after a restart (the app keeps the run in the series folder)
+  state: 'working' | 'paused' | 'stopped' | 'done'
   episodes: EpisodeRun[]
+  planningCostUSD?: number
 }
 
 /** Claude's proposal for a series, which the user edits and accepts. */
@@ -107,6 +132,7 @@ export interface SeriesPlan {
   title: string
   bible: string // series.md: audience, arc, notation, visual vocabulary
   episodes: SeriesEpisode[]
+  usage?: UsageEntry // what planning used (src/shared/usage.ts)
   instructions?: string // the user's own, for the whole series ("keep it intuitive, skip the derivations")
 }
 
@@ -120,6 +146,8 @@ export interface SeriesStart {
   voice?: VoiceSettings
   export: ExportOptions
   unattended: boolean // make every episode now in quick mode; else open the first to make by hand
+  model?: string // for the series' agents; otherwise the chat's (Settings)
+  effort?: Effort
 }
 
 export interface NewProjectInput {
@@ -443,6 +471,7 @@ export interface Settings {
   agent: Agent // who writes the scenes (ADR 0022)
   codexModel: string // '' = Codex's default for the account
   codexEffort: Effort | ''
+  seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed
   seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
   autoRender: boolean
   hasElevenLabsKey: boolean
@@ -557,7 +586,12 @@ export interface StudioApi {
 
   getSettings(): Promise<Settings>
   setSettings(patch: Partial<Settings>): Promise<Settings>
+  /** Saves the key once it can list voices and speak (one character); throws which permissions are missing. */
   setElevenLabsKey(key: string): Promise<Settings>
+  /** What the saved key may do, tried for real (once per session unless `again`: each try speaks a character). */
+  checkElevenLabsKey(again?: boolean): Promise<ElevenLabsCheck>
+  /** This month's characters, or null without a key or its User permission. */
+  elevenLabsUsage(): Promise<ElevenLabsUsage | null>
   setAnthropicKey(key: string): Promise<Settings>
   /** Codex uses an OpenAI API key instead of the ChatGPT sign-in while one is saved. */
   setOpenAIKey(key: string): Promise<Settings>
@@ -595,14 +629,29 @@ export interface StudioApi {
   quickRun(): Promise<QuickRun | null>
   stopQuick(): Promise<void>
   /** Reads the PDFs and asks Claude for a series plan (a minute or two). */
-  planSeries(request: { pdfs: string[]; title?: string; instructions?: string; language: string; tone: Tone }): Promise<SeriesPlan>
+  planSeries(request: {
+    pdfs: string[]
+    title?: string
+    instructions?: string
+    language: string
+    tone: Tone
+    model?: string
+    effort?: Effort
+  }): Promise<SeriesPlan>
   /** Stops series planning (reading the PDFs or the agent's answer). */
   cancelSeriesPlan(): Promise<void>
   /** Creates the series' projects; unattended, makes them one after another in quick mode. */
   startSeries(start: SeriesStart): Promise<void>
   /** The series being made unattended, or the last one until it's dismissed. */
   seriesRun(): Promise<SeriesRun | null>
+  /** Stops the agents and exports; Continue (continueSeries) carries on later, even after a restart. */
   stopSeries(): Promise<void>
+  continueSeries(): Promise<void>
+  /** Pauses or resumes the whole series (its agents), or one episode. */
+  pauseSeries(paused: boolean): Promise<void>
+  pauseEpisode(dir: string, paused: boolean): Promise<void>
+  /** What the open project's agent turns used, one entry per turn. */
+  projectUsage(): Promise<UsageEntry[]>
   dismissSeries(): Promise<void>
   renderServers(): Promise<RenderServer[]>
   /** Pairs with a render worker from the code it printed; checks that it answers first. */

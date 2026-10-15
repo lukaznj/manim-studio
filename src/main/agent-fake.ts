@@ -3,7 +3,8 @@
 // and scene and renders them through the same per-project path a real agent's tools use.
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { EpisodeAgent } from './agent'
+import type { AgentOptions, EpisodeAgent } from './agent'
+import { appendUsage } from './usage'
 import { readMeta } from './projects'
 import { currentOrNewRender } from './render'
 
@@ -13,15 +14,36 @@ export const fakeAgents = (): boolean => !!(process.env.STUDIO_FAKE_AGENT && pro
 let limitedOnce = false
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-export function fakeAgent(dir: string, onTool: (summary: string) => void): EpisodeAgent {
+export function fakeAgent(dir: string, { onTool, onUsage, model }: AgentOptions): EpisodeAgent {
   const meta = readMeta(dir)
   const n = meta.series?.episode ?? 1
+  // What a turn would have used: made up, but shaped like the real thing.
+  const used = (step: string, tools: Record<string, number>, scale: number) => {
+    const entry = {
+      at: Date.now(),
+      step,
+      models: {
+        [model || 'claude-sonnet-5-5']: {
+          input: 2_000 * scale,
+          output: 9_000 * scale,
+          cacheRead: 180_000 * scale,
+          cacheWrite: 30_000 * scale,
+          costUSD: 0.35 * scale,
+        },
+      },
+      tools,
+      ms: 2_500,
+    }
+    appendUsage(dir, entry)
+    onUsage(entry)
+  }
   return {
-    async turn(text) {
+    async turn(text, step) {
       await sleep(1000)
       if (/only the script/.test(text)) {
         onTool('Writing script.md')
         await sleep(1500)
+        used(step, { Read: 3, mcp__studio__read_source: 2, Write: 1 }, 1)
         writeFileSync(
           join(dir, 'script.md'),
           `---\nstatus: approved\n---\n# ${meta.name}\n\n**The idea:** what episode ${n} is about.\n\n## Opening\n**Narration:**\n> Hello.\n`,
@@ -41,6 +63,7 @@ export function fakeAgent(dir: string, onTool: (summary: string) => void): Episo
       await currentOrNewRender(dir)
       onTool('Looking at frames 1.0s, 4.0s')
       await sleep(800)
+      used(step, { Write: 1, Edit: 4, mcp__studio__render_preview: 3, mcp__studio__view_frames: 5 }, 3)
       return { ok: true }
     },
     close() {},

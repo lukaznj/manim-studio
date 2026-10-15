@@ -7,19 +7,21 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { SCRIPT_FILE } from '../shared/script'
+import { SCRIPT_FILE, scriptStatus } from '../shared/script'
 import { TONES } from '../shared/tone'
-import type { EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
+import type { Effort, EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
 import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
 import { askClaude, claudeStatus, codexChosen, languageName } from './claude'
 import { cancelExport, queueExport } from './exports'
 import { cancel } from './render'
-import { createProject, readMeta } from './projects'
+import { createProject, readMeta, readScript } from './projects'
 import { parsePlan, titlesSoFar } from '../shared/series-plan'
 import { checkAndFix, ensureQuickReady, makeVideo, quickStopped } from './quick'
 import { runRunner } from './runner'
 import { getSettings, setSettings } from './settings'
 import { slugify } from './slug'
+import { appendUsage } from './usage'
+import { costOf, type UsageEntry } from '../shared/usage'
 
 /** Per PDF, at most this much text goes into the planning request. */
 const MAX_TEXT = 40_000
@@ -27,7 +29,7 @@ const MAX_TEXT = 40_000
 /** Reads the PDFs and asks Claude for episodes and a bible. */
 /** Reads the PDFs and asks the agent for episodes and a bible, reporting each step as it goes. */
 export async function planSeries(
-  req: { pdfs: string[]; title?: string; instructions?: string; language: string; tone: Tone },
+  req: { pdfs: string[]; title?: string; instructions?: string; language: string; tone: Tone; model?: string; effort?: Effort },
   report: (p: SeriesPlanProgress) => void = () => {},
   signal?: AbortSignal,
 ): Promise<SeriesPlan> {
@@ -64,8 +66,12 @@ export async function planSeries(
       ...material,
     ].join('\n')
     report({ ...progress, stage: 'planning' })
+    let usage: UsageEntry | undefined
     const answer = await askClaude('You plan educational maths and engineering video series. You answer with JSON only.', prompt, 'plan the series', {
       signal,
+      model: req.model,
+      effort: req.effort,
+      onUsage: (e) => (usage = { ...e, step: 'Planning the series' }),
       onText: (soFar) => report({ ...progress, stage: /"bible"\s*:/.test(soFar) ? 'bible' : 'planning', episodes: titlesSoFar(soFar) }),
     })
     const plan = parsePlan(
@@ -73,7 +79,7 @@ export async function planSeries(
       req.pdfs.map((p) => basename(p)),
       req.title,
     )
-    return { ...plan, instructions: req.instructions?.trim() || undefined }
+    return { ...plan, instructions: req.instructions?.trim() || undefined, usage }
   } finally {
     rmSync(work, { recursive: true, force: true })
   }
@@ -84,7 +90,8 @@ const two = (n: number) => String(n).padStart(2, '0')
 /** Creates the series folder and one project per episode; unattended, makes them all in quick mode. */
 export async function startSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>): Promise<void> {
   if (start.unattended) await ensureQuickReady()
-  if (start.unattended && series?.state === 'working') throw new Error('A series is already being made. Wait for it, or stop it.')
+  if (start.unattended && series && series.state !== 'done')
+    throw new Error('Another series is still on Home. Let it finish, or stop and dismiss it there, before starting a new one.')
   const { plan } = start
   const root = getSettings().projectsDir
   let folder = join(root, slugify(plan.title))
@@ -125,7 +132,8 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
     await openInWindow(dirs[0])
     return
   }
-  if (!codexChosen()) return void runSeries(plan.title, folder, dirs, start.export)
+  if (plan.usage) appendUsage(folder, plan.usage)
+  if (!codexChosen()) return startRun(plan.title, folder, dirs, start, plan.usage && costOf(plan.usage.models))
   // Codex's tools work on the open project only, so with Codex the episodes are made one at a time, in the window.
   void (async () => {
     const episodes = plan.episodes.map((ep) => ({ title: ep.title, state: 'todo' as 'done' | 'failed' | 'now' | 'todo' }))
@@ -144,141 +152,247 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
 }
 
 // --- making a series unattended, several episodes at once (ADR 0023) ---------------------------
+//
+// A loop hands out the work from each episode's state: one agent writes the scripts in order, the
+// others make each video as soon as its script is ready, and each finished video is exported. So
+// pausing (the series or one episode), stopping and continuing later are only states: the loop
+// skips what's held, and Continue starts it again on the saved run, also after a restart.
 
 let series: SeriesRun | null = null
-let stopping = false
-const agents = new Set<EpisodeAgent>()
+let exportOptions: ExportOptions = { themes: [], languages: [], languageVideos: false }
+const agents = new Map<string, EpisodeAgent>() // by episode folder
+const steps = new Map<string, 'script' | 'video'>() // episodes whose agent step is running
+const exporting = new Set<string>()
 let sendSeries: (run: SeriesRun | null) => void = () => {}
 
+const runFile = (folder: string) => join(folder, '.studio', 'series-run.json')
+
+/** Loads the series Home last showed: a run the app was making when it quit can continue. */
 export function setupSeries(send: typeof sendSeries): void {
   sendSeries = send
+  const folder = getSettings().seriesRun
+  if (!folder || !existsSync(runFile(folder))) return
+  try {
+    const saved = JSON.parse(readFileSync(runFile(folder), 'utf8')) as { run: SeriesRun; exportOptions: ExportOptions }
+    series = saved.run
+    exportOptions = saved.exportOptions
+    if (series.state === 'working' || series.state === 'paused') series.state = 'stopped' // the app quit while making it
+    for (const ep of series.episodes) ep.activity = undefined
+  } catch {
+    // an unreadable run: Home just doesn't show it
+  }
 }
 
 export const seriesRun = (): SeriesRun | null => (series ? structuredClone(series) : null)
 
-/** Stops the agents, the episodes not started yet and the exports still running. */
-export function stopSeries(): void {
-  if (series?.state !== 'working') return
-  stopping = true
-  for (const agent of agents) agent.close()
-  for (const ep of series.episodes) {
-    if (ep.state === 'export' && ep.exportJob) cancelExport(ep.exportJob)
-    cancel('preview', ep.dir) // a render an agent asked for
-  }
-}
-
-export function dismissSeries(): void {
-  if (series?.state === 'working') return
-  series = null
-  sendSeries(null)
+/** Saves the run in its folder (for Continue after a restart) and tells the window. */
+function save(): void {
+  if (!series) return
+  mkdirSync(join(series.folder, '.studio'), { recursive: true })
+  writeFileSync(runFile(series.folder), JSON.stringify({ run: series, exportOptions }))
+  sendSeries(seriesRun())
 }
 
 const update = (ep: EpisodeRun, patch: Partial<EpisodeRun>) => {
   Object.assign(ep, patch)
-  sendSeries(seriesRun())
+  save()
 }
 
-function check(): void {
-  if (stopping) throw new Error('Stopped')
+const halted = (ep: EpisodeRun) => series?.state !== 'working' || !!ep.held
+
+/** Stops an episode's agent and its render; its state stays, so it carries on from there later. */
+function halt(ep: EpisodeRun): void {
+  agents.get(ep.dir)?.close()
+  cancel('preview', ep.dir)
 }
 
-/**
- * First the scripts, one after another: each episode's series.md says what the ones before it
- * actually cover, from their scripts. Then the videos, `seriesAgents` at a time, each queued for
- * export as soon as it passes Studio's check.
- */
-async function runSeries(title: string, folder: string, dirs: string[], exportOptions: ExportOptions): Promise<void> {
-  stopping = false
+export function pauseSeries(paused: boolean): void {
+  if (!series || (paused ? series.state !== 'working' : series.state !== 'paused')) return
+  series.state = paused ? 'paused' : 'working'
+  if (paused) series.episodes.forEach(halt)
+  save()
+  if (!paused) void drive()
+}
+
+export function pauseEpisode(dir: string, paused: boolean): void {
+  const ep = series?.episodes.find((e) => e.dir === dir)
+  if (!ep) return
+  update(ep, { held: paused })
+  if (paused) halt(ep)
+}
+
+/** Stops the agents and the exports; Continue picks the run up again. */
+export function stopSeries(): void {
+  if (!series || series.state === 'stopped' || series.state === 'done') return
+  series.state = 'stopped'
+  for (const ep of series.episodes) {
+    halt(ep)
+    if (ep.exportJob && exporting.has(ep.dir)) cancelExport(ep.exportJob)
+  }
+  save()
+}
+
+/** Carries on with a stopped run: what didn't finish, including what failed, gets another go. */
+export async function continueSeries(): Promise<void> {
+  if (series?.state !== 'stopped') return
+  await ensureQuickReady()
+  for (const ep of series.episodes) {
+    if (ep.state !== 'failed' && ep.state !== 'stopped') continue
+    const script = readScript(ep.dir)
+    ep.state = script && scriptStatus(script) === 'approved' ? 'scripted' : 'waiting'
+    ep.error = undefined
+  }
+  series.state = 'working'
+  save()
+  void drive()
+}
+
+export function dismissSeries(): void {
+  if (!series || series.state === 'working') return
+  series.episodes.forEach(halt)
+  series = null
+  setSettings({ seriesRun: undefined })
+  sendSeries(null)
+}
+
+function startRun(title: string, folder: string, dirs: string[], start: SeriesStart, planningCostUSD?: number): void {
+  exportOptions = start.export
   series = {
     title,
     folder,
     agents: Math.max(1, getSettings().seriesAgents || 3),
+    model: start.model,
+    effort: start.effort,
     state: 'working',
     episodes: dirs.map((dir) => ({ dir, title: readMeta(dir).name, state: 'waiting', warnings: [] })),
+    planningCostUSD,
   }
-  sendSeries(seriesRun())
-  const run = series
-
-  // One agent writes the scripts in order; the others make each video as soon as its script is ready.
-  // Together they never exceed `agents`: while scripts are still being written, the writer holds one.
-  const ready: EpisodeRun[] = []
-  const exports: Promise<unknown>[] = []
-  let scripting = true
-
-  const writeScripts = async () => {
-    for (const ep of run.episodes) {
-      if (stopping) break
-      await episodeStep(ep, 'script', async (turn) => {
-        await turn(
-          `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: you’ll make the video in the next step.`,
-        )
-        update(ep, { state: 'scripted', activity: undefined })
-        ready.push(ep)
-      })
-    }
-    scripting = false
-  }
-
-  const makeVideo = async (ep: EpisodeRun) => {
-    await episodeStep(ep, 'scene', async (turn) => {
-      await turn(
-        'Your script.md is approved, and series.md lists the episodes with what the ones scripted so far cover. Make this episode’s video from your script: write scene.py, render it and look at the frames.',
-      )
-      update(ep, { state: 'check', activity: 'Checking the render' })
-      update(ep, { warnings: await checkAndFix(ep.dir, turn, check) })
-    })
-    if (ep.state !== 'check') return
-    const { job, finished } = queueExport(ep.dir, exportOptions)
-    update(ep, { state: 'export', activity: undefined, exportJob: job.id })
-    exports.push(
-      finished.then(
-        () => update(ep, { state: 'done' }),
-        (e: Error) => update(ep, stopping ? { state: 'stopped' } : { state: 'failed', error: e.message }),
-      ),
-    )
-  }
-
-  const makeVideos = async () => {
-    const making = new Set<Promise<void>>()
-    while (!stopping && (scripting || ready.length || making.size)) {
-      const slots = scripting ? run.agents - 1 : run.agents
-      if (ready.length && making.size < slots) {
-        const video = makeVideo(ready.shift()!).finally(() => making.delete(video))
-        making.add(video)
-        continue
-      }
-      await new Promise((r) => setTimeout(r, 500)) // ponytail: polls; a wake-up signal would save nothing you'd notice
-    }
-    await Promise.all(making)
-  }
-
-  await Promise.all([writeScripts(), makeVideos()])
-  await Promise.all(exports)
-  for (const ep of run.episodes) if (ep.state === 'waiting' || ep.state === 'scripted') ep.state = 'stopped'
-  run.state = stopping ? 'stopped' : 'done'
-  sendSeries(seriesRun())
+  setSettings({ seriesRun: folder })
+  save()
+  void drive()
 }
 
-/** One agent session on an episode: `work` gets its turn (past usage limits); a failure marks the episode. */
-async function episodeStep(ep: EpisodeRun, state: EpisodeRun['state'], work: (turn: (text: string) => Promise<void>) => Promise<void>): Promise<void> {
-  update(ep, { state, activity: 'Starting' })
+/** Hands out the work while the series is being made: scripts in order, videos and exports as they're ready. */
+async function drive(): Promise<void> {
+  const run = series
+  while (run && series === run && run.state === 'working') {
+    for (const ep of run.episodes) if (ep.state === 'export' && !exporting.has(ep.dir)) exportEpisode(ep, run)
+
+    // A paused episode's script waits; the writer goes on with the next one.
+    const nextScript = run.episodes.find((ep) => (ep.state === 'waiting' || ep.state === 'script') && !ep.held)
+    if (nextScript && ![...steps.values()].includes('script')) {
+      launch(nextScript, 'script')
+      continue
+    }
+    // While scripts are still to be written, the writer keeps one of the agents.
+    const slots = nextScript ? run.agents - 1 : run.agents
+    const videos = [...steps.values()].filter((k) => k === 'video').length
+    const nextVideo = run.episodes.find((ep) => ['scripted', 'scene', 'check'].includes(ep.state) && !ep.held && !steps.has(ep.dir))
+    if (nextVideo && videos < slots) {
+      launch(nextVideo, 'video')
+      continue
+    }
+    if (run.episodes.every((ep) => ep.state === 'done' || ep.state === 'failed') && !steps.size && !exporting.size) {
+      run.state = 'done'
+      save()
+      return
+    }
+    await new Promise((r) => setTimeout(r, 500)) // ponytail: polls; a wake-up signal would save nothing you'd notice
+  }
+}
+
+function launch(ep: EpisodeRun, kind: 'script' | 'video'): void {
+  steps.set(ep.dir, kind)
+  const step = kind === 'script' ? writeScript(ep) : episodeVideo(ep)
+  void step.finally(() => steps.delete(ep.dir))
+}
+
+async function writeScript(ep: EpisodeRun): Promise<void> {
+  await episodeStep(ep, 'script', async (turn) => {
+    await turn(
+      `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: you’ll make the video in the next step.`,
+      'Script',
+    )
+    update(ep, { state: 'scripted', activity: undefined })
+  })
+}
+
+async function episodeVideo(ep: EpisodeRun): Promise<void> {
+  await episodeStep(ep, 'scene', async (turn) => {
+    await turn(
+      'Your script.md is approved, and series.md lists the episodes with what the ones scripted so far cover. Make this episode’s video from your script: write scene.py, render it and look at the frames.',
+      'Video',
+    )
+    update(ep, { state: 'check', activity: 'Checking the render' })
+    const warnings = await checkAndFix(
+      ep.dir,
+      (text) => turn(text, 'Fixing the render'),
+      () => stopIf(ep),
+    )
+    update(ep, { warnings, state: 'export', activity: undefined })
+  })
+}
+
+function exportEpisode(ep: EpisodeRun, run: SeriesRun): void {
+  exporting.add(ep.dir)
+  const { job, finished } = queueExport(ep.dir, exportOptions)
+  update(ep, { exportJob: job.id })
+  finished
+    .then(
+      () => update(ep, { state: 'done' }),
+      (e: Error) => run.state === 'working' && update(ep, { state: 'failed', error: e.message }), // stopped: it exports again on Continue
+    )
+    .finally(() => exporting.delete(ep.dir))
+}
+
+function stopIf(ep: EpisodeRun): void {
+  if (halted(ep)) throw new Error('Stopped')
+}
+
+/**
+ * One agent session on an episode: `work` gets its turn (past usage limits). An episode that was
+ * interrupted in this step before carries on from where it stopped; a pause leaves its state as it
+ * is, and a failure marks it.
+ */
+async function episodeStep(
+  ep: EpisodeRun,
+  state: EpisodeRun['state'],
+  work: (turn: (text: string, step: string) => Promise<void>) => Promise<void>,
+): Promise<void> {
+  const run = series!
+  let again = !!ep.tried
+  update(ep, { state, activity: 'Starting', tried: true })
   let agent: EpisodeAgent | null = null
   try {
     writeEpisodeBible(ep.dir)
-    agent = await episodeAgent(ep.dir, (summary) => update(ep, { activity: summary }))
-    agents.add(agent)
+    agent = await episodeAgent(ep.dir, {
+      onTool: (summary) => update(ep, { activity: summary }),
+      onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models) }),
+      model: run.model,
+      effort: run.effort,
+    })
+    agents.set(ep.dir, agent)
+    stopIf(ep)
     const a = agent
-    await work(async (text) => {
-      check()
-      const result = await turnPastLimits(a.turn, text, (note) => update(ep, { activity: note }), check)
-      check()
+    await work(async (text, step) => {
+      stopIf(ep)
+      const ask = again ? `You were interrupted. Carry on where you stopped, with this task:\n\n${text}` : text
+      again = false
+      const result = await turnPastLimits(
+        (t) => a.turn(t, step),
+        ask,
+        (note) => update(ep, { activity: note }),
+        () => stopIf(ep),
+      )
+      stopIf(ep)
       if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
     })
+    update(ep, { tried: false })
   } catch (e) {
-    update(ep, stopping ? { state: 'stopped', activity: undefined } : { state: 'failed', error: (e as Error).message, activity: undefined })
+    update(ep, halted(ep) ? { activity: undefined } : { state: 'failed', error: (e as Error).message, activity: undefined, tried: false })
   } finally {
     if (agent) {
-      agents.delete(agent)
+      if (agents.get(ep.dir) === agent) agents.delete(ep.dir)
       agent.close()
     }
   }
