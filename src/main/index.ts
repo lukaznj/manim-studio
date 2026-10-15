@@ -17,6 +17,7 @@ import {
   closeChat,
   loadChat,
   onChatEvent,
+  projectUsage,
 } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
 import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, pauseExport, queueExport } from './exports'
@@ -26,7 +27,18 @@ import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
 import { watchMemory } from './memory'
 import { quickRun, setupQuick, startQuick, stopQuick } from './quick'
-import { dismissSeries, planSeries, seriesRun, setupSeries, startSeries, stopSeries, writeEpisodeBible } from './series'
+import {
+  continueSeries,
+  dismissSeries,
+  pauseEpisode,
+  pauseSeries,
+  planSeries,
+  seriesRun,
+  setupSeries,
+  startSeries,
+  stopSeries,
+  writeEpisodeBible,
+} from './series'
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
@@ -254,6 +266,10 @@ function registerIpc(): void {
   handle('seriesRun', () => seriesRun())
   handle('stopSeries', () => stopSeries())
   handle('dismissSeries', () => dismissSeries())
+  handle('continueSeries', () => continueSeries())
+  handle('pauseSeries', (paused: boolean) => pauseSeries(paused))
+  handle('pauseEpisode', (dir: string, paused: boolean) => pauseEpisode(dir, paused))
+  handle('projectUsage', () => projectUsage())
   handle('renderServers', () => listServers())
   handle('addServer', (code: string) => addServer(code))
   handle('removeServer', (id: string) => removeServer(id))

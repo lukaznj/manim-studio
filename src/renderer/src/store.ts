@@ -74,6 +74,7 @@ export type Dialog =
   | { kind: 'export' }
   | { kind: 'quick' }
   | { kind: 'series' }
+  | { kind: 'usage' }
   | null
 
 interface State {
