@@ -12,7 +12,18 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { pageRanges } from '../shared/pages'
 import { sceneTools } from '../shared/studio-tools'
-import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, ClaudeStatus, ModelOption, PlanUsage, UsageWindow } from '../shared/types'
+import type {
+  ChatEvent,
+  ChatMessage,
+  ChatPart,
+  ChatRequest,
+  ClaudeLoginEvent,
+  ClaudeStatus,
+  Effort,
+  ModelOption,
+  PlanUsage,
+  UsageWindow,
+} from '../shared/types'
 import { agentBusy } from './agent'
 import { askCodex, closeCodex, codexLogin, codexLogout, codexModels, codexStatus, codexTurn, interruptCodex } from './codex'
 import { cleanEnv, pythonExe } from './env'
@@ -26,6 +37,8 @@ import { sourcesNote } from './sources'
 import { scriptBrief } from '../shared/script'
 import { styleBrief } from '../shared/tone'
 import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
+import type { UsageEntry } from '../shared/usage'
+import { entryFrom, readUsage, recordTurn } from './usage'
 import { seriesBrief } from './series'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
@@ -156,7 +169,7 @@ interface Session {
 
 let session: Session | null = null
 let messages: ChatMessage[] = []
-let turn: { message: ChatMessage; prompt: string } | null = null
+let turn: { message: ChatMessage; prompt: string; step: string; tools: Record<string, number>; started: number } | null = null
 let emit: (e: ChatEvent) => void = () => {}
 
 const observers = new Set<(e: ChatEvent) => void>()
@@ -196,9 +209,9 @@ function noteLimit(msg: SDKMessage): void {
 
 /** Sends a message as the user and waits until Claude's turn ends. */
 /** Sends a message and waits for Claude's turn to end. `limitedUntil` says a usage limit ended it. */
-export async function chatAndWait(text: string): Promise<TurnResult> {
+export async function chatAndWait(text: string, step = 'Chat'): Promise<TurnResult> {
   const done = new Promise<TurnResult>((resolve) => (turnDone = resolve))
-  await chatSend({ text })
+  await chatSend({ text }, step)
   return done
 }
 
@@ -216,7 +229,8 @@ export function closeChat(): void {
   pauseCommits(false)
 }
 
-export async function chatSend(req: ChatRequest): Promise<void> {
+/** `step` labels the turn in the project's usage log (quick mode says which step it is). */
+export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
   const p = requireProject()
   if (turn) throw new Error('Claude is still working on the previous message')
   if (agentBusy.has(p.path)) throw new Error('A series agent is making this episode. Chat here once it’s done (Home shows its progress).')
@@ -241,7 +255,7 @@ export async function chatSend(req: ChatRequest): Promise<void> {
   }
   const reply: ChatMessage = { id: randomUUID(), role: 'assistant', parts: [], at: Date.now() }
   messages.push(user, reply)
-  turn = { message: reply, prompt: req.text }
+  turn = { message: reply, prompt: req.text, step, tools: {}, started: Date.now() }
   emit({ type: 'message', message: user })
   emit({ type: 'message', message: reply })
   emit({ type: 'busy', busy: true })
@@ -311,9 +325,9 @@ export async function chatModels(): Promise<ModelOption[]> {
     const list = await q.supportedModels()
     return list.map((m) => ({
       value: m.value === 'default' ? '' : m.value,
-      // "Default (recommended)" says less than which model it is: "Opus 5.5 · Best for…" → "Default (Opus 5.5)".
-      label: m.value === 'default' && m.description.includes(' · ') ? `Default (${m.description.split(' · ')[0]})` : m.displayName,
-      description: m.description,
+      // Claude Code's "Default" is its own (Opus on some plans); in Studio no model means Sonnet 5.5.
+      label: m.value === 'default' ? 'Studio default (Sonnet 5.5)' : m.displayName,
+      description: m.value === 'default' ? 'Sonnet 5.5: writes scenes well, faster and cheaper than Opus.' : m.description,
       efforts: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [],
     }))
   } finally {
@@ -330,7 +344,7 @@ export async function askClaude(
   system: string,
   prompt: string,
   what: string,
-  opts: { onText?: (soFar: string) => void; signal?: AbortSignal } = {},
+  opts: { onText?: (soFar: string) => void; signal?: AbortSignal; model?: string; effort?: Effort; onUsage?: (entry: UsageEntry) => void } = {},
 ): Promise<string> {
   if (codexChosen()) return askCodex(system, prompt, what) // Codex answers at once at the end
   const { query } = await sdk()
@@ -343,7 +357,8 @@ export async function askClaude(
       settingSources: [],
       tools: [],
       maxTurns: 1,
-      model: getSettings().claudeModel || 'claude-sonnet-5-5',
+      model: opts.model || getSettings().claudeModel || 'claude-sonnet-5-5',
+      ...(opts.effort ? { effort: opts.effort } : {}),
       systemPrompt: system,
     },
   })
@@ -360,6 +375,7 @@ export async function askClaude(
       continue
     }
     if (msg.type !== 'result') continue
+    opts.onUsage?.(entryFrom(what, msg, {}, {}, msg.duration_ms))
     if (msg.subtype !== 'success' || msg.is_error)
       throw new Error(activeLimit() ? limitText(activeLimit()!) : `Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
     answer = msg.result
@@ -478,7 +494,7 @@ const metaOf = (dir: string) => (project()?.path === dir ? project()!.meta : rea
  * file permissions (writes only inside it) and the brief. The chat and a series' background agents
  * (agent.ts) share it. `resume` continues the project's conversation when this machine has it.
  */
-export async function studioOptions(dir: string, opts: { autopilot: boolean }): Promise<Options> {
+export async function studioOptions(dir: string, opts: { autopilot: boolean; model?: string; effort?: Effort }): Promise<Options> {
   const { createSdkMcpServer, tool, getSessionInfo } = await sdk()
   const meta = metaOf(dir)
   // A project synced from another machine carries a session id this machine doesn't have.
@@ -505,8 +521,8 @@ export async function studioOptions(dir: string, opts: { autopilot: boolean }): 
     cwd: dir,
     env: claudeEnv(),
     pathToClaudeCodeExecutable: paths.claude(),
-    model: getSettings().claudeModel || 'claude-sonnet-5-5',
-    effort: getSettings().claudeEffort || 'high',
+    model: opts.model || getSettings().claudeModel || 'claude-sonnet-5-5',
+    effort: opts.effort || getSettings().claudeEffort || 'high',
     resume: resumable ? meta.claudeSessionId : undefined,
     includePartialMessages: true,
     settingSources: ['project'],
@@ -571,6 +587,7 @@ function handle(msg: SDKMessage): void {
       let part: ChatPart | null = null
       if (block.type === 'text' && block.text.trim()) part = { kind: 'text', text: block.text }
       if (block.type === 'tool_use') part = { kind: 'tool', id: block.id, name: block.name, summary: summarize(block.name, block.input), status: 'running' }
+      if (block.type === 'tool_use') turn.tools[block.name] = (turn.tools[block.name] ?? 0) + 1
       if (part) {
         reply.parts.push(part)
         emit({ type: 'part', messageId: reply.id, part })
@@ -589,6 +606,8 @@ function handle(msg: SDKMessage): void {
     return
   }
   if (msg.type === 'result') {
+    const dir = project()?.path
+    if (dir) recordTurn(dir, turn.step, msg, turn.tools, Date.now() - turn.started)
     const ok = msg.subtype === 'success' && !msg.is_error
     // A failed turn (e.g. expired sign-in) can still arrive as subtype "success" with is_error.
     const error = ok ? undefined : msg.subtype === 'success' ? msg.result : msg.errors?.join('\n')
@@ -690,3 +709,6 @@ function inside(root: string, target: string): boolean {
   const rel = relative(resolve(root), resolve(target))
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
+
+/** What the open project's agent turns used (Usage in the chat's header). */
+export const projectUsage = (): UsageEntry[] => (project() ? readUsage(project()!.path) : [])

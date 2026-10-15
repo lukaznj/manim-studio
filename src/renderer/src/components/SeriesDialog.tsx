@@ -1,9 +1,10 @@
 import { ArrowDown, ArrowUp, Check, Circle, FileText, Library, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_TONE, TONES } from '../../../shared/tone'
-import type { Aspect, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
+import type { Aspect, Effort, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
 import { api } from '../lib/api'
 import { closeDialog, errorText, toast, useStore } from '../store'
+import { ModelPicker } from './ChatPane'
 import { ExportOn } from './ExportDialog'
 import { VoiceForm, voiceProblem } from './SettingsDialog'
 import { Modal, Tabs } from './ui'
@@ -27,6 +28,9 @@ export function SeriesDialog() {
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
   const [voice, setVoice] = useState<VoiceSettings>({ provider: 'elevenlabs', language: 'en' })
   const [unattended, setUnattended] = useState(true)
+  const settings = useStore((s) => s.settings)
+  const [model, setModel] = useState('')
+  const [effort, setEffort] = useState<Effort>('high')
   const [server, setServer] = useState<string | undefined>()
   const [plan, setPlan] = useState<SeriesPlan | null>(null)
   const [busy, setBusy] = useState<'planning' | 'starting' | null>(null)
@@ -39,6 +43,8 @@ export function SeriesDialog() {
     setPdfs([])
     setTitle('')
     setInstructions('')
+    setModel(settings?.claudeModel ?? '')
+    setEffort(settings?.claudeEffort || 'high')
     setPlan(null)
     setBusy(null)
     if (defaultVoice) setVoice(defaultVoice)
@@ -63,7 +69,17 @@ export function SeriesDialog() {
     cancelled.current = false
     const off = api.on('series-plan', setProgress)
     try {
-      setPlan(await api.planSeries({ pdfs, title: title.trim() || undefined, instructions: instructions.trim() || undefined, language, tone }))
+      setPlan(
+        await api.planSeries({
+          pdfs,
+          title: title.trim() || undefined,
+          instructions: instructions.trim() || undefined,
+          language,
+          tone,
+          model: model || undefined,
+          effort,
+        }),
+      )
     } catch (e) {
       if (!cancelled.current) toast(errorText(e), 'error')
     } finally {
@@ -81,6 +97,8 @@ export function SeriesDialog() {
     setBusy('starting')
     try {
       await api.startSeries({
+        model: model || undefined,
+        effort,
         plan: { ...plan, instructions: instructions.trim() || undefined },
         pdfs,
         aspect,
@@ -248,6 +266,22 @@ export function SeriesDialog() {
             <VoiceForm voice={voice} onChange={setVoice} inProject={false} />
           </div>
           {voiceIssue && <div className="quick-warning">{voiceIssue} The episodes are made without you, so the voice has to be ready first.</div>}
+          {!codex && (
+            <div className="field">
+              <span className="label">Claude model</span>
+              <ModelPicker
+                model={model}
+                effort={effort}
+                onChange={(m, e) => {
+                  setModel(m)
+                  if (e) setEffort(e)
+                }}
+              />
+              <span className="hint">
+                For planning and every episode of this series; the chat keeps its own. Opus and higher effort cost much more of your plan.
+              </span>
+            </div>
+          )}
           {unattended && <ExportOn value={server} onChange={setServer} />}
           <label className="export-check">
             <input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} />
