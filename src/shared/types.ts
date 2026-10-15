@@ -107,6 +107,7 @@ export interface SeriesPlan {
   title: string
   bible: string // series.md: audience, arc, notation, visual vocabulary
   episodes: SeriesEpisode[]
+  instructions?: string // the user's own, for the whole series ("keep it intuitive, skip the derivations")
 }
 
 export interface SeriesStart {
@@ -592,7 +593,7 @@ export interface StudioApi {
   quickRun(): Promise<QuickRun | null>
   stopQuick(): Promise<void>
   /** Reads the PDFs and asks Claude for a series plan (a minute or two). */
-  planSeries(request: { pdfs: string[]; title?: string; language: string; tone: Tone }): Promise<SeriesPlan>
+  planSeries(request: { pdfs: string[]; title?: string; instructions?: string; language: string; tone: Tone }): Promise<SeriesPlan>
   /** Stops series planning (reading the PDFs or the agent's answer). */
   cancelSeriesPlan(): Promise<void>
   /** Creates the series' projects; unattended, makes them one after another in quick mode. */
