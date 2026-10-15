@@ -199,40 +199,60 @@ async function runSeries(title: string, folder: string, dirs: string[], exportOp
   sendSeries(seriesRun())
   const run = series
 
-  for (const ep of run.episodes) {
-    if (stopping) break
-    await episodeStep(ep, 'script', async (turn) => {
-      await turn(
-        `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: the other episodes’ scripts come first, and you’ll make the video after them.`,
-      )
-      update(ep, { state: 'scripted', activity: undefined })
-    })
+  // One agent writes the scripts in order; the others make each video as soon as its script is ready.
+  // Together they never exceed `agents`: while scripts are still being written, the writer holds one.
+  const ready: EpisodeRun[] = []
+  const exports: Promise<unknown>[] = []
+  let scripting = true
+
+  const writeScripts = async () => {
+    for (const ep of run.episodes) {
+      if (stopping) break
+      await episodeStep(ep, 'script', async (turn) => {
+        await turn(
+          `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: you’ll make the video in the next step.`,
+        )
+        update(ep, { state: 'scripted', activity: undefined })
+        ready.push(ep)
+      })
+    }
+    scripting = false
   }
 
-  const exports: Promise<unknown>[] = []
-  const queue = run.episodes.filter((ep) => ep.state === 'scripted')
-  await Promise.all(
-    Array.from({ length: run.agents }, async () => {
-      for (let ep = queue.shift(); ep && !stopping; ep = queue.shift()) {
-        await episodeStep(ep, 'scene', async (turn) => {
-          await turn(
-            'All the episodes’ scripts are written now, and series.md lists them. Make this episode’s video from your approved script.md: write scene.py, render it and look at the frames.',
-          )
-          update(ep, { state: 'check', activity: 'Checking the render' })
-          update(ep, { warnings: await checkAndFix(ep.dir, turn, check) })
-        })
-        if (ep.state !== 'check') continue
-        const { job, finished } = queueExport(ep.dir, exportOptions)
-        update(ep, { state: 'export', activity: undefined, exportJob: job.id })
-        exports.push(
-          finished.then(
-            () => update(ep, { state: 'done' }),
-            (e: Error) => update(ep, stopping ? { state: 'stopped' } : { state: 'failed', error: e.message }),
-          ),
-        )
+  const makeVideo = async (ep: EpisodeRun) => {
+    await episodeStep(ep, 'scene', async (turn) => {
+      await turn(
+        'Your script.md is approved, and series.md lists the episodes with what the ones scripted so far cover. Make this episode’s video from your script: write scene.py, render it and look at the frames.',
+      )
+      update(ep, { state: 'check', activity: 'Checking the render' })
+      update(ep, { warnings: await checkAndFix(ep.dir, turn, check) })
+    })
+    if (ep.state !== 'check') return
+    const { job, finished } = queueExport(ep.dir, exportOptions)
+    update(ep, { state: 'export', activity: undefined, exportJob: job.id })
+    exports.push(
+      finished.then(
+        () => update(ep, { state: 'done' }),
+        (e: Error) => update(ep, stopping ? { state: 'stopped' } : { state: 'failed', error: e.message }),
+      ),
+    )
+  }
+
+  const makeVideos = async () => {
+    const making = new Set<Promise<void>>()
+    while (!stopping && (scripting || ready.length || making.size)) {
+      const slots = scripting ? run.agents - 1 : run.agents
+      if (ready.length && making.size < slots) {
+        const video = makeVideo(ready.shift()!).finally(() => making.delete(video))
+        making.add(video)
+        continue
       }
-    }),
-  )
+      await new Promise((r) => setTimeout(r, 500)) // ponytail: polls; a wake-up signal would save nothing you'd notice
+    }
+    await Promise.all(making)
+  }
+
+  await Promise.all([writeScripts(), makeVideos()])
   await Promise.all(exports)
   for (const ep of run.episodes) if (ep.state === 'waiting' || ep.state === 'scripted') ep.state = 'stopped'
   run.state = stopping ? 'stopped' : 'done'
