@@ -1,11 +1,11 @@
 import { ArrowDown, ArrowUp, Check, Circle, FileText, Library, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_TONE, TONES } from '../../../shared/tone'
-import type { Aspect, SeriesPlan, SeriesPlanProgress, Theme, Tone } from '../../../shared/types'
+import type { Aspect, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
 import { api } from '../lib/api'
-import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, errorText, toast, useStore } from '../store'
 import { ExportOn } from './ExportDialog'
+import { VoiceForm, voiceProblem } from './SettingsDialog'
 import { Modal, Tabs } from './ui'
 
 /**
@@ -15,12 +15,14 @@ import { Modal, Tabs } from './ui'
 export function SeriesDialog() {
   const open = useStore((s) => s.dialog?.kind === 'series')
   const defaultVoice = useStore((s) => s.settings?.defaultVoice)
+  const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
+  const omnivoice = useStore((s) => s.setup?.omnivoice)
   const [pdfs, setPdfs] = useState<string[]>([])
   const [title, setTitle] = useState('')
   const [aspect, setAspect] = useState<Aspect>('16:9')
   const [theme, setTheme] = useState<Theme>('dark')
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
-  const [language, setLanguage] = useState('en')
+  const [voice, setVoice] = useState<VoiceSettings>({ provider: 'elevenlabs', language: 'en' })
   const [unattended, setUnattended] = useState(true)
   const [server, setServer] = useState<string | undefined>()
   const [plan, setPlan] = useState<SeriesPlan | null>(null)
@@ -35,8 +37,12 @@ export function SeriesDialog() {
     setTitle('')
     setPlan(null)
     setBusy(null)
-    if (defaultVoice) setLanguage(defaultVoice.language)
+    if (defaultVoice) setVoice(defaultVoice)
   }, [open]) // a fresh form each time
+
+  const language = voice.language
+  // Checked before planning, so a series never gets made without a voice.
+  const voiceIssue = voiceProblem(voice, hasKey, omnivoice)
 
   const add = (paths: string[]) => setPdfs((p) => [...p, ...paths.filter((x) => /\.pdf$/i.test(x) && !p.includes(x))])
   const move = <T,>(list: T[], i: number, by: number) => {
@@ -67,7 +73,7 @@ export function SeriesDialog() {
   }
 
   const start = async () => {
-    if (!plan) return
+    if (!plan || voiceIssue) return
     setBusy('starting')
     try {
       await api.startSeries({
@@ -77,7 +83,7 @@ export function SeriesDialog() {
         theme,
         tone,
         language,
-        voice: defaultVoice ? { ...defaultVoice, language } : undefined,
+        voice,
         export: { themes: [theme], languages: [], languageVideos: false, server },
         unattended,
       })
@@ -105,7 +111,12 @@ export function SeriesDialog() {
             <button className="btn ghost" disabled={!!busy} onClick={() => setPlan(null)}>
               Back
             </button>
-            <button className="btn primary" disabled={!!busy || !plan.episodes.length} onClick={() => void start()}>
+            <button
+              className="btn primary"
+              disabled={!!busy || !plan.episodes.length || !!voiceIssue}
+              title={voiceIssue ?? undefined}
+              onClick={() => void start()}
+            >
               {busy === 'starting' && <span className="spinner" />}
               {unattended ? `Make all ${plan.episodes.length} episodes` : `Create ${plan.episodes.length} episodes`}
             </button>
@@ -115,7 +126,7 @@ export function SeriesDialog() {
             <button className="btn ghost" onClick={busy === 'planning' ? cancelPlan : closeDialog}>
               {busy === 'planning' ? 'Stop planning' : 'Cancel'}
             </button>
-            <button className="btn primary" disabled={!pdfs.length || !!busy} onClick={() => void makePlan()}>
+            <button className="btn primary" disabled={!pdfs.length || !!busy || !!voiceIssue} title={voiceIssue ?? undefined} onClick={() => void makePlan()}>
               {busy === 'planning' ? <span className="spinner" /> : <Library />} {busy === 'planning' ? 'Planning…' : 'Plan the episodes'}
             </button>
           </>
@@ -190,16 +201,6 @@ export function SeriesDialog() {
                 ]}
               />
             </div>
-            <div className="field">
-              <label htmlFor="series-lang">Language</label>
-              <select id="series-lang" className="select" value={language} onChange={(e) => setLanguage(e.target.value)}>
-                {(LANGUAGES.includes(language) ? LANGUAGES : [language, ...LANGUAGES]).map((code) => (
-                  <option key={code} value={code}>
-                    {languageName.of(code)}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
           <div className="quick-row">
             <div className="field">
@@ -219,6 +220,11 @@ export function SeriesDialog() {
               />
             </div>
           </div>
+          <div className="np-voice set-group">
+            <div className="eyebrow">Narration</div>
+            <VoiceForm voice={voice} onChange={setVoice} inProject={false} />
+          </div>
+          {voiceIssue && <div className="quick-warning">{voiceIssue} The episodes are made without you, so the voice has to be ready first.</div>}
           {unattended && <ExportOn value={server} onChange={setServer} />}
           <label className="export-check">
             <input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} />
