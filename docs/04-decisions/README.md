@@ -28,3 +28,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0022-codex-as-second-agent]] | Codex as a second agent: installed on demand, its own sign-in, Studio's tools through the MCP bridge | accepted |
 | [[0023-parallel-series-episodes]] | A series writes the scripts in order and makes each video as soon as its script is ready, several at a time | accepted |
 | [[0024-usage-per-project]] | Every agent turn's tokens and API price are recorded per project and shown by model and step | accepted |
+| [[0025-exercise-sets]] | Exercise sets: exercises read from text, pictures and PDFs; a checked written solution first, then a short video each | accepted |

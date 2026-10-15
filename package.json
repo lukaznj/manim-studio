@@ -41,6 +41,7 @@
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "esbuild": "^0.25.12",
+    "katex": "^0.16.47",
     "lucide-react": "^1.52.0",
     "monaco-editor": "^0.57.0",
     "playwright-core": "^1.64.0",

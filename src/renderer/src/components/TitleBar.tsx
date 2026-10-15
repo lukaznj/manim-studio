@@ -2,7 +2,7 @@ import { ArrowDownToLine, ChevronLeft, History, Pause, Play, RefreshCw, Settings
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { shortcut } from '../lib/platform'
-import { closeProject, openDialog, pausePreview, renderProgress, useStore } from '../store'
+import { closeProject, openDialog, openExerciseSet, pausePreview, renderProgress, useStore } from '../store'
 import { ExportsMenu } from './ExportsMenu'
 import { HistoryPopover } from './HistoryPopover'
 import { ProgressLine, Ring, Wordmark } from './ui'
@@ -10,6 +10,7 @@ import { ProgressLine, Ring, Wordmark } from './ui'
 export function TitleBar() {
   const project = useStore((s) => s.project)
   const screen = useStore((s) => s.screen)
+  const exerciseSet = useStore((s) => s.exerciseSet)
   const render = useStore((s) => s.render)
   const dirty = useStore((s) => s.dirty)
   const platform = useStore((s) => s.app?.platform)
@@ -22,13 +23,35 @@ export function TitleBar() {
   return (
     <header className={`titlebar ${platform === 'darwin' ? 'mac' : 'other'}`}>
       <div className="titlebar-left">
-        {screen === 'editor' && project ? (
+        {screen === 'exercises' && exerciseSet ? (
           <>
             <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
               <ChevronLeft />
             </button>
             <div className="crumb">
               <span className="faint">Projects</span>
+              <span className="faint">/</span>
+              <strong>{exerciseSet.title}</strong>
+            </div>
+          </>
+        ) : screen === 'editor' && project ? (
+          <>
+            {project.meta.exercise ? (
+              <button
+                className="icon-btn no-drag"
+                onClick={() => void openExerciseSet(project.meta.exercise!.set, project.path)}
+                aria-label="Back to the exercises"
+                title="Back to the exercises"
+              >
+                <ChevronLeft />
+              </button>
+            ) : (
+              <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
+                <ChevronLeft />
+              </button>
+            )}
+            <div className="crumb">
+              <span className="faint">{project.meta.exercise ? project.meta.exercise.title : 'Projects'}</span>
               <span className="faint">/</span>
               <strong>{project.meta.name}</strong>
               {dirty && <span className="dirty-dot" title={`Unsaved changes (${shortcut('S')})`} />}

@@ -1,9 +1,11 @@
 // Handlers for the scene tools in src/shared/studio-tools.ts, shared by the in-app chat
 // (claude.ts), a series' background agents (agent.ts) and Claude Desktop (mcp.ts). Each works on
 // the project folder it's given.
+import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { Timeline } from '../shared/types'
+import { cleanEnv, pythonExe } from './env'
 import { readTimeline } from './projects'
 import { currentOrNewRender, framesBase64, type RenderOutcome } from './render'
 import { requireSource, sourcePageCount, sourcePages, sourceText } from './sources'
@@ -63,6 +65,27 @@ export async function viewSourcePages(dir: string, source: string, pages: number
   } catch (e) {
     return textResult((e as Error).message, true)
   }
+}
+
+/** Runs Claude's check in the render environment's python, in the project folder, for at most 30 s. */
+export function calculate(dir: string, code: string): Promise<CallToolResult> {
+  return new Promise((resolve) => {
+    const child = spawn(pythonExe('default'), ['-I', '-c', code], { cwd: dir, env: cleanEnv(), windowsHide: true })
+    let out = ''
+    const take = (b: Buffer) => (out = (out + b.toString()).slice(-8_000))
+    child.stdout.on('data', take)
+    child.stderr.on('data', take)
+    const timer = setTimeout(() => child.kill(), 30_000)
+    child.on('error', (e) => {
+      clearTimeout(timer)
+      resolve(textResult(`Python didn’t start: ${e.message}. Is the manim environment installed (Settings → Environment)?`, true))
+    })
+    child.on('close', (code, signal) => {
+      clearTimeout(timer)
+      if (signal) return resolve(textResult(`Stopped after 30 seconds.${out ? `\n${out}` : ''}`, true))
+      resolve(textResult(out.trim() || '(printed nothing)', code !== 0))
+    })
+  })
 }
 
 function describeOutcome(o: RenderOutcome): string {

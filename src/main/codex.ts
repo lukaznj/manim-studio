@@ -305,6 +305,7 @@ const TOOL_SUMMARY: Record<string, string> = {
   view_frames: 'Looking at frames',
   read_source: 'Reading a source',
   view_source_pages: 'Looking at source pages',
+  calculate: 'Checking a calculation',
 }
 
 function friendly(message: string): string {

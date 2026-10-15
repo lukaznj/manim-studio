@@ -16,7 +16,7 @@ import type { ClaudeDesktopStatus, ExportResult, Tone } from '../shared/types'
 import { languageName, mediaNote } from './claude'
 import { createProject, listProjects, readScene, readScript, requireProject, saveScene, saveScript } from './projects'
 import { getSettings } from './settings'
-import { getTimeline, readSource, renderPreview, textResult, viewFrames, viewSourcePages } from './scene-tools'
+import { calculate, getTimeline, readSource, renderPreview, textResult, viewFrames, viewSourcePages } from './scene-tools'
 import { slugify } from './slug'
 import { sourcesNote } from './sources'
 import { scriptBrief, scriptStatus } from '../shared/script'
@@ -160,6 +160,8 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
       return readSource(requireProject().path, String(args.source), args.from_page as number | undefined, args.to_page as number | undefined)
     case 'view_source_pages':
       return viewSourcePages(requireProject().path, String(args.source), args.pages as number[])
+    case 'calculate':
+      return calculate(requireProject().path, String(args.code))
     case 'export_video':
       return exportVideo(host)
   }
