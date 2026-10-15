@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
 import type { ChatEvent, ExportOptions, ExportResult, QuickRequest, QuickRun, QuickStep } from '../shared/types'
 import { chatAndWait, chatInterrupt, claudeStatus, observeChat, setAutopilot } from './claude'
+import { limitText } from '../shared/usage-limit'
 import { setupStatus } from './env'
 import { cancelExport, queueExport } from './exports'
 import { createProject } from './projects'
@@ -110,7 +111,10 @@ async function make(r: QuickRun, req: QuickTask): Promise<ExportResult> {
       const outcome = await currentOrNewRender()
       check()
       if ('cancelled' in outcome) throw new Error('The render was cancelled')
-      const problems = 'error' in outcome ? [`fails: ${outcome.error.message}${outcome.error.line ? ` (scene.py line ${outcome.error.line})` : ''}`] : outcome.timeline.warnings.map((w) => w.message)
+      const problems =
+        'error' in outcome
+          ? [`fails: ${outcome.error.message}${outcome.error.line ? ` (scene.py line ${outcome.error.line})` : ''}`]
+          : outcome.timeline.warnings.map((w) => w.message)
       if (!problems.length) {
         if ('timeline' in outcome) update({ warnings: outcome.timeline.voiceWarnings })
         break
@@ -120,7 +124,9 @@ async function make(r: QuickRun, req: QuickTask): Promise<ExportResult> {
         update({ warnings: [...outcome.timeline.warnings.map((w) => w.message), ...outcome.timeline.voiceWarnings] })
         break
       }
-      await turn(`I rendered it, and the render ${problems.length === 1 ? problems[0] : `has these problems:\n- ${problems.join('\n- ')}`}\nFix ${problems.length === 1 ? 'it' : 'them'}, render again and look at the frames.`)
+      await turn(
+        `I rendered it, and the render ${problems.length === 1 ? problems[0] : `has these problems:\n- ${problems.join('\n- ')}`}\nFix ${problems.length === 1 ? 'it' : 'them'}, render again and look at the frames.`,
+      )
     }
     setAutopilot(false)
 
@@ -147,8 +153,21 @@ function check(): void {
 
 async function turn(text: string): Promise<void> {
   check()
-  const result = await chatAndWait(text)
+  let result = await chatAndWait(text)
   check()
+  // A usage limit doesn't end an unattended run: wait for the reset, then carry on where it stopped.
+  while (!result.ok && result.limitedUntil !== undefined) {
+    const until = result.limitedUntil || Date.now() + 30 * 60_000 // reset time unknown: try again in half an hour
+    const before = run?.activity
+    update({ activity: `${limitText({ until })} Waiting, then it carries on by itself.` })
+    while (Date.now() < until + 60_000) {
+      check()
+      await new Promise((r) => setTimeout(r, 5_000))
+    }
+    update({ activity: before })
+    result = await chatAndWait('Your usage limit has reset. Carry on where you stopped, with the task above.')
+    check()
+  }
   if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
 }
 
