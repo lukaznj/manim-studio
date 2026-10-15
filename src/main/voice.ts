@@ -193,7 +193,9 @@ export async function elevenLabsDefaultVoice(language: string): Promise<VoiceOpt
     const found = (await elevenLabsLibrary(lang, preferred.split(' ')[0]).catch(() => [])).find((v) => v.name.startsWith(preferred))
     if (found) return found
   }
-  return (await elevenLabsLibrary(lang, '').catch(() => []))[0] ?? null
+  const top = await elevenLabsLibrary(lang, '').catch(() => [])
+  // Without a key there's no search, but the preferred voice is often among the most used anyway.
+  return (preferred && top.find((v) => v.name.startsWith(preferred))) || top[0] || null
 }
 
 const previews = new Map<string, Promise<Uint8Array>>()
