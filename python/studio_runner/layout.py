@@ -1,4 +1,5 @@
-"""Cheap layout checks after every play(): things off the frame and text on text.
+"""Cheap layout checks after every play(): things off the frame, text on text, and text in the
+band kept clear for the viewer's subtitles (projects with captionBand).
 
 These are the two most common defects in generated manim code. A warning that holds
 over consecutive clips becomes one time range."""
@@ -60,6 +61,7 @@ def _find(scene) -> dict[tuple, str]:
         _text_leaves(m, leaves)
     leaves = [m for m in leaves if _visible(m)]
     boxes = [_box(m) for m in leaves]
+    found.update(_in_band(leaves, boxes, hw, hh))
     # ponytail: O(n²) over text leaves; scenes hold tens of them, not thousands.
     for i in range(len(leaves)):
         for j in range(i + 1, len(leaves)):
@@ -72,6 +74,26 @@ def _find(scene) -> dict[tuple, str]:
             if smaller > 1e-4 and w * h / smaller > OVERLAP_RATIO:
                 key = ("overlap", id(leaves[i]), id(leaves[j]))
                 found[key] = f"{describe(leaves[i])} overlaps {describe(leaves[j])}"
+    return found
+
+
+def _in_band(leaves: list[Mobject], boxes: list[tuple], hw: float, hh: float) -> dict[tuple, str]:
+    """Text and formulas reaching into the subtitle band; pictures, shapes and axes may cross it."""
+    import os
+
+    if os.environ.get("STUDIO_CAPTION_BAND") != "1":
+        return {}
+    from studio import BOTTOM_BUFF, PORTRAIT, RIGHT_BUFF
+
+    floor, wall, t = -hh + BOTTOM_BUFF, hw - RIGHT_BUFF, EDGE_TOLERANCE
+    found: dict[tuple, str] = {}
+    for m, (left, bottom, right, top) in zip(leaves, boxes):
+        if top < -hh or left > hw:
+            continue  # off the frame: reported as that
+        if bottom < floor - t:
+            found[("subtitles", id(m))] = f"{describe(m)} is in the bottom {BOTTOM_BUFF:g} units kept clear for subtitles: move it up (centre on SAFE_CENTER, or to_edge(DOWN, buff=BOTTOM_BUFF))"
+        elif PORTRAIT and right > wall + t:
+            found[("subtitles", id(m))] = f"{describe(m)} is in the right {RIGHT_BUFF:g} units, where phone apps put their buttons: move it left"
     return found
 
 

@@ -628,6 +628,22 @@ body.resizing-y .code-host {
 .frame {
   container-type: inline-size;
 }
+/* The subtitle band (ADR 0027): drawn on the video, so fixed colours rather than tokens. */
+.caption-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-top: 1px dashed rgb(255 209 102 / 0.45);
+  background: rgb(255 209 102 / 0.05);
+  pointer-events: none;
+}
+.caption-band.right {
+  left: auto;
+  top: 0;
+  border-top: 0;
+  border-left: 1px dashed rgb(255 209 102 / 0.45);
+}
 
 .preview-foot {
   display: flex;
