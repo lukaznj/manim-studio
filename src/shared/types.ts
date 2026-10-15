@@ -69,6 +69,21 @@ export interface SeriesEpisode {
   buildsOn?: number[] // 1-based episode numbers
 }
 
+/** What an ElevenLabs key may do (src/main/voice.ts checkElevenLabsKey). */
+export interface ElevenLabsCheck {
+  voices: boolean // Voices: Read
+  tts: boolean // Text to Speech
+  user: boolean // User: for the usage meter
+  problem?: string // it's allowed, but something else stops it (an invalid key, no characters left)
+}
+
+export interface ElevenLabsUsage {
+  used: number // characters this period
+  limit: number
+  resetsAt?: number
+  tier: string
+}
+
 /** What series planning is doing, step by step (src/main/series.ts planSeries). */
 export interface SeriesPlanProgress {
   stage: 'reading' | 'planning' | 'bible'
@@ -571,7 +586,12 @@ export interface StudioApi {
 
   getSettings(): Promise<Settings>
   setSettings(patch: Partial<Settings>): Promise<Settings>
+  /** Saves the key once it can list voices and speak (one character); throws which permissions are missing. */
   setElevenLabsKey(key: string): Promise<Settings>
+  /** What the saved key may do, tried for real (once per session unless `again`: each try speaks a character). */
+  checkElevenLabsKey(again?: boolean): Promise<ElevenLabsCheck>
+  /** This month's characters, or null without a key or its User permission. */
+  elevenLabsUsage(): Promise<ElevenLabsUsage | null>
   setAnthropicKey(key: string): Promise<Settings>
   /** Codex uses an OpenAI API key instead of the ChatGPT sign-in while one is saved. */
   setOpenAIKey(key: string): Promise<Settings>
