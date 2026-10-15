@@ -1,9 +1,10 @@
 import { Check, ChevronDown, Pause, Play, Search } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
-import type { VoiceOption } from '../../../shared/types'
+import type { VoiceOption, VoiceSettings } from '../../../shared/types'
+import { DEFAULT_EL_MODEL } from '../../../shared/voice'
 import { api } from '../lib/api'
 import { languageName } from '../lib/languages'
-import { errorText } from '../store'
+import { errorText, toast, useStore } from '../store'
 
 const compact = new Intl.NumberFormat('en', { notation: 'compact' })
 
@@ -24,18 +25,35 @@ export function VoicePicker(props: { language: string; hasKey: boolean; value?: 
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState<string | null>(null)
 
+  const wanted = useRef<string | null>(null) // the sample asked for last; a slower one that loads later stays quiet
+
   const stop = () => {
+    wanted.current = null
     audio.current?.pause()
     audio.current = null
     setPlaying(null)
   }
-  const play = (v: VoiceOption) => {
+  // The main process fetches the sample (they live on several hosts) and it plays from memory.
+  const play = async (v: VoiceOption) => {
     if (playing === v.id || !v.preview) return stop()
     audio.current?.pause()
-    audio.current = new Audio(v.preview)
-    audio.current.onended = () => setPlaying(null)
-    void audio.current.play().catch(() => setPlaying(null))
+    wanted.current = v.id
     setPlaying(v.id)
+    try {
+      const bytes = await api.voicePreview(v.preview)
+      if (wanted.current !== v.id) return
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'audio/mpeg' }))
+      const a = new Audio(url)
+      audio.current = a
+      a.onended = () => {
+        URL.revokeObjectURL(url)
+        if (wanted.current === v.id) stop()
+      }
+      await a.play()
+    } catch (e) {
+      if (wanted.current === v.id) stop()
+      toast(`The sample of ${v.name} didn’t play: ${errorText(e)}`, 'error')
+    }
   }
 
   useEffect(() => {
@@ -84,7 +102,7 @@ export function VoicePicker(props: { language: string; hasKey: boolean; value?: 
     const on = v.id === props.value?.id
     return (
       <div key={v.id} className={`voice-row ${on ? 'on' : ''}`}>
-        <button className="icon-btn" disabled={!v.preview} onClick={() => play(v)} aria-label={playing === v.id ? 'Stop the sample' : `Play a sample of ${v.name}`}>
+        <button className="icon-btn" disabled={!v.preview} onClick={() => void play(v)} aria-label={playing === v.id ? 'Stop the sample' : `Play a sample of ${v.name}`}>
           {playing === v.id ? <Pause /> : <Play />}
         </button>
         <button
@@ -136,4 +154,25 @@ export function VoicePicker(props: { language: string; hasKey: boolean; value?: 
       </div>
     </>
   )
+}
+
+/**
+ * Settings → Voice's default voice, for a video in `language`: in another language than the
+ * default's, its ElevenLabs voice is that language's own (elevenLabsDefaultVoice).
+ */
+export function useVoiceFor(language: string): VoiceSettings | undefined {
+  const def = useStore((s) => s.settings?.defaultVoice)
+  const [picked, setPicked] = useState<{ language: string; id: string; name: string } | null>(null)
+  const own = !!def && (def.provider !== 'elevenlabs' || (def.language === language && !!def.elevenlabs?.voiceId))
+  useEffect(() => {
+    if (!def || own) return
+    let live = true
+    void api.elevenLabsDefaultVoice(language).then((v) => live && v && setPicked({ language, id: v.id, name: v.name }), () => undefined)
+    return () => {
+      live = false
+    }
+  }, [language, own])
+  if (!def) return undefined
+  if (own || picked?.language !== language) return { ...def, language }
+  return { ...def, language, elevenlabs: { modelId: def.elevenlabs?.modelId ?? DEFAULT_EL_MODEL, voiceId: picked.id, voiceName: picked.name } }
 }
