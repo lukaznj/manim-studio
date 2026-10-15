@@ -579,6 +579,8 @@ export interface StudioApi {
   pickPdfs(): Promise<string[]>
   closeProject(): Promise<void>
   forgetProject(path: string): Promise<void>
+  /** Asks where a missing project went; null when the picker was closed. `found`: others found again next to it. */
+  locateProject(path: string): Promise<{ path: string; found: number } | null>
   reveal(path: string): Promise<void>
   saveScene(source: string): Promise<void>
   updateMeta(patch: Partial<ProjectMeta>): Promise<ProjectMeta>
