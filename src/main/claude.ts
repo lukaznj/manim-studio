@@ -24,6 +24,7 @@ import { getSecret, getSettings } from './settings'
 import { sourcesNote } from './sources'
 import { scriptBrief } from '../shared/script'
 import { styleBrief } from '../shared/tone'
+import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
 import { seriesBrief } from './series'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
@@ -180,11 +181,22 @@ export function setAutopilot(on: boolean): void {
   closeChat() // the next turn starts a session with the matching brief
 }
 
-let turnDone: ((r: { ok: boolean; error?: string }) => void) | null = null
+let turnDone: ((r: TurnResult) => void) | null = null
+type TurnResult = { ok: boolean; error?: string; limitedUntil?: number }
+
+/** The plan's usage limit while Claude refuses for it (claude.ai sign-in only; API keys have none). */
+let limit: Limit | null = null
+const activeLimit = () => (limit && (!limit.until || limit.until > Date.now()) ? limit : null)
+
+function noteLimit(msg: SDKMessage): void {
+  if (msg.type === 'rate_limit_event') limit = limitFrom(msg.rate_limit_info)
+  else if (msg.type === 'result' && msg.subtype === 'success' && msg.is_error) limit = limitFromText(msg.result) ?? limit
+}
 
 /** Sends a message as the user and waits until Claude's turn ends. */
-export async function chatAndWait(text: string): Promise<{ ok: boolean; error?: string }> {
-  const done = new Promise<{ ok: boolean; error?: string }>((resolve) => (turnDone = resolve))
+/** Sends a message and waits for Claude's turn to end. `limitedUntil` says a usage limit ended it. */
+export async function chatAndWait(text: string): Promise<TurnResult> {
+  const done = new Promise<TurnResult>((resolve) => (turnDone = resolve))
   await chatSend({ text })
   return done
 }
@@ -339,13 +351,15 @@ export async function askClaude(
   let soFar = ''
   for await (const msg of q) {
     if (opts.signal?.aborted) break
+    noteLimit(msg)
     if (msg.type === 'stream_event' && msg.event.type === 'content_block_delta' && msg.event.delta.type === 'text_delta') {
       soFar += msg.event.delta.text
       opts.onText?.(soFar)
       continue
     }
     if (msg.type !== 'result') continue
-    if (msg.subtype !== 'success' || msg.is_error) throw new Error(`Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
+    if (msg.subtype !== 'success' || msg.is_error)
+      throw new Error(activeLimit() ? limitText(activeLimit()!) : `Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
     answer = msg.result
   }
   opts.signal?.removeEventListener('abort', stop)
@@ -525,6 +539,7 @@ async function pump(s: Session): Promise<void> {
 }
 
 function handle(msg: SDKMessage): void {
+  noteLimit(msg)
   if (msg.type === 'system' && msg.subtype === 'init') {
     if (project() && project()!.meta.claudeSessionId !== msg.session_id) updateMeta({ claudeSessionId: msg.session_id })
     return
@@ -568,6 +583,9 @@ function handle(msg: SDKMessage): void {
 }
 
 function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
+  const limited = ok ? null : activeLimit()
+  if (limited) error = limitText(limited)
+  if (ok) limit = null
   const t = turn
   turn = null
   pauseCommits(false)
@@ -584,7 +602,7 @@ function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
   emit({ type: 'done', ok, error, costUsd })
   const waiter = turnDone
   turnDone = null
-  waiter?.({ ok, error })
+  waiter?.({ ok, error, limitedUntil: limited?.until })
 }
 
 // --- prompt and tool text --------------------------------------------------------------------

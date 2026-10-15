@@ -1649,6 +1649,11 @@
 .series-bible .textarea {
   font: 12.5px/1.55 var(--font-mono);
 }
+/* The plan's texts grow to fit, so nothing has to be scrolled inside its box. */
+.series-plan .textarea {
+  field-sizing: content;
+  min-height: 56px;
+}
 
 /* ---- render servers (Settings → General) ----------------------------------------------------- */
 
