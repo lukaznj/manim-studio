@@ -13,28 +13,30 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/c
 import { pageRanges } from '../shared/pages'
 import { sceneTools } from '../shared/studio-tools'
 import type { ChatEvent, ChatMessage, ChatPart, ChatRequest, ClaudeLoginEvent, ClaudeStatus, ModelOption, PlanUsage, UsageWindow } from '../shared/types'
+import { agentBusy } from './agent'
 import { askCodex, closeCodex, codexLogin, codexLogout, codexModels, codexStatus, codexTurn, interruptCodex } from './codex'
 import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
-import { mediaNames, project, readChat, readScript, readTimeline, requireProject, updateMeta, writeChat } from './projects'
+import { mediaNames, project, readChat, readMeta, readScript, readTimeline, requireProject, updateMeta, writeChat } from './projects'
 import { frameBase64, pauseCommits } from './render'
 import { getTimeline, readSource, renderPreview, viewFrames, viewSourcePages } from './scene-tools'
 import { getSecret, getSettings } from './settings'
 import { sourcesNote } from './sources'
 import { scriptBrief } from '../shared/script'
 import { styleBrief } from '../shared/tone'
+import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
 import { seriesBrief } from './series'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
-const sdk = () => (sdkPromise ??= import('@anthropic-ai/claude-agent-sdk'))
+export const sdk = () => (sdkPromise ??= import('@anthropic-ai/claude-agent-sdk'))
 
 /** Settings → Agent (Claude) chooses between the Claude account sign-in and the user's own API key. */
 const usingApiKey = () => getSettings().claudeAuth === 'api-key'
 
 /** Settings → Agent: Codex instead of Claude (ADR 0022). The chat, quick mode and translation follow it. */
-const codexChosen = () => getSettings().agent === 'codex'
+export const codexChosen = () => getSettings().agent === 'codex'
 
 /** cleanEnv() strips inherited ANTHROPIC_* variables; the key saved in Settings goes back only when it's the chosen method. */
 const claudeEnv = (): NodeJS.ProcessEnv => {
@@ -93,7 +95,10 @@ export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<Cla
     const child = spawn(paths.claude(), ['auth', 'login', '--claudeai'], { env: claudeEnv(), windowsHide: true })
     loginChild = child
     const onData = (b: Buffer) => {
-      for (const line of b.toString().split('\n').map((l) => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim())) {
+      for (const line of b
+        .toString()
+        .split('\n')
+        .map((l) => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim())) {
         if (!line) continue
         const url = line.match(/https:\/\/\S+/)?.[0]
         onEvent({ line, url, needsCode: /paste|code/i.test(line) && !url })
@@ -121,7 +126,7 @@ export async function claudeLogout(): Promise<ClaudeStatus> {
 
 // --- chat -------------------------------------------------------------------------------
 
-class Inbox implements AsyncIterable<SDKUserMessage> {
+export class Inbox implements AsyncIterable<SDKUserMessage> {
   private items: SDKUserMessage[] = []
   private wake: (() => void) | null = null
   private closed = false
@@ -177,11 +182,22 @@ export function setAutopilot(on: boolean): void {
   closeChat() // the next turn starts a session with the matching brief
 }
 
-let turnDone: ((r: { ok: boolean; error?: string }) => void) | null = null
+let turnDone: ((r: TurnResult) => void) | null = null
+export type TurnResult = { ok: boolean; error?: string; limitedUntil?: number }
+
+/** The plan's usage limit while Claude refuses for it (claude.ai sign-in only; API keys have none). */
+let limit: Limit | null = null
+const activeLimit = () => (limit && (!limit.until || limit.until > Date.now()) ? limit : null)
+
+function noteLimit(msg: SDKMessage): void {
+  if (msg.type === 'rate_limit_event') limit = limitFrom(msg.rate_limit_info)
+  else if (msg.type === 'result' && msg.subtype === 'success' && msg.is_error) limit = limitFromText(msg.result) ?? limit
+}
 
 /** Sends a message as the user and waits until Claude's turn ends. */
-export async function chatAndWait(text: string): Promise<{ ok: boolean; error?: string }> {
-  const done = new Promise<{ ok: boolean; error?: string }>((resolve) => (turnDone = resolve))
+/** Sends a message and waits for Claude's turn to end. `limitedUntil` says a usage limit ended it. */
+export async function chatAndWait(text: string): Promise<TurnResult> {
+  const done = new Promise<TurnResult>((resolve) => (turnDone = resolve))
   await chatSend({ text })
   return done
 }
@@ -203,6 +219,7 @@ export function closeChat(): void {
 export async function chatSend(req: ChatRequest): Promise<void> {
   const p = requireProject()
   if (turn) throw new Error('Claude is still working on the previous message')
+  if (agentBusy.has(p.path)) throw new Error('A series agent is making this episode. Chat here once it’s done (Home shows its progress).')
 
   const content: Exclude<SDKUserMessage['message']['content'], string> = []
   let frame: string | undefined
@@ -213,7 +230,15 @@ export async function chatSend(req: ChatRequest): Promise<void> {
   }
   content.push({ type: 'text', text: contextNote(req) + req.text })
 
-  const user: ChatMessage = { id: randomUUID(), role: 'user', parts: [{ kind: 'text', text: req.text }], context: req.context, frame, source: req.source, at: Date.now() }
+  const user: ChatMessage = {
+    id: randomUUID(),
+    role: 'user',
+    parts: [{ kind: 'text', text: req.text }],
+    context: req.context,
+    frame,
+    source: req.source,
+    at: Date.now(),
+  }
   const reply: ChatMessage = { id: randomUUID(), role: 'assistant', parts: [], at: Date.now() }
   messages.push(user, reply)
   turn = { message: reply, prompt: req.text }
@@ -238,7 +263,7 @@ async function codexChat(dir: string, text: string, frame?: string): Promise<voi
     images.push(file)
   }
   const meta = requireProject().meta
-  const result = await codexTurn(dir, studioPrompt(dir, 'codex'), text, images, meta.codexThreadId, {
+  const result = await codexTurn(dir, studioPrompt(dir, 'codex', autopilot), text, images, meta.codexThreadId, {
     part: (part) => {
       reply.parts.push(part)
       emit({ type: 'part', messageId: reply.id, part })
@@ -301,12 +326,18 @@ export async function chatModels(): Promise<ModelOption[]> {
  * A one-off request with no tools, on the chat's sign-in and model: translation, series planning.
  * `what` names it in errors ("Claude couldn't plan: …").
  */
-export async function askClaude(system: string, prompt: string, what: string): Promise<string> {
-  if (codexChosen()) return askCodex(system, prompt, what)
+export async function askClaude(
+  system: string,
+  prompt: string,
+  what: string,
+  opts: { onText?: (soFar: string) => void; signal?: AbortSignal } = {},
+): Promise<string> {
+  if (codexChosen()) return askCodex(system, prompt, what) // Codex answers at once at the end
   const { query } = await sdk()
   const q = query({
     prompt,
     options: {
+      includePartialMessages: !!opts.onText, // the answer as it's written, for progress
       env: claudeEnv(),
       pathToClaudeCodeExecutable: paths.claude(),
       settingSources: [],
@@ -316,12 +347,25 @@ export async function askClaude(system: string, prompt: string, what: string): P
       systemPrompt: system,
     },
   })
+  const stop = () => q.close()
+  opts.signal?.addEventListener('abort', stop)
   let answer = ''
+  let soFar = ''
   for await (const msg of q) {
+    if (opts.signal?.aborted) break
+    noteLimit(msg)
+    if (msg.type === 'stream_event' && msg.event.type === 'content_block_delta' && msg.event.delta.type === 'text_delta') {
+      soFar += msg.event.delta.text
+      opts.onText?.(soFar)
+      continue
+    }
     if (msg.type !== 'result') continue
-    if (msg.subtype !== 'success' || msg.is_error) throw new Error(`Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
+    if (msg.subtype !== 'success' || msg.is_error)
+      throw new Error(activeLimit() ? limitText(activeLimit()!) : `Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
     answer = msg.result
   }
+  opts.signal?.removeEventListener('abort', stop)
+  if (opts.signal?.aborted) throw Object.assign(new Error('cancelled'), { cancelled: true })
   return answer
 }
 
@@ -345,7 +389,8 @@ export async function translateNarration(sentences: string[], from: string, to: 
   } catch {
     parsed = null
   }
-  if (!Array.isArray(parsed) || parsed.length !== sentences.length) throw new Error(`Claude’s ${languageName(to)} translation didn’t match the narration. Try the export again.`)
+  if (!Array.isArray(parsed) || parsed.length !== sentences.length)
+    throw new Error(`Claude’s ${languageName(to)} translation didn’t match the narration. Try the export again.`)
   return parsed.map(String)
 }
 
@@ -358,7 +403,7 @@ const WINDOW_LABELS: Record<string, string> = {
 
 type UsageAnswer = {
   rate_limits_available: boolean
-  rate_limits: Record<string, unknown> & { model_scoped?: { display_name: string; utilization: number | null; resets_at: string | null }[] } | null
+  rate_limits: (Record<string, unknown> & { model_scoped?: { display_name: string; utilization: number | null; resets_at: string | null }[] }) | null
 }
 
 /**
@@ -425,27 +470,38 @@ function contextNote(req: ChatRequest): string {
   return notes.length ? notes.join('\n') + '\n\n' : ''
 }
 
-async function startSession(dir: string): Promise<void> {
-  const { query, createSdkMcpServer, tool, getSessionInfo } = await sdk()
-  const meta = requireProject().meta
+/** A project's meta: the open one's in memory, any other's from its project.json. */
+const metaOf = (dir: string) => (project()?.path === dir ? project()!.meta : readMeta(dir))
+
+/**
+ * What a Claude session on the project in `dir` gets: Studio's tools bound to that project, the
+ * file permissions (writes only inside it) and the brief. The chat and a series' background agents
+ * (agent.ts) share it. `resume` continues the project's conversation when this machine has it.
+ */
+export async function studioOptions(dir: string, opts: { autopilot: boolean }): Promise<Options> {
+  const { createSdkMcpServer, tool, getSessionInfo } = await sdk()
+  const meta = metaOf(dir)
   // A project synced from another machine carries a session id this machine doesn't have.
   const resumable = meta.claudeSessionId && (await getSessionInfo(meta.claudeSessionId, { dir }).catch(() => undefined))
-  const inbox = new Inbox()
   const studio = createSdkMcpServer({
     name: 'studio',
     version: app.getVersion(),
     tools: [
-      tool('render_preview', sceneTools.render_preview.description, sceneTools.render_preview.shape, () => renderPreview()),
-      tool('get_timeline', sceneTools.get_timeline.description, sceneTools.get_timeline.shape, async () => getTimeline()),
-      tool('view_frames', sceneTools.view_frames.description, sceneTools.view_frames.shape, ({ times }) => viewFrames(times)),
-      tool('read_source', sceneTools.read_source.description, sceneTools.read_source.shape, ({ source, from_page, to_page }) => readSource(source, from_page, to_page)),
-      tool('view_source_pages', sceneTools.view_source_pages.description, sceneTools.view_source_pages.shape, ({ source, pages }) => viewSourcePages(source, pages)),
+      tool('render_preview', sceneTools.render_preview.description, sceneTools.render_preview.shape, () => renderPreview(dir)),
+      tool('get_timeline', sceneTools.get_timeline.description, sceneTools.get_timeline.shape, async () => getTimeline(dir)),
+      tool('view_frames', sceneTools.view_frames.description, sceneTools.view_frames.shape, ({ times }) => viewFrames(dir, times)),
+      tool('read_source', sceneTools.read_source.description, sceneTools.read_source.shape, ({ source, from_page, to_page }) =>
+        readSource(dir, source, from_page, to_page),
+      ),
+      tool('view_source_pages', sceneTools.view_source_pages.description, sceneTools.view_source_pages.shape, ({ source, pages }) =>
+        viewSourcePages(dir, source, pages),
+      ),
     ],
   })
 
   const studioTools = Object.keys(sceneTools).map((name) => `mcp__studio__${name}`)
   const readRoots = [dir, paths.python(), join(paths.env(), '.pixi', 'envs', 'default')]
-  const options: Options = {
+  return {
     cwd: dir,
     env: claudeEnv(),
     pathToClaudeCodeExecutable: paths.claude(),
@@ -458,13 +514,14 @@ async function startSession(dir: string): Promise<void> {
     // Reads inside the project need no approval; everything else goes through canUseTool.
     allowedTools: ['WebSearch', 'WebFetch', 'TodoWrite', ...studioTools],
     mcpServers: { studio },
-    systemPrompt: { type: 'preset', preset: 'claude_code', append: studioPrompt(dir) },
+    systemPrompt: { type: 'preset', preset: 'claude_code', append: studioPrompt(dir, 'claude', opts.autopilot) },
     canUseTool: async (name, input) => {
       const target = String(input.file_path ?? input.path ?? '')
       const writes = name === 'Edit' || name === 'Write'
       if (!writes && !target && ['Glob', 'Grep'].includes(name)) return { behavior: 'allow', updatedInput: input }
       // Claude Code opens PDF pages only with poppler installed; our tools work everywhere.
-      if (name === 'Read' && /\.pdf$/i.test(target)) return { behavior: 'deny', message: 'Use read_source for a PDF’s text and view_source_pages to look at its pages.' }
+      if (name === 'Read' && /\.pdf$/i.test(target))
+        return { behavior: 'deny', message: 'Use read_source for a PDF’s text and view_source_pages to look at its pages.' }
       const roots = writes ? [dir] : readRoots
       if (target && roots.some((r) => inside(r, isAbsolute(target) ? target : resolve(dir, target)))) {
         return { behavior: 'allow', updatedInput: input }
@@ -473,7 +530,12 @@ async function startSession(dir: string): Promise<void> {
     },
     stderr: (line) => console.error('[claude]', line),
   }
+}
 
+async function startSession(dir: string): Promise<void> {
+  const { query } = await sdk()
+  const inbox = new Inbox()
+  const options = await studioOptions(dir, { autopilot })
   const q = query({ prompt: inbox, options })
   session = { dir, query: q, inbox }
   void pump(session)
@@ -491,6 +553,7 @@ async function pump(s: Session): Promise<void> {
 }
 
 function handle(msg: SDKMessage): void {
+  noteLimit(msg)
   if (msg.type === 'system' && msg.subtype === 'init') {
     if (project() && project()!.meta.claudeSessionId !== msg.session_id) updateMeta({ claudeSessionId: msg.session_id })
     return
@@ -534,6 +597,9 @@ function handle(msg: SDKMessage): void {
 }
 
 function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
+  const limited = ok ? null : activeLimit()
+  if (limited) error = limitText(limited)
+  if (ok) limit = null
   const t = turn
   turn = null
   pauseCommits(false)
@@ -550,13 +616,13 @@ function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
   emit({ type: 'done', ok, error, costUsd })
   const waiter = turnDone
   turnDone = null
-  waiter?.({ ok, error })
+  waiter?.({ ok, error, limitedUntil: limited?.until })
 }
 
 // --- prompt and tool text --------------------------------------------------------------------
 
-function studioPrompt(dir: string, agent: 'claude' | 'codex' = 'claude'): string {
-  const meta = requireProject().meta
+function studioPrompt(dir: string, agent: 'claude' | 'codex', autopilot: boolean): string {
+  const meta = metaOf(dir)
   const portrait = meta.aspect === '9:16'
   const site = join(paths.env(), '.pixi', 'envs', 'default', process.platform === 'win32' ? 'Lib' : 'lib/python3.12', 'site-packages')
   return [
@@ -582,7 +648,7 @@ function studioPrompt(dir: string, agent: 'claude' | 'codex' = 'claude'): string
   ].join('\n')
 }
 
-function summarize(name: string, input: unknown): string {
+export function summarize(name: string, input: unknown): string {
   const i = (input ?? {}) as Record<string, unknown>
   const file = typeof i.file_path === 'string' ? basename(i.file_path) : ''
   switch (name) {
@@ -598,7 +664,11 @@ function summarize(name: string, input: unknown): string {
     case 'WebSearch':
       return `Searching the web: ${String(i.query ?? '')}`.slice(0, 70)
     case 'WebFetch':
-      return `Opening ${String(i.url ?? '').replace(/^https?:\/\//, '').split('/')[0]}`
+      return `Opening ${
+        String(i.url ?? '')
+          .replace(/^https?:\/\//, '')
+          .split('/')[0]
+      }`
     case 'TodoWrite':
       return 'Planning steps'
     case 'mcp__studio__render_preview':

@@ -14,9 +14,24 @@ export function parsePlan(answer: string, files: string[], title?: string): Seri
     .map((e) => ({
       title: e.title.trim(),
       summary: String(e.summary ?? '').trim(),
-      sources: (Array.isArray(e.sources) ? e.sources : []).filter((s) => files.includes(s?.file)).map((s) => ({ file: s.file, pages: s.pages ? String(s.pages) : undefined })),
+      sources: (Array.isArray(e.sources) ? e.sources : [])
+        .filter((s) => files.includes(s?.file))
+        .map((s) => ({ file: s.file, pages: s.pages ? String(s.pages) : undefined })),
       buildsOn: Array.isArray(e.buildsOn) ? e.buildsOn.filter((n) => Number.isInteger(n)) : [],
     }))
   if (!episodes.length) throw new Error('Claude didn’t propose any episodes. Try again, or with fewer PDFs.')
   return { title: (title || String(plan.title ?? '')).trim() || 'Untitled series', bible: String(plan.bible ?? '').trim(), episodes }
+}
+
+/** The episode titles in a plan that's still being written: every complete "title" after "episodes". */
+export function titlesSoFar(json: string): string[] {
+  const at = json.indexOf('"episodes"')
+  if (at < 0) return []
+  return [...json.slice(at).matchAll(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => {
+    try {
+      return JSON.parse(`"${m[1]}"`) as string
+    } catch {
+      return m[1]
+    }
+  })
 }

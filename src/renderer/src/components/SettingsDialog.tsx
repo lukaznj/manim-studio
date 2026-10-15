@@ -1,6 +1,20 @@
 import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Agent, Background, ClaudeAuth, ClaudeDesktopStatus, Component, ComponentState, MediaItem, PlanUsage, ProjectMeta, Settings, Theme, VoiceProvider, VoiceSettings } from '../../../shared/types'
+import type {
+  Agent,
+  Background,
+  ClaudeAuth,
+  ClaudeDesktopStatus,
+  Component,
+  ComponentState,
+  MediaItem,
+  PlanUsage,
+  ProjectMeta,
+  Settings,
+  Theme,
+  VoiceProvider,
+  VoiceSettings,
+} from '../../../shared/types'
 import { DEFAULT_TONE, TONES } from '../../../shared/tone'
 import { DEFAULT_EL_MODEL, EL_MODELS } from '../../../shared/voice'
 import { api } from '../lib/api'
@@ -8,7 +22,20 @@ import { LANGUAGES, languageName } from '../lib/languages'
 import { encodeWav } from '../lib/audio'
 import { resetTime } from '../lib/time'
 import { shortcut } from '../lib/platform'
-import { closeDialog, errorText, installComponent, openDialog, refreshClaude, refreshUsage, renderNow, startTour, toast, updateMeta, updateSettings, useStore } from '../store'
+import {
+  closeDialog,
+  errorText,
+  installComponent,
+  openDialog,
+  refreshClaude,
+  refreshUsage,
+  renderNow,
+  startTour,
+  toast,
+  updateMeta,
+  updateSettings,
+  useStore,
+} from '../store'
 import { ModelControls, usageLevel } from './ChatPane'
 import { RevoiceButton, useOutdatedVoice, voiceLabel } from './Revoice'
 import { VoicePicker } from './VoicePicker'
@@ -114,6 +141,7 @@ const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1
 /** Settings → Agent: who writes the scenes, Claude or Codex (ADR 0022), and its sign-in and model. */
 function AccountTab() {
   const agent = useStore((s) => s.settings!.agent)
+  const seriesAgents = useStore((s) => s.settings!.seriesAgents)
   const pick = async (next: Agent) => {
     await updateSettings({ agent: next })
     await refreshClaude()
@@ -129,6 +157,21 @@ function AccountTab() {
             { value: 'claude', label: 'Claude' },
             { value: 'codex', label: 'Codex' },
           ]}
+        />
+      </Row>
+      <Row
+        title="Series episodes at once"
+        text={
+          agent === 'codex'
+            ? 'With Codex, a series is made one episode at a time.'
+            : 'An unattended series makes this many videos at the same time, one Claude agent each. More is faster, but uses your plan’s limits faster and renders more at once on this computer.'
+        }
+      >
+        <Tabs
+          radio="Series episodes at once"
+          value={String(seriesAgents || 3)}
+          onChange={(v) => void updateSettings({ seriesAgents: Number(v) })}
+          items={['1', '2', '3', '4'].map((n) => ({ value: n, label: n }))}
         />
       </Row>
       {agent === 'codex' ? <CodexAccount /> : <ClaudeAccount />}
@@ -159,7 +202,10 @@ function CodexAccount() {
 
   return (
     <>
-      <Row title="Codex" text="OpenAI's coding agent. Its program, about 140 MB, is downloaded once from OpenAI's npm package and checked against its published hash.">
+      <Row
+        title="Codex"
+        text="OpenAI's coding agent. Its program, about 140 MB, is downloaded once from OpenAI's npm package and checked against its published hash."
+      >
         <InstallButton component="codex" state={setup?.codex ?? 'missing'} />
       </Row>
       {installed && !settings.hasOpenAIKey && (
@@ -167,7 +213,9 @@ function CodexAccount() {
           <Sparkles />
           <div>
             <strong>{status?.loggedIn ? 'Signed in' : 'Not signed in'}</strong>
-            <div className="hint">{status?.loggedIn ? status.subscription : 'Codex signs in with your ChatGPT account, in your browser. Usage counts against your plan.'}</div>
+            <div className="hint">
+              {status?.loggedIn ? status.subscription : 'Codex signs in with your ChatGPT account, in your browser. Usage counts against your plan.'}
+            </div>
           </div>
           {status?.loggedIn ? (
             <button
@@ -187,7 +235,14 @@ function CodexAccount() {
         </div>
       )}
       {installed && (
-        <Row title="OpenAI API key" text={settings.hasOpenAIKey ? 'Saved and encrypted on this computer. Codex uses it, billed per use, instead of a ChatGPT sign-in.' : 'Optional: instead of signing in, a key from platform.openai.com, billed per use.'}>
+        <Row
+          title="OpenAI API key"
+          text={
+            settings.hasOpenAIKey
+              ? 'Saved and encrypted on this computer. Codex uses it, billed per use, instead of a ChatGPT sign-in.'
+              : 'Optional: instead of signing in, a key from platform.openai.com, billed per use.'
+          }
+        >
           <KeyField
             saved={settings.hasOpenAIKey}
             placeholder="sk-…"
@@ -300,11 +355,13 @@ function ClaudeAccount() {
       )}
 
       {claude?.loggedIn && (
-        <Row title="Model and effort" text="Which model writes the scenes and how much it thinks first. Also under the chat box; a change applies to the current conversation.">
+        <Row
+          title="Model and effort"
+          text="Which model writes the scenes and how much it thinks first. Also under the chat box; a change applies to the current conversation."
+        >
           <ModelControls />
         </Row>
       )}
-
     </>
   )
 }
@@ -418,7 +475,10 @@ function VideoTab() {
           items={TONES.map((t) => ({ value: t.value, label: t.label }))}
         />
       </Row>
-      <Row title="Script first" text="Claude plans the video in a script (the idea, each section's narration and visuals) and waits for your approval before writing the code.">
+      <Row
+        title="Script first"
+        text="Claude plans the video in a script (the idea, each section's narration and visuals) and waits for your approval before writing the code."
+      >
         <Tabs
           radio="Script first"
           value={meta.scriptFirst ? 'on' : 'off'}
@@ -445,7 +505,11 @@ function VideoTab() {
         </div>
       </Row>
       <Row title="Background picture" text="A picture from the project's media, covering the frame behind everything. Add pictures in the Media tab.">
-        <select className="select" value={background.image ?? ''} onChange={(e) => void save({ background: { ...background, image: e.target.value || undefined } })}>
+        <select
+          className="select"
+          value={background.image ?? ''}
+          onChange={(e) => void save({ background: { ...background, image: e.target.value || undefined } })}
+        >
           <option value="">None</option>
           {pictures.map((p) => (
             <option key={p.name} value={p.name}>
@@ -504,7 +568,10 @@ function RevoiceRow() {
   const credit = outdated.to.provider === 'elevenlabs' ? ` That uses up to ${outdated.characters.toLocaleString('en')} ElevenLabs characters.` : ''
   return (
     <div className="revoice">
-      <Row title="The narration still has the old voice" text={`It was made with ${voiceLabel(outdated.from)}. Re-voicing speaks it again; your recordings stay.${credit}`}>
+      <Row
+        title="The narration still has the old voice"
+        text={`It was made with ${voiceLabel(outdated.from)}. Re-voicing speaks it again; your recordings stay.${credit}`}
+      >
         <RevoiceButton className="btn primary small" />
       </Row>
     </div>
@@ -512,6 +579,15 @@ function RevoiceRow() {
 }
 
 /** Language, provider and voice: in Settings → Voice and in the new-project dialog. */
+/** What's missing before this voice can speak, or null when it's ready. */
+export function voiceProblem(voice: VoiceSettings | undefined, hasKey: boolean, omnivoice?: ComponentState): string | null {
+  if (!voice) return 'Choose a voice for the narration.'
+  if (voice.provider === 'elevenlabs' && !hasKey) return 'Add your ElevenLabs API key for the narration.'
+  if (voice.provider === 'elevenlabs' && !voice.elevenlabs?.voiceId) return 'Choose an ElevenLabs voice for the narration.'
+  if (voice.provider === 'omnivoice' && omnivoice !== 'ready') return 'Install the OmniVoice model for the narration.'
+  return null
+}
+
 export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings; onChange: (voice: VoiceSettings) => void; inProject: boolean }) {
   const settings = useStore((s) => s.settings)!
   const setup = useStore((s) => s.setup)
@@ -536,7 +612,13 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
       </Row>
       <div className="provider-cards" role="radiogroup" aria-label="Voice">
         {PROVIDERS.map((p) => (
-          <button key={p.value} role="radio" aria-checked={voice.provider === p.value} className={`provider-card ${voice.provider === p.value ? 'on' : ''}`} onClick={() => save({ provider: p.value })}>
+          <button
+            key={p.value}
+            role="radio"
+            aria-checked={voice.provider === p.value}
+            className={`provider-card ${voice.provider === p.value ? 'on' : ''}`}
+            onClick={() => save({ provider: p.value })}
+          >
             {p.icon}
             <strong>{p.title}</strong>
             <span className="hint">{p.text}</span>
@@ -572,7 +654,11 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
             />
           </Row>
           <Row title="Model">
-            <select className="select" value={modelId} onChange={(e) => save({ elevenlabs: { voiceId: el?.voiceId ?? '', voiceName: el?.voiceName, modelId: e.target.value } })}>
+            <select
+              className="select"
+              value={modelId}
+              onChange={(e) => save({ elevenlabs: { voiceId: el?.voiceId ?? '', voiceName: el?.voiceName, modelId: e.target.value } })}
+            >
               {models.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.label}
@@ -630,7 +716,13 @@ function ReferenceRecorder() {
       <blockquote>{text}</blockquote>
       <button className={`btn ${rec.state !== 'idle' ? 'danger' : ''}`} onClick={() => void toggle()}>
         {rec.state === 'idle' ? <Circle /> : <Square />}
-        {rec.state === 'countdown' ? `Starting in ${rec.count}…` : rec.state === 'recording' ? `Stop (${rec.elapsed.toFixed(1)} s)` : has ? 'Record again' : 'Record'}
+        {rec.state === 'countdown'
+          ? `Starting in ${rec.count}…`
+          : rec.state === 'recording'
+            ? `Stop (${rec.elapsed.toFixed(1)} s)`
+            : has
+              ? 'Record again'
+              : 'Record'}
       </button>
     </div>
   )
@@ -667,7 +759,7 @@ function EnvTab() {
         </div>
       ))}
       <div className="set-divider" />
-      <Row title="Render on save" text={`Every save (${shortcut("S")}) renders a preview. Turn it off for very slow scenes.`}>
+      <Row title="Render on save" text={`Every save (${shortcut('S')}) renders a preview. Turn it off for very slow scenes.`}>
         <label className="switch">
           <input type="checkbox" checked={settings.autoRender} onChange={(e) => void updateSettings({ autoRender: e.target.checked })} />
           <span />
@@ -714,7 +806,11 @@ function RenderServers() {
   useEffect(() => {
     for (const s of servers)
       api.checkServer(s.id).then(
-        (i) => setStatus((st) => ({ ...st, [s.id]: `${i.cores} cores · ${i.busy ? `busy${i.waiting ? `, ${i.waiting} waiting` : ''}` : 'ready'} · version ${i.version}` })),
+        (i) =>
+          setStatus((st) => ({
+            ...st,
+            [s.id]: `${i.cores} cores · ${i.busy ? `busy${i.waiting ? `, ${i.waiting} waiting` : ''}` : 'ready'} · version ${i.version}`,
+          })),
         (e) => setStatus((st) => ({ ...st, [s.id]: errorText(e) })),
       )
   }, [servers.length])
@@ -753,7 +849,13 @@ function RenderServers() {
         </div>
       ))}
       <div className="inline-form">
-        <input className="input mono" placeholder="msw1.… (the pairing code)" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code.trim() && void add()} />
+        <input
+          className="input mono"
+          placeholder="msw1.… (the pairing code)"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && code.trim() && void add()}
+        />
         <button className="btn" disabled={!code.trim() || busy} onClick={() => void add()}>
           {busy && <span className="spinner" />} Pair
         </button>
@@ -789,9 +891,33 @@ function AboutTab() {
           value={settings.appearance}
           onChange={(appearance) => void updateSettings({ appearance })}
           items={[
-            { value: 'system', label: <><Monitor />System</> },
-            { value: 'light', label: <><Sun />Light</> },
-            { value: 'dark', label: <><Moon />Dark</> },
+            {
+              value: 'system',
+              label: (
+                <>
+                  <Monitor />
+                  System
+                </>
+              ),
+            },
+            {
+              value: 'light',
+              label: (
+                <>
+                  <Sun />
+                  Light
+                </>
+              ),
+            },
+            {
+              value: 'dark',
+              label: (
+                <>
+                  <Moon />
+                  Dark
+                </>
+              ),
+            },
           ]}
         />
       </Row>

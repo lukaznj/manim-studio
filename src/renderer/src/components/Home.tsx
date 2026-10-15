@@ -1,10 +1,12 @@
-import { Check, CircleAlert, FolderOpen, Library, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
+import { Check, ChevronLeft, CircleAlert, FolderOpen, Library, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ComponentState, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
+import { revealLabel } from '../lib/platform'
 import { ago, timecode } from '../lib/time'
 import { installComponent, openDialog, openProject, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
 import { ProgressLine } from './ui'
+import { SeriesPanel } from './SeriesPanel'
 
 export function Home() {
   const projects = useStore((s) => s.projects)
@@ -22,6 +24,11 @@ export function Home() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  const homeSeries = useStore((s) => s.homeSeries)
+  const items = homeItems(projects)
+  const inSeries =
+    (homeSeries && items.find((i): i is { folder: string; episodes: ProjectSummary[] } => 'episodes' in i && i.folder === homeSeries)?.episodes) || []
 
   return (
     <div className="home">
@@ -48,18 +55,94 @@ export function Home() {
         </header>
 
         {needsSetup && <SetupPanel />}
+        <SeriesPanel />
 
         {projects.length === 0 ? (
           <EmptyState />
+        ) : inSeries.length ? (
+          <>
+            <nav className="home-crumbs">
+              <button className="link-btn" onClick={() => useStore.setState({ homeSeries: null })}>
+                <ChevronLeft /> Projects
+              </button>
+              <span className="faint">/</span>
+              <strong>{inSeries[0].series!.title}</strong>
+              <span className="faint">{inSeries.length === 1 ? '1 episode' : `${inSeries.length} episodes`}</span>
+              <button className="btn small ghost" onClick={() => void api.reveal(inSeries[0].series!.folder)}>
+                <FolderOpen /> {revealLabel}
+              </button>
+            </nav>
+            <section className="project-grid">
+              {inSeries.map((p, i) => (
+                <ProjectCard key={p.path} project={p} index={i} />
+              ))}
+            </section>
+          </>
         ) : (
           <section className="project-grid">
-            {projects.map((p, i) => (
-              <ProjectCard key={p.path} project={p} index={i} />
-            ))}
+            {items.map((item, i) =>
+              'episodes' in item ? (
+                <SeriesCard key={item.folder} folder={item.folder} episodes={item.episodes} index={i} />
+              ) : (
+                <ProjectCard key={item.path} project={item} index={i} />
+              ),
+            )}
           </section>
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Home's list: a series' episodes go into one folder card, where the series' most recently changed
+ * episode would be; everything else stays a project card.
+ */
+function homeItems(projects: ProjectSummary[]): (ProjectSummary | { folder: string; episodes: ProjectSummary[] })[] {
+  const items: (ProjectSummary | { folder: string; episodes: ProjectSummary[] })[] = []
+  const folders = new Map<string, ProjectSummary[]>()
+  for (const p of projects) {
+    const folder = p.series?.folder
+    if (!folder) items.push(p)
+    else if (folders.has(folder)) folders.get(folder)!.push(p)
+    else {
+      folders.set(folder, [p])
+      items.push({ folder, episodes: folders.get(folder)! })
+    }
+  }
+  for (const episodes of folders.values()) episodes.sort((a, b) => a.series!.episode - b.series!.episode)
+  return items
+}
+
+/** A series on Home: its first episodes' pictures stacked, the title and how many episodes it has. */
+function SeriesCard({ folder, episodes, index }: { folder: string; episodes: ProjectSummary[]; index: number }) {
+  const first = episodes[0]
+  const cover = episodes.find((e) => e.thumbnail) ?? first
+  const latest = Math.max(...episodes.map((e) => e.updatedAt))
+  const open = () => useStore.setState({ homeSeries: folder })
+  return (
+    <article
+      className="project-card series-card"
+      style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
+      onClick={open}
+      onKeyDown={(e) => e.key === 'Enter' && open()}
+      tabIndex={0}
+      aria-label={`Series ${first.series!.title}, ${episodes.length} episodes`}
+    >
+      <div className={`thumb stack ${cover.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${cover.theme}`}>
+        {cover.thumbnail ? <img src={api.mediaUrl(cover.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
+      </div>
+      <div className="project-meta">
+        <div className="project-name">{first.series!.title}</div>
+        <div className="project-sub">
+          <span className="badge sun">
+            <Library /> Series
+          </span>
+          <span className="faint">{episodes.length === 1 ? '1 episode' : `${episodes.length} episodes`}</span>
+          <span className="faint project-ago">{ago(latest)}</span>
+        </div>
+      </div>
+    </article>
   )
 }
 
@@ -85,11 +168,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
           ) : (
             <>
               <span className="badge">{p.aspect}</span>
-              {p.series && (
-                <span className="badge sun series-badge" title={`Episode ${p.series.episode} of ${p.series.of} · ${p.series.title}`}>
-                  {p.series.episode}/{p.series.of} · {p.series.title}
-                </span>
-              )}
+              {p.series && <span className="badge sun">Episode {p.series.episode}</span>}
               <span className="faint project-ago">{ago(p.updatedAt)}</span>
             </>
           )}
@@ -219,7 +298,7 @@ function SetupPanel() {
           <span className="step-icon">{claude?.loggedIn ? <Check /> : <Sparkles />}</span>
           <div className="step-body">
             <div className="step-title">
-              Claude <span className="faint">· {claude?.loggedIn ? claude.email ?? claude.subscription ?? 'Signed in' : 'Not signed in'}</span>
+              Claude <span className="faint">· {claude?.loggedIn ? (claude.email ?? claude.subscription ?? 'Signed in') : 'Not signed in'}</span>
             </div>
             <div className="hint">
               {loggingIn

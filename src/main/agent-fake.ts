@@ -1,0 +1,48 @@
+// A stand-in for Claude in a series' background agents, for driving the app in tests without a
+// signed-in agent (STUDIO_FAKE_AGENT=1; "limit" also hits one usage limit). It writes a real script
+// and scene and renders them through the same per-project path a real agent's tools use.
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import type { EpisodeAgent } from './agent'
+import { readMeta } from './projects'
+import { currentOrNewRender } from './render'
+
+/** Only in a driven test profile (with STUDIO_USER_DATA), never in a real install. */
+export const fakeAgents = (): boolean => !!(process.env.STUDIO_FAKE_AGENT && process.env.STUDIO_USER_DATA)
+
+let limitedOnce = false
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+export function fakeAgent(dir: string, onTool: (summary: string) => void): EpisodeAgent {
+  const meta = readMeta(dir)
+  const n = meta.series?.episode ?? 1
+  return {
+    async turn(text) {
+      await sleep(1000)
+      if (/only the script/.test(text)) {
+        onTool('Writing script.md')
+        await sleep(1500)
+        writeFileSync(
+          join(dir, 'script.md'),
+          `---\nstatus: approved\n---\n# ${meta.name}\n\n**The idea:** what episode ${n} is about.\n\n## Opening\n**Narration:**\n> Hello.\n`,
+        )
+        return { ok: true }
+      }
+      if (process.env.STUDIO_FAKE_AGENT === 'limit' && n === 2 && !limitedOnce) {
+        limitedOnce = true
+        return { ok: false, error: 'limit', limitedUntil: Date.now() + 5_000 }
+      }
+      onTool('Writing scene.py')
+      writeFileSync(
+        join(dir, 'scene.py'),
+        `from manim import *\nfrom studio import *\n\n\nclass Video(StudioScene):\n    def construct(self):\n        self.next_section("Opening")\n        t = Text("Episode ${n}", font_size=56)\n        self.play(Write(t))\n        for i in range(14):\n            self.play(t.animate.shift(UP * 0.2 if i % 2 else DOWN * 0.2), run_time=0.5)\n        self.wait(1)\n`,
+      )
+      onTool('Rendering the preview')
+      await currentOrNewRender(dir)
+      onTool('Looking at frames 1.0s, 4.0s')
+      await sleep(800)
+      return { ok: true }
+    },
+    close() {},
+  }
+}
