@@ -2,7 +2,7 @@ import { ArrowDownToLine, ChevronLeft, History, Pause, Play, RefreshCw, Settings
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { shortcut } from '../lib/platform'
-import { closeProject, openDialog, pausePreview, useStore } from '../store'
+import { closeProject, openDialog, pausePreview, renderProgress, useStore } from '../store'
 import { ExportsMenu } from './ExportsMenu'
 import { HistoryPopover } from './HistoryPopover'
 import { ProgressLine, Ring, Wordmark } from './ui'
@@ -16,7 +16,8 @@ export function TitleBar() {
   const historyOpen = useStore((s) => s.historyOpen)
   const setHistoryOpen = (open: boolean) => useStore.setState({ historyOpen: open })
 
-  const progress = render.status === 'rendering' && render.expected ? (render.clips ?? 0) / render.expected : undefined
+  const progress = render.status === 'rendering' ? renderProgress(render).fraction : undefined
+  const words = renderProgress(render)
 
   return (
     <header className={`titlebar ${platform === 'darwin' ? 'mac' : 'other'}`}>
@@ -41,10 +42,10 @@ export function TitleBar() {
 
       <div className="titlebar-right no-drag">
         {render.status === 'rendering' && (
-          <span className={`render-pill ${render.paused ? 'paused' : ''}`}>
+          <span className={`render-pill ${render.paused ? 'paused' : ''}`} title={words.title}>
             {render.paused ? <Pause /> : <span className="spinner" />}
-            {render.paused ? 'Paused' : 'Rendering'}
-            {render.expected ? ` ${render.clips ?? 0}${(render.clips ?? 0) <= render.expected ? `/${render.expected}` : ''}` : render.paused ? '' : '…'}
+            {words.label}
+            {words.detail && <span className="mono">{words.detail}</span>}
             <button
               className="pill-btn"
               onClick={() => void pausePreview(!render.paused)}

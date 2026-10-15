@@ -16,7 +16,7 @@ A course comes as a batch of lecture PDFs. Turning it into videos one by one los
 - **You edit the plan** before anything is made: titles, summaries, order, removing episodes, the bible itself.
 - **Each episode is an ordinary project** in a series folder (`<projects>/<series>/01-…`, with `series.md` and `series.json`), with its PDFs as sources and `meta.series` saying where it sits. Home lists the episodes with an "episode/total · series" badge.
 - **Episodes refer to each other through `series.md`.** Each episode gets a copy of the bible plus the list of episodes, and for the finished ones, what they actually became (the idea and the sections of their script). It's refreshed when an episode is started or opened. Claude's brief says to follow the bible's notation and visuals, assume what earlier episodes taught and refer back to them, and leave later topics alone.
-- **Unattended** (the default), quick mode ([[0018-quick-mode]]) makes the episodes one after another and exports each. Otherwise the first episode opens with "Make this episode." ready in the chat.
+- **Unattended** (the default), the episodes are made without you and each is exported: with Claude, every script first and then several videos at once ([[0023-parallel-series-episodes]]); with Codex, one after another in quick mode ([[0018-quick-mode]]). Otherwise the first episode opens with "Make this episode." ready in the chat.
 
 ## Consequences
 

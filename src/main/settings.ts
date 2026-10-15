@@ -18,6 +18,7 @@ const defaults = (): Settings => ({
   agent: 'claude',
   codexModel: '',
   codexEffort: 'high',
+  seriesAgents: 3,
   autoRender: true,
   hasElevenLabsKey: false,
   hasAnthropicKey: false,

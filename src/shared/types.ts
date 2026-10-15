@@ -78,6 +78,30 @@ export interface SeriesPlanProgress {
   startedAt: number
 }
 
+/** One episode of a series being made (src/main/series.ts runSeries). */
+export interface EpisodeRun {
+  dir: string
+  title: string
+  // waiting → script (its turn in the first pass) → scripted → scene → check → export → done
+  state: 'waiting' | 'script' | 'scripted' | 'scene' | 'check' | 'export' | 'done' | 'failed' | 'stopped'
+  activity?: string // what its agent is doing right now
+  exportJob?: string
+  error?: string
+  warnings: string[]
+}
+
+/**
+ * A series being made unattended: first every script, one after another (each episode builds on the
+ * ones before), then the videos, `agents` at a time, each exported when it's done.
+ */
+export interface SeriesRun {
+  title: string
+  folder: string
+  agents: number
+  state: 'working' | 'done' | 'stopped'
+  episodes: EpisodeRun[]
+}
+
 /** Claude's proposal for a series, which the user edits and accepts. */
 export interface SeriesPlan {
   title: string
@@ -418,6 +442,7 @@ export interface Settings {
   agent: Agent // who writes the scenes (ADR 0022)
   codexModel: string // '' = Codex's default for the account
   codexEffort: Effort | ''
+  seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
   autoRender: boolean
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
@@ -520,7 +545,7 @@ export interface VoiceOption {
 }
 
 export type EventChannel =
-  'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'series-plan' | 'open-project' | 'menu'
+  'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'series-plan' | 'series' | 'open-project' | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -572,6 +597,10 @@ export interface StudioApi {
   cancelSeriesPlan(): Promise<void>
   /** Creates the series' projects; unattended, makes them one after another in quick mode. */
   startSeries(start: SeriesStart): Promise<void>
+  /** The series being made unattended, or the last one until it's dismissed. */
+  seriesRun(): Promise<SeriesRun | null>
+  stopSeries(): Promise<void>
+  dismissSeries(): Promise<void>
   renderServers(): Promise<RenderServer[]>
   /** Pairs with a render worker from the code it printed; checks that it answers first. */
   addServer(code: string): Promise<RenderServer[]>
@@ -637,6 +666,7 @@ export interface StudioApi {
   on(channel: 'exports', cb: (jobs: ExportJob[]) => void): () => void
   on(channel: 'quick', cb: (run: QuickRun | null) => void): () => void
   on(channel: 'series-plan', cb: (p: SeriesPlanProgress) => void): () => void
+  on(channel: 'series', cb: (run: SeriesRun | null) => void): () => void
   /** script.md changed on disk (Claude wrote it), or was removed (null). */
   on(channel: 'script', cb: (e: { text: string | null }) => void): () => void
 }

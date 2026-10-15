@@ -9,11 +9,14 @@ import { basename, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { SCRIPT_FILE } from '../shared/script'
 import { TONES } from '../shared/tone'
-import type { ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesStart, Tone } from '../shared/types'
-import { askClaude, claudeStatus, languageName } from './claude'
+import type { EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
+import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
+import { askClaude, claudeStatus, codexChosen, languageName } from './claude'
+import { cancelExport, queueExport } from './exports'
+import { cancel } from './render'
 import { createProject, readMeta } from './projects'
 import { parsePlan, titlesSoFar } from '../shared/series-plan'
-import { ensureQuickReady, makeVideo, quickStopped } from './quick'
+import { checkAndFix, ensureQuickReady, makeVideo, quickStopped } from './quick'
 import { runRunner } from './runner'
 import { getSettings, setSettings } from './settings'
 import { slugify } from './slug'
@@ -75,6 +78,7 @@ const two = (n: number) => String(n).padStart(2, '0')
 /** Creates the series folder and one project per episode; unattended, makes them all in quick mode. */
 export async function startSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>): Promise<void> {
   if (start.unattended) await ensureQuickReady()
+  if (start.unattended && series?.state === 'working') throw new Error('A series is already being made. Wait for it, or stop it.')
   const { plan } = start
   const root = getSettings().projectsDir
   let folder = join(root, slugify(plan.title))
@@ -115,6 +119,8 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
     await openInWindow(dirs[0])
     return
   }
+  if (!codexChosen()) return void runSeries(plan.title, folder, dirs, start.export)
+  // Codex's tools work on the open project only, so with Codex the episodes are made one at a time, in the window.
   void (async () => {
     const episodes = plan.episodes.map((ep) => ({ title: ep.title, state: 'todo' as 'done' | 'failed' | 'now' | 'todo' }))
     for (const [i, dir] of dirs.entries()) {
@@ -129,6 +135,127 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
       if (quickStopped()) break
     }
   })()
+}
+
+// --- making a series unattended, several episodes at once (ADR 0023) ---------------------------
+
+let series: SeriesRun | null = null
+let stopping = false
+const agents = new Set<EpisodeAgent>()
+let sendSeries: (run: SeriesRun | null) => void = () => {}
+
+export function setupSeries(send: typeof sendSeries): void {
+  sendSeries = send
+}
+
+export const seriesRun = (): SeriesRun | null => (series ? structuredClone(series) : null)
+
+/** Stops the agents, the episodes not started yet and the exports still running. */
+export function stopSeries(): void {
+  if (series?.state !== 'working') return
+  stopping = true
+  for (const agent of agents) agent.close()
+  for (const ep of series.episodes) {
+    if (ep.state === 'export' && ep.exportJob) cancelExport(ep.exportJob)
+    cancel('preview', ep.dir) // a render an agent asked for
+  }
+}
+
+export function dismissSeries(): void {
+  if (series?.state === 'working') return
+  series = null
+  sendSeries(null)
+}
+
+const update = (ep: EpisodeRun, patch: Partial<EpisodeRun>) => {
+  Object.assign(ep, patch)
+  sendSeries(seriesRun())
+}
+
+function check(): void {
+  if (stopping) throw new Error('Stopped')
+}
+
+/**
+ * First the scripts, one after another: each episode's series.md says what the ones before it
+ * actually cover, from their scripts. Then the videos, `seriesAgents` at a time, each queued for
+ * export as soon as it passes Studio's check.
+ */
+async function runSeries(title: string, folder: string, dirs: string[], exportOptions: ExportOptions): Promise<void> {
+  stopping = false
+  series = {
+    title,
+    folder,
+    agents: Math.max(1, getSettings().seriesAgents || 3),
+    state: 'working',
+    episodes: dirs.map((dir) => ({ dir, title: readMeta(dir).name, state: 'waiting', warnings: [] })),
+  }
+  sendSeries(seriesRun())
+  const run = series
+
+  for (const ep of run.episodes) {
+    if (stopping) break
+    await episodeStep(ep, 'script', async (turn) => {
+      await turn(
+        `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: the other episodes’ scripts come first, and you’ll make the video after them.`,
+      )
+      update(ep, { state: 'scripted', activity: undefined })
+    })
+  }
+
+  const exports: Promise<unknown>[] = []
+  const queue = run.episodes.filter((ep) => ep.state === 'scripted')
+  await Promise.all(
+    Array.from({ length: run.agents }, async () => {
+      for (let ep = queue.shift(); ep && !stopping; ep = queue.shift()) {
+        await episodeStep(ep, 'scene', async (turn) => {
+          await turn(
+            'All the episodes’ scripts are written now, and series.md lists them. Make this episode’s video from your approved script.md: write scene.py, render it and look at the frames.',
+          )
+          update(ep, { state: 'check', activity: 'Checking the render' })
+          update(ep, { warnings: await checkAndFix(ep.dir, turn, check) })
+        })
+        if (ep.state !== 'check') continue
+        const { job, finished } = queueExport(ep.dir, exportOptions)
+        update(ep, { state: 'export', activity: undefined, exportJob: job.id })
+        exports.push(
+          finished.then(
+            () => update(ep, { state: 'done' }),
+            (e: Error) => update(ep, stopping ? { state: 'stopped' } : { state: 'failed', error: e.message }),
+          ),
+        )
+      }
+    }),
+  )
+  await Promise.all(exports)
+  for (const ep of run.episodes) if (ep.state === 'waiting' || ep.state === 'scripted') ep.state = 'stopped'
+  run.state = stopping ? 'stopped' : 'done'
+  sendSeries(seriesRun())
+}
+
+/** One agent session on an episode: `work` gets its turn (past usage limits); a failure marks the episode. */
+async function episodeStep(ep: EpisodeRun, state: EpisodeRun['state'], work: (turn: (text: string) => Promise<void>) => Promise<void>): Promise<void> {
+  update(ep, { state, activity: 'Starting' })
+  let agent: EpisodeAgent | null = null
+  try {
+    writeEpisodeBible(ep.dir)
+    agent = await episodeAgent(ep.dir, (summary) => update(ep, { activity: summary }))
+    agents.add(agent)
+    const a = agent
+    await work(async (text) => {
+      check()
+      const result = await turnPastLimits(a.turn, text, (note) => update(ep, { activity: note }), check)
+      check()
+      if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
+    })
+  } catch (e) {
+    update(ep, stopping ? { state: 'stopped', activity: undefined } : { state: 'failed', error: (e as Error).message, activity: undefined })
+  } finally {
+    if (agent) {
+      agents.delete(agent)
+      agent.close()
+    }
+  }
 }
 
 /** The name importSources would give a PDF: "Lecture 1.PDF" → lecture-1.pdf. */

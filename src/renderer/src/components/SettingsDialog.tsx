@@ -141,6 +141,7 @@ const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1
 /** Settings → Agent: who writes the scenes, Claude or Codex (ADR 0022), and its sign-in and model. */
 function AccountTab() {
   const agent = useStore((s) => s.settings!.agent)
+  const seriesAgents = useStore((s) => s.settings!.seriesAgents)
   const pick = async (next: Agent) => {
     await updateSettings({ agent: next })
     await refreshClaude()
@@ -156,6 +157,21 @@ function AccountTab() {
             { value: 'claude', label: 'Claude' },
             { value: 'codex', label: 'Codex' },
           ]}
+        />
+      </Row>
+      <Row
+        title="Series episodes at once"
+        text={
+          agent === 'codex'
+            ? 'With Codex, a series is made one episode at a time.'
+            : 'An unattended series makes this many videos at the same time, one Claude agent each. More is faster, but uses your plan’s limits faster and renders more at once on this computer.'
+        }
+      >
+        <Tabs
+          radio="Series episodes at once"
+          value={String(seriesAgents || 3)}
+          onChange={(v) => void updateSettings({ seriesAgents: Number(v) })}
+          items={['1', '2', '3', '4'].map((n) => ({ value: n, label: n }))}
         />
       </Row>
       {agent === 'codex' ? <CodexAccount /> : <ClaudeAccount />}

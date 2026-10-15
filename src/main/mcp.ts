@@ -108,7 +108,13 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
     }
     case 'create_project': {
       const a = args as { title: string; format: '16:9' | '9:16'; theme?: 'dark' | 'light'; language?: string; tone?: Tone }
-      const dir = await createProject({ name: a.title, aspect: a.format, theme: a.theme ?? 'dark', language: a.language ?? getSettings().defaultVoice.language, tone: a.tone })
+      const dir = await createProject({
+        name: a.title,
+        aspect: a.format,
+        theme: a.theme ?? 'dark',
+        language: a.language ?? getSettings().defaultVoice.language,
+        tone: a.tone,
+      })
       await host.openInWindow(dir)
       return textResult(guide())
     }
@@ -132,19 +138,28 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
       const source = readScene()
       const oldText = String(args.old_text)
       const count = source.split(oldText).length - 1
-      if (count !== 1) return textResult(count ? `That text occurs ${count} times in scene.py; include more of the surrounding lines.` : 'That text isn’t in scene.py. Call get_scene to see the current file.', true)
-      return writeScene(host, source.replace(oldText, () => String(args.new_text)))
+      if (count !== 1)
+        return textResult(
+          count
+            ? `That text occurs ${count} times in scene.py; include more of the surrounding lines.`
+            : 'That text isn’t in scene.py. Call get_scene to see the current file.',
+          true,
+        )
+      return writeScene(
+        host,
+        source.replace(oldText, () => String(args.new_text)),
+      )
     }
     case 'render_preview':
-      return renderPreview(MAX_WAIT_MS)
+      return renderPreview(requireProject().path, MAX_WAIT_MS)
     case 'get_timeline':
-      return getTimeline()
+      return getTimeline(requireProject().path)
     case 'view_frames':
-      return viewFrames(args.times as number[])
+      return viewFrames(requireProject().path, args.times as number[])
     case 'read_source':
-      return readSource(String(args.source), args.from_page as number | undefined, args.to_page as number | undefined)
+      return readSource(requireProject().path, String(args.source), args.from_page as number | undefined, args.to_page as number | undefined)
     case 'view_source_pages':
-      return viewSourcePages(String(args.source), args.pages as number[])
+      return viewSourcePages(requireProject().path, String(args.source), args.pages as number[])
     case 'export_video':
       return exportVideo(host)
   }

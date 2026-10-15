@@ -1,30 +1,32 @@
 // Handlers for the scene tools in src/shared/studio-tools.ts, shared by the in-app chat
-// (claude.ts) and Claude Desktop (mcp.ts). They work on the open project.
+// (claude.ts), a series' background agents (agent.ts) and Claude Desktop (mcp.ts). Each works on
+// the project folder it's given.
 import { readFileSync } from 'node:fs'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { Timeline } from '../shared/types'
-import { readTimeline, requireProject } from './projects'
+import { readTimeline } from './projects'
 import { currentOrNewRender, framesBase64, type RenderOutcome } from './render'
 import { requireSource, sourcePageCount, sourcePages, sourceText } from './sources'
 
 export const textResult = (text: string, isError = false): CallToolResult => ({ content: [{ type: 'text', text }], ...(isError ? { isError } : {}) })
 
 /** Waits for the render; with `maxWaitMs`, gives up waiting (not rendering) so a caller with a tool timeout gets an answer. */
-export async function renderPreview(maxWaitMs?: number): Promise<CallToolResult> {
-  const render = currentOrNewRender()
+export async function renderPreview(dir: string, maxWaitMs?: number): Promise<CallToolResult> {
+  const render = currentOrNewRender(dir)
   const outcome = maxWaitMs ? await Promise.race([render, new Promise<null>((r) => setTimeout(() => r(null), maxWaitMs))]) : await render
-  if (!outcome) return textResult('Still rendering (the first render after an install or update takes up to a minute). Call render_preview again for the result.')
+  if (!outcome)
+    return textResult('Still rendering (the first render after an install or update takes up to a minute). Call render_preview again for the result.')
   return textResult(describeOutcome(outcome))
 }
 
-export function getTimeline(): CallToolResult {
-  const t = readTimeline(requireProject().path)
+export function getTimeline(dir: string): CallToolResult {
+  const t = readTimeline(dir)
   return textResult(t ? describeTimeline(t) : 'No successful render yet.')
 }
 
-export async function viewFrames(times: number[]): Promise<CallToolResult> {
-  if (!readTimeline(requireProject().path)) return textResult('Nothing rendered yet; call render_preview.')
-  const images = await framesBase64(times, 854)
+export async function viewFrames(dir: string, times: number[]): Promise<CallToolResult> {
+  if (!readTimeline(dir)) return textResult('Nothing rendered yet; call render_preview.')
+  const images = await framesBase64(times, 854, dir)
   return {
     content: images.flatMap((data, i) => [
       { type: 'text' as const, text: `Frame at ${times[i].toFixed(2)} s:` },
@@ -33,21 +35,21 @@ export async function viewFrames(times: number[]): Promise<CallToolResult> {
   }
 }
 
-export async function readSource(source: string, from?: number, to?: number): Promise<CallToolResult> {
+export async function readSource(dir: string, source: string, from?: number, to?: number): Promise<CallToolResult> {
   try {
-    return textResult(await sourceText(source, from, to))
+    return textResult(await sourceText(source, from, to, dir))
   } catch (e) {
     return textResult((e as Error).message, true)
   }
 }
 
 /** Pages as pictures, about the size Claude reads a page at (the API scales larger ones down anyway). */
-export async function viewSourcePages(source: string, pages: number[]): Promise<CallToolResult> {
+export async function viewSourcePages(dir: string, source: string, pages: number[]): Promise<CallToolResult> {
   try {
-    const name = requireSource(source)
-    const count = await sourcePageCount(name)
+    const name = requireSource(source, dir)
+    const count = await sourcePageCount(name, dir)
     const missing = pages.filter((n) => n > count)
-    const files = await sourcePages(name, pages, 1100)
+    const files = await sourcePages(name, pages, 1100, dir)
     if (!files.length) return textResult(`${name} has ${count} pages; there is no page ${missing.join(', ')}.`, true)
     return {
       content: [
