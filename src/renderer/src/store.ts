@@ -240,6 +240,18 @@ export async function refreshProjects(): Promise<void> {
   set({ projects: await api.listProjects() })
 }
 
+/** Asks where a missing project went; the others that moved with it come back too. */
+export async function locateProject(path: string): Promise<void> {
+  try {
+    const r = await api.locateProject(path)
+    if (!r) return
+    await refreshProjects()
+    toast(r.found ? `Found it, and ${r.found === 1 ? '1 more project' : `${r.found} more projects`} next to it` : 'Found it')
+  } catch (e) {
+    toast(errorText(e), 'error')
+  }
+}
+
 let modelsFor = '' // the account the model list belongs to
 
 export async function refreshClaude(): Promise<void> {

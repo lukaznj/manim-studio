@@ -1,10 +1,10 @@
-import { Check, ChevronLeft, CircleAlert, FolderOpen, Library, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
+import { Check, ChevronLeft, CircleAlert, FolderOpen, FolderSearch, Library, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ComponentState, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { ago, timecode } from '../lib/time'
-import { installComponent, openDialog, openProject, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
+import { installComponent, locateProject, openDialog, openProject, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
 import { ProgressLine } from './ui'
 import { SeriesPanel } from './SeriesPanel'
 
@@ -152,8 +152,8 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
     <article
       className={`project-card ${p.missing ? 'missing' : ''}`}
       style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
-      onClick={() => !p.missing && void openProject(p.path)}
-      onKeyDown={(e) => e.key === 'Enter' && !p.missing && void openProject(p.path)}
+      onClick={() => void (p.missing ? locateProject(p.path) : openProject(p.path))}
+      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && void (p.missing ? locateProject(p.path) : openProject(p.path))}
       tabIndex={0}
     >
       <div className={`thumb ${p.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${p.theme}`}>
@@ -164,7 +164,9 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
         <div className="project-name">{p.name}</div>
         <div className="project-sub">
           {p.missing ? (
-            <span className="badge coral">Folder not found</span>
+            <span className="badge coral" title={p.path}>
+              Folder not found
+            </span>
           ) : (
             <>
               <span className="badge">{p.aspect}</span>
@@ -174,32 +176,50 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
           )}
         </div>
       </div>
-      <button
-        className="icon-btn card-menu"
-        onClick={(e) => {
-          e.stopPropagation()
-          setMenu((m) => !m)
-        }}
-        aria-label="More"
-      >
-        <MoreHorizontal />
-      </button>
-      {menu && (
-        <div className="menu" onMouseLeave={() => setMenu(false)} onClick={(e) => e.stopPropagation()}>
-          {!p.missing && (
-            <button onClick={() => void api.reveal(p.path)}>
-              <FolderOpen /> Show in folder
-            </button>
-          )}
+      {p.missing ? (
+        <div className="missing-actions" onClick={(e) => e.stopPropagation()}>
+          <button className="btn small" onClick={() => void locateProject(p.path)}>
+            <FolderSearch /> Locate…
+          </button>
           <button
+            className="btn small ghost"
+            title="Remove from list"
             onClick={async () => {
               await api.forgetProject(p.path)
               void refreshProjects()
             }}
           >
-            <Trash2 /> Remove from list
+            <Trash2 /> Remove
           </button>
         </div>
+      ) : (
+        <>
+          <button
+            className="icon-btn card-menu"
+            onClick={(e) => {
+              e.stopPropagation()
+              setMenu((m) => !m)
+            }}
+            aria-label="More"
+          >
+            <MoreHorizontal />
+          </button>
+          {menu && (
+            <div className="menu" onMouseLeave={() => setMenu(false)} onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => void api.reveal(p.path)}>
+                <FolderOpen /> Show in folder
+              </button>
+              <button
+                onClick={async () => {
+                  await api.forgetProject(p.path)
+                  void refreshProjects()
+                }}
+              >
+                <Trash2 /> Remove from list
+              </button>
+            </div>
+          )}
+        </>
       )}
     </article>
   )
