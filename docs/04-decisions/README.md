@@ -26,4 +26,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0020-parallel-exports]] | Exports draw slices of the animations in parallel into the shared cache, then render once | accepted |
 | [[0021-render-servers]] | Exports can render on a paired worker (Docker, pairing code with a token); narration stays local | accepted |
 | [[0022-codex-as-second-agent]] | Codex as a second agent: installed on demand, its own sign-in, Studio's tools through the MCP bridge | accepted |
-| [[0023-parallel-series-episodes]] | A series writes every script first, then makes the videos several at a time with background agents | accepted |
+| [[0023-parallel-series-episodes]] | A series writes the scripts in order and makes each video as soon as its script is ready, several at a time | accepted |
