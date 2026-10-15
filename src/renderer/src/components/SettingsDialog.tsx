@@ -9,6 +9,7 @@ import type {
   ComponentState,
   ElevenLabsCheck,
   ElevenLabsUsage,
+  KeyCheck,
   MediaItem,
   PlanUsage,
   ProjectMeta,
@@ -269,6 +270,7 @@ function CodexAccount() {
           />
         </Row>
       )}
+      {installed && settings.hasOpenAIKey && <KeyStatus check={(again) => api.checkOpenAIKey(again)} fix="platform.openai.com → API keys" />}
       {status?.loggedIn && (
         <Row title="Model and effort" text="Which model writes the scenes and how much it reasons first. Also under the chat box.">
           <ModelControls />
@@ -332,11 +334,14 @@ function ClaudeAccount() {
       </Row>
 
       {apiKey ? (
-        <Row title="Anthropic API key" text={settings.hasAnthropicKey ? 'Saved and encrypted on this computer.' : 'A key from console.anthropic.com.'}>
-          <div className="inline-form">
-            <KeyField saved={settings.hasAnthropicKey} placeholder="sk-ant-…" onSave={saveKey} />
-          </div>
-        </Row>
+        <>
+          <Row title="Anthropic API key" text={settings.hasAnthropicKey ? 'Saved and encrypted on this computer.' : 'A key from console.anthropic.com.'}>
+            <div className="inline-form">
+              <KeyField saved={settings.hasAnthropicKey} placeholder="sk-ant-…" onSave={saveKey} />
+            </div>
+          </Row>
+          {settings.hasAnthropicKey && <KeyStatus check={(again) => api.checkAnthropicKey(again)} fix="console.anthropic.com → API keys" />}
+        </>
       ) : (
         <>
           <div className={`account-card ${claude?.loggedIn ? 'on' : ''}`}>
@@ -1037,6 +1042,51 @@ const PERMISSIONS: { key: 'tts' | 'voices' | 'user'; label: string; why: string 
   { key: 'voices', label: 'Voices: Read', why: 'lists the voices' },
   { key: 'user', label: 'User', why: 'the usage meter; optional' },
 ]
+
+/** A saved Anthropic or OpenAI key, tried for real (src/main/keys.ts): what it may do, and what stops it. */
+function KeyStatus({ check, fix }: { check: (again: boolean) => Promise<KeyCheck>; fix: string }) {
+  const [result, setResult] = useState<KeyCheck | null>(null)
+  const [busy, setBusy] = useState(false)
+  const run = async (again = false) => {
+    setBusy(true)
+    try {
+      setResult(await check(again))
+    } catch (e) {
+      setResult({ items: [], problem: errorText(e) })
+    } finally {
+      setBusy(false)
+    }
+  }
+  useEffect(() => void run(), [])
+  return (
+    <div className="el-status">
+      <div className="el-permissions">
+        {!result && (
+          <span className="faint">
+            <span className="spinner" /> Checking the key…
+          </span>
+        )}
+        {result?.items.map((i) => (
+          <span key={i.label} className={i.ok ? 'ok' : 'bad'} title={i.why}>
+            {i.ok ? <Check /> : <X />} {i.label}
+          </span>
+        ))}
+        <button className="link-btn" disabled={busy} onClick={() => void run(true)} title="Tries the key again (one tiny request)">
+          Check again
+        </button>
+      </div>
+      {result?.problem && (
+        <p className="key-error">
+          {result.problem}
+          {result.rejected ? ` Replace it with a key from ${fix}.` : ''}
+        </p>
+      )}
+      {result && !result.problem && result.items.some((i) => !i.ok) && (
+        <p className="key-error">Edit the key at {fix} and allow what’s crossed out, then check again.</p>
+      )}
+    </div>
+  )
+}
 
 /** The saved ElevenLabs key's permissions, tried for real, and this month's characters. */
 function ElevenLabsStatus() {

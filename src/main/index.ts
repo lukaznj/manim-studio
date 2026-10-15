@@ -42,6 +42,7 @@ import {
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
+import { checkAnthropicKey, checkOpenAIKey, keyUsable } from './keys'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
@@ -208,11 +209,18 @@ function registerIpc(): void {
   })
   handle('checkElevenLabsKey', (again?: boolean) => checkElevenLabsKey(undefined, again))
   handle('elevenLabsUsage', () => elevenLabsUsage())
-  handle('setAnthropicKey', (key: string) => setSecret('anthropic', key.trim()))
-  handle('setOpenAIKey', (key: string) => {
+  handle('setAnthropicKey', async (key: string) => {
+    if (key.trim()) await keyUsable('anthropic', key.trim())
+    closeChat() // the next message starts Claude Code with the new key
+    return setSecret('anthropic', key.trim())
+  })
+  handle('checkAnthropicKey', (again?: boolean) => checkAnthropicKey(undefined, again))
+  handle('setOpenAIKey', async (key: string) => {
+    if (key.trim()) await keyUsable('openai', key.trim())
     closeChat() // Codex picks the key up when it starts again
     return setSecret('openai', key.trim())
   })
+  handle('checkOpenAIKey', (again?: boolean) => checkOpenAIKey(undefined, again))
 
   handle('claudeStatus', () => claudeStatus())
   handle('claudeUsage', () => claudeUsage())
