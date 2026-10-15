@@ -2,6 +2,8 @@ import { CircleAlert, CircleCheck, Info } from 'lucide-react'
 import { BoothDialog } from './components/RecordingBooth'
 import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
+import { AddExercisesDialog, LectureDialog, NewExerciseSetDialog } from './components/ExerciseDialogs'
+import { ExercisesView } from './components/ExercisesView'
 import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
 import { QuickDialog } from './components/QuickDialog'
@@ -23,7 +25,7 @@ export function App() {
   return (
     <div className={`app ${window.studio ? '' : 'no-bridge'}`}>
       <TitleBar />
-      <main className="app-main">{ready && (screen === 'home' ? <Home /> : quickHere ? <QuickView /> : <Editor />)}</main>
+      <main className="app-main">{ready && (screen === 'home' ? <Home /> : screen === 'exercises' ? <ExercisesView /> : quickHere ? <QuickView /> : <Editor />)}</main>
       <NewProjectDialog />
       <SettingsDialog />
       <BoothDialog />
@@ -31,6 +33,9 @@ export function App() {
       <QuickDialog />
       <SeriesDialog />
       <UsageDialog />
+      <NewExerciseSetDialog />
+      <AddExercisesDialog />
+      <LectureDialog />
       {screen === 'editor' && !quickHere && <Tour />}
       <div className="toast-stack" aria-live="polite">
         {toasts.map((t) => (
