@@ -14,6 +14,7 @@ import type {
   ProjectSummary,
   Quality,
   QuickRun,
+  ElevenLabsCheck,
   SeriesRun,
   RenderError,
   RenderEvent,
@@ -108,6 +109,7 @@ interface State {
   quickEditor: boolean // show the editor instead of quick mode's progress
   series: SeriesRun | null // a series being made unattended (SeriesPanel.tsx on Home)
   homeSeries: string | null // the series folder Home has open, or null for all projects
+  elevenLabsCheck: ElevenLabsCheck | null // the saved key's permissions, once checked this session
   selection: number[] // clip indices
   recordings: string[]
 
@@ -150,6 +152,7 @@ export const useStore = create<State>(() => ({
   quickEditor: false,
   series: null,
   homeSeries: null,
+  elevenLabsCheck: null,
   selection: [],
   recordings: [],
   chat: [],
