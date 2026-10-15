@@ -43,6 +43,7 @@ One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studi
   - Follow the material: its order, notation, examples and numbers. Explain it rather than read it out, and don't add claims it doesn't make.
   - Rebuild formulas and graphs with `MathTex` and manim so they animate.
   - Show the page itself when the original matters (the exercise as printed, a figure): `pdf_page("notes.pdf", 3)` is page 3, and `crop=(left, top, right, bottom)` keeps part of it, in fractions of the page from its top-left corner. Find the crop with `view_source_pages`.
+- **Thumbnail** — call `self.thumbnail("A short hook")` once, right after the animation that completes the video's key picture: the core idea fully on screen, nothing half-drawn. The hook is 2 to 5 words in the narration language that make someone want to watch ("Why the vertex is the minimum"), not the title. The exported thumbnail shows that frame with the hook and the episode number on its left, so keep the key picture near the middle.
 - **Pacing** — take the time each idea needs to be explained clearly; there is no target length. One idea per section. Leave about 0.5 s of stillness after an important result.
 - **Tone** — Studio tells you the project's tone (professional, warm or playful). Follow it unless the user asks otherwise.
 
