@@ -517,6 +517,47 @@
 .thumb-empty {
   background: #0b1626;
 }
+/* A series on Home: the cover with two more episodes stacked behind it. */
+.thumb.stack img,
+.thumb.stack .thumb-empty {
+  transform: translate(-7px, 7px);
+  box-shadow:
+    7px -7px 0 -1px light-dark(#c4ccd9, #1b2a44),
+    14px -14px 0 -2px light-dark(#d3d9e3, #142139),
+    0 6px 18px -6px light-dark(rgb(15 30 55 / 0.25), rgb(0 0 0 / 0.7));
+}
+.series-card .badge svg {
+  width: 11px;
+  height: 11px;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+.home-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  min-width: 0;
+}
+.home-crumbs strong {
+  font-size: 18px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-crumbs .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.home-crumbs .link-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.home-crumbs .btn {
+  margin-left: auto;
+}
 .thumb.theme-light .thumb-empty {
   background: #f7f8fa;
 }
@@ -534,14 +575,6 @@
   padding: 12px 14px 14px;
   display: grid;
   gap: 6px;
-}
-.series-badge {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: inline-block;
-  line-height: 20px;
 }
 .project-ago {
   white-space: nowrap;

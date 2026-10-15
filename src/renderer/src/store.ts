@@ -106,6 +106,7 @@ interface State {
   quick: QuickRun | null // quick mode's run (QuickView.tsx)
   quickEditor: boolean // show the editor instead of quick mode's progress
   series: SeriesRun | null // a series being made unattended (SeriesPanel.tsx on Home)
+  homeSeries: string | null // the series folder Home has open, or null for all projects
   selection: number[] // clip indices
   recordings: string[]
 
@@ -147,6 +148,7 @@ export const useStore = create<State>(() => ({
   quick: null,
   quickEditor: false,
   series: null,
+  homeSeries: null,
   selection: [],
   recordings: [],
   chat: [],
