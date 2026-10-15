@@ -8,7 +8,7 @@ import { openProject, refreshProjects, useStore } from '../store'
 const LABEL: Record<EpisodeRun['state'], string> = {
   waiting: 'Waiting for its script',
   script: 'Writing the script',
-  scripted: 'Script ready, waiting for an agent',
+  scripted: 'Script ready; its video starts when an agent is free',
   scene: 'Making the video',
   check: 'Checking the render',
   export: 'Exporting',
@@ -34,8 +34,8 @@ export function SeriesPanel() {
       ? `Stopped. ${made} of ${run.episodes.length} episodes were made; the others keep what was done so far.`
       : `${made} of ${run.episodes.length} episodes made${failed ? `, ${failed} didn’t finish: open one to see why, and ask Claude to finish it` : ''}.`
     : scripting >= 0
-      ? `First the scripts, one after another, so each episode builds on the ones before: episode ${scripting + 1} of ${run.episodes.length}.`
-      : `Now the videos, ${run.agents} at a time. Each is exported as soon as it passes the check.`
+      ? `One agent writes the scripts in order, so each episode builds on the ones before (episode ${scripting + 1} of ${run.episodes.length}); ${run.agents > 1 ? `${run.agents - 1 === 1 ? 'the other makes' : `the other ${run.agents - 1} make`} each video as soon as its script is ready` : 'the videos follow once the scripts are written'}.`
+      : `The scripts are written; the videos are being made, ${run.agents} at a time. Each is exported as soon as it passes the check.`
 
   return (
     <section className="setup series-panel" aria-live="polite">

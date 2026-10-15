@@ -256,7 +256,7 @@ export function SeriesDialog() {
               <span className="hint">
                 {codex
                   ? 'One after another, each exported when it’s done.'
-                  : `First every script, one after another, then the videos ${agents} at a time (Settings → Agent), each exported when it’s done.`}{' '}
+                  : `The scripts are written in order, and each video starts as soon as its script is ready, ${agents} agents at a time (Settings → Agent); each is exported when it’s done.`}{' '}
                 Off: the episodes are created, and you make each in the editor.
               </span>
             </span>

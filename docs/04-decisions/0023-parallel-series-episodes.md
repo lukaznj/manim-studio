@@ -11,7 +11,7 @@ An unattended series (ADR 0019) made its episodes one after another, each in the
 
 ## Decision
 
-- **Two passes.** First every episode's script, one after another, each with series.md listing the scripts before it. Then the videos, `seriesAgents` at a time (Settings → Agent, default 3), each with series.md listing every script.
+- **Scripts in order, videos as soon as they can.** One agent writes the episodes' scripts one after another, each with series.md listing what the scripts before it cover. Each episode's video starts as soon as its script is approved, on one of the other agents. Together they never exceed `seriesAgents` (Settings → Agent, default 3): while scripts are still being written, the writer holds one of them. (At first every script was written before any video started; with 15 episodes the first video waited an hour or more.)
 - **Background agents** (`src/main/agent.ts`): one Claude session per episode, outside the window, with the chat's tools and permissions bound to that episode's project (`claude.ts` `studioOptions(dir)`). The video pass resumes the script pass's session. Each records its conversation in the episode's chat.json and commits after each turn, so opening the episode later shows what it did and the chat can carry on.
 - **Per-project renders.** Preview renders, frames and the PDF-source tools take a project folder; the open project's renders still report to the window, the others run unseen. While an agent works on an episode, the chat in that project waits.
 - **Studio's check** (`quick.ts` `checkAndFix`) runs on each episode as in quick mode; a passing episode is queued for export at once and its agent slot goes to the next episode.
