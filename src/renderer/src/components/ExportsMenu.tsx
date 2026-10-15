@@ -1,4 +1,4 @@
-import { CircleAlert, Download, FolderOpen, X } from 'lucide-react'
+import { CircleAlert, Download, FolderOpen, Pause, Play, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ExportJob } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -16,12 +16,20 @@ export function ExportsMenu() {
   const running = jobs.find((j) => j.state === 'running')
   const waiting = jobs.filter((j) => j.state === 'waiting').length
   const failed = jobs.some((j) => j.state === 'failed')
-  const label = running ? (running.percent !== undefined ? `Exporting ${Math.round(running.percent * 100)}%` : 'Exporting…') : waiting ? `${waiting} waiting` : 'Exports'
+  const label = running?.paused
+    ? 'Export paused'
+    : running
+      ? running.percent !== undefined
+        ? `Exporting ${Math.round(running.percent * 100)}%`
+        : 'Exporting…'
+      : waiting
+        ? `${waiting} waiting`
+        : 'Exports'
 
   return (
     <div className="popover-anchor">
       <button className={`exports-pill ${running ? 'busy' : ''} ${failed ? 'failed' : ''}`} onClick={() => setOpen(!open)} title="Exports">
-        {running ? <Ring value={running.percent ?? 0} size={15} /> : failed ? <CircleAlert /> : <Download />}
+        {running?.paused ? <Pause /> : running ? <Ring value={running.percent ?? 0} size={15} /> : failed ? <CircleAlert /> : <Download />}
         {label}
         {running && waiting > 0 && <span className="faint">+{waiting}</span>}
       </button>
@@ -65,12 +73,32 @@ function ExportsPopover({ jobs, onClose }: { jobs: ExportJob[]; onClose: () => v
               ))}
             </div>
             <div className="export-job-actions">
+              {j.state === 'running' && !j.options.server && (
+                <button
+                  className="icon-btn"
+                  onClick={() => void api.pauseExport(j.id, !j.paused)}
+                  title={j.paused ? 'Resume this export' : 'Pause this export'}
+                  aria-label={j.paused ? 'Resume this export' : 'Pause this export'}
+                >
+                  {j.paused ? <Play /> : <Pause />}
+                </button>
+              )}
               {j.result && (
-                <button className="icon-btn" onClick={() => void api.reveal(j.result!.files[0] ?? j.result!.folder)} title={revealLabel}>
+                <button
+                  className="icon-btn"
+                  onClick={() => void api.reveal(j.result!.files[0] ?? j.result!.folder)}
+                  title={revealLabel}
+                  aria-label={revealLabel}
+                >
                   <FolderOpen />
                 </button>
               )}
-              <button className="icon-btn" onClick={() => void api.cancelExport(j.id)} title={active(j) ? 'Stop this export' : 'Remove from the list'}>
+              <button
+                className="icon-btn"
+                onClick={() => void api.cancelExport(j.id)}
+                title={active(j) ? 'Stop this export' : 'Remove from the list'}
+                aria-label={active(j) ? 'Stop this export' : 'Remove from the list'}
+              >
                 <X />
               </button>
             </div>
@@ -86,7 +114,7 @@ function status(j: ExportJob): string {
     case 'waiting':
       return 'Waiting for the export before it'
     case 'running':
-      return `${j.stage ?? 'Starting'}${j.percent !== undefined ? ` · ${Math.round(j.percent * 100)}%` : ''}`
+      return `${j.paused ? 'Paused · ' : ''}${j.stage ?? 'Starting'}${j.percent !== undefined ? ` · ${Math.round(j.percent * 100)}%` : ''}`
     case 'done':
       return `Done · ${j.result?.files.length ?? 0} files in ${j.result?.folder.split(/[\\/]/).pop()}`
     case 'failed':

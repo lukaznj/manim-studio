@@ -1,7 +1,7 @@
-import { ArrowDown, ArrowUp, FileText, Library, Plus, Trash2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowDown, ArrowUp, Check, Circle, FileText, Library, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_TONE, TONES } from '../../../shared/tone'
-import type { Aspect, SeriesPlan, Theme, Tone } from '../../../shared/types'
+import type { Aspect, SeriesPlan, SeriesPlanProgress, Theme, Tone } from '../../../shared/types'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, errorText, toast, useStore } from '../store'
@@ -26,6 +26,8 @@ export function SeriesDialog() {
   const [plan, setPlan] = useState<SeriesPlan | null>(null)
   const [busy, setBusy] = useState<'planning' | 'starting' | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [progress, setProgress] = useState<SeriesPlanProgress | null>(null)
+  const cancelled = useRef(false)
 
   useEffect(() => {
     if (!open) return
@@ -47,13 +49,21 @@ export function SeriesDialog() {
 
   const makePlan = async () => {
     setBusy('planning')
+    setProgress(null)
+    cancelled.current = false
+    const off = api.on('series-plan', setProgress)
     try {
       setPlan(await api.planSeries({ pdfs, title: title.trim() || undefined, language, tone }))
     } catch (e) {
-      toast(errorText(e), 'error')
+      if (!cancelled.current) toast(errorText(e), 'error')
     } finally {
+      off()
       setBusy(null)
     }
+  }
+  const cancelPlan = () => {
+    cancelled.current = true
+    void api.cancelSeriesPlan()
   }
 
   const start = async () => {
@@ -85,7 +95,7 @@ export function SeriesDialog() {
   return (
     <Modal
       open={open}
-      onClose={() => busy !== 'planning' && closeDialog()}
+      onClose={() => (busy === 'planning' ? cancelPlan() : closeDialog())}
       title={plan ? 'The series plan' : 'New series'}
       icon={<Library className="head-icon" />}
       width={760}
@@ -102,25 +112,34 @@ export function SeriesDialog() {
           </>
         ) : (
           <>
-            <button className="btn ghost" disabled={busy === 'planning'} onClick={closeDialog}>
-              Cancel
+            <button className="btn ghost" onClick={busy === 'planning' ? cancelPlan : closeDialog}>
+              {busy === 'planning' ? 'Stop planning' : 'Cancel'}
             </button>
             <button className="btn primary" disabled={!pdfs.length || !!busy} onClick={() => void makePlan()}>
-              {busy === 'planning' ? <span className="spinner" /> : <Library />} {busy === 'planning' ? 'Claude is reading and planning…' : 'Plan the episodes'}
+              {busy === 'planning' ? <span className="spinner" /> : <Library />} {busy === 'planning' ? 'Planning…' : 'Plan the episodes'}
             </button>
           </>
         )
       }
     >
-      {!plan ? (
+      {busy === 'planning' ? (
+        <PlanProgress pdfs={pdfs.map(name)} progress={progress} />
+      ) : !plan ? (
         <div className="modal-body quick-form">
           <p className="hint">
-            Add a course's material, one PDF per lecture for example. Claude reads it all and proposes the episodes: usually one per PDF, merged or split where that
-            makes better videos. You review the plan before anything is made.
+            Add a course's material, one PDF per lecture for example. Claude reads it all and proposes the episodes: usually one per PDF, merged or split where
+            that makes better videos. You review the plan before anything is made.
           </p>
           <div className="field">
             <label htmlFor="series-title">Series title</label>
-            <input id="series-title" className="input" data-autofocus placeholder="Optional: Claude names it from the material" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <input
+              id="series-title"
+              className="input"
+              data-autofocus
+              placeholder="Optional: Claude names it from the material"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
           <div
             className={`series-pdfs ${dragging ? 'dragging' : ''}`}
@@ -204,7 +223,10 @@ export function SeriesDialog() {
           <label className="export-check">
             <input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} />
             <span>
-              Make every episode now, unattended <span className="hint">In quick mode, one after another, each exported when it's done. Off: the episodes are created, and you make each in the editor.</span>
+              Make every episode now, unattended{' '}
+              <span className="hint">
+                In quick mode, one after another, each exported when it's done. Off: the episodes are created, and you make each in the editor.
+              </span>
             </span>
           </label>
         </div>
@@ -220,20 +242,40 @@ export function SeriesDialog() {
                 <span className="series-number mono">{i + 1}</span>
                 <div className="series-episode-body">
                   <input className="input" value={ep.title} onChange={(e) => setEpisode(i, { title: e.target.value })} aria-label={`Episode ${i + 1} title`} />
-                  <textarea className="textarea" rows={2} value={ep.summary} onChange={(e) => setEpisode(i, { summary: e.target.value })} aria-label={`Episode ${i + 1} summary`} />
+                  <textarea
+                    className="textarea"
+                    rows={2}
+                    value={ep.summary}
+                    onChange={(e) => setEpisode(i, { summary: e.target.value })}
+                    aria-label={`Episode ${i + 1} summary`}
+                  />
                   <span className="hint">
                     {ep.sources.map((s) => `${s.file}${s.pages ? ` p. ${s.pages}` : ''}`).join(' · ') || 'No source pages'}
                     {ep.buildsOn?.length ? ` · builds on ${ep.buildsOn.join(', ')}` : ''}
                   </span>
                 </div>
                 <div className="series-episode-actions">
-                  <button className="icon-btn" disabled={i === 0} onClick={() => setPlan({ ...plan, episodes: move(plan.episodes, i, -1) })} aria-label="Earlier">
+                  <button
+                    className="icon-btn"
+                    disabled={i === 0}
+                    onClick={() => setPlan({ ...plan, episodes: move(plan.episodes, i, -1) })}
+                    aria-label="Earlier"
+                  >
                     <ArrowUp />
                   </button>
-                  <button className="icon-btn" disabled={i === plan.episodes.length - 1} onClick={() => setPlan({ ...plan, episodes: move(plan.episodes, i, 1) })} aria-label="Later">
+                  <button
+                    className="icon-btn"
+                    disabled={i === plan.episodes.length - 1}
+                    onClick={() => setPlan({ ...plan, episodes: move(plan.episodes, i, 1) })}
+                    aria-label="Later"
+                  >
                     <ArrowDown />
                   </button>
-                  <button className="icon-btn" onClick={() => setPlan({ ...plan, episodes: plan.episodes.filter((_, j) => j !== i) })} aria-label="Remove this episode">
+                  <button
+                    className="icon-btn"
+                    onClick={() => setPlan({ ...plan, episodes: plan.episodes.filter((_, j) => j !== i) })}
+                    aria-label="Remove this episode"
+                  >
                     <Trash2 />
                   </button>
                 </div>
@@ -247,5 +289,75 @@ export function SeriesDialog() {
         </div>
       )}
     </Modal>
+  )
+}
+
+/** What planning is doing: each PDF as it's read, then the episodes as the agent writes them. */
+function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlanProgress | null }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const clock = (since = now) => {
+    const s = Math.max(0, Math.round((now - since) / 1000))
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  }
+  const reading = !progress || progress.stage === 'reading'
+  const pages = progress?.read.reduce((n, r) => n + r.pages, 0) ?? 0
+  const episodes = progress?.episodes ?? []
+  return (
+    <div className="modal-body series-progress" aria-live="polite">
+      <div className="series-progress-head">
+        <strong>
+          {reading
+            ? `Reading PDF ${progress?.index ?? 1} of ${pdfs.length}`
+            : progress.stage === 'bible'
+              ? 'Writing the series bible'
+              : episodes.length
+                ? `Planning episode ${episodes.length}`
+                : 'Claude is reading the material and planning'}
+        </strong>
+        <span className="mono faint">{clock(progress?.startedAt)}</span>
+      </div>
+      {reading && (
+        <ol className="quick-steps">
+          {pdfs.map((file, i) => {
+            const read = progress?.read[i]
+            const state = read ? 'done' : reading && (progress?.index ?? 1) === i + 1 ? 'now' : 'todo'
+            return (
+              <li key={i} className={state}>
+                {state === 'done' ? <Check /> : state === 'now' ? <span className="spinner" /> : <Circle />}
+                <span className="series-progress-name">{file}</span>
+                {read && <span className="mono faint">{read.pages} pages</span>}
+              </li>
+            )
+          })}
+        </ol>
+      )}
+      {!reading && (
+        <>
+          <div className="series-progress-head">
+            <span className="muted">
+              Read {pdfs.length} PDFs, {pages} pages.{' '}
+              {!episodes.length
+                ? 'The episodes appear here as Claude writes them; this usually takes a few minutes.'
+                : progress.stage === 'bible'
+                  ? `The ${episodes.length} episodes:`
+                  : `Episodes so far (${episodes.length}):`}
+            </span>
+          </div>
+          {episodes.length > 0 && (
+            <ol className="series-progress-episodes">
+              {episodes.map((t, i) => (
+                <li key={i}>
+                  <span className="series-number mono">{i + 1}</span> {t}
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
+      )}
+    </div>
   )
 }

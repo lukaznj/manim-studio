@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path'
 import type { ProjectMeta, Quality, RenderError, RenderEvent, Theme, Timeline } from '../shared/types'
 import { commitAll } from './git'
 import { readTimeline, requireProject } from './projects'
-import { runRunner } from './runner'
+import { killJob, pauseTag, runRunner } from './runner'
 import { getSettings } from './settings'
 import { voiceEnv } from './voice'
 
@@ -45,6 +45,7 @@ export interface RenderVariant {
 
 export function render(quality: Quality, variant: RenderVariant = {}): Promise<RenderOutcome> {
   running.get(quality)?.cancel()
+  if (quality === 'preview') pauseTag('preview', false) // asking for a render means you want it to run
   const p = requireProject()
   const id = nextId++
   const expectedClips = readTimeline(p.path, quality)?.clips.length ?? readTimeline(p.path)?.clips.length ?? 0
@@ -55,7 +56,7 @@ export function render(quality: Quality, variant: RenderVariant = {}): Promise<R
   const entry: Running = {
     cancel: () => {
       cancelled = true
-      child?.kill()
+      if (child) killJob(child)
     },
     outcome: Promise.resolve({ cancelled: true }),
   }
@@ -76,12 +77,13 @@ export function render(quality: Quality, variant: RenderVariant = {}): Promise<R
             ]
       const job = await runRunner<{ result: Timeline }>('default', ['render', p.path, '--quality', quality, ...options], {
         extraEnv: await voiceEnv(p.meta, p.path),
+        tag: quality === 'preview' ? 'preview' : undefined,
         onEvent: (e) => {
           if (e.type === 'progress') send({ id, quality, type: 'progress', clips: Number(e.clips), t: Number(e.t) })
         },
       })
       child = job.child
-      if (cancelled) child.kill()
+      if (cancelled) killJob(child)
       const { result } = await job.done.finally(() => (log = job.log()))
       send({ id, quality, type: 'done', timeline: result })
       if (quality === 'preview') void afterPreview(p.path, result)
@@ -116,7 +118,7 @@ export async function renderFinal(
   dir: string,
   meta: ProjectMeta,
   variant: RenderVariant,
-  opts: { cacheDir?: string; partialDir?: string; signal?: AbortSignal; onProgress?: (t: number) => void; offlineVoice?: boolean } = {},
+  opts: { cacheDir?: string; partialDir?: string; signal?: AbortSignal; onProgress?: (t: number) => void; offlineVoice?: boolean; tag?: string } = {},
 ): Promise<Timeline> {
   const args = ['render', dir, '--quality', 'final']
   if (variant.theme) args.push('--theme', variant.theme)
@@ -129,6 +131,7 @@ export async function renderFinal(
     extraEnv: { ...(await voiceEnv(meta, dir)), ...(opts.cacheDir ? { STUDIO_CACHE_DIR: opts.cacheDir } : {}), ...(opts.partialDir ? { STUDIO_PARTIAL_DIR: opts.partialDir } : {}), ...(opts.offlineVoice ? { STUDIO_VOICE_OFFLINE: '1' } : {}) },
     onEvent: (e) => e.type === 'progress' && opts.onProgress?.(Number(e.t)),
     signal: opts.signal,
+    tag: opts.tag,
   })
   try {
     return (await job.done).result

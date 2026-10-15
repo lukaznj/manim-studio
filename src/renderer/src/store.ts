@@ -41,6 +41,7 @@ export interface RenderState {
   t?: number
   error?: RenderError
   startedAt?: number
+  paused?: boolean // the preview render's processes are stopped (TitleBar's pause)
 }
 
 export type Dialog =
@@ -393,6 +394,12 @@ export async function saveScene(opts: { render?: boolean } = {}): Promise<void> 
   await api.saveScene(source)
   set({ savedSource: source, dirty: false, conflict: null })
   if (opts.render ?? get().settings?.autoRender ?? true) void renderNow()
+}
+
+/** Pauses or resumes the preview render in progress. */
+export async function pausePreview(paused: boolean): Promise<void> {
+  await api.pauseRender(paused)
+  set((s) => (s.render.status === 'rendering' ? { render: { ...s.render, paused } } : {}))
 }
 
 export async function renderNow(quality: Quality = 'preview'): Promise<void> {

@@ -83,6 +83,34 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.render-pill > svg {
+  width: 12px;
+  height: 12px;
+}
+.render-pill.paused {
+  background: var(--raised);
+  color: var(--text-2);
+}
+/* Pause and stop inside a pill: small round buttons that don't grow it. */
+.pill-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: -4px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.pill-btn:hover {
+  background: light-dark(rgb(0 0 0 / 0.08), rgb(255 255 255 / 0.12));
+}
+.pill-btn svg {
+  width: 11px;
+  height: 11px;
+}
 .render-pill .spinner {
   width: 11px;
   height: 11px;
@@ -1454,6 +1482,50 @@
 .quick-steps li.now {
   color: var(--text);
   font-weight: 600;
+}
+.quick-steps li.failed svg {
+  color: var(--coral);
+}
+.quick-series {
+  margin-top: 8px;
+}
+.quick-series summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.series-progress {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 320px;
+}
+.series-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.series-progress-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.series-progress-episodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.series-progress-episodes li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  animation: fade-up 0.25s ease;
 }
 .quick-activity {
   font-size: 12.5px;

@@ -32,7 +32,7 @@ export function snapshotProject(project: string, to: string): void {
 }
 
 /** Exports `project` by rendering a copy of it in `work` (an empty folder the caller removes). */
-export async function exportVideo(project: string, work: string, options: ExportOptions, progress: Progress, signal?: AbortSignal): Promise<ExportResult> {
+export async function exportVideo(project: string, work: string, options: ExportOptions, progress: Progress, signal?: AbortSignal, tag?: string): Promise<ExportResult> {
   progress({ stage: 'Copying the project' })
   const snap = join(work, 'project')
   snapshotProject(project, snap)
@@ -69,7 +69,7 @@ export async function exportVideo(project: string, work: string, options: Export
     if (options.server) {
       // On a render server (ADR 0021): the narration is made here first, since the server has no voice.
       progress({ stage: 'Making the narration' })
-      await (await runRunner('default', ['render', snap, '--quality', 'preview', '--voice-only', '--out', 'voice-only'], { extraEnv: await voiceEnv(meta, snap), signal })).done
+      await (await runRunner('default', ['render', snap, '--quality', 'preview', '--voice-only', '--out', 'voice-only'], { extraEnv: await voiceEnv(meta, snap), signal, tag })).done
       progress({ stage: 'Packing the project' })
       const archive = join(work, 'project.tar.gz')
       await packProject(snap, archive)
@@ -85,17 +85,18 @@ export async function exportVideo(project: string, work: string, options: Export
     } else
       for (const theme of themes) {
         const stage = themes.length > 1 ? `Rendering the ${theme} version` : 'Rendering at full quality'
-        const parts = await renderSlices(snap, meta, { theme, size, fps }, join(project, '.studio', 'cache'), animations, (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }), signal)
+        const parts = await renderSlices(snap, meta, { theme, size, fps }, join(project, '.studio', 'cache'), animations, (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }), signal, tag)
         progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage })
         await renderFinal(snap, meta, { theme, out: `final-${theme}`, size, fps }, {
           cacheDir: join(project, '.studio', 'cache'),
           signal,
+          tag,
           onProgress: (t) => progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, percent: duration ? Math.min(t / duration, 1) : undefined }),
         })
         progress({ stage: 'Saving the video' })
         const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
         const base = join(folder, themes.length > 1 ? `${slug}.${theme}` : slug)
-        await (await runRunner('default', ['export', timeline, base], { signal })).done
+        await (await runRunner('default', ['export', timeline, base], { signal, tag })).done
         keep(theme, base, timeline)
       }
     files.push(join(folder, `${slug}.${original}.srt`), join(folder, `${slug}.${original}.vtt`))
@@ -111,6 +112,7 @@ export async function exportVideo(project: string, work: string, options: Export
       const job = await runRunner<{ files: string[]; warnings: string[] }>('default', args, {
         extraEnv: env,
         signal,
+        tag,
         onEvent: (e) => {
           if (e.type === 'progress') progress({ stage: `Voicing ${name}`, percent: Number(e.done) / Number(e.total) })
         },
@@ -142,6 +144,7 @@ async function renderSlices(
   animations: number,
   progress: (percent: number, slices: number) => void,
   signal?: AbortSignal,
+  tag?: string,
 ): Promise<number> {
   const slices = sliceCount(animations, availableParallelism(), totalmem())
   if (slices < 2) return 1
@@ -157,7 +160,7 @@ async function renderSlices(
         snap,
         meta,
         { ...variant, out: `slice-${i}`, from: i * size, upto: i === slices - 1 ? undefined : (i + 1) * size - 1 },
-        { cacheDir: join(own, 'cache'), partialDir: join(own, 'partial'), signal, offlineVoice: true },
+        { cacheDir: join(own, 'cache'), partialDir: join(own, 'partial'), signal, offlineVoice: true, tag },
       ).finally(() => progress(++done / slices, slices))
       return { pieces: join(own, 'partial'), shared: join(cacheDir, 'partial', `${timeline.width}x${timeline.height}@${Math.round(timeline.fps)}`) }
     }),
