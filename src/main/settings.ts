@@ -52,8 +52,9 @@ export function setSettings(patch: Partial<Settings>): Settings {
   return cache
 }
 
+/** Most recent first. No limit: it's Home's list of projects, and a series adds a dozen at once (Open Recent shows 10). */
 export function rememberProject(path: string): void {
-  const recent = [path, ...getSettings().recentProjects.filter((p) => p !== path)].slice(0, 30)
+  const recent = [path, ...getSettings().recentProjects.filter((p) => p !== path)]
   setSettings({ recentProjects: recent })
 }
 

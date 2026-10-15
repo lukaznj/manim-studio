@@ -62,6 +62,10 @@ export function listProjects(): ProjectSummary[] {
       else if (existsSync(join(dir, 'series.json'))) for (const ep of readdirSync(dir)) if (existsSync(metaFile(join(dir, ep)))) found.add(join(dir, ep))
     }
   }
+  // Remember what the scan found too, so a project moved out of the projects folder shows as
+  // "Folder not found" (and can be located) instead of vanishing.
+  const unknown = [...found].filter((dir) => !recentProjects.includes(dir))
+  if (unknown.length) setSettings({ recentProjects: [...recentProjects, ...unknown] })
   const out: ProjectSummary[] = []
   for (const dir of found) {
     if (!existsSync(metaFile(dir))) {
