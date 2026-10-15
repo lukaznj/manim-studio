@@ -1,0 +1,91 @@
+import { useEffect, useMemo, useState, type RefObject } from 'react'
+import type { Section } from '../../../shared/types'
+import { api } from '../lib/api'
+import { useStore } from '../store'
+
+const RATES = [0.75, 1, 1.25, 1.5, 2]
+
+function saved(key: string): number {
+  try {
+    return Number(localStorage.getItem(`watch:${key}`)) || 0
+  } catch {
+    return 0
+  }
+}
+
+function save(key: string, t: number): void {
+  try {
+    localStorage.setItem(`watch:${key}`, String(Math.round(t)))
+  } catch {
+    // a viewer convenience only
+  }
+}
+
+/**
+ * A finished video to study (the exercises and Watch screens): chapters, speed, subtitles, and the
+ * spot where it was left, per video, on this computer. Its position goes to the store, so a chat
+ * question says where in the video it was asked.
+ */
+export function StudyPlayer(props: { src: string; vtt?: string; chapters: Section[]; video: RefObject<HTMLVideoElement | null>; resume?: boolean }) {
+  const { src, vtt, video } = props
+  const [rate, setRate] = useState(1)
+  const [now, setNow] = useState(0)
+  const chapters = useMemo(() => props.chapters.filter((c) => c.end > c.start), [props.chapters])
+  useEffect(() => {
+    if (video.current) video.current.playbackRate = rate
+  }, [rate, src])
+  useEffect(() => () => useStore.setState({ watchTime: null }), [])
+
+  const seek = (t: number) => {
+    if (!video.current) return
+    video.current.currentTime = t + 0.01
+    void video.current.play()
+  }
+
+  return (
+    <section className="ex-player">
+      <video
+        ref={video}
+        key={src}
+        className="ex-video"
+        src={api.mediaUrl(src)}
+        controls
+        preload="metadata"
+        onTimeUpdate={(e) => {
+          const t = e.currentTarget.currentTime
+          setNow(t)
+          useStore.setState({ watchTime: t })
+          if (props.resume && Math.round(t) % 5 === 0) save(src, t)
+        }}
+        onLoadedMetadata={(e) => {
+          const v = e.currentTarget
+          v.playbackRate = rate
+          const at = props.resume ? saved(src) : 0
+          if (at > 3 && at < v.duration - 5) v.currentTime = at // where it was left, unless near either end
+          useStore.setState({ watchTime: v.currentTime })
+        }}
+      >
+        {vtt && <track kind="subtitles" src={api.mediaUrl(vtt)} default label="Subtitles" />}
+      </video>
+      <div className="ex-player-bar">
+        <div className="ex-chapters" role="list" aria-label="Chapters">
+          {chapters.map((c) => (
+            <button key={`${c.name}-${c.start}`} role="listitem" className={`ex-chapter ${now >= c.start && now < c.end ? 'on' : ''}`} onClick={() => seek(c.start)}>
+              {c.name || '—'}
+            </button>
+          ))}
+        </div>
+        <label className="ex-rate">
+          <span className="faint">Speed</span>
+          <select className="select small" value={rate} onChange={(e) => setRate(Number(e.target.value))}>
+            {RATES.map((r) => (
+              <option key={r} value={r}>
+                {r}×
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </section>
+  )
+}

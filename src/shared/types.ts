@@ -37,6 +37,7 @@ export interface ProjectMeta {
   tone?: Tone // unset: warm
   series?: SeriesRef // an episode of a series
   exercise?: ExerciseRef // an exercise in an exercise set (ADR 0025)
+  extra?: { of: string; at: number; request: string } // a follow-up video to an episode (its folder name), asked for while watching (ADR 0028)
   captionBand?: boolean // keeps text out of the bottom band, where viewers' subtitles go (ADR 0027); projects made since 0.6
   scriptFirst?: boolean // Claude plans script.md and gets it approved before writing scene.py (ADR 0016)
   claudeSessionId?: string
@@ -54,6 +55,7 @@ export interface ProjectSummary {
   missing?: boolean
   series?: SeriesRef
   exercise?: ExerciseRef
+  extra?: boolean // a follow-up video: listed under its episode on the Watch screen, not on Home
 }
 
 /** Where an episode sits in its series (src/main/series.ts). */
@@ -178,6 +180,43 @@ export interface ExerciseHit {
   title: string
   topic?: string
   snippet: string
+}
+
+// --- watching a series (src/main/watch.ts, ADR 0028) -------------------------------------------------
+
+/** A follow-up video the viewer asked for, explaining part of an episode further. */
+export interface FollowUp {
+  dir: string
+  title: string
+  at: number // where in the episode it was asked
+  request: string
+  state: 'making' | 'done' | 'failed'
+  activity?: string
+  error?: string
+  video?: string
+}
+
+export interface WatchEpisode {
+  dir: string
+  number: number
+  title: string
+  video?: string // the exported video, else none (the preview plays meanwhile)
+  followUps: FollowUp[]
+}
+
+export interface WatchSeries {
+  folder: string
+  title: string
+  episodes: WatchEpisode[]
+}
+
+/** One video on the Watch screen: what plays, its chapters and its words. */
+export interface WatchDetail {
+  video?: string // exported
+  vtt?: string
+  preview?: string
+  chapters: Section[]
+  subtitles: Subtitle[]
 }
 
 /** What series planning is doing, step by step (src/main/series.ts planSeries). */
@@ -597,6 +636,7 @@ export interface ChatRequest {
   text: string
   context?: ChatContext
   frameAt?: number
+  watchingAt?: number // the moment of the finished video the viewer asks about (Watch and exercise screens)
   source?: SourceRef
 }
 
@@ -676,7 +716,7 @@ export interface VoiceOption {
 }
 
 export type EventChannel =
-  'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'series-plan' | 'series' | 'exercises' | 'open-project' | 'menu'
+  'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'series-plan' | 'series' | 'exercises' | 'watch' | 'open-project' | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -779,6 +819,13 @@ export interface StudioApi {
   searchExercises(query: string): Promise<ExerciseHit[]>
   /** Joins the exercises' videos, in order, into one lecture video in the set's folder. */
   makeLecture(folder: string, dirs: string[]): Promise<void>
+
+  /** A series as its Watch screen shows it: episodes with their videos and follow-ups. */
+  watchSeries(folder: string): Promise<WatchSeries>
+  watchDetail(dir: string): Promise<WatchDetail>
+  /** Makes a new video explaining the part of an episode at `at` further, as the viewer asks. */
+  requestFollowUp(dir: string, at: number, request: string): Promise<void>
+  retryFollowUp(dir: string): Promise<void>
   renderServers(): Promise<RenderServer[]>
   /** Pairs with a render worker from the code it printed; checks that it answers first. */
   addServer(code: string): Promise<RenderServer[]>
@@ -850,6 +897,7 @@ export interface StudioApi {
   on(channel: 'series-plan', cb: (p: SeriesPlanProgress) => void): () => void
   on(channel: 'series', cb: (run: SeriesRun | null) => void): () => void
   on(channel: 'exercises', cb: (set: ExerciseSet) => void): () => void
+  on(channel: 'watch', cb: (series: WatchSeries) => void): () => void
   /** script.md changed on disk (Claude wrote it), or was removed (null). */
   on(channel: 'script', cb: (e: { text: string | null }) => void): () => void
 }

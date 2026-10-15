@@ -42,6 +42,7 @@ import {
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
+import { requestFollowUp, retryFollowUp, setupWatch, watchDetail, watchSeries } from './watch'
 import { checkAnthropicKey, checkOpenAIKey, keyUsable } from './keys'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
@@ -334,6 +335,10 @@ function registerIpc(): void {
   handle('removeExercise', (dir: string) => ex.removeExercise(dir))
   handle('searchExercises', (query: string) => ex.searchExercises(query))
   handle('makeLecture', (folder: string, dirs: string[]) => ex.makeLecture(folder, dirs))
+  handle('watchSeries', (folder: string) => watchSeries(folder))
+  handle('watchDetail', (dir: string) => watchDetail(dir))
+  handle('requestFollowUp', (dir: string, at: number, request: string) => requestFollowUp(dir, at, request))
+  handle('retryFollowUp', (dir: string) => retryFollowUp(dir))
   handle('renderServers', () => listServers())
   handle('addServer', (code: string) => addServer(code))
   handle('removeServer', (id: string) => removeServer(id))
@@ -417,6 +422,7 @@ app.whenReady().then(() => {
   setupQuick({ send: (run) => send('quick', run), openInWindow })
   setupSeries((run) => send('series', run))
   ex.setupExercises((set) => send('exercises', set))
+  setupWatch((series) => send('watch', series))
   onSetupEvent((e) => send('setup', e))
   onWorkerLog((e) => send('setup', e))
   onChatEvent((e) => send('chat', e))
