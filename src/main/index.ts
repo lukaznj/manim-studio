@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell, systemPreferences } from 'electron'
 import { createReadStream, existsSync, statSync } from 'node:fs'
-import { join, normalize, resolve, sep } from 'node:path'
+import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import type { EventChannel, ExportOptions, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
 import {
@@ -40,6 +40,7 @@ import {
   writeEpisodeBible,
 } from './series'
 import { addServer, checkServer, listServers, removeServer } from './remote'
+import { movedSeriesFolder, relocate } from './relocate'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
@@ -252,6 +253,22 @@ function registerIpc(): void {
     refreshMenu()
   })
   handle('forgetProject', (path: string) => setSettings({ recentProjects: getSettings().recentProjects.filter((p) => p !== path) }))
+  handle('locateProject', async (from: string) => {
+    let near = dirname(from)
+    while (!existsSync(near) && dirname(near) !== near) near = dirname(near)
+    const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory'], title: `Where is ${basename(from)} now?`, defaultPath: near })
+    const to = r.filePaths[0]
+    if (!to) return null
+    if (!existsSync(join(to, 'project.json'))) throw new Error('That folder has no project.json, so it is not a Manim Studio project.')
+    const { recent, moved } = relocate(getSettings().recentProjects, from, to)
+    for (const [, dir] of moved) {
+      const folder = movedSeriesFolder(dir)
+      if (folder) projects.updateMetaAt(dir, { series: { ...projects.readMeta(dir).series!, folder } })
+    }
+    setSettings({ recentProjects: recent })
+    refreshMenu()
+    return { path: to, found: moved.length - 1 }
+  })
   handle('reveal', (path: string) => shell.showItemInFolder(normalize(path))) // the renderer joins with /
   handle('saveScene', (source: string) => projects.saveScene(source))
   handle('updateMeta', (patch: Partial<ProjectMeta>) => projects.updateMeta(patch))
