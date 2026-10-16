@@ -1,16 +1,16 @@
-import { Check, ChevronLeft, CircleAlert, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
+import { Check, ChevronLeft, CircleAlert, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ComponentState, ExerciseSet, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { ago, timecode } from '../lib/time'
-import { installComponent, locateProject, openDialog, openExerciseSet, openProject, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
+import { installComponent, locateProject, openDialog, openExerciseSet, openProject, openWatch, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
 import { ProgressLine } from './ui'
 import { SeriesPanel } from './SeriesPanel'
 
 export function Home() {
   const all = useStore((s) => s.projects)
-  const projects = useMemo(() => all.filter((p) => !p.exercise), [all]) // exercises show in their set's card
+  const projects = useMemo(() => all.filter((p) => !p.exercise && !p.extra), [all]) // exercises show in their set's card, follow-ups under their episode
   const sets = useStore((s) => s.exerciseSets)
   const setup = useStore((s) => s.setup)
   const claude = useStore((s) => s.claude)
@@ -73,6 +73,9 @@ export function Home() {
               <span className="faint">/</span>
               <strong>{inSeries[0].series!.title}</strong>
               <span className="faint">{inSeries.length === 1 ? '1 episode' : `${inSeries.length} episodes`}</span>
+              <button className="btn small" onClick={() => void openWatch(inSeries[0].series!.folder)} title="Study the series: the videos, a transcript and a chat that knows where you are">
+                <Play /> Watch
+              </button>
               <button className="btn small ghost" onClick={() => void api.reveal(inSeries[0].series!.folder)}>
                 <FolderOpen /> {revealLabel}
               </button>

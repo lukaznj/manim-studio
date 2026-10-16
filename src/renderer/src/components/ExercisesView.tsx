@@ -1,5 +1,5 @@
-import { Check, CircleAlert, Code2, Film, FolderOpen, MessageCircleQuestion, Pause, Play, Plus, RotateCcw, Search, Sparkles, Trash2, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, CircleAlert, Code2, Eye, Film, FolderOpen, MessageCircleQuestion, Pause, Play, Plus, RotateCcw, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import type { ExerciseDetail, ExerciseHit, ExerciseItem, ExerciseSet, Section } from '../../../shared/types'
 import { fold } from '../../../shared/exercise'
 import { api } from '../lib/api'
@@ -7,6 +7,8 @@ import { revealLabel } from '../lib/platform'
 import { errorText, openDialog, openExerciseSet, selectExercise, toast, useStore } from '../store'
 import { ChatPane } from './ChatPane'
 import { Markdown } from './Markdown'
+import { StudyPlayer } from './StudyPlayer'
+import { WatchedToggle } from './WatchView'
 
 const LABEL: Record<ExerciseItem['state'], string> = {
   waiting: 'Waiting to be solved',
@@ -50,7 +52,7 @@ function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: strin
         <h2 className="ex-set-title">{set.title}</h2>
         <p className="faint">
           {set.items.length === 1 ? '1 exercise' : `${set.items.length} exercises`}
-          {set.items.length ? `, ${done} with a video` : ''}
+          {set.items.length ? `, ${done} with a video, ${set.items.filter((i) => i.watched).length} watched` : ''}
           {set.level ? ` · ${set.level}` : ''}
         </p>
         <label className="ex-search">
@@ -120,7 +122,7 @@ function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: strin
 }
 
 function StateIcon({ item, paused }: { item: ExerciseItem; paused: boolean }) {
-  if (item.state === 'done') return <Check className="ex-state-icon done" />
+  if (item.state === 'done') return item.watched ? <Eye className="ex-state-icon watched" /> : <Check className="ex-state-icon done" />
   if (item.state === 'failed') return <CircleAlert className="ex-state-icon failed" />
   if (['solving', 'video', 'export'].includes(item.state)) return <span className="spinner" />
   if (paused) return <Pause className="ex-state-icon" />
@@ -202,6 +204,7 @@ function ExerciseMain({ item }: { item: ExerciseItem }) {
           <h1>{item.title}</h1>
         </div>
         <div className="ex-detail-actions">
+          {item.video && <WatchedToggle dir={item.dir} watched={!!item.watched} />}
           {item.state === 'failed' && (
             <button className="btn small" onClick={() => void api.retryExercise(item.dir).catch((e) => toast(errorText(e), 'error'))}>
               <RotateCcw /> Try again
@@ -287,14 +290,7 @@ function ExerciseMain({ item }: { item: ExerciseItem }) {
 }
 
 function ExercisePlayer({ item, detail, video }: { item: ExerciseItem; detail: ExerciseDetail | null; video: React.RefObject<HTMLVideoElement | null> }) {
-  const [rate, setRate] = useState(1)
-  const [now, setNow] = useState(0)
   const src = item.video ?? detail?.preview
-  const chapters = useMemo(() => (detail?.chapters ?? []).filter((c) => c.end > c.start), [detail])
-  useEffect(() => {
-    if (video.current) video.current.playbackRate = rate
-  }, [rate, src])
-
   if (!src)
     return (
       <section className="ex-card ex-player-wait faint">
@@ -309,49 +305,16 @@ function ExercisePlayer({ item, detail, video }: { item: ExerciseItem; detail: E
       </section>
     )
   return (
-    <section className="ex-player">
-      <video
-        ref={video}
-        key={src}
-        className="ex-video"
-        src={api.mediaUrl(src)}
-        controls
-        preload="metadata"
-        onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => (e.currentTarget.playbackRate = rate)}
-      >
-        {item.video && item.subtitles && <track kind="subtitles" src={api.mediaUrl(item.subtitles)} default label="Subtitles" />}
-      </video>
-      <div className="ex-player-bar">
-        <div className="ex-chapters" role="list" aria-label="Chapters">
-          {chapters.map((c) => (
-            <button
-              key={`${c.name}-${c.start}`}
-              role="listitem"
-              className={`ex-chapter ${now >= c.start && now < c.end ? 'on' : ''}`}
-              onClick={() => {
-                if (!video.current) return
-                video.current.currentTime = c.start + 0.01
-                void video.current.play()
-              }}
-            >
-              {c.name || '—'}
-            </button>
-          ))}
-        </div>
-        <label className="ex-rate">
-          <span className="faint">Speed</span>
-          <select className="select small" value={rate} onChange={(e) => setRate(Number(e.target.value))}>
-            {[0.75, 1, 1.25, 1.5, 2].map((r) => (
-              <option key={r} value={r}>
-                {r}×
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+    <>
+      <StudyPlayer
+        src={src}
+        vtt={item.video ? item.subtitles : undefined}
+        chapters={detail?.chapters ?? []}
+        video={video}
+        onWatched={() => item.video && !item.watched && void api.setWatched(item.dir, true)}
+      />
       {!item.video && <p className="faint ex-preview-note">The preview, until the video is exported.</p>}
-    </section>
+    </>
   )
 }
 

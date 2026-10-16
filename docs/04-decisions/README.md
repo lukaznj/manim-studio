@@ -31,3 +31,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0025-exercise-sets]] | Exercise sets: exercises read from text, pictures and PDFs; a checked written solution first, then a short video each | accepted |
 | [[0026-thumbnail-card]] | The exported thumbnail is a card: the scene's marked key picture, a hook, the episode number and the series name | accepted |
 | [[0027-subtitle-band]] | New projects keep the bottom of the frame (and, in portrait, the right edge) clear of text for viewers' subtitles; a layout warning, not a rule | accepted |
+| [[0028-watching-a-series]] | A series can be watched: study player, synced transcript, a chat that knows the moment, follow-up videos per episode | accepted |

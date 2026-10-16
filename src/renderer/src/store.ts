@@ -17,6 +17,7 @@ import type {
   ElevenLabsCheck,
   ExerciseSet,
   SeriesRun,
+  WatchSeries,
   RenderError,
   RenderEvent,
   SetupStatus,
@@ -83,7 +84,7 @@ export type Dialog =
   | null
 
 interface State {
-  screen: 'home' | 'editor' | 'exercises'
+  screen: 'home' | 'editor' | 'exercises' | 'watch'
   app: AppInfo | null
   settings: Settings | null
   setup: SetupStatus | null
@@ -115,6 +116,8 @@ interface State {
   homeSeries: string | null // the series folder Home has open, or null for all projects
   exerciseSets: ExerciseSet[] // Home's cards
   exerciseSet: ExerciseSet | null // the set on the exercises screen (ExercisesView.tsx)
+  watchSeries: WatchSeries | null // the series on the Watch screen (WatchView.tsx)
+  watchTime: number | null // where the study player is, for the chat; null without a video
   elevenLabsCheck: ElevenLabsCheck | null // the saved key's permissions, once checked this session
   selection: number[] // clip indices
   recordings: string[]
@@ -160,6 +163,8 @@ export const useStore = create<State>(() => ({
   homeSeries: null,
   exerciseSets: [],
   exerciseSet: null,
+  watchSeries: null,
+  watchTime: null,
   elevenLabsCheck: null,
   selection: [],
   recordings: [],
@@ -238,6 +243,7 @@ export async function boot(): Promise<void> {
   api.on('quick', (quick) => set((s) => ({ quick, quickEditor: quick?.id === s.quick?.id ? s.quickEditor : false })))
   void api.quickRun().then((quick) => set({ quick }))
   api.on('series', (series) => set({ series }))
+  api.on('watch', (w) => set((st) => (st.watchSeries?.folder === w.folder ? { watchSeries: w } : {})))
   api.on('exercises', (s) => {
     set((st) => ({
       exerciseSet: st.exerciseSet?.folder === s.folder ? s : st.exerciseSet,
@@ -270,12 +276,27 @@ export async function openExerciseSet(folder: string, dir?: string): Promise<voi
 }
 
 /** Opens the exercise as the project (for the chat), staying on the exercises screen. */
-export async function selectExercise(dir: string): Promise<void> {
+export const selectExercise = (dir: string) => selectStudied(dir, 'exercises')
+
+/** Opens a project for the chat while its video is studied (the exercises and Watch screens). */
+async function selectStudied(dir: string, screen: 'exercises' | 'watch'): Promise<void> {
   if (get().project?.path === dir) return
   if (get().dirty) await saveScene()
   const opened = await guard(api.openProject(dir))
-  if (opened) applyOpened(opened, 'exercises')
+  if (opened) applyOpened(opened, screen)
+  set({ watchTime: null })
 }
+
+/** A series' Watch screen (WatchView.tsx): with `dir`, that episode or follow-up, else the first. */
+export async function openWatch(folder: string, dir?: string): Promise<void> {
+  const watchSeries = await guard(api.watchSeries(folder))
+  if (!watchSeries) return
+  withTransition(() => set({ screen: 'watch', watchSeries }))
+  const pick = dir ?? (get().project?.meta.series?.folder === folder ? get().project!.path : watchSeries.episodes[0]?.dir)
+  if (pick) await selectWatched(pick)
+}
+
+export const selectWatched = (dir: string) => selectStudied(dir, 'watch')
 
 export async function createExerciseSet(req: Parameters<typeof api.createExerciseSet>[0]): Promise<boolean> {
   const folder = await guard(api.createExerciseSet(req))
@@ -424,7 +445,7 @@ function applyOpened(o: OpenProject, screen: State['screen'] = 'editor'): void {
     project: { path: o.path, meta: o.meta },
     savedSource: o.source,
     // An episode made by hand starts with its request ready in the chat; Claude's brief has the rest.
-    ...(o.meta.series && !o.chat.length && get().quick?.project !== o.path ? { chatDraft: 'Make this episode.' } : {}),
+    ...(screen === 'editor' && o.meta.series && !o.meta.extra && !o.chat.length && get().quick?.project !== o.path ? { chatDraft: 'Make this episode.' } : {}),
     script: o.script,
     dirty: false,
     stale: false,
@@ -456,7 +477,7 @@ function firstRunTour(): void {
 export async function closeProject(): Promise<void> {
   if (get().dirty) await saveScene()
   await api.closeProject()
-  withTransition(() => set({ screen: 'home', exerciseSet: null, project: null, timeline: null, chat: [], selection: [], historyOpen: false, chatSource: null }))
+  withTransition(() => set({ screen: 'home', exerciseSet: null, watchSeries: null, watchTime: null, project: null, timeline: null, chat: [], selection: [], historyOpen: false, chatSource: null }))
   void refreshProjects()
 }
 
@@ -603,7 +624,15 @@ export async function sendChat(text: string, withFrame: boolean): Promise<boolea
       }
     : undefined
   try {
-    await api.chatSend({ text, context, frameAt: withFrame && timeline ? playback.time : undefined, source: get().chatSource ?? undefined })
+    const { screen, watchTime } = get()
+    const studying = screen === 'exercises' || screen === 'watch'
+    await api.chatSend({
+      text,
+      context: studying ? undefined : context,
+      frameAt: !studying && withFrame && timeline ? playback.time : undefined,
+      watchingAt: studying && watchTime !== null ? watchTime : undefined,
+      source: get().chatSource ?? undefined,
+    })
     set({ chatSource: null })
     return true
   } catch (e) {
