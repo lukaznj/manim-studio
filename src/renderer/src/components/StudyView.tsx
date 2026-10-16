@@ -1,9 +1,10 @@
-import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { Captions, Plus, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { addCourseExercises, openDialog, useStore } from '../store'
 import { ChatPane } from './ChatPane'
 import { ExerciseActions, ExerciseEmpty, ExerciseHits, ExerciseMain, ExerciseRows, ExerciseSearch, useExerciseHits } from './ExerciseView'
 import { EpisodeRow, Watched } from './LessonView'
+import { findInTranscript, Transcript } from './Transcript'
 
 /**
  * A course to study (ADR 0030): its lessons (a series' episodes with their follow-ups, or one video)
@@ -16,6 +17,18 @@ export function StudyView() {
   const path = useStore((s) => s.project?.path)
   const [query, setQuery] = useState('')
   const hits = useExerciseHits(query)
+  const tab = useStore((s) => s.studyTab)
+  // Cmd/Ctrl+F searches what the video says.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        findInTranscript()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   if (!series && !set) return null
 
   const single = !!series && series.episodes.length === 1 && series.episodes[0].dir === series.folder // a video on its own
@@ -23,6 +36,17 @@ export function StudyView() {
   const followUp = episode?.followUps.find((f) => f.dir === path)
   const item = set?.items.find((i) => i.dir === path)
   const both = !!series && !!set
+  const version = item ? `${item.state}:${item.video ?? ''}` : `${episode?.video ?? ''}:${followUp?.state ?? ''}`
+  const tabs = (
+    <div className="pane-tabs" role="tablist" aria-label="Transcript or chat">
+      <button role="tab" aria-selected={tab === 'transcript'} className="file-tab" onClick={() => useStore.setState({ studyTab: 'transcript' })}>
+        <Captions /> Transcript
+      </button>
+      <button role="tab" aria-selected={tab === 'chat'} className="file-tab" onClick={() => useStore.setState({ studyTab: 'chat' })}>
+        <Sparkles className="claude-mark" /> Chat
+      </button>
+    </div>
+  )
 
   const parts = [
     series &&
@@ -78,7 +102,15 @@ export function StudyView() {
           <div className="ex-empty faint">Choose a lesson or an exercise.</div>
         )}
       </main>
-      <aside className="ex-chat">{path ? <ChatPane /> : <div className="ex-empty faint">The chat opens with the first exercise.</div>}</aside>
+      <aside className="ex-chat">
+        {!path ? (
+          <div className="ex-empty faint">The chat opens with the first exercise.</div>
+        ) : tab === 'transcript' ? (
+          <Transcript key={path} dir={path} version={version} head={tabs} />
+        ) : (
+          <ChatPane head={tabs} />
+        )}
+      </aside>
     </div>
   )
 }

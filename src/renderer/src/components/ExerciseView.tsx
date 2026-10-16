@@ -4,7 +4,7 @@ import type { ExerciseDetail, ExerciseHit, ExerciseItem, ExerciseSet, Section } 
 import { fold } from '../../../shared/exercise'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
-import { canEdit, errorText, openDialog, openExerciseSet, selectStudied, toast, useStore } from '../store'
+import { askInChat, canEdit, errorText, openDialog, openExerciseSet, selectStudied, toast, useStore } from '../store'
 import { Markdown } from './Markdown'
 import { StudyPlayer } from './StudyPlayer'
 import { WatchedToggle } from './LessonView'
@@ -198,7 +198,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
     const chapters = detail?.chapters ?? []
     return chapters.find((c) => fold(c.name).trim() === fold(title).trim()) ?? chapters.filter((c) => fold(c.name) !== 'exercise')[i]
   }
-  const ask = (text: string) => useStore.setState({ chatDraft: text })
+  const ask = askInChat
   const hasVideo = !!(item.video ?? detail?.preview)
 
   return (

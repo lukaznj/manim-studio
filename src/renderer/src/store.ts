@@ -119,6 +119,7 @@ interface State {
   // The study screen (StudyView.tsx, ADR 0030) shows a course: its lessons, its exercises, or both.
   exerciseSet: ExerciseSet | null // its exercises
   watchSeries: WatchSeries | null // its lessons (a series, or a single video)
+  studyTab: 'transcript' | 'chat' // the study screen's right column (ADR 0032)
   watchTime: number | null // where the study player is, for the chat; null without a video
   elevenLabsCheck: ElevenLabsCheck | null // the saved key's permissions, once checked this session
   selection: number[] // clip indices
@@ -166,6 +167,7 @@ export const useStore = create<State>(() => ({
   exerciseSets: [],
   exerciseSet: null,
   watchSeries: null,
+  studyTab: 'transcript',
   watchTime: null,
   elevenLabsCheck: null,
   selection: [],
@@ -297,6 +299,11 @@ export async function selectStudied(dir: string): Promise<void> {
   const opened = await guard(api.openProject(dir))
   if (opened) applyOpened(opened, 'study')
   set({ watchTime: null })
+}
+
+/** A question about what's being studied: into the chat's box, with the chat shown. */
+export function askInChat(text: string): void {
+  set({ chatDraft: text, studyTab: 'chat' })
 }
 
 /** "Add exercises" on a course: its own set is made the first time, then the usual dialog. */
