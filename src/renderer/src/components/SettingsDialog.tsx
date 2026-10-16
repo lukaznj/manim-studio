@@ -26,6 +26,7 @@ import { encodeWav } from '../lib/audio'
 import { resetTime } from '../lib/time'
 import { shortcut } from '../lib/platform'
 import {
+  canEdit,
   closeDialog,
   errorText,
   installComponent,
@@ -34,6 +35,7 @@ import {
   refreshUsage,
   renderNow,
   startTour,
+  switchMode,
   toast,
   updateMeta,
   updateSettings,
@@ -55,6 +57,7 @@ export function SettingsDialog() {
     if (dialog?.kind === 'settings') setTab(dialog.tab ?? 'account')
   }, [dialog])
 
+  const learn = useStore((s) => !canEdit(s))
   return (
     <Modal open={open} onClose={closeDialog} title="Settings" icon={<Settings2 className="head-icon" />} width={720}>
       <div className="settings-tabs">
@@ -64,7 +67,7 @@ export function SettingsDialog() {
           items={[
             { value: 'account', label: 'Agent' },
             { value: 'voice', label: 'Voice' },
-            { value: 'video', label: 'Video' },
+            ...(learn ? [] : [{ value: 'video' as const, label: 'Video' }]), // the editor's preview and timeline
             { value: 'env', label: 'Environment' },
             { value: 'about', label: 'General' },
           ]}
@@ -156,6 +159,7 @@ const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1
 
 /** Settings → Agent: who writes the scenes, Claude or Codex (ADR 0022), and its sign-in and model. */
 function AccountTab() {
+  const editing = useStore((s) => canEdit(s))
   const agent = useStore((s) => s.settings!.agent)
   const seriesAgents = useStore((s) => s.settings!.seriesAgents)
   const pick = async (next: Agent) => {
@@ -191,7 +195,7 @@ function AccountTab() {
         />
       </Row>
       {agent === 'codex' ? <CodexAccount /> : <ClaudeAccount />}
-      <ClaudeDesktopRow />
+      {editing && <ClaudeDesktopRow />}
     </div>
   )
 }
@@ -929,6 +933,24 @@ function AboutTab() {
                 : ''
   return (
     <div className="set-group">
+      <Row
+        title="How you use Manim Studio"
+        text={
+          settings.mode === 'learn'
+            ? 'Learn: courses and exercises become videos to study, with a chat to ask about them. No editor.'
+            : 'Create: the full studio, with the editor, the timeline and exports for publishing.'
+        }
+      >
+        <Tabs
+          radio="How you use Manim Studio"
+          value={settings.mode ?? 'create'}
+          onChange={(mode) => void switchMode(mode)}
+          items={[
+            { value: 'learn', label: 'Learn' },
+            { value: 'create', label: 'Create' },
+          ]}
+        />
+      </Row>
       <Row title="Appearance" text="System follows your computer’s light or dark setting.">
         <Tabs
           radio="Appearance"
@@ -1020,11 +1042,13 @@ function AboutTab() {
           Change
         </button>
       </Row>
-      <Row title="Tutorial" text="A short tour of the editor: the code, Claude, the timeline, media, narration and export.">
-        <button className="btn small" disabled={!project} title={project ? undefined : 'Open a project first'} onClick={startTour}>
-          Show the tutorial
-        </button>
-      </Row>
+      {canEdit({ settings }) && (
+        <Row title="Tutorial" text="A short tour of the editor: the code, Claude, the timeline, media, narration and export.">
+          <button className="btn small" disabled={!project} title={project ? undefined : 'Open a project first'} onClick={startTour}>
+            Show the tutorial
+          </button>
+        </Row>
+      )}
       <Row title="Releases" text="If an automatic update fails, download the new version from the releases page.">
         <button className="btn small ghost" onClick={() => void api.openExternal(app.releasesUrl)}>
           Open

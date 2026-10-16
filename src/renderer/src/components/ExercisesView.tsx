@@ -1,10 +1,26 @@
-import { Check, CircleAlert, Code2, Eye, Film, FolderOpen, MessageCircleQuestion, Pause, Play, Plus, RotateCcw, Search, Sparkles, Trash2, X } from 'lucide-react'
+import {
+  Check,
+  CircleAlert,
+  Code2,
+  Eye,
+  Film,
+  FolderOpen,
+  MessageCircleQuestion,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  Search,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ExerciseDetail, ExerciseHit, ExerciseItem, ExerciseSet, Section } from '../../../shared/types'
 import { fold } from '../../../shared/exercise'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
-import { errorText, openDialog, openExerciseSet, selectExercise, toast, useStore } from '../store'
+import { canEdit, errorText, openDialog, openExerciseSet, selectExercise, toast, useStore } from '../store'
 import { ChatPane } from './ChatPane'
 import { Markdown } from './Markdown'
 import { StudyPlayer } from './StudyPlayer'
@@ -57,7 +73,13 @@ function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: strin
         </p>
         <label className="ex-search">
           <Search />
-          <input className="input" placeholder="Search all exercises" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search all exercises" />
+          <input
+            className="input"
+            placeholder="Search all exercises"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search all exercises"
+          />
           {query && (
             <button className="icon-btn" aria-label="Clear the search" onClick={() => setQuery('')}>
               <X />
@@ -71,7 +93,10 @@ function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: strin
           {!hits.length && <li className="ex-none faint">No exercise mentions “{query}”.</li>}
           {hits.map((h) => (
             <li key={h.dir}>
-              <button className={`ex-row ${h.dir === selected ? 'on' : ''}`} onClick={() => void (h.set === set.folder ? selectExercise(h.dir) : openExerciseSet(h.set, h.dir))}>
+              <button
+                className={`ex-row ${h.dir === selected ? 'on' : ''}`}
+                onClick={() => void (h.set === set.folder ? selectExercise(h.dir) : openExerciseSet(h.set, h.dir))}
+              >
                 <span className="ex-num mono">{h.number}</span>
                 <span className="ex-row-body">
                   <span className="ex-row-title">{h.title}</span>
@@ -91,7 +116,11 @@ function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: strin
                 <span className="ex-row-body">
                   <span className="ex-row-title">{it.title}</span>
                   <span className="ex-row-state">
-                    {it.state === 'done' ? it.topic || 'Done' : set.paused && ['waiting', 'solved'].includes(it.state) ? 'Paused' : (it.activity ?? LABEL[it.state])}
+                    {it.state === 'done'
+                      ? it.topic || 'Done'
+                      : set.paused && ['waiting', 'solved'].includes(it.state)
+                        ? 'Paused'
+                        : (it.activity ?? LABEL[it.state])}
                   </span>
                 </span>
                 <StateIcon item={it} paused={!!set.paused} />
@@ -106,7 +135,12 @@ function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: strin
           <Plus /> Add exercises
         </button>
         <div className="ex-side-actions">
-          <button className="btn small ghost" disabled={!done} title={done ? undefined : 'Once an exercise has its video'} onClick={() => openDialog({ kind: 'lecture' })}>
+          <button
+            className="btn small ghost"
+            disabled={!done}
+            title={done ? undefined : 'Once an exercise has its video'}
+            onClick={() => openDialog({ kind: 'lecture' })}
+          >
             <Film /> Lecture video
           </button>
           {(working || set.paused) && (
@@ -170,13 +204,18 @@ function ExerciseEmpty({ set }: { set: ExerciseSet }) {
   return (
     <div className="ex-empty">
       <Sparkles />
-      <p>{set.intake?.state === 'reading' ? 'Your exercises show up here as soon as they’re read.' : 'Add exercises to start: type them, paste a screenshot or add pictures and PDFs.'}</p>
+      <p>
+        {set.intake?.state === 'reading'
+          ? 'Your exercises show up here as soon as they’re read.'
+          : 'Add exercises to start: type them, paste a screenshot or add pictures and PDFs.'}
+      </p>
     </div>
   )
 }
 
 /** The selected exercise: what's asked, the video, and the written solution step by step. */
 function ExerciseMain({ item }: { item: ExerciseItem }) {
+  const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
   const [detail, setDetail] = useState<ExerciseDetail | null>(null)
   const video = useRef<HTMLVideoElement>(null)
   useEffect(() => {
@@ -210,9 +249,11 @@ function ExerciseMain({ item }: { item: ExerciseItem }) {
               <RotateCcw /> Try again
             </button>
           )}
-          <button className="btn small ghost" title="The code, timeline and voice of this video" onClick={() => useStore.setState({ screen: 'editor' })}>
-            <Code2 /> Open in editor
-          </button>
+          {editing && (
+            <button className="btn small ghost" title="The code, timeline and voice of this video" onClick={() => useStore.setState({ screen: 'editor' })}>
+              <Code2 /> Open in editor
+            </button>
+          )}
           <button className="icon-btn" title={revealLabel} aria-label={revealLabel} onClick={() => void api.reveal(item.dir)}>
             <FolderOpen />
           </button>
@@ -282,7 +323,15 @@ function ExerciseMain({ item }: { item: ExerciseItem }) {
         </section>
       ) : (
         <section className="ex-card ex-pending faint">
-          {item.state === 'failed' ? 'No written solution yet.' : ['solving'].includes(item.state) ? <><span className="spinner" /> {item.activity ?? 'Solving'}…</> : 'The written solution shows up here once it’s solved.'}
+          {item.state === 'failed' ? (
+            'No written solution yet.'
+          ) : ['solving'].includes(item.state) ? (
+            <>
+              <span className="spinner" /> {item.activity ?? 'Solving'}…
+            </>
+          ) : (
+            'The written solution shows up here once it’s solved.'
+          )}
         </section>
       )}
     </div>

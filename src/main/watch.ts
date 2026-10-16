@@ -63,6 +63,11 @@ function followUp(dir: string): FollowUp {
 /** The series' episodes in order (series.json), each with its exported video and follow-ups. */
 export function watchSeries(folder: string): WatchSeries {
   const file = join(folder, 'series.json')
+  if (!existsSync(file) && existsSync(join(folder, 'project.json'))) {
+    // A single video (Learn mode watches every video here): a list of one.
+    const meta = readMeta(folder)
+    return { folder, title: meta.name, episodes: [{ dir: folder, number: 1, title: meta.name, video: exported(folder), watched: isWatched(folder), followUps: [] }] }
+  }
   if (!existsSync(file)) throw new Error('That folder isn’t a series any more (its series.json is gone).')
   const { plan, episodes } = JSON.parse(readFileSync(file, 'utf8')) as { plan: { title: string }; episodes: string[] }
   const extras = join(folder, 'extras')
@@ -148,10 +153,7 @@ export async function retryFollowUp(dir: string): Promise<void> {
   void make(dir, readMeta(episode), meta.extra.at, meta.extra.request)
 }
 
-const changed = (dir: string) => {
-  const folder = readMeta(dir).series?.folder
-  if (folder) send(watchSeries(folder))
-}
+const changed = (dir: string) => send(watchSeries(readMeta(dir).series?.folder ?? dir))
 
 async function make(dir: string, episode: ProjectMeta, at: number, request: string): Promise<void> {
   const run: { activity?: string } = { activity: 'Starting' }

@@ -1,10 +1,40 @@
-import { Check, ChevronLeft, CircleAlert, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Sigma, Sparkles, Terminal, Trash2, Zap } from 'lucide-react'
+import {
+  Check,
+  ChevronLeft,
+  CircleAlert,
+  FolderOpen,
+  FolderSearch,
+  GraduationCap,
+  Library,
+  MoreHorizontal,
+  Play,
+  Plus,
+  Sigma,
+  Sparkles,
+  Terminal,
+  Trash2,
+  Zap,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ComponentState, ExerciseSet, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { ago, timecode } from '../lib/time'
-import { installComponent, locateProject, openDialog, openExerciseSet, openProject, openWatch, pickAndOpenProject, refreshClaude, refreshProjects, toast, errorText, useStore } from '../store'
+import {
+  canEdit,
+  installComponent,
+  locateProject,
+  openDialog,
+  openExerciseSet,
+  openProject,
+  openWatch,
+  pickAndOpenProject,
+  refreshClaude,
+  refreshProjects,
+  toast,
+  errorText,
+  useStore,
+} from '../store'
 import { ProgressLine } from './ui'
 import { SeriesPanel } from './SeriesPanel'
 
@@ -12,13 +42,14 @@ export function Home() {
   const all = useStore((s) => s.projects)
   const projects = useMemo(() => all.filter((p) => !p.exercise && !p.extra), [all]) // exercises show in their set's card, follow-ups under their episode
   const sets = useStore((s) => s.exerciseSets)
+  const editing = useStore((s) => canEdit(s)) // Learn mode: a library to watch, no editor (ADR 0029)
   const setup = useStore((s) => s.setup)
   const claude = useStore((s) => s.claude)
   const needsSetup = !!setup && (setup.env !== 'ready' || setup.latex !== 'ready' || (claude && !claude.loggedIn))
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n' && canEdit()) {
         e.preventDefault()
         openDialog({ kind: 'new-project' })
       }
@@ -37,13 +68,19 @@ export function Home() {
       <div className="home-inner">
         <header className="home-head">
           <div>
-            <h1>Projects</h1>
-            <p className="muted">Each project is one video: a scene in code, its voice and its subtitles.</p>
+            <h1>{editing ? 'Projects' : 'Library'}</h1>
+            <p className="muted">
+              {editing
+                ? 'Each project is one video: a scene in code, its voice and its subtitles.'
+                : 'Your courses, exercises and videos, to watch and ask about.'}
+            </p>
           </div>
           <div className="home-actions">
-            <button className="btn ghost" onClick={() => void pickAndOpenProject()}>
-              <FolderOpen /> Open folder…
-            </button>
+            {editing && (
+              <button className="btn ghost" onClick={() => void pickAndOpenProject()}>
+                <FolderOpen /> Open folder…
+              </button>
+            )}
             <button className="btn large" onClick={() => openDialog({ kind: 'exercises' })} title="Exercises in, worked solutions and short videos out">
               <GraduationCap /> Exercises
             </button>
@@ -53,9 +90,11 @@ export function Home() {
             <button className="btn large" onClick={() => openDialog({ kind: 'quick' })} title="Describe it, attach PDFs, and Studio makes and exports it">
               <Zap /> Quick video
             </button>
-            <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
-              <Plus /> New project
-            </button>
+            {editing && (
+              <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
+                <Plus /> New project
+              </button>
+            )}
           </div>
         </header>
 
@@ -73,7 +112,11 @@ export function Home() {
               <span className="faint">/</span>
               <strong>{inSeries[0].series!.title}</strong>
               <span className="faint">{inSeries.length === 1 ? '1 episode' : `${inSeries.length} episodes`}</span>
-              <button className="btn small" onClick={() => void openWatch(inSeries[0].series!.folder)} title="Study the series: the videos, a transcript and a chat that knows where you are">
+              <button
+                className="btn small"
+                onClick={() => void openWatch(inSeries[0].series!.folder)}
+                title="Study the series: the videos, a transcript and a chat that knows where you are"
+              >
                 <Play /> Watch
               </button>
               <button className="btn small ghost" onClick={() => void api.reveal(inSeries[0].series!.folder)}>
@@ -161,7 +204,8 @@ function SeriesCard({ folder, episodes, index }: { folder: string; episodes: Pro
   const first = episodes[0]
   const cover = episodes.find((e) => e.thumbnail) ?? first
   const latest = Math.max(...episodes.map((e) => e.updatedAt))
-  const open = () => useStore.setState({ homeSeries: folder })
+  // Learn mode watches a series; Create opens its episodes to edit.
+  const open = () => (canEdit() ? useStore.setState({ homeSeries: folder }) : void openWatch(folder))
   return (
     <article
       className="project-card series-card"
@@ -276,11 +320,26 @@ function EmptyState() {
         <path d="M54 22 Q93.1 154.6 132.2 61.8" fill="none" stroke="var(--sun)" strokeWidth="3" strokeLinecap="round" className="draw" />
         <circle cx="132.2" cy="61.8" r="6" fill="var(--blue)" className="pop" />
       </svg>
-      <h2>Every video starts with an empty scene</h2>
-      <p className="muted">Pick a format, describe what to show, and Claude writes the animation, the narration and the subtitles with you.</p>
-      <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
-        <Plus /> New project
-      </button>
+      {canEdit() ? (
+        <>
+          <h2>Every video starts with an empty scene</h2>
+          <p className="muted">Pick a format, describe what to show, and Claude writes the animation, the narration and the subtitles with you.</p>
+        </>
+      ) : (
+        <>
+          <h2>Learn anything with a video made for you</h2>
+          <p className="muted">Describe a topic, add your notes or exercises, and Claude makes explained videos you can watch and ask about.</p>
+        </>
+      )}
+      {canEdit() ? (
+        <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
+          <Plus /> New project
+        </button>
+      ) : (
+        <button className="btn primary large" onClick={() => openDialog({ kind: 'quick' })}>
+          <Zap /> Make a video to learn from
+        </button>
+      )}
     </div>
   )
 }

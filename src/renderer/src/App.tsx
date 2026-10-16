@@ -1,10 +1,12 @@
 import { CircleAlert, CircleCheck, Info } from 'lucide-react'
+import { useEffect } from 'react'
 import { BoothDialog } from './components/RecordingBooth'
 import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
 import { AddExercisesDialog, LectureDialog, NewExerciseSetDialog } from './components/ExerciseDialogs'
 import { ExercisesView } from './components/ExercisesView'
 import { WatchView } from './components/WatchView'
+import { ModeChoice } from './components/ModeChoice'
 import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
 import { QuickDialog } from './components/QuickDialog'
@@ -14,7 +16,7 @@ import { SettingsDialog } from './components/SettingsDialog'
 import { TitleBar } from './components/TitleBar'
 import { UsageDialog } from './components/UsageDialog'
 import { Tour } from './components/Tour'
-import { useStore } from './store'
+import { canEdit, leaveEditor, useStore } from './store'
 
 export function App() {
   const screen = useStore((s) => s.screen)
@@ -22,11 +24,29 @@ export function App() {
   const toasts = useStore((s) => s.toasts)
   // Quick mode shows its progress instead of the editor, until you ask for the editor.
   const quickHere = useStore((s) => !!s.quick && s.quick.project === s.project?.path && !s.quickEditor)
+  const learn = useStore((s) => !canEdit(s))
+  const editorBarred = learn && screen === 'editor' && !quickHere
+  useEffect(() => {
+    if (editorBarred) void leaveEditor()
+  }, [editorBarred])
 
   return (
     <div className={`app ${window.studio ? '' : 'no-bridge'}`}>
       <TitleBar />
-      <main className="app-main">{ready && (screen === 'home' ? <Home /> : screen === 'exercises' ? <ExercisesView /> : screen === 'watch' ? <WatchView /> : quickHere ? <QuickView /> : <Editor />)}</main>
+      <main className="app-main">
+        {ready &&
+          (screen === 'home' ? (
+            <Home />
+          ) : screen === 'exercises' ? (
+            <ExercisesView />
+          ) : screen === 'watch' ? (
+            <WatchView />
+          ) : quickHere ? (
+            <QuickView />
+          ) : editorBarred ? null : (
+            <Editor />
+          ))}
+      </main>
       <NewProjectDialog />
       <SettingsDialog />
       <BoothDialog />
@@ -37,7 +57,8 @@ export function App() {
       <NewExerciseSetDialog />
       <AddExercisesDialog />
       <LectureDialog />
-      {screen === 'editor' && !quickHere && <Tour />}
+      <ModeChoice />
+      {screen === 'editor' && !quickHere && !learn && <Tour />}
       <div className="toast-stack" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>

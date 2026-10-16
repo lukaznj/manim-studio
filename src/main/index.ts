@@ -201,7 +201,7 @@ function registerIpc(): void {
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
     // Another sign-in method means another Claude Code process: the next message starts it.
     if ('claudeAuth' in patch || 'agent' in patch) closeChat()
-    if (patch.appearance || patch.recentProjects) refreshMenu()
+    if (patch.appearance || patch.recentProjects || patch.mode) refreshMenu()
     return settings
   })
   handle('setElevenLabsKey', async (key: string) => {
