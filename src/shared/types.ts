@@ -761,12 +761,13 @@ export interface StudioApi {
   setGeminiKey(key: string): Promise<Settings>
   checkGeminiKey(again?: boolean): Promise<KeyCheck>
 
-  claudeStatus(): Promise<ClaudeStatus>
+  /** The chosen agent's sign-in, or `agent`'s (Settings → Accounts). */
+  claudeStatus(agent?: Agent): Promise<ClaudeStatus>
   /** Plan limits used, or null with an API key or when Claude Code can't tell. */
   claudeUsage(): Promise<PlanUsage | null>
-  claudeLogin(): Promise<ClaudeStatus>
-  claudeLoginCode(code: string): Promise<void>
-  claudeLogout(): Promise<ClaudeStatus>
+  claudeLogin(agent?: Agent): Promise<ClaudeStatus>
+  claudeLoginCode(code: string, agent?: Agent): Promise<void>
+  claudeLogout(agent?: Agent): Promise<ClaudeStatus>
 
   listProjects(): Promise<ProjectSummary[]>
   createProject(input: NewProjectInput): Promise<string>

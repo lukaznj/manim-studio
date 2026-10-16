@@ -6,6 +6,12 @@
 // and Linux (studio_runner/agy_login.py), in a console window on Windows; or the user's Gemini API
 // key. The app never reads a token.
 //
+// Each project has a home of its own for the CLI (homeFor): its settings, permission rules, brief
+// and Studio's tools name that project, so the chat and background agents in different projects
+// run at once. The sign-in is shared: it lives in the system's keyring (the macOS keychain, linked
+// into every home; Windows' Credential Manager; Linux's Secret Service), or, without one, in a token
+// file in the main home that each project home links to.
+//
 // Containment, measured on 1.3.6 (ADR 0031): no --dangerously-skip-permissions (it also approves
 // leaving the sandbox), so headless runs refuse everything the rules don't allow. The rules allow
 // writing in the project only, reading the project and the studio and manim sources, and the six
@@ -14,8 +20,10 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   chmodSync,
+  copyFileSync,
   createWriteStream,
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   readdirSync,
@@ -26,7 +34,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { app } from 'electron'
@@ -52,10 +60,32 @@ const DEFAULT_MODEL = 'gemini-4-argon' // confirmed with `agy models`: gemini-4-
 
 const root = () => join(app.getPath('userData'), 'antigravity')
 const binDir = () => join(root(), AGY_VERSION)
-/** The CLI's own home: its settings, rules, MCP config and sign-in. Kept across versions. */
+/** The CLI's main home: its sign-in (or the link to it), and the home of status checks and sign-in. Kept across versions. */
 export const agyHome = (): string => join(root(), 'home')
-const cliDir = () => join(agyHome(), '.gemini', 'antigravity-cli')
-const tokenFile = () => join(cliDir(), 'antigravity-oauth-token')
+const cliDir = (home = agyHome()) => join(home, '.gemini', 'antigravity-cli')
+const TOKEN = 'antigravity-oauth-token' // the CLI's sign-in when there's no keyring
+const tokenFile = (home = agyHome()) => join(cliDir(home), TOKEN)
+
+/** A project's own home for the CLI: its settings, rules, Studio's tools and conversations. */
+export function homeFor(project: string): string {
+  const real = existsSync(project) ? realpathSync(project) : resolve(project)
+  return join(root(), 'projects', createHash('sha256').update(real).digest('hex').slice(0, 16))
+}
+
+/** A project home signs in as the main one: the keychain linked (macOS), the token file linked when there is one. */
+async function shareSignIn(home: string): Promise<void> {
+  await ensureKeychain(home)
+  if (home === agyHome()) return
+  const own = tokenFile(home)
+  rmSync(own, { force: true }) // a stale copy, or the user signed out
+  if (!existsSync(tokenFile())) return
+  mkdirSync(cliDir(home), { recursive: true })
+  try {
+    linkSync(tokenFile(), own) // one file: the CLI refreshing it in place serves every home
+  } catch {
+    copyFileSync(tokenFile(), own)
+  }
+}
 const KEYCHAIN_ITEM = 'antigravity' // the service the CLI stores its sign-in under (macOS: seen in its keychain prompt)
 
 /**
@@ -66,11 +96,11 @@ const KEYCHAIN_ITEM = 'antigravity' // the service the CLI stores its sign-in un
  * themselves; its settings and rules stay in its own folder. (A separate keychain in the folder
  * can't be unlocked on macOS 27.)
  */
-async function ensureKeychain(): Promise<void> {
+async function ensureKeychain(home = agyHome()): Promise<void> {
   if (process.platform !== 'darwin') return
-  const link = join(agyHome(), 'Library', 'Keychains')
+  const link = join(home, 'Library', 'Keychains')
   if (existsSync(link) || lstatExists(link)) return
-  mkdirSync(join(agyHome(), 'Library'), { recursive: true })
+  mkdirSync(join(home, 'Library'), { recursive: true })
   symlinkSync(join(homedir(), 'Library', 'Keychains'), link)
 }
 
@@ -151,28 +181,30 @@ function run(cmd: string, args: string[], env?: Record<string, string>, cwd?: st
 const apiKey = () => getSecret('gemini')
 
 /** The CLI's environment: no inherited agent or Google variables, its own home, no self-updates. */
-function agyEnv(): Record<string, string> {
-  const env = agyEnvBase()
+function agyEnv(home = agyHome()): Record<string, string> {
+  const env = agyEnvBase(home)
   const key = apiKey()
   if (key) env.GEMINI_API_KEY = key
   return env
 }
 
-function agyEnvBase(): Record<string, string> {
+function agyEnvBase(home = agyHome()): Record<string, string> {
   const env = Object.fromEntries(
     Object.entries(cleanEnv()).filter(([k, v]) => v !== undefined && !/^(GEMINI|GOOGLE|AGY|ANTIGRAVITY|JETSKI|CLOUDSDK)_/.test(k)),
   ) as Record<string, string>
-  env.HOME = agyHome()
-  if (process.platform === 'win32') env.USERPROFILE = agyHome()
+  env.HOME = home
+  if (process.platform === 'win32') env.USERPROFILE = home
   env.AGY_CLI_DISABLE_AUTO_UPDATE = '1' // the pinned, checked version stays the one that runs
   return env
 }
 
 /**
- * The CLI's settings, Studio's tools and Studio's brief for a run in `dir`. Written before every
- * run: the project, the key and the instructions change.
+ * The CLI's settings, Studio's tools and Studio's brief for a run in `project`, in the project's
+ * own home. Written before every run: the key and the instructions change. Returns the home.
  */
-function prepare(project: string, instructions: string): void {
+async function prepare(project: string, instructions: string): Promise<string> {
+  const home = homeFor(project)
+  await shareSignIn(home)
   // The CLI checks real paths (it follows symlinks, and /var is /private/var on macOS), so the rules name them.
   const real = (p: string) => (existsSync(p) ? realpathSync(p) : p)
   const dir = real(project)
@@ -184,15 +216,18 @@ function prepare(project: string, instructions: string): void {
     `read_file(${real(site)})`,
     // Its own working files: the pictures Studio's tools return (brain/…) and the tools' descriptions (mcp/…).
     // Not its whole folder, which holds its sign-in.
-    `read_file(${real(join(cliDir(), 'brain'))})`,
-    `read_file(${real(join(cliDir(), 'mcp'))})`,
+    `read_file(${real(join(cliDir(home), 'brain'))})`,
+    `read_file(${real(join(cliDir(home), 'mcp'))})`,
     ...Object.keys(sceneTools).map((t) => `mcp(studio/${t})`),
   ]
-  mkdirSync(join(cliDir(), 'rules'), { recursive: true })
-  mkdirSync(join(agyHome(), '.gemini', 'config', 'rules'), { recursive: true })
+  mkdirSync(join(cliDir(home), 'rules'), { recursive: true })
+  mkdirSync(join(cliDir(home), 'brain'), { recursive: true })
+  mkdirSync(join(cliDir(home), 'mcp'), { recursive: true })
+  mkdirSync(join(home, '.gemini', 'config', 'rules'), { recursive: true })
   const settings = { trustedWorkspaces: [dir], permissions: { allow }, ...(apiKey() ? { modelProvider: 'gemini' } : {}) }
-  writeFileSync(join(cliDir(), 'settings.json'), JSON.stringify(settings, null, 2))
-  const bridgeEnv: Record<string, string> = { ELECTRON_RUN_AS_NODE: '1' }
+  writeFileSync(join(cliDir(home), 'settings.json'), JSON.stringify(settings, null, 2))
+  // The bridge's calls name this project: it may be one a background agent is making, not the open one.
+  const bridgeEnv: Record<string, string> = { ELECTRON_RUN_AS_NODE: '1', STUDIO_PROJECT: project }
   if (process.env.STUDIO_USER_DATA) bridgeEnv.STUDIO_USER_DATA = process.env.STUDIO_USER_DATA
   const studio = {
     command: process.execPath,
@@ -200,9 +235,10 @@ function prepare(project: string, instructions: string): void {
     env: bridgeEnv,
     disabledTools: Object.keys(desktopTools).filter((t) => !(t in sceneTools)),
   }
-  writeFileSync(join(agyHome(), '.gemini', 'config', 'mcp_config.json'), JSON.stringify({ mcpServers: { studio } }, null, 2))
+  writeFileSync(join(home, '.gemini', 'config', 'mcp_config.json'), JSON.stringify({ mcpServers: { studio } }, null, 2))
   // An always-on global rule is how the brief reaches a headless run (checked on 1.3.6).
-  writeFileSync(join(agyHome(), '.gemini', 'config', 'rules', 'studio.md'), `---\ntrigger: always_on\ndescription: Manim Studio\n---\n${instructions}\n`)
+  writeFileSync(join(home, '.gemini', 'config', 'rules', 'studio.md'), `---\ntrigger: always_on\ndescription: Manim Studio\n---\n${instructions}\n`)
+  return home
 }
 
 // --- sign-in ----------------------------------------------------------------------------
@@ -233,7 +269,7 @@ async function signedInOnWindows(): Promise<boolean> {
 
 export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
   const bin = installed()
-  if (!bin) throw new Error('Install Antigravity first (Settings → Agent).')
+  if (!bin) throw new Error('Install Antigravity first (Settings → Accounts).')
   if (process.platform === 'win32') return windowsLogin(bin, onEvent)
   loginChild?.kill()
   mkdirSync(agyHome(), { recursive: true })
@@ -263,7 +299,7 @@ async function windowsLogin(bin: string, onEvent: (e: ClaudeLoginEvent) => void)
   const child = spawn(bin, [], { cwd: work, env: agyEnvBase(), detached: true, stdio: 'ignore', windowsHide: false })
   loginChild = child
   const closed = new Promise<void>((resolve) => child.on('exit', () => resolve()))
-  for (let open = true; open;) {
+  for (let open = true; open; ) {
     open = await Promise.race([closed.then(() => false), new Promise<boolean>((r) => setTimeout(() => r(true), 4000))])
     windowsSignedIn = null
     if (await signedInOnWindows()) break
@@ -282,9 +318,10 @@ export function antigravityLoginCode(code: string): void {
 /** Forgets the Google sign-in (the CLI's /logout does the same to its own token file). */
 export async function antigravityLogout(): Promise<ClaudeStatus> {
   rmSync(tokenFile(), { force: true })
+  const homes = join(root(), 'projects')
+  if (existsSync(homes)) for (const h of readdirSync(homes)) rmSync(tokenFile(join(homes, h)), { force: true }) // their links to it
   windowsSignedIn = null
-  // Windows: the item's name in Credential Manager is a guess (untested); a missing one is harmless.
-  if (process.platform === 'win32') await run('cmdkey', [`/delete:${KEYCHAIN_ITEM}`]).catch(() => undefined)
+  if (process.platform === 'win32') await forgetOnWindows()
   await ensureKeychain()
   if (process.platform === 'darwin')
     while (
@@ -294,6 +331,17 @@ export async function antigravityLogout(): Promise<ClaudeStatus> {
       )
     );
   return antigravityStatus()
+}
+
+/**
+ * Windows: the CLI keeps its sign-in in Credential Manager through go-keyring, whose items are
+ * named "<service>:<user>" (antigravity:…). cmdkey lists them as "Target: LegacyGeneric:target=…";
+ * every Antigravity one is deleted. Untested on a real sign-in.
+ */
+async function forgetOnWindows(): Promise<void> {
+  const list = await run('cmdkey', ['/list']).catch(() => '')
+  const targets = [...list.matchAll(/target=(\S+)/gi)].map((m) => m[1]).filter((t) => new RegExp(`^${KEYCHAIN_ITEM}(:|$)`, 'i').test(t))
+  for (const t of targets) await run('cmdkey', [`/delete:${t}`]).catch(() => undefined)
 }
 
 /** The account's models (`agy models`), one per family with its efforts: gemini-4-argon-high → Gemini 4 Argon, high. */
@@ -332,7 +380,7 @@ function slug(): string {
 
 // --- turns ------------------------------------------------------------------------------
 
-let current: ChildProcess | null = null
+let current: ChildProcess | null = null // the chat's turn
 
 export function interruptAntigravity(): void {
   current?.kill()
@@ -346,21 +394,25 @@ export interface AntigravityTurnHandlers {
   conversation(id: string): void
 }
 
-/** Runs one headless CLI call in `cwd` and follows its stream-json events. */
+type Outcome = { ok: boolean; error?: string; result?: AgyResult }
+
+/** Runs one headless CLI call in `cwd` with `home`, following its stream-json events. `started` gets the process, to stop it. */
 function runTurn(
+  home: string,
   cwd: string,
   prompt: string,
   conversation: string | undefined,
   on: AntigravityTurnHandlers,
-): Promise<{ ok: boolean; error?: string; result?: AgyResult }> {
+  started: (child: ChildProcess) => void,
+): Promise<Outcome> {
   const bin = installed()
-  if (!bin) return Promise.resolve({ ok: false, error: 'Install Antigravity first (Settings → Agent).' })
+  if (!bin) return Promise.resolve({ ok: false, error: 'Install Antigravity first (Settings → Accounts).' })
   const args = ['-p', prompt, '--output-format', 'stream-json', '--model', slug(), ...(conversation ? ['--conversation', conversation] : [])]
   return new Promise((resolve) => {
-    const child = spawn(bin, args, { cwd, env: agyEnv(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-    current = child
+    const child = spawn(bin, args, { cwd, env: agyEnv(home), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    started(child)
     const feed = agyFollower(on)
-    let outcome: { ok: boolean; error?: string; result?: AgyResult } | null = null
+    let outcome: Outcome | null = null
     let pending = ''
     let stderr = ''
     child.stdout.on('data', (b: Buffer) => {
@@ -378,7 +430,6 @@ function runTurn(
     child.stderr.on('data', (b: Buffer) => (stderr = (stderr + b.toString('utf8')).slice(-4000)))
     child.on('error', (e) => resolve({ ok: false, error: e.message }))
     child.on('close', (code, signal) => {
-      if (current === child) current = null
       if (signal) return resolve({ ok: false, error: 'Stopped' })
       resolve(outcome ?? { ok: false, error: friendly(stderr.trim().split('\n').pop() || `Antigravity exited with ${code}`) })
     })
@@ -386,13 +437,17 @@ function runTurn(
 }
 
 function friendly(message: string): string {
-  if (/authentication|sign in|log in|expired/i.test(message)) return 'Antigravity isn’t signed in. Sign in in Settings → Agent.'
+  if (/authentication|sign in|log in|expired/i.test(message)) return 'Antigravity isn’t signed in. Sign in in Settings → Accounts.'
   return message
 }
 
+/** Pictures go in as files for it to look at: headless input takes text only. */
+const withImages = (text: string, images: string[]) =>
+  images.length ? `${text}\n\n${images.map((p) => `[Attached image: ${p}. Look at it with view_file.]`).join('\n')}` : text
+
 /**
  * One turn in the project's Antigravity conversation (resumed from `conversation` after a
- * restart). Pictures go in as files in the project for it to look at: headless input takes text only.
+ * restart): the chat's.
  */
 export async function antigravityTurn(
   dir: string,
@@ -402,26 +457,57 @@ export async function antigravityTurn(
   conversation: string | undefined,
   on: AntigravityTurnHandlers,
 ): Promise<{ ok: boolean; error?: string }> {
-  prepare(dir, instructions)
-  await ensureKeychain()
-  const prompt = images.length ? `${text}\n\n${images.map((p) => `[Attached image: ${p}. Look at it with view_file.]`).join('\n')}` : text
-  const { ok, error } = await runTurn(dir, prompt, conversation, on)
+  const home = await prepare(dir, instructions)
+  const { ok, error } = await runTurn(home, dir, withImages(text, images), conversation, on, (child) => (current = child)).finally(() => (current = null))
   return { ok, error: error && friendly(error) }
 }
 
-/** A one-off request with no project (translation, series planning), in an empty folder. */
-export async function askAntigravity(system: string, prompt: string, what: string): Promise<string> {
+/** A background agent's conversation in one project (agent.ts): turns one after another, its own process to stop. */
+export function antigravitySession(dir: string, instructions: string, conversation: string | undefined, on: AntigravityTurnHandlers) {
+  let child: ChildProcess | null = null
+  let closed = false
+  let id = conversation
+  const handlers = { ...on, conversation: (c: string) => ((id = c), on.conversation(c)) }
+  return {
+    async turn(text: string): Promise<{ ok: boolean; error?: string }> {
+      if (closed) return { ok: false, error: 'Stopped' }
+      const home = await prepare(dir, instructions)
+      const { ok, error } = await runTurn(home, dir, text, id, handlers, (c) => (child = c))
+      child = null
+      return { ok, error: error && friendly(error) }
+    },
+    close(): void {
+      closed = true
+      child?.kill()
+    },
+  }
+}
+
+/** A one-off request with no project (translation, series planning, reading exercises), in an empty folder. */
+export async function askAntigravity(
+  system: string,
+  prompt: string,
+  what: string,
+  images: { name: string; mediaType: string; data: string }[] = [],
+): Promise<string> {
   const dir = join(tmpdir(), 'manim-studio-antigravity', String(Date.now()))
   mkdirSync(dir, { recursive: true })
+  let home = ''
   try {
-    prepare(dir, system)
-    await ensureKeychain()
-    const out = await runTurn(dir, prompt, undefined, { part: () => {}, status: () => {}, conversation: () => {} })
+    const files = images.map((img, i) => {
+      const file = join(dir, `picture-${i + 1}.${img.mediaType.split('/')[1] === 'jpeg' ? 'jpg' : (img.mediaType.split('/')[1] ?? 'png')}`)
+      writeFileSync(file, Buffer.from(img.data, 'base64'))
+      return file
+    })
+    const named = images.length ? `${prompt}\n\nThe pictures, in order: ${images.map((img, i) => `${files[i]} is "${img.name}"`).join('; ')}.` : prompt
+    home = await prepare(dir, system)
+    const out = await runTurn(home, dir, withImages(named, files), undefined, { part: () => {}, status: () => {}, conversation: () => {} }, () => {})
     if (!out.ok || !out.result) throw new Error(out.error ?? 'no answer')
     return out.result.response
   } catch (e) {
     throw new Error(`Antigravity couldn’t ${what}: ${friendly((e as Error).message)}`)
   } finally {
     rmSync(dir, { recursive: true, force: true })
+    if (home) rmSync(home, { recursive: true, force: true })
   }
 }

@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, sh
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
-import type { EventChannel, ExerciseInput, ExportOptions, NewExerciseSet, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
+import type { Agent, EventChannel, ExerciseInput, ExportOptions, NewExerciseSet, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
 import {
   applyChatSettings,
   chatInterrupt,
@@ -231,11 +231,11 @@ function registerIpc(): void {
   })
   handle('checkGeminiKey', (again?: boolean) => checkGeminiKey(undefined, again))
 
-  handle('claudeStatus', () => claudeStatus())
+  handle('claudeStatus', (agent?: Agent) => claudeStatus(agent))
   handle('claudeUsage', () => claudeUsage())
-  handle('claudeLogin', () => claudeLogin((e) => send('claude-login', e)))
-  handle('claudeLoginCode', (code: string) => claudeLoginCode(code))
-  handle('claudeLogout', () => claudeLogout())
+  handle('claudeLogin', (agent?: Agent) => claudeLogin((e) => send('claude-login', e), agent))
+  handle('claudeLoginCode', (code: string, agent?: Agent) => claudeLoginCode(code, agent))
+  handle('claudeLogout', (agent?: Agent) => claudeLogout(agent))
 
   handle('listProjects', () => projects.listProjects())
   handle('createProject', (input: Parameters<typeof projects.createProject>[0]) => projects.createProject(input))

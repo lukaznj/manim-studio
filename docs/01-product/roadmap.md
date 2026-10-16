@@ -40,7 +40,7 @@ Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017
 - Several scene files per project, with helper modules opened as editor tabs.
 - Music and sound effects: an audio lane backed by `self.add_sound()`.
 - Translated subtitles and narration, for one video in several languages.
-- Faster renders: profile first, then a warm render worker (parallel exports are in the list above). The OpenGL renderer comes last, only if render latency stays the bottleneck. Today, cached 480p renders take 2–10 s ([[../02-architecture/render-performance|render performance]]).
+- **Faster renders: the rendering engine needs work.** A 10-minute video took about 30 minutes to export on a CPU. First profile a long export, then hardware video encoding, more parallel slices for long videos and a warm render worker for previews; drawing on the GPU (manim's OpenGL renderer) is a larger, separate project, worth it if profiling shows drawing dominates. Render servers already let a faster machine do the work. Today, cached 480p renders take 2–10 s ([[../02-architecture/render-performance|render performance]]).
 
 ## Ideas to revisit
 

@@ -2,14 +2,19 @@
 // window, so several episodes are made at once. Each has the chat's tools and permissions, bound to
 // its own project (claude.ts studioOptions), records its conversation in the episode's chat.json
 // (opening the episode shows what it did) and keeps the session id, so the chat can carry on later.
+// With Codex or Antigravity chosen, the same agent runs on them (otherAgent): their bridge to
+// Studio's tools names the project, so several projects are worked on at once.
 import { randomUUID } from 'node:crypto'
-import type { ChatMessage, Effort } from '../shared/types'
+import type { ChatMessage, ChatPart, Effort } from '../shared/types'
 import type { UsageEntry } from '../shared/usage'
 import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
-import { Inbox, sdk, studioOptions, summarize, type TurnResult } from './claude'
+import { antigravitySession } from './antigravity'
+import { antigravityChosen, codexChosen, Inbox, sdk, studioOptions, studioPrompt, summarize, type TurnResult } from './claude'
+import { codexSession } from './codex'
+import { agentProjects } from './agent-projects'
 import { fakeAgent, fakeAgents } from './agent-fake'
 import { commitAll } from './git'
-import { readChat, updateMetaAt, writeChat } from './projects'
+import { readChat, readMeta, updateMetaAt, writeChat } from './projects'
 import { recordTurn } from './usage'
 
 export interface EpisodeAgent {
@@ -30,6 +35,8 @@ export const agentBusy = new Set<string>()
 
 export async function episodeAgent(dir: string, opts: AgentOptions): Promise<EpisodeAgent> {
   if (fakeAgents()) return fakeAgent(dir, opts) // driving the app in tests
+  if (codexChosen()) return otherAgent(dir, opts, 'codex')
+  if (antigravityChosen()) return otherAgent(dir, opts, 'antigravity')
   const { onTool } = opts
   const { query } = await sdk()
   const inbox = new Inbox()
@@ -108,6 +115,58 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
       finish(false, 'Stopped')
       inbox.close()
       q.close()
+    },
+  }
+}
+
+/**
+ * The same agent on Codex or Antigravity: its turns and their steps go into the project's chat.json,
+ * and the thread or conversation id into project.json, so the chat carries on from it. The project
+ * is registered with the bridge (mcp.ts agentProjects) while the agent works in it.
+ */
+function otherAgent(dir: string, opts: AgentOptions, agent: 'codex' | 'antigravity'): EpisodeAgent {
+  agentBusy.add(dir)
+  agentProjects.add(dir)
+  const messages = readChat(dir)
+  let reply: ChatMessage | null = null
+  const on = {
+    part(part: ChatPart) {
+      if (!reply) return
+      reply.parts.push(part)
+      if (part.kind === 'tool') opts.onTool(part.summary)
+    },
+    status(id: string, status: 'ok' | 'error') {
+      const part = reply?.parts.find((p) => p.kind === 'tool' && p.id === id)
+      if (part && part.kind === 'tool') part.status = status
+    },
+  }
+  const meta = readMeta(dir)
+  const instructions = studioPrompt(dir, agent, true)
+  const session =
+    agent === 'codex'
+      ? codexSession(dir, instructions, meta.codexThreadId, { ...on, thread: (id) => updateMetaAt(dir, { codexThreadId: id }) })
+      : antigravitySession(dir, instructions, meta.antigravityConversationId, {
+          ...on,
+          conversation: (id) => updateMetaAt(dir, { antigravityConversationId: id }),
+        })
+  const name = agent === 'codex' ? 'Codex' : 'Antigravity'
+  return {
+    async turn(text) {
+      messages.push({ id: randomUUID(), role: 'user', parts: [{ kind: 'text', text }], auto: true, at: Date.now() })
+      reply = { id: randomUUID(), role: 'assistant', parts: [], auto: true, at: Date.now() }
+      messages.push(reply)
+      writeChat(messages, dir)
+      const r = await session.turn(text)
+      for (const p of reply.parts) if (p.kind === 'tool' && p.status === 'running') p.status = r.ok ? 'ok' : 'error'
+      if (!r.ok && r.error) messages.push({ id: randomUUID(), role: 'error', parts: [{ kind: 'text', text: r.error }], auto: true, at: Date.now() })
+      writeChat(messages, dir)
+      await commitAll(dir, `${name}: ${text.split('\n')[0].slice(0, 72)}`, agent === 'codex' ? 'codex' : 'antigravity').catch(() => null)
+      return { ok: r.ok, error: r.error }
+    },
+    close() {
+      session.close()
+      agentBusy.delete(dir)
+      agentProjects.delete(dir)
     },
   }
 }
