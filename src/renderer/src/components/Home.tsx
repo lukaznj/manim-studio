@@ -41,7 +41,8 @@ import { SeriesPanel } from './SeriesPanel'
 export function Home() {
   const all = useStore((s) => s.projects)
   const projects = useMemo(() => all.filter((p) => !p.exercise && !p.extra), [all]) // exercises show in their set's card, follow-ups under their episode
-  const sets = useStore((s) => s.exerciseSets)
+  const allSets = useStore((s) => s.exerciseSets)
+  const sets = useMemo(() => allSets.filter((x) => !x.course), [allSets]) // a course's own set shows in its series' card
   const editing = useStore((s) => canEdit(s)) // Learn mode: a library to watch, no editor (ADR 0029)
   const setup = useStore((s) => s.setup)
   const claude = useStore((s) => s.claude)
@@ -85,7 +86,7 @@ export function Home() {
               <GraduationCap /> Exercises
             </button>
             <button className="btn large" onClick={() => openDialog({ kind: 'series' })} title="A series of videos from a course's PDFs">
-              <Library /> New series
+              <Library /> {editing ? 'New series' : 'New course'}
             </button>
             <button className="btn large" onClick={() => openDialog({ kind: 'quick' })} title="Describe it, attach PDFs, and Studio makes and exports it">
               <Zap /> Quick video
@@ -136,7 +137,13 @@ export function Home() {
             ))}
             {items.map((item, i) =>
               'episodes' in item ? (
-                <SeriesCard key={item.folder} folder={item.folder} episodes={item.episodes} index={i} />
+                <SeriesCard
+                  key={item.folder}
+                  folder={item.folder}
+                  episodes={item.episodes}
+                  exercises={allSets.find((x) => x.course === item.folder)?.items.length ?? 0}
+                  index={i}
+                />
               ) : (
                 <ProjectCard key={item.path} project={item} index={i} />
               ),
@@ -200,7 +207,7 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
 }
 
 /** A series on Home: its first episodes' pictures stacked, the title and how many episodes it has. */
-function SeriesCard({ folder, episodes, index }: { folder: string; episodes: ProjectSummary[]; index: number }) {
+function SeriesCard({ folder, episodes, exercises, index }: { folder: string; episodes: ProjectSummary[]; exercises: number; index: number }) {
   const first = episodes[0]
   const cover = episodes.find((e) => e.thumbnail) ?? first
   const latest = Math.max(...episodes.map((e) => e.updatedAt))
@@ -225,7 +232,11 @@ function SeriesCard({ folder, episodes, index }: { folder: string; episodes: Pro
             <Library /> Series
           </span>
           <span className="faint">{episodes.length === 1 ? '1 episode' : `${episodes.length} episodes`}</span>
-          <span className="faint project-ago">{ago(latest)}</span>
+          {exercises ? (
+            <span className="faint">{exercises === 1 ? '1 exercise' : `${exercises} exercises`}</span>
+          ) : (
+            <span className="faint project-ago">{ago(latest)}</span>
+          )}
         </div>
       </div>
     </article>
