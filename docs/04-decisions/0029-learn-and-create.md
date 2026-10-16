@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-16
 ---
 
-# 0029 — Learn and Create: the editor is for creators only
+# 0029 — Learn, Create or both: the editor is for creators only
 
 ## Context
 
@@ -15,6 +15,7 @@ Two kinds of people use the app. Creators make and polish videos to publish; the
 - **Learn has no editor.** One gate (`canEdit` in the store): opening any project in Learn goes to its study screen instead: an exercise to its set, an episode or follow-up to its series' Watch screen, any other video to the Watch screen as a list of one. A screen that still ends up on the editor is sent back the same way (`leaveEditor`).
 - **What Learn hides:** New project and Open folder on Home (which becomes the Library), "Open in editor" on the study screens and the quick-video screen (a finished quick video is watched instead), the series dialog's make-by-hand option (every episode is made), the Video settings, the Claude Desktop extension, the editor tour, and the macOS menu's editor items.
 - **Create is unchanged**, with the study screens as a way to see what viewers will see.
+- **Both,** for someone who studies and makes videos: Home's title becomes two tabs, Create (projects, opened in the editor) and Learn (the library, where everything opens on the study screen, as in Learn). The tab is remembered (`settings.homeTab`), and the editor stays reachable from the study screen.
 
 ## Consequences
 
