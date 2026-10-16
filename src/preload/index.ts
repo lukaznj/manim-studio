@@ -7,7 +7,7 @@ const invoke =
     ipcRenderer.invoke(name, ...args)
 
 const methods = [
-  'appInfo', 'setupStatus', 'install', 'getSettings', 'setSettings', 'setElevenLabsKey', 'checkElevenLabsKey', 'elevenLabsUsage', 'setAnthropicKey', 'checkAnthropicKey', 'setOpenAIKey', 'checkOpenAIKey',
+  'appInfo', 'setupStatus', 'install', 'getSettings', 'setSettings', 'setElevenLabsKey', 'checkElevenLabsKey', 'elevenLabsUsage', 'setAnthropicKey', 'checkAnthropicKey', 'setOpenAIKey', 'checkOpenAIKey', 'setGeminiKey', 'checkGeminiKey',
   'claudeStatus', 'claudeUsage', 'claudeLogin', 'claudeLoginCode', 'claudeLogout', 'claudeDesktopStatus',
   'listProjects', 'createProject', 'openProject', 'pickProject', 'pickFolder', 'pickPdfs', 'closeProject', 'forgetProject', 'locateProject', 'reveal',
   'saveScene', 'updateMeta', 'saveScript', 'render', 'cancelRender', 'frame', 'startQuick', 'quickRun', 'stopQuick', 'planSeries', 'cancelSeriesPlan', 'startSeries', 'seriesRun', 'stopSeries', 'continueSeries', 'pauseSeries', 'pauseEpisode', 'projectUsage', 'dismissSeries', 'createExerciseSet', 'exerciseSet', 'exerciseSets', 'addExercises', 'pickExerciseFiles', 'savePastedImage', 'exerciseDetail', 'reviseExercise', 'retryExercise', 'pauseExercises', 'removeExercise', 'searchExercises', 'makeLecture', 'watchSeries', 'courseExercises', 'watchDetail', 'requestFollowUp', 'retryFollowUp', 'setWatched', 'renderServers', 'addServer', 'removeServer', 'checkServer', 'queueExport', 'exportJobs', 'cancelExport', 'pauseExport', 'pauseRender', 'clearExports', 'listMedia', 'importMedia', 'removeMedia',

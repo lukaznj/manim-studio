@@ -45,7 +45,7 @@ import type {
 } from '../shared/types'
 import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
 import { fakeAgents } from './agent-fake'
-import { askClaude, claudeStatus, codexChosen, languageName } from './claude'
+import { askClaude, claudeStatus, claudeNotChosen, languageName } from './claude'
 import { setupStatus } from './env'
 import { cancelExport, queueExport } from './exports'
 import { createProject, readMeta, readTimeline } from './projects'
@@ -214,7 +214,7 @@ export function exerciseSets(): ExerciseSet[] {
 }
 
 async function ensureReady(): Promise<void> {
-  if (codexChosen()) throw new Error('Exercise sets are solved by Claude agents in the background. Choose Claude in Settings → Agent.')
+  if (claudeNotChosen()) throw new Error('Exercise sets are solved by Claude agents in the background. Choose Claude in Settings → Agent.')
   if (setupStatus().env !== 'ready') throw new Error('The manim environment isn’t installed yet (Settings → Environment).')
   if (!fakeAgents() && !(await claudeStatus()).loggedIn) throw new Error('Sign in to Claude first (Settings → Agent): it solves the exercises.')
 }

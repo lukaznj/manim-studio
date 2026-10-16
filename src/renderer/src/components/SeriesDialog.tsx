@@ -18,7 +18,7 @@ export function SeriesDialog() {
   const defaultVoice = useStore((s) => s.settings?.defaultVoice)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
   const omnivoice = useStore((s) => s.setup?.omnivoice)
-  const codex = useStore((s) => s.settings?.agent === 'codex')
+  const codex = useStore((s) => s.settings?.agent !== 'claude') // Codex or Antigravity: one episode at a time, in the window
   const agents = useStore((s) => s.settings?.seriesAgents || 3)
   const [pdfs, setPdfs] = useState<string[]>([])
   const [title, setTitle] = useState('')

@@ -43,7 +43,7 @@ import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
 import { requestFollowUp, retryFollowUp, setupWatch, setWatched, watchDetail, watchSeries } from './watch'
-import { checkAnthropicKey, checkOpenAIKey, keyUsable } from './keys'
+import { checkAnthropicKey, checkGeminiKey, checkOpenAIKey, keyUsable } from './keys'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
@@ -142,7 +142,9 @@ async function openInWindow(dir: string): Promise<void> {
 function registerMediaProtocol(): void {
   protocol.handle('studio-media', async (req) => {
     const file = decodeURIComponent(new URL(req.url).pathname.slice(1))
-    const allowed = [projects.project()?.path, ...getSettings().recentProjects, ...(getSettings().exerciseSets ?? []), paths.userData()].filter(Boolean) as string[]
+    const allowed = [projects.project()?.path, ...getSettings().recentProjects, ...(getSettings().exerciseSets ?? []), paths.userData()].filter(
+      Boolean,
+    ) as string[]
     const full = resolve(file)
     if (!allowed.some((root) => full === resolve(root) || full.startsWith(resolve(root) + sep)) || !existsSync(full)) {
       return new Response('not found', { status: 404 })
@@ -222,6 +224,12 @@ function registerIpc(): void {
     return setSecret('openai', key.trim())
   })
   handle('checkOpenAIKey', (again?: boolean) => checkOpenAIKey(undefined, again))
+  handle('setGeminiKey', async (key: string) => {
+    if (key.trim()) await keyUsable('gemini', key.trim())
+    closeChat() // Antigravity picks the key up on its next run
+    return setSecret('gemini', key.trim())
+  })
+  handle('checkGeminiKey', (again?: boolean) => checkGeminiKey(undefined, again))
 
   handle('claudeStatus', () => claudeStatus())
   handle('claudeUsage', () => claudeUsage())

@@ -18,11 +18,14 @@ const defaults = (): Settings => ({
   agent: 'claude',
   codexModel: '',
   codexEffort: 'high',
+  antigravityModel: '',
+  antigravityEffort: 'medium', // Antigravity's own default for Argon
   seriesAgents: 3,
   autoRender: true,
   hasElevenLabsKey: false,
   hasAnthropicKey: false,
   hasOpenAIKey: false,
+  hasGeminiKey: false,
   defaultVoice: { provider: 'elevenlabs', language: 'en' },
   renderServers: [],
   sidebarWidth: 440,
@@ -60,7 +63,7 @@ export function rememberProject(path: string): void {
 
 // --- secrets: encrypted with the OS keychain via safeStorage, never sent to the renderer ---
 
-const secretFlags = () => ({ hasElevenLabsKey: !!getSecret('elevenlabs'), hasAnthropicKey: !!getSecret('anthropic'), hasOpenAIKey: !!getSecret('openai') })
+const secretFlags = () => ({ hasElevenLabsKey: !!getSecret('elevenlabs'), hasAnthropicKey: !!getSecret('anthropic'), hasOpenAIKey: !!getSecret('openai'), hasGeminiKey: !!getSecret('gemini') })
 
 const secretFile = (name: string) => join(app.getPath('userData'), `${name}.secret`)
 

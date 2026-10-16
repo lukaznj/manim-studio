@@ -1,5 +1,5 @@
 // API keys for the agents, tried for real like the ElevenLabs key (voice.ts checkElevenLabsKey):
-// an Anthropic key for Claude, an OpenAI key for Codex. Each check lists what the key may do and,
+// an Anthropic key for Claude, an OpenAI key for Codex, a Gemini key for Antigravity. Each check lists what the key may do and,
 // when something else stops it (an invalid key, no credit left), says what.
 import Anthropic from '@anthropic-ai/sdk'
 import type { KeyCheck } from '../shared/types'
@@ -110,21 +110,78 @@ export async function checkOpenAIKey(key = getSecret('openai'), again = false): 
   return remember('openai', key, result)
 }
 
+/**
+ * A Gemini key for Antigravity (generativelanguage.googleapis.com): it's valid (it lists the
+ * models), Gemini 4 Argon is among them, and it can make a request (one token from a Flash model).
+ */
+export async function checkGeminiKey(key = getSecret('gemini'), again = false): Promise<KeyCheck> {
+  const hit = remembered('gemini', key, again)
+  if (hit) return hit
+  if (!key) return { items: [], problem: 'No Gemini API key is saved.', rejected: true }
+  const call = async (path: string, init: RequestInit = {}) => {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta${path}`, {
+      ...init,
+      headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+    })
+    const body = (await res.json().catch(() => null)) as {
+      models?: { name: string }[]
+      error?: { message?: string; status?: string; details?: { reason?: string }[] }
+    } | null
+    return { status: res.status, body }
+  }
+  const result: KeyCheck = { items: [] }
+  let models: string[] = []
+  try {
+    const list = await call('/models?pageSize=1000')
+    if (list.body?.error?.details?.some((d) => d.reason === 'API_KEY_INVALID') || list.status === 401)
+      return remember('gemini', key, {
+        items: [{ label: 'Valid key', ok: false }],
+        problem: 'Google doesn’t accept this key: it may be mistyped, deleted or from another project.',
+        rejected: true,
+      })
+    result.items.push({ label: 'Valid key', ok: true })
+    models = list.body?.models?.map((m) => m.name.replace(/^models\//, '')) ?? []
+    result.items.push({ label: 'Gemini 4 Argon', ok: models.some((m) => m.startsWith('gemini-4-argon')), why: 'Antigravity’s default model.' })
+  } catch {
+    return { items: [], problem: 'Google couldn’t be reached. Check the internet connection and try again.' }
+  }
+  const model =
+    models
+      .filter((m) => /flash/.test(m) && !/image|tts|live|audio/.test(m))
+      .sort()
+      .pop() ?? 'gemini-2.5-flash'
+  const r = await call(`/models/${model}:generateContent`, {
+    method: 'POST',
+    body: JSON.stringify({ contents: [{ parts: [{ text: '.' }] }], generationConfig: { maxOutputTokens: 1 } }),
+  }).catch(() => null)
+  if (r?.status === 200) result.items.push({ label: 'Requests', ok: true, why: 'It can ask Gemini for answers.' })
+  else if (r?.status === 429 && !/quota/i.test(r.body?.error?.message ?? ''))
+    result.items.push({ label: 'Requests', ok: true, why: 'Rate-limited right now, but allowed.' })
+  else {
+    result.items.push({ label: 'Requests', ok: false })
+    result.problem = `Gemini: ${sentence(r?.body?.error?.message || `HTTP ${r?.status ?? '?'}`)}`
+  }
+  return remember('gemini', key, result)
+}
+
 function remember(name: string, key: string, result: KeyCheck): KeyCheck {
   cache.set(name, { key, result })
   return result
 }
 
 /** Throws, saying what to change, when the key can't be used at all; returns what the check found. */
-export async function keyUsable(name: 'anthropic' | 'openai', key: string): Promise<KeyCheck> {
-  const check = name === 'anthropic' ? await checkAnthropicKey(key, true) : await checkOpenAIKey(key, true)
+export async function keyUsable(name: 'anthropic' | 'openai' | 'gemini', key: string): Promise<KeyCheck> {
+  const check =
+    name === 'anthropic' ? await checkAnthropicKey(key, true) : name === 'openai' ? await checkOpenAIKey(key, true) : await checkGeminiKey(key, true)
   if (check.rejected) throw new Error(check.problem)
   const missing = check.items.filter((i) => !i.ok && /Requests|Model requests/.test(i.label))
   if (missing.length && !check.problem)
     throw new Error(
       name === 'anthropic'
         ? 'This key may not send messages: its workspace restricts it. Use a key from a workspace that allows the Messages API.'
-        : 'This key is missing Model capabilities (Responses). Edit it at platform.openai.com → API keys, switch it on, and save it here again.',
+        : name === 'gemini'
+          ? 'This key may not send requests to Gemini. Check its restrictions at aistudio.google.com → API keys.'
+          : 'This key is missing Model capabilities (Responses). Edit it at platform.openai.com → API keys, switch it on, and save it here again.',
     )
   return check
 }

@@ -11,7 +11,7 @@ import { SCRIPT_FILE, scriptStatus } from '../shared/script'
 import { TONES } from '../shared/tone'
 import type { Effort, EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
 import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
-import { askClaude, claudeStatus, codexChosen, languageName } from './claude'
+import { askClaude, claudeStatus, claudeNotChosen, languageName } from './claude'
 import { cancelExport, queueExport } from './exports'
 import { cancel } from './render'
 import { createProject, readMeta, readScript } from './projects'
@@ -133,7 +133,7 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
     return
   }
   if (plan.usage) appendUsage(folder, plan.usage)
-  if (!codexChosen()) return startRun(plan.title, folder, dirs, start, plan.usage && costOf(plan.usage.models))
+  if (!claudeNotChosen()) return startRun(plan.title, folder, dirs, start, plan.usage && costOf(plan.usage.models))
   // Codex's tools work on the open project only, so with Codex the episodes are made one at a time, in the window.
   void (async () => {
     const episodes = plan.episodes.map((ep) => ({ title: ep.title, state: 'todo' as 'done' | 'failed' | 'now' | 'todo' }))
