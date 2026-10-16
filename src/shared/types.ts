@@ -583,6 +583,7 @@ export type MenuAction =
   | 'export'
   | 'quick'
   | 'series'
+  | 'exercises'
   | 'close-project'
   | 'new-conversation'
   | 'appearance'
@@ -599,7 +600,11 @@ export interface ClaudeLoginEvent {
 
 export type Appearance = 'system' | 'light' | 'dark'
 
+/** Who the app is for (ADR 0029): Learn hides the editor everywhere; Create is the full studio. */
+export type AppMode = 'learn' | 'create'
+
 export interface Settings {
+  mode?: AppMode // unset until chosen at first launch
   appearance: Appearance // 'system' follows the OS
   projectsDir: string
   recentProjects: string[]

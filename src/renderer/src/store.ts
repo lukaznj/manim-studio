@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type {
   AppInfo,
+  AppMode,
   ChatEvent,
   ChatMessage,
   ClaudeStatus,
@@ -384,6 +385,8 @@ function onMenu({ action, path, value }: { action: MenuAction; path?: string; va
       return openDialog({ kind: 'quick' })
     case 'series':
       return openDialog({ kind: 'series' })
+    case 'exercises':
+      return openDialog({ kind: 'exercises' })
     case 'open-project':
       return void pickAndOpenProject()
     case 'open-recent':
@@ -430,13 +433,44 @@ export async function installComponent(c: Component): Promise<void> {
 
 // --- projects -------------------------------------------------------------------------------
 
+/** Whether the editor exists for this user: not in Learn mode (ADR 0029). Every way into it asks here. */
+export const canEdit = (s: Pick<State, 'settings'> = get()): boolean => s.settings?.mode !== 'learn'
+
 export async function openProject(path: string): Promise<void> {
+  // Quick mode's progress screen isn't the editor: it opens the same way, and its video is watched after.
+  if (!canEdit() && get().quick?.project !== path) return studyProject(path)
   const opened = await guard(api.openProject(path))
   if (!opened) return
   withTransition(() => applyOpened(opened))
   firstRunTour()
   playback.restore(0)
   if (!opened.timeline && get().setup?.env === 'ready') void renderNow()
+}
+
+/** Switches Learn and Create; leaving Create from the editor moves to the study screen of what's open. */
+export async function switchMode(mode: AppMode): Promise<void> {
+  await updateSettings({ mode })
+  const { screen, project } = get()
+  if (mode === 'learn' && screen === 'editor' && project) await studyProject(project.path)
+}
+
+/** Learn mode never shows the editor: whatever got there (a menu, an old path) goes to the study screen. */
+export async function leaveEditor(): Promise<void> {
+  const project = get().project
+  if (project) await studyProject(project.path)
+  else set({ screen: 'home' })
+}
+
+/** Learn mode's way to open anything: an exercise in its set, everything else on the Watch screen. */
+async function studyProject(path: string): Promise<void> {
+  let summary = get().projects.find((p) => p.path === path)
+  if (!summary) {
+    const opened = await guard(api.openProject(path))
+    if (!opened) return
+    summary = { path, name: opened.meta.name, aspect: opened.meta.aspect, theme: opened.meta.theme, updatedAt: 0, series: opened.meta.series, exercise: opened.meta.exercise }
+  }
+  if (summary.exercise) return openExerciseSet(summary.exercise.set, path)
+  return openWatch(summary.series?.folder ?? path, path)
 }
 
 function applyOpened(o: OpenProject, screen: State['screen'] = 'editor'): void {
