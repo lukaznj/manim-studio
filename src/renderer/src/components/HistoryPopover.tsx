@@ -5,6 +5,8 @@ import { api } from '../lib/api'
 import { ago } from '../lib/time'
 import { errorText, renderNow, toast } from '../store'
 
+const AGENTS = new Set(['Claude', 'Codex', 'Antigravity']) // versions an agent made (git.ts)
+
 export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const [commits, setCommits] = useState<Commit[] | null>(null)
   const [confirm, setConfirm] = useState<string | null>(null)
@@ -39,7 +41,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         {commits?.length === 0 && <div className="hint pad">No versions yet.</div>}
         {commits?.map((c, i) => (
           <div key={c.oid} className="history-row">
-            <span className={`who ${c.author === 'Claude' ? 'claude' : ''}`}>{c.author === 'Claude' ? <Sparkles /> : <UserRound />}</span>
+            <span className={`who ${AGENTS.has(c.author) ? 'claude' : ''}`}>{AGENTS.has(c.author) ? <Sparkles /> : <UserRound />}</span>
             <div className="history-text">
               <div className="history-msg">{c.message}</div>
               <div className="faint">

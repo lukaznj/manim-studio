@@ -7,7 +7,7 @@
 // files itself, sandboxed to the project.
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { createWriteStream, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -127,7 +127,7 @@ let loginChild: ChildProcess | null = null
 /** `codex login` opens the browser for ChatGPT and waits for the callback. */
 export function codexLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
   const bin = installed()?.bin
-  if (!bin) return Promise.reject(new Error('Install Codex first (Settings → Agent).'))
+  if (!bin) return Promise.reject(new Error('Install Codex first (Settings → Accounts).'))
   loginChild?.kill()
   return new Promise((resolve) => {
     const child = spawn(bin, ['login'], { env: codexEnv(), windowsHide: true })
@@ -167,8 +167,9 @@ const sdk = () => (sdkPromise ??= import('@openai/codex-sdk'))
 async function client(dir: string, instructions: string) {
   const { Codex } = await sdk()
   const bin = installed()?.bin
-  if (!bin) throw new Error('Install Codex first (Settings → Agent).')
-  const bridgeEnv: Record<string, string> = { ELECTRON_RUN_AS_NODE: '1' }
+  if (!bin) throw new Error('Install Codex first (Settings → Accounts).')
+  // The bridge's calls name this project: it may be one a background agent is making, not the open one.
+  const bridgeEnv: Record<string, string> = { ELECTRON_RUN_AS_NODE: '1', STUDIO_PROJECT: dir }
   if (process.env.STUDIO_USER_DATA) bridgeEnv.STUDIO_USER_DATA = process.env.STUDIO_USER_DATA
   return new Codex({
     codexPathOverride: bin,
@@ -222,32 +223,65 @@ export async function codexTurn(
   on: CodexTurnHandlers,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    if (!thread || thread.dir !== dir) {
-      const codex = await client(dir, instructions)
-      const { codexModel, codexEffort } = getSettings()
-      const options = {
-        workingDirectory: dir,
-        skipGitRepoCheck: true,
-        sandboxMode: 'workspace-write' as const,
-        approvalPolicy: 'never' as const, // nobody to ask: the sandbox keeps writes inside the project
-        model: codexModel || undefined,
-        modelReasoningEffort: (codexEffort || 'high') as 'high',
-      }
-      thread = { dir, thread: threadId ? codex.resumeThread(threadId, options) : codex.startThread(options) }
-    }
+    if (!thread || thread.dir !== dir) thread = { dir, thread: await openThread(dir, instructions, threadId) }
     abort = new AbortController()
-    const input = images.length ? [{ type: 'text' as const, text }, ...images.map((path) => ({ type: 'local_image' as const, path }))] : text
-    const { events } = await thread.thread.runStreamed(input, { signal: abort.signal })
-    for await (const event of events) {
-      const r = follow(event, on)
-      if (r) return r
-    }
-    return { ok: true }
+    return await runOn(thread.thread, text, images, on, abort.signal)
   } catch (e) {
     if (abort?.signal.aborted) return { ok: false, error: 'Stopped' }
     return { ok: false, error: friendly((e as Error).message) }
   } finally {
     abort = null
+  }
+}
+
+/** The project's thread, resumed from `threadId` when there is one, sandboxed to the project. */
+async function openThread(dir: string, instructions: string, threadId: string | undefined): Promise<Thread> {
+  const codex = await client(dir, instructions)
+  const { codexModel, codexEffort } = getSettings()
+  const options = {
+    workingDirectory: dir,
+    skipGitRepoCheck: true,
+    sandboxMode: 'workspace-write' as const,
+    approvalPolicy: 'never' as const, // nobody to ask: the sandbox keeps writes inside the project
+    model: codexModel || undefined,
+    modelReasoningEffort: (codexEffort || 'high') as 'high',
+  }
+  return threadId ? codex.resumeThread(threadId, options) : codex.startThread(options)
+}
+
+async function runOn(t: Thread, text: string, images: string[], on: CodexTurnHandlers, signal: AbortSignal): Promise<{ ok: boolean; error?: string }> {
+  const input = images.length ? [{ type: 'text' as const, text }, ...images.map((path) => ({ type: 'local_image' as const, path }))] : text
+  const { events } = await t.runStreamed(input, { signal })
+  for await (const event of events) {
+    const r = follow(event, on)
+    if (r) return r
+  }
+  return { ok: true }
+}
+
+/** A background agent's thread in one project (agent.ts): its own client and bridge, turns one after another. */
+export function codexSession(dir: string, instructions: string, threadId: string | undefined, on: CodexTurnHandlers) {
+  let t: Thread | null = null
+  let stop: AbortController | null = null
+  let closed = false
+  return {
+    async turn(text: string): Promise<{ ok: boolean; error?: string }> {
+      if (closed) return { ok: false, error: 'Stopped' }
+      stop = new AbortController()
+      try {
+        t ??= await openThread(dir, instructions, threadId)
+        return await runOn(t, text, [], on, stop.signal)
+      } catch (e) {
+        if (stop.signal.aborted) return { ok: false, error: 'Stopped' }
+        return { ok: false, error: friendly((e as Error).message) }
+      } finally {
+        stop = null
+      }
+    },
+    close(): void {
+      closed = true
+      stop?.abort()
+    },
   }
 }
 
@@ -309,18 +343,24 @@ const TOOL_SUMMARY: Record<string, string> = {
 }
 
 function friendly(message: string): string {
-  if (/not logged in|unauthorized|401|login/i.test(message)) return 'Codex isn’t signed in. Sign in in Settings → Agent.'
+  if (/not logged in|unauthorized|401|login/i.test(message)) return 'Codex isn’t signed in. Sign in in Settings → Accounts.'
   return message
 }
 
-/** A one-off request with no tools (translation, series planning), in an empty folder. */
-export async function askCodex(system: string, prompt: string, what: string): Promise<string> {
+/** A one-off request with no tools (translation, series planning, reading exercises from pictures), in an empty folder. */
+export async function askCodex(system: string, prompt: string, what: string, images: { name: string; mediaType: string; data: string }[] = []): Promise<string> {
   const dir = join(tmpdir(), 'manim-studio-codex', String(Date.now()))
   mkdirSync(dir, { recursive: true })
   try {
     const codex = await client(dir, system)
     const t = codex.startThread({ workingDirectory: dir, skipGitRepoCheck: true, sandboxMode: 'read-only', approvalPolicy: 'never', model: getSettings().codexModel || undefined })
-    const turn = await t.run(prompt)
+    const files = images.map((img, i) => {
+      const file = join(dir, `picture-${i + 1}.${img.mediaType.endsWith('jpeg') ? 'jpg' : (img.mediaType.split('/')[1] ?? 'png')}`)
+      writeFileSync(file, Buffer.from(img.data, 'base64'))
+      return file
+    })
+    const named = images.length ? `${prompt}\n\nThe pictures, in order: ${images.map((img) => `"${img.name}"`).join('; ')}.` : prompt
+    const turn = await t.run(images.length ? [{ type: 'text' as const, text: named }, ...files.map((path) => ({ type: 'local_image' as const, path }))] : named)
     return turn.finalResponse
   } catch (e) {
     throw new Error(`Codex couldn’t ${what}: ${friendly((e as Error).message)}`)

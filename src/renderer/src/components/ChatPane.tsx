@@ -23,7 +23,9 @@ const SUGGESTIONS = [
 /** The chat; `head` replaces its title (the study screen puts its Transcript and Chat tabs there). */
 export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
   const claude = useStore((s) => s.claude)
-  const codex = useStore((s) => s.settings?.agent === 'codex')
+  const agent = useStore((s) => s.settings?.agent ?? 'claude')
+  const codex = agent === 'codex'
+  const agentName = codex ? 'Codex' : agent === 'antigravity' ? 'Antigravity' : 'Claude'
   const all = useStore((s) => s.chat)
   // On the exercises screen the chat is the student's: the agents' own turns stay out of it.
   const exercise = useStore((s) => s.screen === 'study') // studying a finished video
@@ -43,7 +45,7 @@ export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
       <div className="pane-head">
         {head ?? (
           <div className="file-tab">
-            <Sparkles className="claude-mark" /> {codex ? 'Codex' : 'Claude Agent'}
+            <Sparkles className="claude-mark" /> {agent === 'claude' ? 'Claude Agent' : agentName}
           </div>
         )}
         <div className="pane-actions">
@@ -54,7 +56,7 @@ export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
             title="New conversation"
             disabled={busy || chat.length === 0}
             onClick={() => {
-              if (confirm(`Start a new conversation? ${codex ? 'Codex' : 'Claude'} forgets the context of this project’s current one.`)) void api.chatReset()
+              if (confirm(`Start a new conversation? ${agentName} forgets the context of this project’s current one.`)) void api.chatReset()
             }}
           >
             <RotateCcw />
@@ -65,6 +67,8 @@ export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
       {!claude?.loggedIn ? (
         codex ? (
           <CodexSignIn />
+        ) : agent === 'antigravity' ? (
+          <AntigravitySignIn />
         ) : (
           <SignIn />
         )
@@ -98,7 +102,7 @@ function UsageMeter() {
       className={`usage-chip ${usageLevel(top.percent)}`}
       title={`Your Claude plan (shared with claude.ai and Claude Desktop)\n${usageLines(usage).join('\n')}`}
       aria-label={`Claude plan: ${Math.round(top.percent)}% of the ${top.label.toLowerCase()} used`}
-      onClick={() => openDialog({ kind: 'settings', tab: 'account' })}
+      onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}
     >
       <span className="usage-bar">
         <span style={{ width: `${Math.min(100, top.percent)}%` }} />
@@ -170,10 +174,30 @@ function CodexSignIn() {
         </p>
       )}
       {!busy && (
-        <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
+        <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
           Use an OpenAI API key instead
         </button>
       )}
+    </div>
+  )
+}
+
+/** Antigravity instead of Claude: its install and Google sign-in (with the code to paste) live in Settings → Accounts. */
+function AntigravitySignIn() {
+  return (
+    <div className="chat-signin">
+      <Sparkles className="signin-mark" />
+      <h3>Set up Antigravity</h3>
+      <p className="muted">
+        Studio is set to use Antigravity, Google's agent with Gemini 4 Argon. Install it and sign in with your Google account (or add a Gemini API key) in
+        Settings → Accounts. It edits only this project, and Studio never sees your password or tokens.
+      </p>
+      <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
+        <Sparkles /> Open Settings → Accounts
+      </button>
+      <button className="link-btn" onClick={() => void updateSettings({ agent: 'claude' }).then(refreshClaude)}>
+        Use Claude instead
+      </button>
     </div>
   )
 }
@@ -212,7 +236,7 @@ function SignIn() {
   const useKey = async (claudeAuth: 'account' | 'api-key') => {
     await updateSettings({ claudeAuth })
     await refreshClaude()
-    if (claudeAuth === 'api-key') openDialog({ kind: 'settings', tab: 'account' })
+    if (claudeAuth === 'api-key') openDialog({ kind: 'settings', tab: 'accounts' })
   }
 
   if (settings?.claudeAuth === 'api-key')
@@ -220,8 +244,8 @@ function SignIn() {
       <div className="chat-signin">
         <Sparkles className="signin-mark" />
         <h3>Add your Anthropic API key</h3>
-        <p className="muted">Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Agent.</p>
-        <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
+        <p className="muted">Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Accounts.</p>
+        <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
           Open Claude settings
         </button>
         <button className="link-btn" onClick={() => void useKey('account')}>
@@ -267,12 +291,14 @@ function SignIn() {
 }
 
 function Intro() {
+  const agent = useStore((s) => s.settings?.agent ?? 'claude')
+  const name = agent === 'codex' ? 'Codex' : agent === 'antigravity' ? 'Antigravity' : 'Claude'
   return (
     <div className="chat-intro">
       <p className="muted">
-        Describe what the video should show. Claude edits <span className="mono">scene.py</span>, renders it and looks at the frames before it says it’s done.
+        Describe what the video should show. {name} edits <span className="mono">scene.py</span>, renders it and looks at the frames before it says it’s done.
       </p>
-      <p className="hint">Select clips on the timeline so Claude knows which part you mean.</p>
+      <p className="hint">Select clips on the timeline so {name} knows which part you mean.</p>
     </div>
   )
 }
@@ -294,7 +320,9 @@ const WATCH_QUESTIONS = [
 function WatchIntro() {
   return (
     <div className="chat-intro">
-      <p className="muted">Ask about anything in the video. Studio tells the agent where you paused and what was on screen and said there, so “this part” is enough.</p>
+      <p className="muted">
+        Ask about anything in the video. Studio tells the agent where you paused and what was on screen and said there, so “this part” is enough.
+      </p>
       <div className="suggestions">
         {WATCH_QUESTIONS.map((q) => (
           <button key={q} className="suggestion" onClick={() => useStore.setState({ chatDraft: q })}>
@@ -309,7 +337,10 @@ function WatchIntro() {
 function ExerciseIntro() {
   return (
     <div className="chat-intro">
-      <p className="muted">Ask anything about this exercise: a step you don’t follow, why a method works, a similar one to practise. The answer comes right away, without a new video.</p>
+      <p className="muted">
+        Ask anything about this exercise: a step you don’t follow, why a method works, a similar one to practise. The answer comes right away, without a new
+        video.
+      </p>
       <div className="suggestions">
         {EXERCISE_QUESTIONS.map((q) => (
           <button key={q} className="suggestion" onClick={() => useStore.setState({ chatDraft: q })}>
@@ -486,7 +517,13 @@ function Composer() {
           ref={area}
           className="composer-input"
           rows={2}
-          placeholder={busy ? 'Claude is working…' : exercise ? 'Ask about what you’re watching (Enter sends)' : 'What should I make? (Enter sends, Shift+Enter for a new line)'}
+          placeholder={
+            busy
+              ? 'Claude is working…'
+              : exercise
+                ? 'Ask about what you’re watching (Enter sends)'
+                : 'What should I make? (Enter sends, Shift+Enter for a new line)'
+          }
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -523,7 +560,16 @@ export function ModelControls() {
   const settings = useStore((s) => s.settings)
   if (!settings) return null
   // The chosen agent's own model and effort (Settings → Agent).
-  const codex = settings.agent === 'codex'
+  const agent = settings.agent
+  if (agent === 'antigravity')
+    return (
+      <ModelPicker
+        model={settings.antigravityModel}
+        effort={settings.antigravityEffort || 'medium'}
+        onChange={(m, e) => void updateSettings({ antigravityModel: m, ...(e ? { antigravityEffort: e } : {}) })}
+      />
+    )
+  const codex = agent === 'codex'
   return (
     <ModelPicker
       model={codex ? settings.codexModel : settings.claudeModel}

@@ -1,6 +1,8 @@
 # Render performance
 
-Notes for when render time becomes worth working on. Nothing here is planned yet; an item gets an ADR when it's picked up ([[../01-product/roadmap|roadmap]]).
+Render time is now worth working on: it's the slowest part of making a long video, and the rendering engine will get work ([[../01-product/roadmap|roadmap]]). Each item gets an ADR when it's picked up.
+
+**Reported (October 2026):** a 10-minute video took about 30 minutes to export on a CPU, about 3× its length. At 1080p30 that's 18,000 frames, so about 10 frames a second all told (Python, Cairo, encoding, and a second theme or language version if one was chosen). For a series of long episodes, that's the bottleneck.
 
 ## How a render works today
 
@@ -52,6 +54,16 @@ Preview: 854×480 at 15 fps (Settings → Preview). Export: 1080p or 1440p at 30
 4. **Keep the cache hitting.** Randomness, time-dependent values and some updaters change an animation's hash, so manim draws it again. A layout warning or a note in the project's CLAUDE.md could steer Claude away from those.
 5. **Hardware encoding for exports.** NVENC, Quick Sync or VideoToolbox through ffmpeg, where available. It speeds up the encode only, so it's a modest gain.
 6. **The OpenGL renderer** (`--renderer=opengl`, GPU through moderngl). It's less mature in manim Community Edition: partial-movie caching doesn't work, some mobjects behave differently, and `render.Recorder`'s hooks assume Cairo. It also depends on each user's graphics drivers. It would help crowded or 3D scenes more than typical 2D ones. Worth it only if render latency becomes the bottleneck after the items above.
+
+## Can a GPU make it faster?
+
+Partly, and less than it sounds. The CPU time is split between Python moving mobjects every frame, Cairo drawing them, and ffmpeg encoding. A GPU helps the last two, not the first.
+
+- **Drawing on the GPU:** manim's OpenGL renderer (option 6 above). It draws much faster, but it's the less finished renderer in manim Community Edition: no partial-movie cache (every render redraws everything, so previews would get slower), some mobjects look or behave differently, Studio's recorder assumes Cairo, and headless rendering on a user's machine depends on their graphics drivers. It would need its own test suite of real scenes before it could be trusted for exports.
+- **Encoding on the GPU:** NVENC (NVIDIA), Quick Sync (Intel), AMF (AMD) or VideoToolbox (Mac) through ffmpeg (option 5). Safe, with a fallback to the CPU encoder when there's none, but it only speeds up the encode.
+- **More cores instead:** parallel exports already split a video into slices, one process each; the gain grows with cores and with length, so a 10-minute video gains more than the 3-minute one measured. A render server ([[../04-decisions/0021-render-servers|ADR 0021]]) can be a many-core machine (a desktop, or a rented cloud machine for a batch of episodes); for Cairo, cores matter, not a GPU.
+
+So the order stays: profile a long export (where those 30 minutes go), then hardware encoding and more slices on long videos, a warm worker for previews, and the OpenGL renderer as a separate project, exports first, if profiling shows drawing is the larger part.
 
 ## What wouldn't help
 

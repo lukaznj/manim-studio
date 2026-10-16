@@ -19,7 +19,7 @@ Students mostly don't need a 10-minute explainer: they need one exercise solved,
 - **Search** covers every set: titles, topics and tags, statements and solutions, accent-insensitive (`shared/exercise.ts`).
 - **A lecture video** joins chosen exercises' exports without re-encoding (`studio_runner/concat.py`, PyAV), with joined subtitles and a YouTube chapter list.
 - **KaTeX** (`katex`) typesets the maths on the screen and in the chat. Rendering LaTeX can't be done in a few lines, and the agents write maths in LaTeX everywhere.
-- **Claude only:** Codex's tools reach Studio through the MCP bridge, which works on the open project only, so background agents need Claude.
+- **Any agent** since [[0033-every-agent-in-the-background|ADR 0033]] (Claude only at first, when the bridge worked on the open project only).
 
 ## Consequences
 
