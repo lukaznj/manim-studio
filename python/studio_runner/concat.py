@@ -2,7 +2,8 @@
 
 The exercises' exports share their codec and size (one set, one export setting), so their packets
 can be copied into one file with their timestamps moved along. Videos that don't match are refused
-rather than joined into something players choke on."""
+rather than joined into something players choke on: also those encoded by another encoder (a GPU's,
+encoder.py), whose stream parameters (SPS/PPS, in the extradata) differ even at the same size."""
 
 from pathlib import Path
 
@@ -16,6 +17,7 @@ def _layout(container) -> tuple:
         v.codec_context.name,
         v.codec_context.width,
         v.codec_context.height,
+        bytes(v.codec_context.extradata or b""),
         a.codec_context.name if a else None,
         a.codec_context.sample_rate if a else None,
     )
@@ -37,7 +39,7 @@ def concat(out: Path, videos: list[Path]) -> list[float]:
     for path in videos[1:]:
         with av.open(str(path)) as c:
             if _layout(c) != layout:
-                raise ValueError(f"{path.name} was exported with other settings (size or codec) than {videos[0].name}; export it again")
+                raise ValueError(f"{path.name} was exported with other settings (size, codec or video encoder) than {videos[0].name}; export it again")
 
     out.parent.mkdir(parents=True, exist_ok=True)
     durations: list[float] = []

@@ -34,6 +34,7 @@ def configure(
     from_anim: int | None = None,
     upto: int | None = None,
     voice_only: bool = False,
+    encoder: str | None = None,
 ) -> tuple[dict, Path]:
     from manim import config
 
@@ -53,8 +54,12 @@ def configure(
     # every render of the project reuses them: previews, exports of its copies, and the final pass
     # of a parallel export. A slice of one draws into its own folder (STUDIO_PARTIAL_DIR), and the
     # app moves what it made into the shared one only when it succeeded.
+    # A GPU encoder's pieces get their own folder (…@30-nvenc): pieces from different encoders can't be joined.
+    from .encoder import short_name
+
+    suffix = f"-{short_name(encoder)}" if encoder else ""
     config.partial_movie_dir = os.environ.get("STUDIO_PARTIAL_DIR") or str(
-        Path(config.media_dir) / "partial" / f"{config.pixel_width}x{config.pixel_height}@{int(config.frame_rate)}"
+        Path(config.media_dir) / "partial" / f"{config.pixel_width}x{config.pixel_height}@{int(config.frame_rate)}{suffix}"
     )
     config.video_dir = str(out)
     config.output_file = str(out / f"video-{int(time.time() * 1000)}")
@@ -111,9 +116,15 @@ class Recorder:
             f = f.f_back
         return None
 
-    def install(self) -> None:
+    def install(self, encoder: str | None = None) -> None:
         from manim import Scene, Wait
+        from manim.scene import scene_file_writer
         from manim_voiceover import VoiceoverScene
+
+        if encoder:  # exports on the GPU (encoder.py): partial movies open `encoder` instead of libx264
+            from .encoder import wrap_av
+
+            scene_file_writer.av = wrap_av(scene_file_writer.av, encoder)
 
         rec = self
         play, next_section, add_voiceover = Scene.play, Scene.next_section, VoiceoverScene._add_voiceover_text
@@ -201,7 +212,7 @@ def render(project: Path, quality: str, **options) -> int:
     try:
         meta, out = configure(project, quality, **options)
         recorder = Recorder(scene_file)
-        recorder.install()
+        recorder.install(options.get("encoder"))
         scene = load_scene_class(scene_file, meta.get("scene"))()
         emit("start", scene=type(scene).__name__)
         scene.render()

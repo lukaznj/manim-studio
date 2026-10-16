@@ -26,6 +26,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--from", dest="from_anim", type=int, help="first animation to draw (0-based)")
     r.add_argument("--upto", type=int, help="last animation to draw, inclusive")
     r.add_argument("--voice-only", action="store_true", help="make the narration, draw nothing (before a remote export)")
+    r.add_argument("--encoder", help="a GPU video encoder for the partial movies (encoder.py), instead of libx264")
+    sub.add_parser("encoders", help="which GPU video encoder works on this computer")
 
     f = sub.add_parser("frame")
     f.add_argument("video")
@@ -100,7 +102,24 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "render":
         from .render import render
 
-        return render(args.project, args.quality, size=args.size, fps=args.fps, theme=args.theme, out_name=args.out, from_anim=args.from_anim, upto=args.upto, voice_only=args.voice_only)
+        return render(
+            args.project,
+            args.quality,
+            size=args.size,
+            fps=args.fps,
+            theme=args.theme,
+            out_name=args.out,
+            from_anim=args.from_anim,
+            upto=args.upto,
+            voice_only=args.voice_only,
+            encoder=args.encoder,
+        )
+
+    if args.cmd == "encoders":
+        from .encoder import detect
+
+        emit("done", **detect())
+        return 0
 
     if args.cmd == "dub":
         from .dub import dub

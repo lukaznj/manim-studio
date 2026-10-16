@@ -18,6 +18,7 @@ import { dirname, join, relative, sep } from 'node:path'
 import type { ExportOptions, ExportResult, ProjectMeta, Timeline } from '../shared/types'
 import { languageName, translateNarration } from './claude'
 import { readMeta, readTimeline, slugify } from './projects'
+import { exportEncoder, partialFolder } from './encoder'
 import { renderFinal, type RenderVariant } from './render'
 import { renderRemote } from './remote'
 import { runRunner } from './runner'
@@ -91,23 +92,37 @@ export async function exportVideo(project: string, work: string, options: Export
         renameSync(join(folder, `timeline.${theme}.json`), timeline)
         keep(theme, join(folder, themes.length > 1 ? `${slug}.${theme}` : slug), timeline)
       }
-    } else
+    } else {
+      // The GPU's video encoder when one works here (ADR 0034); if it fails, the CPU's, for the rest of the export.
+      let encoder = await exportEncoder()
       for (const theme of themes) {
         const stage = themes.length > 1 ? `Rendering the ${theme} version` : 'Rendering at full quality'
-        const parts = await renderSlices(snap, meta, { theme, size, fps }, join(project, '.studio', 'cache'), animations, (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }), signal, tag)
+        const parts = await renderSlices(snap, meta, { theme, size, fps, encoder }, join(project, '.studio', 'cache'), animations, (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }), signal, tag)
+        const final = (on: string | undefined) =>
+          renderFinal(snap, meta, { theme, out: `final-${theme}`, size, fps, encoder: on }, {
+            cacheDir: join(project, '.studio', 'cache'),
+            signal,
+            tag,
+            onProgress: (t) => progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, percent: duration ? Math.min(t / duration, 1) : undefined }),
+          })
         progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage })
-        await renderFinal(snap, meta, { theme, out: `final-${theme}`, size, fps }, {
-          cacheDir: join(project, '.studio', 'cache'),
-          signal,
-          tag,
-          onProgress: (t) => progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, percent: duration ? Math.min(t / duration, 1) : undefined }),
-        })
+        try {
+          await final(encoder)
+        } catch (e) {
+          if (!encoder || signal?.aborted || (e as { cancelled?: boolean }).cancelled) throw e
+          const why = (e as Error).message.replace(/^scene\.py line \d+: /, '').split(':')[0]
+          warnings.push(`The GPU’s video encoder (${encoder}) failed with ${why}, so this video was encoded on the CPU. Settings → Environment can turn GPU encoding off.`)
+          encoder = undefined
+          progress({ stage: `${stage} on the CPU` })
+          await final(undefined)
+        }
         progress({ stage: 'Saving the video' })
         const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
         const base = join(folder, themes.length > 1 ? `${slug}.${theme}` : slug)
         await (await runRunner('default', ['export', timeline, base], { signal, tag })).done
         keep(theme, base, timeline)
       }
+    }
     files.push(join(folder, `${slug}.${original}.srt`), join(folder, `${slug}.${original}.vtt`))
 
     // The thumbnail made for publishing (card.py): the key picture, its hook, number and series.
@@ -182,7 +197,7 @@ async function renderSlices(
         { ...variant, out: `slice-${i}`, from: i * size, upto: i === slices - 1 ? undefined : (i + 1) * size - 1 },
         { cacheDir: join(own, 'cache'), partialDir: join(own, 'partial'), signal, offlineVoice: true, tag },
       ).finally(() => progress(++done / slices, slices))
-      return { pieces: join(own, 'partial'), shared: join(cacheDir, 'partial', `${timeline.width}x${timeline.height}@${Math.round(timeline.fps)}`) }
+      return { pieces: join(own, 'partial'), shared: join(cacheDir, 'partial', partialFolder(timeline.width, timeline.height, timeline.fps, variant.encoder)) }
     }),
   )
   if (signal?.aborted) throw Object.assign(new Error('cancelled'), { cancelled: true })

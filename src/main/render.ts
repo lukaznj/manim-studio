@@ -43,6 +43,7 @@ export interface RenderVariant {
   fps?: number
   from?: number // a slice of a parallel export: the animations to draw (0-based, inclusive)
   upto?: number
+  encoder?: string // a GPU video encoder for the partial movies (encoder.ts); none: libx264 on the CPU
 }
 
 export function render(quality: Quality, variant: RenderVariant = {}, dir = requireProject().path): Promise<RenderOutcome> {
@@ -132,6 +133,7 @@ export async function renderFinal(
   if (variant.fps) args.push('--fps', String(variant.fps))
   if (variant.from !== undefined) args.push('--from', String(variant.from))
   if (variant.upto !== undefined) args.push('--upto', String(variant.upto))
+  if (variant.encoder) args.push('--encoder', variant.encoder)
   const job = await runRunner<{ result: Timeline }>('default', args, {
     extraEnv: {
       ...(await voiceEnv(meta, dir)),
