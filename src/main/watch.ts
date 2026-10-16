@@ -88,7 +88,8 @@ export function watchSeries(folder: string): WatchSeries {
           .map(followUp),
       }
     })
-  return { folder, title: plan.title, episodes: list }
+  const exercises = join(folder, 'exercises')
+  return { folder, title: plan.title, episodes: list, exercises: existsSync(join(exercises, 'exercises.json')) ? exercises : undefined }
 }
 
 /** Marks a video watched or not; the screen showing its list hears about it. */

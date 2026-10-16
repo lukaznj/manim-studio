@@ -1,30 +1,15 @@
-import {
-  Check,
-  CircleAlert,
-  Code2,
-  Eye,
-  Film,
-  FolderOpen,
-  MessageCircleQuestion,
-  Pause,
-  Play,
-  Plus,
-  RotateCcw,
-  Search,
-  Sparkles,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { Check, CircleAlert, Code2, Eye, Film, FolderOpen, MessageCircleQuestion, Pause, Play, RotateCcw, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ExerciseDetail, ExerciseHit, ExerciseItem, ExerciseSet, Section } from '../../../shared/types'
 import { fold } from '../../../shared/exercise'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
-import { canEdit, errorText, openDialog, openExerciseSet, selectExercise, toast, useStore } from '../store'
-import { ChatPane } from './ChatPane'
+import { canEdit, errorText, openDialog, openExerciseSet, selectStudied, toast, useStore } from '../store'
 import { Markdown } from './Markdown'
 import { StudyPlayer } from './StudyPlayer'
-import { WatchedToggle } from './WatchView'
+import { WatchedToggle } from './LessonView'
+
+// The study screen's exercises (StudyView.tsx, src/main/exercises.ts, ADR 0025).
 
 const LABEL: Record<ExerciseItem['state'], string> = {
   waiting: 'Waiting to be solved',
@@ -36,122 +21,103 @@ const LABEL: Record<ExerciseItem['state'], string> = {
   failed: 'Didn’t finish',
 }
 
-/** An exercise set (src/main/exercises.ts): the exercises, the selected one's solution and video, and the chat. */
-export function ExercisesView() {
-  const set = useStore((s) => s.exerciseSet)
-  const selected = useStore((s) => (s.project?.meta.exercise?.set === s.exerciseSet?.folder ? s.project?.path : undefined))
-  if (!set) return null
-  const item = set.items.find((i) => i.dir === selected)
+/** Searches every exercise, in every set: the hits replace the study screen's list while it's typed. */
+export function ExerciseSearch({ query, onQuery }: { query: string; onQuery: (q: string) => void }) {
   return (
-    <div className="ex-view">
-      <ExerciseSidebar set={set} selected={selected} />
-      <main className="ex-main">{item ? <ExerciseMain key={item.dir} item={item} /> : <ExerciseEmpty set={set} />}</main>
-      <aside className="ex-chat">{item ? <ChatPane /> : <div className="ex-empty faint">The chat opens with the first exercise.</div>}</aside>
-    </div>
+    <label className="ex-search">
+      <Search />
+      <input className="input" placeholder="Search all exercises" value={query} onChange={(e) => onQuery(e.target.value)} aria-label="Search all exercises" />
+      {query && (
+        <button className="icon-btn" aria-label="Clear the search" onClick={() => onQuery('')}>
+          <X />
+        </button>
+      )}
+    </label>
   )
 }
 
-function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: string }) {
-  const [query, setQuery] = useState('')
+export function useExerciseHits(query: string): ExerciseHit[] | null {
   const [hits, setHits] = useState<ExerciseHit[] | null>(null)
   useEffect(() => {
     if (!query.trim()) return setHits(null)
     const t = setTimeout(() => void api.searchExercises(query).then(setHits), 180)
     return () => clearTimeout(t)
   }, [query])
+  return hits
+}
+
+export function ExerciseHits({ hits, query, set, selected }: { hits: ExerciseHit[]; query: string; set: ExerciseSet | null; selected?: string }) {
+  return (
+    <ul className="ex-list">
+      {!hits.length && <li className="ex-none faint">No exercise mentions “{query}”.</li>}
+      {hits.map((h) => (
+        <li key={h.dir}>
+          <button
+            className={`ex-row ${h.dir === selected ? 'on' : ''}`}
+            onClick={() => void (h.set === set?.folder ? selectStudied(h.dir) : openExerciseSet(h.set, h.dir))}
+          >
+            <span className="ex-num mono">{h.number}</span>
+            <span className="ex-row-body">
+              <span className="ex-row-title">{h.title}</span>
+              <span className="ex-row-state">{h.set === set?.folder ? h.topic || h.snippet : `${h.setTitle} · ${h.topic || h.snippet}`}</span>
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** The set's exercises in the study screen's list (and the intake's progress while they're read). */
+export function ExerciseRows({ set, selected }: { set: ExerciseSet; selected?: string }) {
+  return (
+    <>
+      {set.intake && <IntakeRow set={set} />}
+      {set.items.map((it) => (
+        <li key={it.dir}>
+          <button className={`ex-row ${it.dir === selected ? 'on' : ''} state-${it.state}`} onClick={() => void selectStudied(it.dir)}>
+            <span className="ex-num mono">{it.number}</span>
+            <span className="ex-row-body">
+              <span className="ex-row-title">{it.title}</span>
+              <span className="ex-row-state">
+                {it.state === 'done'
+                  ? it.topic || 'Done'
+                  : set.paused && ['waiting', 'solved'].includes(it.state)
+                    ? 'Paused'
+                    : (it.activity ?? LABEL[it.state])}
+              </span>
+            </span>
+            <StateIcon item={it} paused={!!set.paused} />
+          </button>
+        </li>
+      ))}
+    </>
+  )
+}
+
+/** Under the list: the set's lecture video and pausing its agents. */
+export function ExerciseActions({ set }: { set: ExerciseSet }) {
   const working = set.items.some((i) => ['solving', 'video', 'export'].includes(i.state))
   const done = set.items.filter((i) => i.state === 'done').length
-
   return (
-    <aside className="ex-side">
-      <div className="ex-side-head">
-        <h2 className="ex-set-title">{set.title}</h2>
-        <p className="faint">
-          {set.items.length === 1 ? '1 exercise' : `${set.items.length} exercises`}
-          {set.items.length ? `, ${done} with a video, ${set.items.filter((i) => i.watched).length} watched` : ''}
-          {set.level ? ` · ${set.level}` : ''}
-        </p>
-        <label className="ex-search">
-          <Search />
-          <input
-            className="input"
-            placeholder="Search all exercises"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search all exercises"
-          />
-          {query && (
-            <button className="icon-btn" aria-label="Clear the search" onClick={() => setQuery('')}>
-              <X />
-            </button>
-          )}
-        </label>
-      </div>
-
-      {hits ? (
-        <ul className="ex-list">
-          {!hits.length && <li className="ex-none faint">No exercise mentions “{query}”.</li>}
-          {hits.map((h) => (
-            <li key={h.dir}>
-              <button
-                className={`ex-row ${h.dir === selected ? 'on' : ''}`}
-                onClick={() => void (h.set === set.folder ? selectExercise(h.dir) : openExerciseSet(h.set, h.dir))}
-              >
-                <span className="ex-num mono">{h.number}</span>
-                <span className="ex-row-body">
-                  <span className="ex-row-title">{h.title}</span>
-                  <span className="ex-row-state">{h.set === set.folder ? h.topic || h.snippet : `${h.setTitle} · ${h.topic || h.snippet}`}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ul className="ex-list">
-          {set.intake && <IntakeRow set={set} />}
-          {set.items.map((it) => (
-            <li key={it.dir}>
-              <button className={`ex-row ${it.dir === selected ? 'on' : ''} state-${it.state}`} onClick={() => void selectExercise(it.dir)}>
-                <span className="ex-num mono">{it.number}</span>
-                <span className="ex-row-body">
-                  <span className="ex-row-title">{it.title}</span>
-                  <span className="ex-row-state">
-                    {it.state === 'done'
-                      ? it.topic || 'Done'
-                      : set.paused && ['waiting', 'solved'].includes(it.state)
-                        ? 'Paused'
-                        : (it.activity ?? LABEL[it.state])}
-                  </span>
-                </span>
-                <StateIcon item={it} paused={!!set.paused} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="ex-side-foot">
-        <button className="btn primary" onClick={() => openDialog({ kind: 'add-exercises' })}>
-          <Plus /> Add exercises
+    <>
+      <div className="ex-side-actions">
+        <button
+          className="btn small ghost"
+          disabled={!done}
+          title={done ? undefined : 'Once an exercise has its video'}
+          onClick={() => openDialog({ kind: 'lecture' })}
+        >
+          <Film /> Lecture video
         </button>
-        <div className="ex-side-actions">
-          <button
-            className="btn small ghost"
-            disabled={!done}
-            title={done ? undefined : 'Once an exercise has its video'}
-            onClick={() => openDialog({ kind: 'lecture' })}
-          >
-            <Film /> Lecture video
+        {(working || set.paused) && (
+          <button className="btn small ghost" onClick={() => void api.pauseExercises(set.folder, !set.paused)}>
+            {set.paused ? <Play /> : <Pause />} {set.paused ? 'Resume' : 'Pause'}
           </button>
-          {(working || set.paused) && (
-            <button className="btn small ghost" onClick={() => void api.pauseExercises(set.folder, !set.paused)}>
-              {set.paused ? <Play /> : <Pause />} {set.paused ? 'Resume' : 'Pause'}
-            </button>
-          )}
-        </div>
-        {set.lecture && <LectureNote set={set} />}
+        )}
       </div>
-    </aside>
+      {set.lecture && <LectureNote set={set} />}
+    </>
   )
 }
 
@@ -200,7 +166,7 @@ function LectureNote({ set }: { set: ExerciseSet }) {
   )
 }
 
-function ExerciseEmpty({ set }: { set: ExerciseSet }) {
+export function ExerciseEmpty({ set }: { set: ExerciseSet }) {
   return (
     <div className="ex-empty">
       <Sparkles />
@@ -214,7 +180,7 @@ function ExerciseEmpty({ set }: { set: ExerciseSet }) {
 }
 
 /** The selected exercise: what's asked, the video, and the written solution step by step. */
-function ExerciseMain({ item }: { item: ExerciseItem }) {
+export function ExerciseMain({ item }: { item: ExerciseItem }) {
   const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
   const [detail, setDetail] = useState<ExerciseDetail | null>(null)
   const video = useRef<HTMLVideoElement>(null)

@@ -24,7 +24,7 @@ export function TitleBar() {
   return (
     <header className={`titlebar ${platform === 'darwin' ? 'mac' : 'other'}`}>
       <div className="titlebar-left">
-        {screen === 'watch' && watchSeries ? (
+        {screen === 'study' && (watchSeries || exerciseSet) ? (
           <>
             <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
               <ChevronLeft />
@@ -32,19 +32,7 @@ export function TitleBar() {
             <div className="crumb">
               <span className="faint">Projects</span>
               <span className="faint">/</span>
-              <strong>{watchSeries.title}</strong>
-              <span className="badge">Watching</span>
-            </div>
-          </>
-        ) : screen === 'exercises' && exerciseSet ? (
-          <>
-            <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
-              <ChevronLeft />
-            </button>
-            <div className="crumb">
-              <span className="faint">Projects</span>
-              <span className="faint">/</span>
-              <strong>{exerciseSet.title}</strong>
+              <strong>{watchSeries?.title ?? exerciseSet!.title}</strong>
             </div>
           </>
         ) : screen === 'editor' && project ? (

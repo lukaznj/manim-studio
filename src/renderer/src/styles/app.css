@@ -373,6 +373,29 @@
   margin: 0;
   font-size: 14px;
 }
+/* Both modes (ADR 0029): Home's title is the two tabs, Create and Learn. */
+.home-tabs {
+  display: flex;
+  gap: 22px;
+  margin-bottom: 6px;
+}
+.home-tab {
+  padding: 0 0 4px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--text-3);
+  font: 900 40px/1 var(--font-display);
+  letter-spacing: -0.025em;
+  cursor: pointer;
+}
+.home-tab:hover {
+  color: var(--text-2);
+}
+.home-tab.on {
+  color: var(--text);
+  border-bottom-color: var(--sun);
+}
 .home-actions {
   display: flex;
   gap: 8px;
@@ -1118,6 +1141,7 @@
   margin-bottom: 4px;
 }
 .mode-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-bottom: 12px;
 }
 .mode-card {

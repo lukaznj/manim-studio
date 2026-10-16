@@ -7,6 +7,9 @@
 // Work is handed out from each exercise's state, like a series (ADR 0023): written solutions first,
 // so every exercise has its answer quickly, then the videos. Pausing, removing and revising are
 // only states the loop reads; opening a set carries on with what's unfinished.
+//
+// A series can have a set of its own, in <series>/exercises/ (ADR 0030): the course's exercises,
+// solved with its bible (course.md) for the notation. Home shows it in the series' card.
 import { app, nativeImage, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -26,6 +29,7 @@ import {
   vttToSrt,
   type IntakeExercise,
 } from '../shared/exercise'
+import { DEFAULT_TONE } from '../shared/tone'
 import type {
   Aspect,
   ExerciseDetail,
@@ -62,6 +66,7 @@ interface SetFile {
   tone: Tone
   language: string
   voice?: VoiceSettings
+  course?: string // the series folder, for a course's own set
   exercises: string[]
 }
 
@@ -78,6 +83,7 @@ interface Saved {
 const IMAGE = /\.(png|jpe?g|gif|webp)$/i
 const PDF = /\.pdf$/i
 const PLACEHOLDER = 'New exercises'
+const COURSE_FILE = 'course.md' // a course's exercise: the series bible, for its notation
 
 const setFile = (folder: string) => join(folder, 'exercises.json')
 const savedFile = (dir: string) => join(dir, '.studio', 'exercise.json')
@@ -145,7 +151,7 @@ function itemFrom(dir: string, number: number): ExerciseItem {
 function load(folder: string): ExerciseSet {
   const f = readSetFile(folder)
   const items = f.exercises.filter((name) => existsSync(join(folder, name, 'project.json'))).map((name, i) => itemFrom(join(folder, name), i + 1))
-  return { folder, title: f.title, level: f.level, createdAt: f.createdAt, items }
+  return { folder, title: f.title, level: f.level, createdAt: f.createdAt, items, course: f.course }
 }
 
 /** Every set this app knows: the ones it made, and any in the projects folder. */
@@ -245,6 +251,33 @@ export async function createExerciseSet(req: NewExerciseSet): Promise<string> {
   return folder
 }
 
+/** The series' own set (<series>/exercises/), made the first time: settings from its first episode. */
+export function courseExercises(series: string): string {
+  const folder = join(series, 'exercises')
+  if (!existsSync(setFile(folder))) {
+    const file = join(series, 'series.json')
+    if (!existsSync(file)) throw new Error('That folder isn’t a series any more (its series.json is gone).')
+    const { plan, episodes } = JSON.parse(readFileSync(file, 'utf8')) as { plan: { title: string }; episodes: string[] }
+    const first = episodes.map((name) => join(series, name)).find((d) => existsSync(join(d, 'project.json')))
+    if (!first) throw new Error('The series has no episodes yet.')
+    const meta = readMeta(first)
+    mkdirSync(folder, { recursive: true })
+    writeSetFile(folder, {
+      title: plan.title,
+      createdAt: new Date().toISOString(),
+      aspect: meta.aspect,
+      theme: meta.theme,
+      tone: meta.tone ?? DEFAULT_TONE,
+      language: meta.voice.language,
+      voice: meta.voice,
+      course: series,
+      exercises: [],
+    })
+  }
+  if (!(getSettings().exerciseSets ?? []).includes(folder)) setSettings({ exerciseSets: [folder, ...(getSettings().exerciseSets ?? [])] })
+  return folder
+}
+
 /** Reads the exercises out of the input in the background; each one found is added and solved. */
 export async function addExercises(folder: string, input: ExerciseInput): Promise<void> {
   await ensureReady()
@@ -291,6 +324,7 @@ async function addOne(set: ExerciseSet, ex: IntakeExercise, files: string[]): Pr
   for (let i = 2; existsSync(dir); i++) dir = join(set.folder, `${two(number)}-${basename(made)}-${i}`)
   renameSync(made, dir)
   writeFileSync(join(dir, PROBLEM_FILE), `# ${ex.title}\n\n${ex.statement.trim()}\n`)
+  if (f.course && existsSync(join(f.course, 'series.md'))) copyFileSync(join(f.course, 'series.md'), join(dir, COURSE_FILE))
   const src = ex.file ? files.find((p) => basename(p) === ex.file) : undefined
   if (src) {
     const into = IMAGE.test(src) ? 'media' : 'sources'
@@ -640,7 +674,12 @@ export function exerciseBrief(meta: ProjectMeta): string {
     `This project is an exercise of the exercise set "${f.title}"${f.level ? `, for ${f.level}` : ''}. problem.md is the exercise as the user gave it; the original picture or PDF, when there is one, is in media/ or sources/. solution.md is the worked solution: its ## sections are the steps, and the video's sections are named after them.`,
     'The user is studying with it. When they ask a question, answer it in the chat: clearly, step by step, with maths in $…$ and $$…$$. Change files only when they ask for a change to the solution or the video.',
     'Check every computation with the calculate tool before you rely on it.',
-  ].join('\n')
+    f.course
+      ? 'These are the exercises of a course, the series in the folder above this set. course.md is its bible: use its notation and visual vocabulary, and point to the episode that teaches a method where it helps ("as in episode 3").'
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 function solvePrompt(dir: string): string {

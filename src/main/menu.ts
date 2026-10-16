@@ -70,7 +70,7 @@ export function refreshMenu(): void {
         // Learn mode has no editor (ADR 0029): only what makes something to watch.
         ...(learn ? [] : [item('New Project…', 'new-project', 'Cmd+N')]),
         item('Quick Video…', 'quick', 'Shift+Cmd+N'),
-        item('New Series…', 'series'),
+        item(learn ? 'New Course…' : 'New Series…', 'series'),
         item('New Exercise Set…', 'exercises'),
         ...(learn ? [] : [item('Open Project…', 'open-project', 'Cmd+O')]),
         {
