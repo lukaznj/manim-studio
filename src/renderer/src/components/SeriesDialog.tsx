@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_TONE, TONES } from '../../../shared/tone'
 import type { Aspect, Effort, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
 import { api } from '../lib/api'
-import { closeDialog, errorText, toast, useStore } from '../store'
+import { canEdit, closeDialog, errorText, toast, useStore } from '../store'
 import { ModelPicker } from './ChatPane'
 import { ExportOn } from './ExportDialog'
 import { VoiceForm, voiceProblem } from './SettingsDialog'
@@ -28,6 +28,7 @@ export function SeriesDialog() {
   const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
   const [voice, setVoice] = useState<VoiceSettings>({ provider: 'elevenlabs', language: 'en' })
   const [unattended, setUnattended] = useState(true)
+  const editing = useStore((s) => canEdit(s)) // Learn mode makes every episode itself: there is no editor to make them in
   const settings = useStore((s) => s.settings)
   const [model, setModel] = useState('')
   const [effort, setEffort] = useState<Effort>('high')
@@ -108,7 +109,7 @@ export function SeriesDialog() {
         language,
         voice,
         export: { themes: [theme], languages: [], languageVideos: false, server },
-        unattended,
+        unattended: unattended || !editing,
       })
       closeDialog()
       toast(
@@ -284,18 +285,20 @@ export function SeriesDialog() {
             </div>
           )}
           {unattended && <ExportOn value={server} onChange={setServer} />}
-          <label className="export-check">
-            <input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} />
-            <span>
-              Make every episode now, unattended{' '}
-              <span className="hint">
-                {codex
-                  ? 'One after another, each exported when it’s done.'
-                  : `The scripts are written in order, and each video starts as soon as its script is ready, ${agents} agents at a time (Settings → Agent); each is exported when it’s done.`}{' '}
-                Off: the episodes are created, and you make each in the editor.
+          {editing && (
+            <label className="export-check">
+              <input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} />
+              <span>
+                Make every episode now, unattended{' '}
+                <span className="hint">
+                  {codex
+                    ? 'One after another, each exported when it’s done.'
+                    : `The scripts are written in order, and each video starts as soon as its script is ready, ${agents} agents at a time (Settings → Agent); each is exported when it’s done.`}{' '}
+                  Off: the episodes are created, and you make each in the editor.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          )}
         </div>
       ) : (
         <div className="modal-body series-plan">
