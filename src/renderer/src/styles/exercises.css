@@ -132,6 +132,9 @@
 .ex-state-icon.done {
   color: var(--mint);
 }
+.ex-state-icon.watched {
+  color: var(--sun-text);
+}
 .ex-state-icon.failed {
   color: var(--coral);
 }

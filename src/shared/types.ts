@@ -140,6 +140,7 @@ export interface ExerciseItem {
   answer?: string
   video?: string // the exported mp4, once there is one
   subtitles?: string // its .vtt
+  watched?: boolean // its video was watched (src/main/watched.ts)
 }
 
 export interface ExerciseSet {
@@ -194,6 +195,7 @@ export interface FollowUp {
   activity?: string
   error?: string
   video?: string
+  watched?: boolean
 }
 
 export interface WatchEpisode {
@@ -201,6 +203,7 @@ export interface WatchEpisode {
   number: number
   title: string
   video?: string // the exported video, else none (the preview plays meanwhile)
+  watched?: boolean
   followUps: FollowUp[]
 }
 
@@ -826,6 +829,8 @@ export interface StudioApi {
   /** Makes a new video explaining the part of an episode at `at` further, as the viewer asks. */
   requestFollowUp(dir: string, at: number, request: string): Promise<void>
   retryFollowUp(dir: string): Promise<void>
+  /** Marks a video (an episode, follow-up or exercise) watched or not; its list updates. */
+  setWatched(dir: string, watched: boolean): Promise<void>
   renderServers(): Promise<RenderServer[]>
   /** Pairs with a render worker from the code it printed; checks that it answers first. */
   addServer(code: string): Promise<RenderServer[]>

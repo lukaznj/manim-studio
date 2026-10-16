@@ -16,6 +16,7 @@ import { createProject, readMeta, readTimeline, updateMetaAt } from './projects'
 import { checkAndFix } from './quick'
 import { writeEpisodeBible } from './series'
 import { titleFrom } from './title'
+import { isWatched, writeWatched } from './watched'
 
 let send: (series: WatchSeries) => void = () => {}
 const running = new Map<string, { activity?: string }>() // follow-ups being made, by folder
@@ -53,6 +54,7 @@ function followUp(dir: string): FollowUp {
     request: meta.extra?.request ?? '',
     state: run ? 'making' : video ? 'done' : 'failed',
     activity: run?.activity,
+    watched: isWatched(dir),
     error: run || video ? undefined : (failed ?? 'It was interrupted. Try again.'),
     video,
   }
@@ -74,6 +76,7 @@ export function watchSeries(folder: string): WatchSeries {
         number: readMeta(dir).series?.episode ?? i + 1,
         title: readMeta(dir).name,
         video: exported(dir),
+        watched: isWatched(dir),
         followUps: follow
           .map((n) => join(extras, n))
           .filter((d) => readMeta(d).extra?.of === name)
@@ -81,6 +84,13 @@ export function watchSeries(folder: string): WatchSeries {
       }
     })
   return { folder, title: plan.title, episodes: list }
+}
+
+/** Marks a video watched or not; the screen showing its list hears about it. */
+export function setWatched(dir: string, watched: boolean, exerciseChanged: (dir: string, watched: boolean) => void): void {
+  writeWatched(dir, watched)
+  if (readMeta(dir).exercise) exerciseChanged(dir, watched)
+  else changed(dir)
 }
 
 export function watchDetail(dir: string): WatchDetail {

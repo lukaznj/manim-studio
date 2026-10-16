@@ -42,7 +42,7 @@ import {
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
-import { requestFollowUp, retryFollowUp, setupWatch, watchDetail, watchSeries } from './watch'
+import { requestFollowUp, retryFollowUp, setupWatch, setWatched, watchDetail, watchSeries } from './watch'
 import { checkAnthropicKey, checkOpenAIKey, keyUsable } from './keys'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
@@ -339,6 +339,7 @@ function registerIpc(): void {
   handle('watchDetail', (dir: string) => watchDetail(dir))
   handle('requestFollowUp', (dir: string, at: number, request: string) => requestFollowUp(dir, at, request))
   handle('retryFollowUp', (dir: string) => retryFollowUp(dir))
+  handle('setWatched', (dir: string, watched: boolean) => setWatched(dir, watched, ex.watchedChanged))
   handle('renderServers', () => listServers())
   handle('addServer', (code: string) => addServer(code))
   handle('removeServer', (id: string) => removeServer(id))

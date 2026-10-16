@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Code2, CornerDownRight, MessageCircleQuestion, RotateCcw, Sparkles } from 'lucide-react'
+import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, MessageCircleQuestion, RotateCcw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -23,7 +23,9 @@ export function WatchView() {
       <aside className="ex-side">
         <div className="ex-side-head">
           <h2 className="ex-set-title">{series.title}</h2>
-          <p className="faint">{series.episodes.length === 1 ? '1 episode' : `${series.episodes.length} episodes`}</p>
+          <p className="faint">
+            {series.episodes.length === 1 ? '1 episode' : `${series.episodes.length} episodes`}, {series.episodes.filter((e) => e.watched).length} watched
+          </p>
         </div>
         <ul className="ex-list">
           {series.episodes.map((e) => (
@@ -45,9 +47,9 @@ function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?
           <span className="ex-num mono">{e.number}</span>
           <span className="ex-row-body">
             <span className="ex-row-title">{e.title}</span>
-            <span className="ex-row-state">{e.video ? 'Exported' : 'Preview only: export it for the full quality'}</span>
+            <span className="ex-row-state">{e.watched ? 'Watched' : e.video ? 'Not watched yet' : 'Preview only: export it for the full quality'}</span>
           </span>
-          {e.video && <Check className="ex-state-icon done" />}
+          {e.watched && <Eye className="ex-state-icon watched" />}
         </button>
       </li>
       {e.followUps.map((f) => (
@@ -58,7 +60,15 @@ function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?
               <span className="ex-row-title">{f.request}</span>
               <span className="ex-row-state">{f.state === 'making' ? (f.activity ?? 'Making the video') : f.state === 'failed' ? (f.error ?? 'Didn’t finish') : `Follow-up from ${clock(f.at)}`}</span>
             </span>
-            {f.state === 'making' ? <span className="spinner" /> : f.state === 'failed' ? <CircleAlert className="ex-state-icon failed" /> : <Check className="ex-state-icon done" />}
+            {f.state === 'making' ? (
+              <span className="spinner" />
+            ) : f.state === 'failed' ? (
+              <CircleAlert className="ex-state-icon failed" />
+            ) : f.watched ? (
+              <Eye className="ex-state-icon watched" />
+            ) : (
+              <Check className="ex-state-icon done" />
+            )}
           </button>
         </li>
       ))}
@@ -84,6 +94,7 @@ function Watched({ dir, episode, followUp }: { dir: string; episode: WatchEpisod
           <h1>{followUp ? followUp.request : episode.title}</h1>
         </div>
         <div className="ex-detail-actions">
+          <WatchedToggle dir={dir} watched={!!(followUp ? followUp.watched : episode.watched)} />
           {followUp?.state === 'failed' && (
             <button className="btn small" onClick={() => void api.retryFollowUp(dir).catch((e) => toast(errorText(e), 'error'))}>
               <RotateCcw /> Try again
@@ -98,7 +109,14 @@ function Watched({ dir, episode, followUp }: { dir: string; episode: WatchEpisod
 
       {src ? (
         <>
-          <StudyPlayer src={src} vtt={detail?.video ? detail.vtt : undefined} chapters={detail?.chapters ?? []} video={video} resume />
+          <StudyPlayer
+            src={src}
+            vtt={detail?.video ? detail.vtt : undefined}
+            chapters={detail?.chapters ?? []}
+            video={video}
+            resume
+            onWatched={() => !(followUp ? followUp.watched : episode.watched) && void api.setWatched(dir, true)}
+          />
           {!detail?.video && <p className="faint ex-preview-note">The preview: export the video for the full quality.</p>}
         </>
       ) : (
@@ -116,6 +134,15 @@ function Watched({ dir, episode, followUp }: { dir: string; episode: WatchEpisod
       {!!detail?.subtitles.length && <Transcript detail={detail} video={video} onAsk={(line, t) => ask(`At ${clock(t)} it says: “${line}”. I don’t understand this part. Explain it more thoroughly.`)} />}
       {!followUp && src && <FollowUpRequest dir={dir} />}
     </div>
+  )
+}
+
+/** Watched or not: marked by itself at 90%, or here by hand. */
+export function WatchedToggle({ dir, watched }: { dir: string; watched: boolean }) {
+  return (
+    <button className={`btn small ${watched ? '' : 'ghost'}`} onClick={() => void api.setWatched(dir, !watched)} title={watched ? 'Mark as not watched' : 'Mark as watched'}>
+      {watched ? <Eye /> : <EyeOff />} {watched ? 'Watched' : 'Not watched'}
+    </button>
   )
 }
 
