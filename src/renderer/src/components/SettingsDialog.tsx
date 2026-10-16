@@ -938,7 +938,9 @@ function AboutTab() {
         text={
           settings.mode === 'learn'
             ? 'Learn: courses and exercises become videos to study, with a chat to ask about them. No editor.'
-            : 'Create: the full studio, with the editor, the timeline and exports for publishing.'
+            : settings.mode === 'both'
+              ? 'Both: Home has a Create tab (projects and the editor) and a Learn tab (courses to study).'
+              : 'Create: the full studio, with the editor, the timeline and exports for publishing.'
         }
       >
         <Tabs
@@ -948,6 +950,7 @@ function AboutTab() {
           items={[
             { value: 'learn', label: 'Learn' },
             { value: 'create', label: 'Create' },
+            { value: 'both', label: 'Both' },
           ]}
         />
       </Row>

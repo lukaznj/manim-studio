@@ -336,6 +336,7 @@ function registerIpc(): void {
   handle('searchExercises', (query: string) => ex.searchExercises(query))
   handle('makeLecture', (folder: string, dirs: string[]) => ex.makeLecture(folder, dirs))
   handle('watchSeries', (folder: string) => watchSeries(folder))
+  handle('courseExercises', (series: string) => ex.courseExercises(series))
   handle('watchDetail', (dir: string) => watchDetail(dir))
   handle('requestFollowUp', (dir: string, at: number, request: string) => requestFollowUp(dir, at, request))
   handle('retryFollowUp', (dir: string) => retryFollowUp(dir))

@@ -85,7 +85,7 @@ export type Dialog =
   | null
 
 interface State {
-  screen: 'home' | 'editor' | 'exercises' | 'watch'
+  screen: 'home' | 'editor' | 'study'
   app: AppInfo | null
   settings: Settings | null
   setup: SetupStatus | null
@@ -116,8 +116,9 @@ interface State {
   series: SeriesRun | null // a series being made unattended (SeriesPanel.tsx on Home)
   homeSeries: string | null // the series folder Home has open, or null for all projects
   exerciseSets: ExerciseSet[] // Home's cards
-  exerciseSet: ExerciseSet | null // the set on the exercises screen (ExercisesView.tsx)
-  watchSeries: WatchSeries | null // the series on the Watch screen (WatchView.tsx)
+  // The study screen (StudyView.tsx, ADR 0030) shows a course: its lessons, its exercises, or both.
+  exerciseSet: ExerciseSet | null // its exercises
+  watchSeries: WatchSeries | null // its lessons (a series, or a single video)
   watchTime: number | null // where the study player is, for the chat; null without a video
   elevenLabsCheck: ElevenLabsCheck | null // the saved key's permissions, once checked this session
   selection: number[] // clip indices
@@ -247,12 +248,14 @@ export async function boot(): Promise<void> {
   api.on('watch', (w) => set((st) => (st.watchSeries?.folder === w.folder ? { watchSeries: w } : {})))
   api.on('exercises', (s) => {
     set((st) => ({
-      exerciseSet: st.exerciseSet?.folder === s.folder ? s : st.exerciseSet,
+      // A course's own set, just made by adding the first exercises to it, shows up too.
+      exerciseSet: st.exerciseSet?.folder === s.folder || (s.course && st.watchSeries?.folder === s.course) ? s : st.exerciseSet,
       exerciseSets: st.exerciseSets.some((x) => x.folder === s.folder) ? st.exerciseSets.map((x) => (x.folder === s.folder ? s : x)) : [s, ...st.exerciseSets],
     }))
-    // The first exercises of a new set are in: show the first one.
+    // The first exercises of a new set are in: show the first one (a course stays on its lesson).
     const st = get()
-    if (st.screen === 'exercises' && st.exerciseSet?.folder === s.folder && s.items.length && st.project?.meta.exercise?.set !== s.folder) void selectExercise(s.items[0].dir)
+    if (st.screen === 'study' && !st.watchSeries && st.exerciseSet?.folder === s.folder && s.items.length && st.project?.meta.exercise?.set !== s.folder)
+      void selectStudied(s.items[0].dir)
   })
   void api.seriesRun().then((series) => set({ series }))
   // Claude wrote the script: show it, unless you're in the middle of something else.
@@ -265,39 +268,49 @@ export async function refreshProjects(): Promise<void> {
   set({ projects, exerciseSets })
 }
 
-// --- exercise sets (ExercisesView.tsx, src/main/exercises.ts) ------------------------------------------
+// --- the study screen (StudyView.tsx, ADR 0030): a course's lessons and exercises ------------------------
 
-/** Shows a set; with `dir`, that exercise (else the first), which becomes the open project for the chat. */
+/** An exercise set; a course's own set comes with the course's lessons. With `dir`, that exercise, else the first. */
 export async function openExerciseSet(folder: string, dir?: string): Promise<void> {
   const exerciseSet = await guard(api.exerciseSet(folder))
   if (!exerciseSet) return
-  withTransition(() => set({ screen: 'exercises', exerciseSet }))
+  const watchSeries = exerciseSet.course ? await api.watchSeries(exerciseSet.course).catch(() => null) : null
+  withTransition(() => set({ screen: 'study', exerciseSet, watchSeries }))
   const pick = dir ?? (get().project?.meta.exercise?.set === folder ? get().project!.path : exerciseSet.items[0]?.dir)
-  if (pick) await selectExercise(pick)
+  if (pick) await selectStudied(pick)
 }
 
-/** Opens the exercise as the project (for the chat), staying on the exercises screen. */
-export const selectExercise = (dir: string) => selectStudied(dir, 'exercises')
-
-/** Opens a project for the chat while its video is studied (the exercises and Watch screens). */
-async function selectStudied(dir: string, screen: 'exercises' | 'watch'): Promise<void> {
-  if (get().project?.path === dir) return
-  if (get().dirty) await saveScene()
-  const opened = await guard(api.openProject(dir))
-  if (opened) applyOpened(opened, screen)
-  set({ watchTime: null })
-}
-
-/** A series' Watch screen (WatchView.tsx): with `dir`, that episode or follow-up, else the first. */
+/** A series (or a single video) with its exercises, if it has some. With `dir`, that video, else the first episode. */
 export async function openWatch(folder: string, dir?: string): Promise<void> {
   const watchSeries = await guard(api.watchSeries(folder))
   if (!watchSeries) return
-  withTransition(() => set({ screen: 'watch', watchSeries }))
+  const exerciseSet = watchSeries.exercises ? await api.exerciseSet(watchSeries.exercises).catch(() => null) : null
+  withTransition(() => set({ screen: 'study', watchSeries, exerciseSet }))
   const pick = dir ?? (get().project?.meta.series?.folder === folder ? get().project!.path : watchSeries.episodes[0]?.dir)
-  if (pick) await selectWatched(pick)
+  if (pick) await selectStudied(pick)
 }
 
-export const selectWatched = (dir: string) => selectStudied(dir, 'watch')
+/** Opens a video of the course as the project (for the chat), staying on the study screen. */
+export async function selectStudied(dir: string): Promise<void> {
+  if (get().project?.path === dir) return
+  if (get().dirty) await saveScene()
+  const opened = await guard(api.openProject(dir))
+  if (opened) applyOpened(opened, 'study')
+  set({ watchTime: null })
+}
+
+/** "Add exercises" on a course: its own set is made the first time, then the usual dialog. */
+export async function addCourseExercises(): Promise<void> {
+  const { exerciseSet, watchSeries } = get()
+  if (!exerciseSet && watchSeries) {
+    const folder = await guard(api.courseExercises(watchSeries.folder))
+    if (!folder) return
+    const made = await guard(api.exerciseSet(folder))
+    if (!made) return
+    set((s) => ({ exerciseSet: made, watchSeries: s.watchSeries && { ...s.watchSeries, exercises: folder } }))
+  }
+  openDialog({ kind: 'add-exercises' })
+}
 
 export async function createExerciseSet(req: Parameters<typeof api.createExerciseSet>[0]): Promise<boolean> {
   const folder = await guard(api.createExerciseSet(req))
@@ -436,9 +449,13 @@ export async function installComponent(c: Component): Promise<void> {
 /** Whether the editor exists for this user: not in Learn mode (ADR 0029). Every way into it asks here. */
 export const canEdit = (s: Pick<State, 'settings'> = get()): boolean => s.settings?.mode !== 'learn'
 
+/** Whether Home is the library, where everything opens on the study screen: Learn, or Both on its Learn tab. */
+export const studying = (s: Pick<State, 'settings'> = get()): boolean =>
+  s.settings?.mode === 'learn' || (s.settings?.mode === 'both' && s.settings.homeTab === 'learn')
+
 export async function openProject(path: string): Promise<void> {
   // Quick mode's progress screen isn't the editor: it opens the same way, and its video is watched after.
-  if (!canEdit() && get().quick?.project !== path) return studyProject(path)
+  if (studying() && get().quick?.project !== path) return studyProject(path)
   const opened = await guard(api.openProject(path))
   if (!opened) return
   withTransition(() => applyOpened(opened))
@@ -461,7 +478,7 @@ export async function leaveEditor(): Promise<void> {
   else set({ screen: 'home' })
 }
 
-/** Learn mode's way to open anything: an exercise in its set, everything else on the Watch screen. */
+/** Learn mode's way to open anything: on the study screen, with its course. */
 async function studyProject(path: string): Promise<void> {
   let summary = get().projects.find((p) => p.path === path)
   if (!summary) {
@@ -659,7 +676,7 @@ export async function sendChat(text: string, withFrame: boolean): Promise<boolea
     : undefined
   try {
     const { screen, watchTime } = get()
-    const studying = screen === 'exercises' || screen === 'watch'
+    const studying = screen === 'study'
     await api.chatSend({
       text,
       context: studying ? undefined : context,

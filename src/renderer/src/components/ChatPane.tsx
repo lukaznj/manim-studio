@@ -25,8 +25,8 @@ export function ChatPane() {
   const codex = useStore((s) => s.settings?.agent === 'codex')
   const all = useStore((s) => s.chat)
   // On the exercises screen the chat is the student's: the agents' own turns stay out of it.
-  const exercise = useStore((s) => s.screen === 'exercises' || s.screen === 'watch') // studying a finished video
-  const watching = useStore((s) => s.screen === 'watch')
+  const exercise = useStore((s) => s.screen === 'study') // studying a finished video
+  const watching = useStore((s) => s.screen === 'study' && !s.project?.meta.exercise)
   const chat = useMemo(() => (exercise ? all.filter((m) => !m.auto) : all), [all, exercise])
   const busy = useStore((s) => s.chatBusy)
   const streaming = useStore((s) => s.streaming)
@@ -395,7 +395,7 @@ function Composer() {
   const selection = useStore((s) => s.selection)
   const [text, setText] = useState('')
   const [frame, setFrame] = useState(true)
-  const exercise = useStore((s) => s.screen === 'exercises' || s.screen === 'watch') // a student's questions: the moment, not clips
+  const exercise = useStore((s) => s.screen === 'study') // a student's questions: the moment, not clips
   const area = useRef<HTMLTextAreaElement>(null)
   const draft = useStore((s) => s.chatDraft)
   const source = useStore((s) => s.chatSource)
@@ -431,7 +431,7 @@ function Composer() {
 
   return (
     <div className="composer">
-      {useStore.getState().chat.length === 0 && !['exercises', 'watch'].includes(useStore.getState().screen) && (
+      {useStore.getState().chat.length === 0 && useStore.getState().screen !== 'study' && (
         <div className="suggestions">
           {SUGGESTIONS.map((s) => (
             <button key={s} className="suggestion" onClick={() => setText(s)}>

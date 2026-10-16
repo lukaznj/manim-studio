@@ -4,8 +4,7 @@ import { BoothDialog } from './components/RecordingBooth'
 import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
 import { AddExercisesDialog, LectureDialog, NewExerciseSetDialog } from './components/ExerciseDialogs'
-import { ExercisesView } from './components/ExercisesView'
-import { WatchView } from './components/WatchView'
+import { StudyView } from './components/StudyView'
 import { ModeChoice } from './components/ModeChoice'
 import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
@@ -37,10 +36,8 @@ export function App() {
         {ready &&
           (screen === 'home' ? (
             <Home />
-          ) : screen === 'exercises' ? (
-            <ExercisesView />
-          ) : screen === 'watch' ? (
-            <WatchView />
+          ) : screen === 'study' ? (
+            <StudyView />
           ) : quickHere ? (
             <QuickView />
           ) : editorBarred ? null : (

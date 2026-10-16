@@ -21,7 +21,7 @@ import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { ago, timecode } from '../lib/time'
 import {
-  canEdit,
+  studying,
   installComponent,
   locateProject,
   openDialog,
@@ -33,6 +33,7 @@ import {
   refreshProjects,
   toast,
   errorText,
+  updateSettings,
   useStore,
 } from '../store'
 import { ProgressLine } from './ui'
@@ -41,15 +42,17 @@ import { SeriesPanel } from './SeriesPanel'
 export function Home() {
   const all = useStore((s) => s.projects)
   const projects = useMemo(() => all.filter((p) => !p.exercise && !p.extra), [all]) // exercises show in their set's card, follow-ups under their episode
-  const sets = useStore((s) => s.exerciseSets)
-  const editing = useStore((s) => canEdit(s)) // Learn mode: a library to watch, no editor (ADR 0029)
+  const allSets = useStore((s) => s.exerciseSets)
+  const sets = useMemo(() => allSets.filter((x) => !x.course), [allSets]) // a course's own set shows in its series' card
+  const editing = useStore((s) => !studying(s)) // Learn: a library to watch, no editor (ADR 0029); Both has a tab for each
+  const both = useStore((s) => s.settings?.mode === 'both')
   const setup = useStore((s) => s.setup)
   const claude = useStore((s) => s.claude)
   const needsSetup = !!setup && (setup.env !== 'ready' || setup.latex !== 'ready' || (claude && !claude.loggedIn))
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n' && canEdit()) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n' && !studying()) {
         e.preventDefault()
         openDialog({ kind: 'new-project' })
       }
@@ -68,7 +71,23 @@ export function Home() {
       <div className="home-inner">
         <header className="home-head">
           <div>
-            <h1>{editing ? 'Projects' : 'Library'}</h1>
+            {both ? (
+              <div className="home-tabs" role="tablist" aria-label="Learn or create">
+                {(['create', 'learn'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    role="tab"
+                    aria-selected={(tab === 'create') === editing}
+                    className={`home-tab ${(tab === 'create') === editing ? 'on' : ''}`}
+                    onClick={() => (useStore.setState({ homeSeries: null }), void updateSettings({ homeTab: tab }))}
+                  >
+                    {tab === 'create' ? 'Create' : 'Learn'}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <h1>{editing ? 'Projects' : 'Library'}</h1>
+            )}
             <p className="muted">
               {editing
                 ? 'Each project is one video: a scene in code, its voice and its subtitles.'
@@ -85,7 +104,7 @@ export function Home() {
               <GraduationCap /> Exercises
             </button>
             <button className="btn large" onClick={() => openDialog({ kind: 'series' })} title="A series of videos from a course's PDFs">
-              <Library /> New series
+              <Library /> {editing ? 'New series' : 'New course'}
             </button>
             <button className="btn large" onClick={() => openDialog({ kind: 'quick' })} title="Describe it, attach PDFs, and Studio makes and exports it">
               <Zap /> Quick video
@@ -136,7 +155,13 @@ export function Home() {
             ))}
             {items.map((item, i) =>
               'episodes' in item ? (
-                <SeriesCard key={item.folder} folder={item.folder} episodes={item.episodes} index={i} />
+                <SeriesCard
+                  key={item.folder}
+                  folder={item.folder}
+                  episodes={item.episodes}
+                  exercises={allSets.find((x) => x.course === item.folder)?.items.length ?? 0}
+                  index={i}
+                />
               ) : (
                 <ProjectCard key={item.path} project={item} index={i} />
               ),
@@ -200,12 +225,12 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
 }
 
 /** A series on Home: its first episodes' pictures stacked, the title and how many episodes it has. */
-function SeriesCard({ folder, episodes, index }: { folder: string; episodes: ProjectSummary[]; index: number }) {
+function SeriesCard({ folder, episodes, exercises, index }: { folder: string; episodes: ProjectSummary[]; exercises: number; index: number }) {
   const first = episodes[0]
   const cover = episodes.find((e) => e.thumbnail) ?? first
   const latest = Math.max(...episodes.map((e) => e.updatedAt))
   // Learn mode watches a series; Create opens its episodes to edit.
-  const open = () => (canEdit() ? useStore.setState({ homeSeries: folder }) : void openWatch(folder))
+  const open = () => (!studying() ? useStore.setState({ homeSeries: folder }) : void openWatch(folder))
   return (
     <article
       className="project-card series-card"
@@ -225,7 +250,11 @@ function SeriesCard({ folder, episodes, index }: { folder: string; episodes: Pro
             <Library /> Series
           </span>
           <span className="faint">{episodes.length === 1 ? '1 episode' : `${episodes.length} episodes`}</span>
-          <span className="faint project-ago">{ago(latest)}</span>
+          {exercises ? (
+            <span className="faint">{exercises === 1 ? '1 exercise' : `${exercises} exercises`}</span>
+          ) : (
+            <span className="faint project-ago">{ago(latest)}</span>
+          )}
         </div>
       </div>
     </article>
@@ -320,7 +349,7 @@ function EmptyState() {
         <path d="M54 22 Q93.1 154.6 132.2 61.8" fill="none" stroke="var(--sun)" strokeWidth="3" strokeLinecap="round" className="draw" />
         <circle cx="132.2" cy="61.8" r="6" fill="var(--blue)" className="pop" />
       </svg>
-      {canEdit() ? (
+      {!studying() ? (
         <>
           <h2>Every video starts with an empty scene</h2>
           <p className="muted">Pick a format, describe what to show, and Claude writes the animation, the narration and the subtitles with you.</p>
@@ -331,7 +360,7 @@ function EmptyState() {
           <p className="muted">Describe a topic, add your notes or exercises, and Claude makes explained videos you can watch and ask about.</p>
         </>
       )}
-      {canEdit() ? (
+      {!studying() ? (
         <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
           <Plus /> New project
         </button>

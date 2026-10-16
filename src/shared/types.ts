@@ -153,6 +153,8 @@ export interface ExerciseSet {
   paused?: boolean // its agents are stopped until it's resumed
   items: ExerciseItem[]
   lecture?: { state: 'making' | 'done' | 'failed'; file?: string; error?: string }
+  /** The series this set is the exercises of (<series>/exercises/, ADR 0030); none for a set on its own. */
+  course?: string
 }
 
 /** solution.md, read for the screen: the steps are its ## sections. */
@@ -211,6 +213,8 @@ export interface WatchSeries {
   folder: string
   title: string
   episodes: WatchEpisode[]
+  /** The course's exercise set (<series>/exercises/), once exercises were added to it (ADR 0030). */
+  exercises?: string
 }
 
 /** One video on the Watch screen: what plays, its chapters and its words. */
@@ -600,11 +604,12 @@ export interface ClaudeLoginEvent {
 
 export type Appearance = 'system' | 'light' | 'dark'
 
-/** Who the app is for (ADR 0029): Learn hides the editor everywhere; Create is the full studio. */
-export type AppMode = 'learn' | 'create'
+/** Who the app is for (ADR 0029): Learn hides the editor everywhere; Create is the full studio; Both has a tab for each on Home. */
+export type AppMode = 'learn' | 'create' | 'both'
 
 export interface Settings {
   mode?: AppMode // unset until chosen at first launch
+  homeTab?: 'learn' | 'create' // Both: the Home tab last shown (unset: Create)
   appearance: Appearance // 'system' follows the OS
   projectsDir: string
   recentProjects: string[]
@@ -830,6 +835,8 @@ export interface StudioApi {
 
   /** A series as its Watch screen shows it: episodes with their videos and follow-ups. */
   watchSeries(folder: string): Promise<WatchSeries>
+  /** The series' own exercise set, made on first use: returns its folder (ADR 0030). */
+  courseExercises(series: string): Promise<string>
   watchDetail(dir: string): Promise<WatchDetail>
   /** Makes a new video explaining the part of an episode at `at` further, as the viewer asks. */
   requestFollowUp(dir: string, at: number, request: string): Promise<void>
