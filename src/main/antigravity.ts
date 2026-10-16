@@ -2,8 +2,9 @@
 // isn't bundled: choosing it downloads the pinned release from GitHub, checked against the
 // published sha256, into the app's data folder. It runs with a home folder of its own there, so
 // its settings, permission rules, Studio's tools and its Google sign-in never touch the user's
-// own ~/.gemini. Sign-in is the CLI's own (Google, in the browser, through a pseudo-terminal:
-// studio_runner/agy_login.py) or the user's Gemini API key; the app never reads a token.
+// own ~/.gemini. Sign-in is the CLI's own (Google, in the browser): through a pseudo-terminal on macOS
+// and Linux (studio_runner/agy_login.py), in a console window on Windows; or the user's Gemini API
+// key. The app never reads a token.
 //
 // Containment, measured on 1.3.6 (ADR 0031): no --dangerously-skip-permissions (it also approves
 // leaving the sandbox), so headless runs refuse everything the rules don't allow. The rules allow
@@ -55,7 +56,7 @@ const binDir = () => join(root(), AGY_VERSION)
 export const agyHome = (): string => join(root(), 'home')
 const cliDir = () => join(agyHome(), '.gemini', 'antigravity-cli')
 const tokenFile = () => join(cliDir(), 'antigravity-oauth-token')
-const KEYCHAIN_ITEM = 'antigravity' // the service the CLI stores its sign-in under
+const KEYCHAIN_ITEM = 'antigravity' // the service the CLI stores its sign-in under (macOS: seen in its keychain prompt)
 
 /**
  * macOS: the CLI keeps its Google sign-in in the keychain through /usr/bin/security, which looks
@@ -210,17 +211,30 @@ export async function antigravityStatus(): Promise<ClaudeStatus> {
   if (!installed()) return { loggedIn: false, method: 'not-installed' }
   if (apiKey()) return { loggedIn: true, method: 'api-key', subscription: 'Gemini API key' }
   // Where the CLI keeps it: its keychain item, or the file it falls back to. Existence only: the app never reads it.
-  const loggedIn = (existsSync(tokenFile()) && statSync(tokenFile()).size > 0) || (await inKeychain())
+  // Windows: where it keeps it there is untested (Credential Manager, probably), so ask the CLI itself.
+  const loggedIn = (existsSync(tokenFile()) && statSync(tokenFile()).size > 0) || (await inKeychain()) || (await signedInOnWindows())
   return { loggedIn, method: loggedIn ? 'google' : undefined, subscription: loggedIn ? 'Google account' : undefined }
 }
 
 let loginChild: ChildProcess | null = null
 
 /** The CLI's own Google sign-in, driven in a pseudo-terminal: the link to open, then the code to paste. */
+/** Windows: `agy models` lists the models only when the CLI is signed in, wherever it keeps the sign-in. */
+let windowsSignedIn: boolean | null = null
+async function signedInOnWindows(): Promise<boolean> {
+  const bin = installed()
+  if (process.platform !== 'win32' || !bin) return false
+  windowsSignedIn ??= await run(bin, ['models'], agyEnvBase(), tmpdir()).then(
+    (out) => /\t/.test(out),
+    () => false,
+  )
+  return windowsSignedIn
+}
+
 export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
   const bin = installed()
   if (!bin) throw new Error('Install Antigravity first (Settings → Agent).')
-  if (process.platform === 'win32') throw new Error('On Windows, Antigravity signs in with a Gemini API key here (Settings → Agent).')
+  if (process.platform === 'win32') return windowsLogin(bin, onEvent)
   loginChild?.kill()
   mkdirSync(agyHome(), { recursive: true })
   await ensureKeychain()
@@ -234,6 +248,32 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
   return antigravityStatus()
 }
 
+/**
+ * Windows has no pty for Python, so the CLI's own sign-in opens in a console window of its own
+ * (a detached console program gets one), with Studio's home for it. The user signs in there;
+ * Studio checks every few seconds and closes the window once the CLI is signed in.
+ */
+async function windowsLogin(bin: string, onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
+  loginChild?.kill()
+  const work = join(agyHome(), 'login')
+  mkdirSync(work, { recursive: true })
+  onEvent({
+    line: 'In the Antigravity window: choose Google OAuth, sign in in the browser and paste the code there. It closes by itself once you’re signed in.',
+  })
+  const child = spawn(bin, [], { cwd: work, env: agyEnvBase(), detached: true, stdio: 'ignore', windowsHide: false })
+  loginChild = child
+  const closed = new Promise<void>((resolve) => child.on('exit', () => resolve()))
+  for (let open = true; open;) {
+    open = await Promise.race([closed.then(() => false), new Promise<boolean>((r) => setTimeout(() => r(true), 4000))])
+    windowsSignedIn = null
+    if (await signedInOnWindows()) break
+  }
+  child.kill()
+  loginChild = null
+  onEvent({ done: true })
+  return antigravityStatus()
+}
+
 /** The code the browser showed, typed into the CLI's sign-in. */
 export function antigravityLoginCode(code: string): void {
   loginChild?.stdin?.write(code.trim() + '\n')
@@ -242,6 +282,9 @@ export function antigravityLoginCode(code: string): void {
 /** Forgets the Google sign-in (the CLI's /logout does the same to its own token file). */
 export async function antigravityLogout(): Promise<ClaudeStatus> {
   rmSync(tokenFile(), { force: true })
+  windowsSignedIn = null
+  // Windows: the item's name in Credential Manager is a guess (untested); a missing one is harmless.
+  if (process.platform === 'win32') await run('cmdkey', [`/delete:${KEYCHAIN_ITEM}`]).catch(() => undefined)
   await ensureKeychain()
   if (process.platform === 'darwin')
     while (
