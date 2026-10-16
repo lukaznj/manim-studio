@@ -37,3 +37,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0031-antigravity-as-third-agent]] | Antigravity (Gemini 4 Argon) as a third agent: pinned CLI with its own home, contained by permission rules without the skip flag, Google sign-in through a pseudo-terminal or a Gemini key | accepted |
 | [[0032-searchable-transcript]] | The study screen's transcript follows the video line by line; searching what's said moves the video to each match | accepted |
 | [[0033-every-agent-in-the-background]] | Codex and Antigravity run the background agents too (the bridge names its project); Settings → Accounts shows every agent's sign-in and key | accepted |
+| [[0034-gpu-video-encoding]] | Exports encode on the GPU (VideoToolbox, NVENC, Media Foundation for AMD) when one works, in a cache of their own, with the CPU as the fallback | accepted |
