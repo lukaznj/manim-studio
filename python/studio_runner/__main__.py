@@ -86,7 +86,16 @@ def main(argv: list[str] | None = None) -> int:
     j.add_argument("out", type=Path)
     j.add_argument("videos", type=Path, nargs="+")
 
+    al = sub.add_parser("agy-login", help="Google sign-in for the Antigravity CLI, in a pseudo-terminal")
+    al.add_argument("binary")
+    al.add_argument("home", help="the CLI's own home folder, where it keeps its sign-in")
+
     args = p.parse_args(argv)
+
+    if args.cmd == "agy-login":
+        from .agy_login import run
+
+        return run(args.binary, args.home)
 
     if args.cmd == "render":
         from .render import render

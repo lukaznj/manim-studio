@@ -7,7 +7,7 @@ date: 2026-10-14
 
 ## Context
 
-Some users have a ChatGPT plan rather than a Claude one. Codex, OpenAI's coding agent, can do the same job as Claude in Studio if it gets the same brief and the same tools. Antigravity was considered and left out for now; the same approach would add it later.
+Some users have a ChatGPT plan rather than a Claude one. Codex, OpenAI's coding agent, can do the same job as Claude in Studio if it gets the same brief and the same tools. Antigravity was considered and left out for now; the same approach added it later ([[0031-antigravity-as-third-agent]]).
 
 ## Decision
 
