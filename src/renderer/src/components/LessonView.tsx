@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, MessageCircleQuestion, RotateCcw, Sparkles } from 'lucide-react'
+import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, RotateCcw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -63,7 +63,6 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
     void api.watchDetail(dir).then(setDetail, () => setDetail(null))
   }, [dir, followUp?.state, episode.video])
   const src = detail?.video ?? detail?.preview
-  const ask = (text: string) => useStore.setState({ chatDraft: text })
 
   return (
     <div className="ex-detail">
@@ -112,13 +111,6 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
         </section>
       )}
 
-      {!!detail?.subtitles.length && (
-        <Transcript
-          detail={detail}
-          video={video}
-          onAsk={(line, t) => ask(`At ${clock(t)} it says: “${line}”. I don’t understand this part. Explain it more thoroughly.`)}
-        />
-      )}
       {!followUp && !single && src && <FollowUpRequest dir={dir} />}
     </div>
   )
@@ -134,48 +126,6 @@ export function WatchedToggle({ dir, watched }: { dir: string; watched: boolean 
     >
       {watched ? <Eye /> : <EyeOff />} {watched ? 'Watched' : 'Not watched'}
     </button>
-  )
-}
-
-/** What's said, line by line, following the video: click a line to go there, ask about it. */
-function Transcript({
-  detail,
-  video,
-  onAsk,
-}: {
-  detail: WatchDetail
-  video: React.RefObject<HTMLVideoElement | null>
-  onAsk: (line: string, t: number) => void
-}) {
-  const now = useStore((s) => s.watchTime ?? 0)
-  const list = useRef<HTMLOListElement>(null)
-  const current = detail.subtitles.findIndex((s) => now >= s.start && now < s.end)
-  useEffect(() => {
-    list.current?.querySelector('.on')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [current])
-  return (
-    <section className="ex-card watch-transcript">
-      <h2 className="ex-card-title">Transcript</h2>
-      <ol ref={list}>
-        {detail.subtitles.map((s, i) => (
-          <li key={i} className={i === current ? 'on' : ''}>
-            <button
-              className="watch-line"
-              onClick={() => {
-                if (!video.current) return
-                video.current.currentTime = s.start + 0.01
-                void video.current.play()
-              }}
-            >
-              <span className="mono faint">{clock(s.start)}</span> {s.text}
-            </button>
-            <button className="icon-btn" title="Ask about this line in the chat" aria-label="Ask about this line" onClick={() => onAsk(s.text, s.start)}>
-              <MessageCircleQuestion />
-            </button>
-          </li>
-        ))}
-      </ol>
-    </section>
   )
 }
 

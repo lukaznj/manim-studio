@@ -20,7 +20,8 @@ const SUGGESTIONS = [
   'Slow down the selected part and add a pause after the result.',
 ]
 
-export function ChatPane() {
+/** The chat; `head` replaces its title (the study screen puts its Transcript and Chat tabs there). */
+export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
   const claude = useStore((s) => s.claude)
   const codex = useStore((s) => s.settings?.agent === 'codex')
   const all = useStore((s) => s.chat)
@@ -40,9 +41,11 @@ export function ChatPane() {
   return (
     <div className="chat-pane">
       <div className="pane-head">
-        <div className="file-tab">
-          <Sparkles className="claude-mark" /> {codex ? 'Codex' : 'Claude Agent'}
-        </div>
+        {head ?? (
+          <div className="file-tab">
+            <Sparkles className="claude-mark" /> {codex ? 'Codex' : 'Claude Agent'}
+          </div>
+        )}
         <div className="pane-actions">
           <ProjectCost />
           <UsageMeter />
