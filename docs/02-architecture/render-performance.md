@@ -35,6 +35,7 @@ Preview: 854×480 at 15 fps (Settings → Preview). Export: 1080p or 1440p at 30
   | 1440p 60 fps | 84 s | 2.2× |
 
   Less than frames × pixels would suggest: part of every export (Python start, LaTeX and narration from the cache, copying the video, the thumbnail) doesn't depend on either.
+- A 24 s lesson (text and a graph) from an empty cache on 4 cores: 1080p30 17.2 s, 1080p24 12.6 s, 720p30 7.5 s, 720p24 6.6 s. Resolution matters more than frame rate here, which is why videos made to study are 720p ([[../04-decisions/0035-720p-study-videos|ADR 0035]]).
 - Not profiled yet: how that time splits between Python, Cairo, encoding, interpreter startup and LaTeX.
 
 ## Likely bottlenecks

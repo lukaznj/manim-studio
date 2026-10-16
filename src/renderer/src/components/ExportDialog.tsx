@@ -100,7 +100,17 @@ export function ExportDialog() {
   const long = Math.round((size * 16) / 9 / 2) * 2 // as the runner computes it
   const res = portrait ? `${size} × ${long}` : `${long} × ${size}`
   // Measured on a 46 s scene: 1440p or 60 fps about 1.5×, both about 2× (docs/02-architecture/render-performance.md).
-  const slower = size === 1440 && fps === 60 ? 'about twice as long' : size === 1440 || fps === 60 ? 'about 1.5× as long' : null
+  // 720p: about 2.3× faster than 1080p (a 24 s scene, 4 cores, ADR 0035).
+  const slower =
+    size === 720
+      ? fps === 60
+        ? null
+        : 'about half as long'
+      : size === 1440 && fps === 60
+        ? 'about twice as long'
+        : size === 1440 || fps === 60
+          ? 'about 1.5× as long'
+          : null
   const both = options.themes.length > 1
   const extra = options.languages.filter((l) => l !== original)
   const offered = LANGUAGES.filter((l) => l !== original && !options.languages.includes(l))
@@ -161,7 +171,7 @@ export function ExportDialog() {
           <div>
             <strong>Quality</strong>
             <div className="hint">
-              1440p keeps thin lines and small text sharp, also after YouTube compresses the video. 60 fps makes motion smoother.
+              720p is the fastest, plenty to watch on a laptop. 1440p keeps thin lines and small text sharp, also after YouTube compresses the video. 60 fps makes motion smoother.
               {slower && ` Exporting takes ${slower}.`}
             </div>
           </div>
@@ -172,6 +182,7 @@ export function ExportDialog() {
 
               onChange={(v) => setOptions((o) => ({ ...o, size: Number(v) as ExportSize }))}
               items={[
+                { value: '720', label: '720p' },
                 { value: '1080', label: '1080p' },
                 { value: '1440', label: '1440p' },
               ]}
@@ -257,7 +268,7 @@ export function ExportDialog() {
             </li>
           )}
           <li>
-            <Image /> <strong>Thumbnail</strong> <span className="mono faint">.jpg, the busiest frame</span>
+            <Image /> <strong>Thumbnail</strong> <span className="mono faint">.jpg, the key picture with its hook</span>
           </li>
         </ul>
 
