@@ -290,7 +290,7 @@ function AntigravityAccount() {
   const status = useStore((s) => s.claude)
   const settings = useStore((s) => s.settings)!
   const setup = useStore((s) => s.setup)
-  const windows = useStore((s) => s.app?.platform === 'win32')
+  const windows = useStore((s) => s.app?.platform === 'win32') // its sign-in opens in a console window there
   const [busy, setBusy] = useState(false)
   const [url, setUrl] = useState<string | null>(null)
   const [code, setCode] = useState('')
@@ -321,7 +321,7 @@ function AntigravityAccount() {
       >
         <InstallButton component="antigravity" state={setup?.antigravity ?? 'missing'} />
       </Row>
-      {installed && !settings.hasGeminiKey && !windows && (
+      {installed && !settings.hasGeminiKey && (
         <div className={`account-card ${status?.loggedIn ? 'on' : ''}`}>
           <Sparkles />
           <div>
@@ -363,7 +363,11 @@ function AntigravityAccount() {
               </button>
             </>
           ) : (
-            <p className="hint">Starting the sign-in…</p>
+            <p className="hint">
+              {windows
+                ? 'In the Antigravity window: choose Google OAuth, sign in in the browser and paste the code there. It closes by itself once you’re signed in.'
+                : 'Starting the sign-in…'}
+            </p>
           )}
         </div>
       )}
@@ -373,9 +377,7 @@ function AntigravityAccount() {
           text={
             settings.hasGeminiKey
               ? 'Saved and encrypted on this computer. Antigravity uses it, billed per use, instead of a Google sign-in.'
-              : windows
-                ? 'On Windows, Antigravity uses a key from aistudio.google.com, billed per use.'
-                : 'Optional: instead of signing in, a key from aistudio.google.com, billed per use.'
+              : 'Optional: instead of signing in, a key from aistudio.google.com, billed per use.'
           }
         >
           <KeyField
