@@ -2,38 +2,82 @@
 
 <h1 align="center">Manim Studio</h1>
 
-<p align="center">A desktop editor for maths explainer videos made with <a href="https://www.manim.community">manim</a>.<br>You describe the video, Claude writes the scene, and you finish it on a real timeline.</p>
+<p align="center">A desktop app for maths explainer videos made with <a href="https://www.manim.community">manim</a>.<br>Learn from videos made for your own course, or make videos to publish. An AI agent writes the scenes; Studio renders them.</p>
 
-![The editor: scene.py, the preview, Claude, and the timeline with sections, animations, voice and subtitles](docs/05-design/screenshots/editor.png)
+![The study screen: a course's lessons and exercises, the video, and its transcript with a search that moves the video to each match](docs/05-design/screenshots/study.png)
 
-## What it does
+## Learn, Create, or both
 
-- **A whole series from a course.** Add a course's lecture PDFs: Claude proposes the episodes and a series bible (notation, visual vocabulary), you edit the plan, and Studio makes the episodes one after another, each referring back to the ones before.
-- **Quick video.** Describe it, attach the lecture notes, and Studio makes and exports the video without the editor: Claude writes a script and the scenes, Studio checks the render and sends Claude back to fix what's wrong.
-- **Claude writes the scene.** Describe what the video should show. Claude edits `scene.py`, renders it, looks at frames, and fixes layout problems before it answers. It uses your own Claude plan or an Anthropic API key. Or Codex, with a ChatGPT plan: choose it in Settings → Agent.
-- **Or ask Claude Desktop.** Add the Manim Studio extension from Settings, then ask Claude in the Claude desktop app for a maths video. Manim Studio opens and Claude makes it there.
+On first launch Manim Studio asks how you'll use it, and you can change it any time in Settings → General.
+
+- **Learn** is for studying. Turn your course material and exercises into explained videos, watch them, and ask about any moment. There's no editor and no code.
+- **Create** is the full studio for making videos to publish: the code, a timeline, your own narration, and exports with thumbnails for YouTube.
+- **Both** gives Home a Create tab and a Learn tab.
+
+![How will you use Manim Studio? Learn, Create or Both](docs/05-design/screenshots/mode-choice.png)
+
+## Learn
+
+- **A course from your PDFs.** Add a course's lecture notes. The agent plans the episodes and a series bible (notation, colours, recurring pictures), and Studio makes every episode in the background, several at once, each building on the ones before.
+- **Exercises, solved twice.** Type exercises, paste a screenshot, or add photos and PDFs. Each one is read out, solved in writing step by step (every computation checked with Python), and then turned into a short video whose chapters match the steps. Add exercises to a course and they use the course's notation and point back to the episode that teaches the method.
+- **One study screen** per course: its lessons and its exercises in one list, with what you've watched marked.
+  - **A player** with chapters, speed, subtitles, and the spot where you left off.
+  - **The transcript** follows the video like song lyrics. Search it, and the video jumps to the moment a word is said (Enter for the next match). Click a line to play from there.
+  - **A chat that knows where you are.** Questions go with the moment you paused at, the frame on screen and the narration around it, so "I don't get this part" is enough. Answers come right away, with maths typeset.
+  - **"Explain this part in a new video"** makes a slower follow-up video for that moment, listed under its episode.
+  - **"Explain something better"** on an exercise redoes its video with that step expanded.
+  - **Search every exercise** you've ever added, by topic or wording.
+  - **A lecture video** joins an exercise set's videos into one, with chapters and subtitles.
+- **Quick video.** Describe a topic and attach notes, and Studio makes and exports the video without the editor.
+
+![An exercise: the statement, its video with one chapter per step, the written solution, and the chat](docs/05-design/screenshots/exercise.png)
+
+## Create
+
+![The editor: scene.py, the preview, the agent, and the timeline with sections, animations, voice and subtitles](docs/05-design/screenshots/editor.png)
+
+- **The agent writes the scene.** Describe the video. The agent edits `scene.py`, renders it, looks at frames, and fixes layout problems before it answers. It writes a script first and follows the project's conventions.
 - **The timeline comes from the render.** Sections, every `self.play`, the narration and the subtitles, each linked to its line of code. While the video plays, the line producing the frame lights up.
-- **Retime by dragging.** Drag a clip's edge and the `run_time=` in the code changes. Select clips and ask Claude about exactly that part.
-- **Narration and subtitles.** Narration lives in the code ([manim-voiceover](https://github.com/ManimCommunity/manim-voiceover)), and subtitles come from it. Voices:
-  - [ElevenLabs](https://elevenlabs.io): the most-used voices for your language, or search their whole library, with samples to play
-  - local [OmniVoice](https://github.com/k2-fsa/OmniVoice), which can clone your voice
-  - your own recordings, made in the recording booth
+- **Retime by dragging.** Drag a clip's edge and the `run_time=` in the code changes. Select clips and ask about exactly that part.
+- **Series and quick videos** work here too: you can make series episodes by hand in the editor, or let Studio make them all.
+- **Your own material.** Drop pictures and videos into the Media tab, and add PDFs as sources the agent reads and shows pages from.
+- **Ask from Claude Desktop.** Add the Manim Studio extension from Settings, then ask Claude in the Claude desktop app for a maths video. Manim Studio opens and Claude makes it there.
+- **Version history.** Every render and every agent turn is a version you can go back to. No git install needed.
+- **16:9 or 9:16**, a light or dark video theme, and a tone (professional, warm or playful) per project. New projects keep the bottom of the frame clear for viewers' subtitles.
 
-  Each project has its own voice. Switch it and one click re-voices the narration. Animations stretch to fit the speech.
-- **Any language.** Pick the narration language per project. Claude writes in it, and the voices and subtitles follow.
-- **16:9 or 9:16.** Choose the format per project, and a light or dark video theme.
-- **Light and dark app.** Follows your system by default, and cross-fades when it switches.
-- **Version history.** Every render and every Claude turn is a commit you can go back to. No git install needed.
-- **Your own pictures and videos.** Drop them into the Media tab, then insert them into the scene or ask Claude to use them.
-- **Export for YouTube, in any language.** A 1080p mp4 (light, dark or both), plus subtitles and a dubbed audio track for every language you add. Claude translates, and your chosen voice speaks it over the same video. Exports run in the background, so you can start the next video meanwhile.
-- **Render on another computer.** Run the render server on a home server ([manim-studio-renderer](https://github.com/lukaznj/manim-studio-renderer)), pair it with the code it prints, and exports render there while your computer stays free.
-- **A short tour** the first time you open a project (Help → Show Tutorial brings it back).
+### Exports
+
+- **For YouTube:** a 1080p or 1440p mp4 at 30 or 60 fps, in the dark theme, the light one or both, with subtitles and a thumbnail card (the scene's key picture, a hook, the episode number and the series name).
+- **In other languages:** the agent translates the narration and your voice speaks it over the same video, as an audio track or a dubbed video per language.
+- **Faster:** an export is split into parts rendered at once, and the video is encoded on the GPU when there is one (Apple VideoToolbox, NVIDIA NVENC, or AMD on Windows through Media Foundation), with the CPU as the fallback.
+- **In the background:** start the next video while exports run. Or send them to a render server on another computer ([manim-studio-renderer](https://github.com/lukaznj/manim-studio-renderer)): pair it with the code it prints and your computer stays free.
+
+### Narration
+
+Narration lives in the code ([manim-voiceover](https://github.com/ManimCommunity/manim-voiceover)), and the subtitles come from it. Each project has its own language and voice. Change the voice and one click re-voices the narration, and the animations stretch to fit the speech.
+
+- [ElevenLabs](https://elevenlabs.io): the most-used voices for your language picked for you, or search their whole library, with samples.
+- [OmniVoice](https://github.com/k2-fsa/OmniVoice): local and free, 600+ languages, and it can clone your voice from a short clip.
+- Your own recordings, made in the recording booth.
+
+Any narration language works: the agent writes in it, and labels are read as names ("R two three", not "R twenty-three").
 
 | | |
 |---|---|
-| ![Projects](docs/05-design/screenshots/home.png) | ![New project](docs/05-design/screenshots/new-project.png) |
+| ![The study screen in the light theme](docs/05-design/screenshots/study-light.png) | ![The editor in the light theme](docs/05-design/screenshots/editor-light.png) |
 | ![Recording booth](docs/05-design/screenshots/recording-booth.png) | ![Version history](docs/05-design/screenshots/history.png) |
-| ![The editor in the light theme](docs/05-design/screenshots/editor-light.png) | ![Projects in the light theme](docs/05-design/screenshots/home-light.png) |
+
+## Agents
+
+Studio works with three agents. Choose one in Settings → Agent; any of them can make series, solve exercises and make follow-up videos, several at once.
+
+| Agent | Sign in with | Or an API key |
+|---|---|---|
+| **Claude** (Claude Code, through the Agent SDK) | Your Claude account, through Claude Code's own login | [Anthropic](https://console.anthropic.com) |
+| **Codex** (OpenAI) | Your ChatGPT account | [OpenAI](https://platform.openai.com) |
+| **Antigravity** (Google, Gemini 4 Argon) | Your Google account | [Gemini](https://aistudio.google.com) |
+
+Settings → Accounts holds every sign-in and key in one place, so you can keep several ready and switch. Sign-ins run each agent's own login in your browser: Studio never sees your password or tokens, and usage counts against your own plan. API keys are stored encrypted with your system keychain. Codex and Antigravity are downloaded the first time you choose them, from their official releases, checked against the published hashes. They work only inside the project, with Studio's render and frame tools.
 
 ## Install
 
@@ -47,11 +91,7 @@ Download the installer for your system from the [latest release](https://github.
 
 On first launch the app installs what renders need into its own data folder: Python with manim (about 750 MB) and LaTeX (about 250 MB). You don't need Python, Homebrew or Xcode. After that, it updates itself from GitHub Releases. One exception: unsigned macOS builds can't replace themselves, so the app links to the new release instead.
 
-### Claude
-
-Sign in from the app with your Claude account. The sign-in runs the official Claude Code login in your browser, and Claude Code keeps the credentials, so Manim Studio never sees them. Usage counts against your own plan.
-
-Or switch to an [Anthropic API key](https://console.anthropic.com) in Settings → Claude ("Use Claude with"). It's stored encrypted with your system keychain. With an account, the chat header shows how much of your plan's limits you've used, and Settings → Claude has every limit with its reset time.
+Then sign in to an agent (Settings → Accounts), and for ElevenLabs voices add its key there too.
 
 ## Develop
 
@@ -66,12 +106,13 @@ npm run dev
 ```bash
 npm run typecheck && npm test   # TypeScript checks and unit tests
 npm run test:python             # renders a fixture project end to end
+npm run build && node scripts/drive.mjs   # drive the built app over HTTP, with screenshots
 ```
 
 The docs in [`docs/`](docs/README.md) are an [Obsidian](https://obsidian.md) vault, and plain markdown otherwise:
 
 - [Product overview](docs/01-product/product-overview.md) and [roadmap](docs/01-product/roadmap.md)
-- [Architecture](docs/02-architecture/system-overview.md), the [timeline contract](docs/02-architecture/timeline-from-render.md) and the [voice pipeline](docs/02-architecture/voice-pipeline.md)
+- [Architecture](docs/02-architecture/system-overview.md), the [timeline contract](docs/02-architecture/timeline-from-render.md), the [voice pipeline](docs/02-architecture/voice-pipeline.md) and [render performance](docs/02-architecture/render-performance.md)
 - [Decisions](docs/04-decisions/README.md) (ADRs)
 - [Development](docs/06-operations/development.md), [releasing](docs/06-operations/releasing.md) and [known issues](docs/06-operations/known-issues.md)
 
@@ -79,17 +120,14 @@ The docs in [`docs/`](docs/README.md) are an [Obsidian](https://obsidian.md) vau
 
 ## Built on
 
-- [manim](https://www.manim.community) (Community Edition)
-- [manim-voiceover](https://github.com/ManimCommunity/manim-voiceover)
-- [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview)
-- [OmniVoice](https://github.com/k2-fsa/OmniVoice)
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-- [pixi](https://pixi.sh) and conda-forge
-- [TinyTeX](https://yihui.org/tinytex/)
-- [Electron](https://www.electronjs.org), [React](https://react.dev), [Monaco](https://microsoft.github.io/monaco-editor/)
+- [manim](https://www.manim.community) (Community Edition) and [manim-voiceover](https://github.com/ManimCommunity/manim-voiceover)
+- [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview), [Codex](https://github.com/openai/codex) and [Antigravity](https://github.com/google-antigravity/antigravity-cli)
+- [OmniVoice](https://github.com/k2-fsa/OmniVoice) and [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- [pixi](https://pixi.sh) and conda-forge, [PyAV](https://pyav.basswood-io.com) and [ffmpeg](https://ffmpeg.org), [TinyTeX](https://yihui.org/tinytex/)
+- [Electron](https://www.electronjs.org), [React](https://react.dev), [Monaco](https://microsoft.github.io/monaco-editor/), [KaTeX](https://katex.org)
 - [isomorphic-git](https://isomorphic-git.org)
 
-Manim Studio is an independent project. It isn't affiliated with Anthropic or the Manim Community.
+Manim Studio is an independent project. It isn't affiliated with Anthropic, OpenAI, Google or the Manim Community.
 
 ## License
 
