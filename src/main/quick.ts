@@ -44,7 +44,7 @@ export async function ensureQuickReady(): Promise<void> {
   if (run?.state === 'working') throw new Error('Quick mode is already making a video. Wait for it, or stop it.')
   if (setupStatus().env !== 'ready') throw new Error('The manim environment isn’t installed yet (Settings → Environment).')
   const claude = await claudeStatus()
-  if (!claude.loggedIn && !fakeAgents()) throw new Error('Sign in to your agent first (Settings → Agent): quick mode needs Claude or Codex to write the video.')
+  if (!claude.loggedIn && !fakeAgents()) throw new Error('Sign in to your agent first (Settings → Accounts): quick mode needs it to write the video.')
 }
 
 /** Starts a run and returns it at once; it goes on in the background. `finished` settles at the end. */

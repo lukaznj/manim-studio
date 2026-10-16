@@ -20,7 +20,7 @@ Some users have a Google AI plan rather than a Claude or ChatGPT one. Google's A
 - **macOS keychain.** The CLI stores the sign-in through `/usr/bin/security`, which looks under `HOME`; with HOME moved it found no keychain and asked the user to reset theirs. The CLI's home links `Library/Keychains` to the user's, so the sign-in is one item, `antigravity`, in the login keychain, as when the user runs the CLI themselves. A separate keychain in the CLI's home can't be unlocked on macOS 27.
 - **A Gemini API key** (`gemini` secret, safeStorage) is used instead of the sign-in while one is saved; `keys.ts` checks it like the other agents' keys (valid, Gemini 4 Argon listed, a one-token request).
 - **Models** come from `agy models`, one per family with its efforts (`gemini-4-argon-{low,medium,high}`); the default is Gemini 4 Argon at medium, Antigravity's own default. The project keeps the conversation id (`antigravityConversationId`) to resume it with `--conversation`.
-- **Background agents stay Claude's**, as with Codex: the bridge works on the open project only.
+- **Background agents** run on Antigravity too, since [[0033-every-agent-in-the-background|ADR 0033]]: each project has its own home (`userData/antigravity/projects/<hash>`), so runs in different projects don't share settings, rules or Studio's tools. The sign-in lives in the system keyring (macOS keychain, linked into every home; Windows Credential Manager; Linux Secret Service), or in the main home's token file, which each project home links to. Signing out deletes the Credential Manager items named `antigravity:…` on Windows (go-keyring's `<service>:<user>`).
 
 ## Consequences
 

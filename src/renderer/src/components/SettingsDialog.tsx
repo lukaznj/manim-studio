@@ -5,6 +5,7 @@ import type {
   Background,
   ClaudeAuth,
   ClaudeDesktopStatus,
+  ClaudeStatus,
   Component,
   ComponentState,
   ElevenLabsCheck,
@@ -47,7 +48,7 @@ import { VoicePicker } from './VoicePicker'
 import { useRecorder } from './RecordingBooth'
 import { Modal, ProgressLine, Tabs } from './ui'
 
-type Tab = 'account' | 'voice' | 'video' | 'env' | 'about'
+type Tab = 'account' | 'accounts' | 'voice' | 'video' | 'env' | 'about'
 
 export function SettingsDialog() {
   const dialog = useStore((s) => s.dialog)
@@ -66,6 +67,7 @@ export function SettingsDialog() {
           onChange={setTab}
           items={[
             { value: 'account', label: 'Agent' },
+            { value: 'accounts', label: 'Accounts' },
             { value: 'voice', label: 'Voice' },
             ...(learn ? [] : [{ value: 'video' as const, label: 'Video' }]), // the editor's preview and timeline
             { value: 'env', label: 'Environment' },
@@ -74,7 +76,8 @@ export function SettingsDialog() {
         />
       </div>
       <div className="modal-body settings-body">
-        {tab === 'account' && <AccountTab />}
+        {tab === 'account' && <AgentTab />}
+        {tab === 'accounts' && <AccountsTab />}
         {tab === 'voice' && <VoiceTab />}
         {tab === 'video' && <VideoTab />}
         {tab === 'env' && <EnvTab />}
@@ -157,10 +160,11 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
 
 const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1) : '')
 
-/** Settings → Agent: who writes the scenes, Claude or Codex (ADR 0022), and its sign-in and model. */
-function AccountTab() {
+/** Settings → Agent: who writes the scenes, Claude, Codex (ADR 0022) or Antigravity (ADR 0031), and its model. Sign-ins are under Accounts. */
+function AgentTab() {
   const editing = useStore((s) => canEdit(s))
   const agent = useStore((s) => s.settings!.agent)
+  const signedIn = useStore((s) => !!s.claude?.loggedIn)
   const seriesAgents = useStore((s) => s.settings!.seriesAgents)
   const pick = async (next: Agent) => {
     await updateSettings({ agent: next })
@@ -168,7 +172,10 @@ function AccountTab() {
   }
   return (
     <div className="set-group">
-      <Row title="Agent" text="Who writes the scenes. Quick mode, series planning and translation use it too. Switching starts a new conversation.">
+      <Row
+        title="Agent"
+        text="Who writes the scenes, solves exercises and makes series episodes. Quick mode, series planning and translation use it too. Switching starts a new conversation."
+      >
         <Tabs
           radio="Agent"
           value={agent}
@@ -180,30 +187,125 @@ function AccountTab() {
           ]}
         />
       </Row>
+      {signedIn ? (
+        <Row title="Model and effort" text="Which model writes the scenes and how much it reasons first. Also under the chat box.">
+          <ModelControls />
+        </Row>
+      ) : (
+        <Row title={`${AGENT_NAMES[agent]} isn’t signed in`} text="Sign in, or add an API key, under Accounts.">
+          <button className="btn small primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
+            <KeyRound /> Accounts
+          </button>
+        </Row>
+      )}
       <Row
-        title="Series episodes at once"
-        text={
-          agent !== 'claude'
-            ? `With ${agent === 'codex' ? 'Codex' : 'Antigravity'}, a series is made one episode at a time.`
-            : 'How many Claude agents an unattended series runs at once: one writes the scripts in order, the others make each video as soon as its script is ready. More is faster, but uses your plan’s limits faster and renders more at once on this computer.'
-        }
+        title="Agents at once"
+        text="How many agents an unattended series or an exercise set runs at once: for a series, one writes the scripts in order and the others make each video as soon as its script is ready. More is faster, but uses your plan’s limits faster and renders more at once on this computer."
       >
         <Tabs
-          radio="Series episodes at once"
+          radio="Agents at once"
           value={String(seriesAgents || 3)}
           onChange={(v) => void updateSettings({ seriesAgents: Number(v) })}
           items={['1', '2', '3', '4'].map((n) => ({ value: n, label: n }))}
         />
       </Row>
-      {agent === 'codex' ? <CodexAccount /> : agent === 'antigravity' ? <AntigravityAccount /> : <ClaudeAccount />}
       {editing && <ClaudeDesktopRow />}
     </div>
   )
 }
 
+const AGENT_NAMES: Record<Agent, string> = { claude: 'Claude', codex: 'Codex', antigravity: 'Antigravity' }
+
+/**
+ * Settings → Accounts: every agent's sign-in and API key, whether it's the chosen one or not, so
+ * someone with several can keep them all ready and switch in Settings → Agent; and the voice's key.
+ */
+function AccountsTab() {
+  return (
+    <div className="set-group">
+      {(['claude', 'codex', 'antigravity'] as const).map((a) => (
+        <AgentAccount key={a} agent={a} />
+      ))}
+      <ElevenLabsAccount />
+    </div>
+  )
+}
+
+/** One agent's account: whether it writes the scenes now, and its sign-in, read for that agent. */
+function AgentAccount({ agent }: { agent: Agent }) {
+  const chosen = useStore((s) => s.settings!.agent === agent)
+  const keys = useStore((s) => [s.settings!.hasAnthropicKey, s.settings!.hasOpenAIKey, s.settings!.hasGeminiKey, s.settings!.claudeAuth].join())
+  const installs = useStore((s) => `${s.setup?.codex}:${s.setup?.antigravity}`)
+  const [status, setStatus] = useState<ClaudeStatus | null>(null)
+  const refresh = async () => {
+    setStatus(await api.claudeStatus(agent))
+    if (chosen) await refreshClaude()
+  }
+  useEffect(() => void api.claudeStatus(agent).then(setStatus), [agent, keys, installs])
+  return (
+    <section className="account-section">
+      <header className="account-head">
+        <strong>{AGENT_NAMES[agent]}</strong>
+        {status?.loggedIn ? <span className="badge mint">Ready</span> : <span className="badge">Not set up</span>}
+        <span className="account-head-end">
+          {chosen ? (
+            <span className="badge sun">Writes the scenes</span>
+          ) : (
+            <button
+              className="btn small ghost"
+              onClick={async () => {
+                await updateSettings({ agent })
+                await refreshClaude()
+              }}
+            >
+              Use this agent
+            </button>
+          )}
+        </span>
+      </header>
+      {agent === 'codex' ? (
+        <CodexAccount status={status} refresh={refresh} />
+      ) : agent === 'antigravity' ? (
+        <AntigravityAccount status={status} refresh={refresh} />
+      ) : (
+        <ClaudeAccount status={status} refresh={refresh} chosen={chosen} />
+      )}
+    </section>
+  )
+}
+
+type AccountProps = { status: ClaudeStatus | null; refresh: () => Promise<void> }
+
+/** The ElevenLabs key, the same one Settings → Voice shows. */
+function ElevenLabsAccount() {
+  const settings = useStore((s) => s.settings)!
+  return (
+    <section className="account-section">
+      <header className="account-head">
+        <strong>ElevenLabs</strong>
+        {settings.hasElevenLabsKey ? <span className="badge mint">Ready</span> : <span className="badge">Not set up</span>}
+        <span className="account-head-end hint">For narration</span>
+      </header>
+      <Row
+        title="ElevenLabs API key"
+        text={settings.hasElevenLabsKey ? 'Saved and encrypted on this computer.' : 'A key from elevenlabs.io → Developers → API keys, for its voices.'}
+      >
+        <KeyField
+          saved={settings.hasElevenLabsKey}
+          placeholder="sk_…"
+          onSave={async (key) => {
+            useStore.setState({ settings: await api.setElevenLabsKey(key), elevenLabsCheck: null })
+            toast(key ? 'API key saved' : 'API key removed', 'ok')
+          }}
+        />
+      </Row>
+      {settings.hasElevenLabsKey && <ElevenLabsStatus />}
+    </section>
+  )
+}
+
 /** Codex: its program, installed once; the ChatGPT sign-in or an OpenAI API key; model and effort. */
-function CodexAccount() {
-  const status = useStore((s) => s.claude)
+function CodexAccount({ status, refresh }: AccountProps) {
   const settings = useStore((s) => s.settings)!
   const setup = useStore((s) => s.setup)
   const [busy, setBusy] = useState(false)
@@ -212,8 +314,8 @@ function CodexAccount() {
   const login = async () => {
     setBusy(true)
     try {
-      await api.claudeLogin()
-      await refreshClaude()
+      await api.claudeLogin('codex')
+      await refresh()
     } catch (e) {
       toast(errorText(e), 'error')
     } finally {
@@ -224,7 +326,7 @@ function CodexAccount() {
   return (
     <>
       <Row
-        title="Codex"
+        title="Program"
         text="OpenAI's coding agent. Its program, about 140 MB, is downloaded once from OpenAI's npm package and checked against its published hash."
       >
         <InstallButton component="codex" state={setup?.codex ?? 'missing'} />
@@ -242,8 +344,8 @@ function CodexAccount() {
             <button
               className="btn ghost small"
               onClick={async () => {
-                await api.claudeLogout()
-                await refreshClaude()
+                await api.claudeLogout('codex')
+                await refresh()
               }}
             >
               <LogOut /> Sign out
@@ -269,25 +371,19 @@ function CodexAccount() {
             placeholder="sk-…"
             onSave={async (key) => {
               useStore.setState({ settings: await api.setOpenAIKey(key) })
-              await refreshClaude()
+              await refresh()
               toast(key ? 'API key saved' : 'API key removed', 'ok')
             }}
           />
         </Row>
       )}
       {installed && settings.hasOpenAIKey && <KeyStatus check={(again) => api.checkOpenAIKey(again)} fix="platform.openai.com → API keys" />}
-      {status?.loggedIn && (
-        <Row title="Model and effort" text="Which model writes the scenes and how much it reasons first. Also under the chat box.">
-          <ModelControls />
-        </Row>
-      )}
     </>
   )
 }
 
-/** Settings → Agent → Antigravity (ADR 0031): install the CLI, then the Google sign-in or a Gemini API key. */
-function AntigravityAccount() {
-  const status = useStore((s) => s.claude)
+/** Settings → Accounts → Antigravity (ADR 0031): install the CLI, then the Google sign-in or a Gemini API key. */
+function AntigravityAccount({ status, refresh }: AccountProps) {
   const settings = useStore((s) => s.settings)!
   const setup = useStore((s) => s.setup)
   const windows = useStore((s) => s.app?.platform === 'win32') // its sign-in opens in a console window there
@@ -302,8 +398,8 @@ function AntigravityAccount() {
     setUrl(null)
     setCode('')
     try {
-      const st = await api.claudeLogin()
-      await refreshClaude()
+      const st = await api.claudeLogin('antigravity')
+      await refresh()
       if (!st.loggedIn) toast('The Google sign-in wasn’t completed.', 'error')
     } catch (e) {
       toast(errorText(e), 'error')
@@ -316,7 +412,7 @@ function AntigravityAccount() {
   return (
     <>
       <Row
-        title="Antigravity"
+        title="Program"
         text="Google's coding agent, with Gemini 4 Argon. Its program is downloaded once (about 60 MB, 180 MB unpacked) from Google's GitHub release and checked against its published hash. It works only inside the project."
       >
         <InstallButton component="antigravity" state={setup?.antigravity ?? 'missing'} />
@@ -334,8 +430,8 @@ function AntigravityAccount() {
             <button
               className="btn ghost small"
               onClick={async () => {
-                await api.claudeLogout()
-                await refreshClaude()
+                await api.claudeLogout('antigravity')
+                await refresh()
               }}
             >
               <LogOut /> Sign out
@@ -358,7 +454,7 @@ function AntigravityAccount() {
                 , then paste the code it shows:
               </p>
               <input className="input mono" placeholder="Authorization code" value={code} onChange={(e) => setCode(e.target.value)} />
-              <button className="btn" disabled={!code.trim()} onClick={() => void api.claudeLoginCode(code)}>
+              <button className="btn" disabled={!code.trim()} onClick={() => void api.claudeLoginCode(code, 'antigravity')}>
                 Confirm
               </button>
             </>
@@ -385,41 +481,36 @@ function AntigravityAccount() {
             placeholder="AIza…"
             onSave={async (key) => {
               useStore.setState({ settings: await api.setGeminiKey(key) })
-              await refreshClaude()
+              await refresh()
               toast(key ? 'API key saved' : 'API key removed', 'ok')
             }}
           />
         </Row>
       )}
       {installed && settings.hasGeminiKey && <KeyStatus check={(again) => api.checkGeminiKey(again)} fix="aistudio.google.com → API keys" />}
-      {status?.loggedIn && (
-        <Row title="Model and effort" text="Which model writes the scenes and how much it reasons first. Also under the chat box.">
-          <ModelControls />
-        </Row>
-      )}
     </>
   )
 }
 
-function ClaudeAccount() {
-  const claude = useStore((s) => s.claude)
+/** Claude: its own account's sign-in (Claude Code's) or an Anthropic API key; the plan's limits when it's the chosen agent. */
+function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { chosen: boolean }) {
   const settings = useStore((s) => s.settings)!
   const usage = useStore((s) => s.usage)
   const [busy, setBusy] = useState(false)
   const apiKey = settings.claudeAuth === 'api-key'
 
-  useEffect(() => void refreshUsage(true), [])
+  useEffect(() => void (chosen && refreshUsage(true)), [chosen])
 
   const setAuth = async (claudeAuth: ClaudeAuth) => {
     await updateSettings({ claudeAuth })
-    await refreshClaude()
+    await refresh()
   }
 
   const login = async () => {
     setBusy(true)
     try {
-      await api.claudeLogin()
-      await refreshClaude()
+      await api.claudeLogin('claude')
+      await refresh()
     } catch (e) {
       toast(errorText(e), 'error')
     } finally {
@@ -429,7 +520,7 @@ function ClaudeAccount() {
 
   const saveKey = async (key: string) => {
     useStore.setState({ settings: await api.setAnthropicKey(key) })
-    await refreshClaude()
+    await refresh()
     toast(key ? 'API key saved' : 'API key removed', 'ok')
   }
 
@@ -479,8 +570,8 @@ function ClaudeAccount() {
               <button
                 className="btn ghost small"
                 onClick={async () => {
-                  await api.claudeLogout()
-                  await refreshClaude()
+                  await api.claudeLogout('claude')
+                  await refresh()
                 }}
               >
                 <LogOut /> Sign out
@@ -491,17 +582,8 @@ function ClaudeAccount() {
               </button>
             )}
           </div>
-          {usage && <PlanUsageList usage={usage} />}
+          {chosen && usage && <PlanUsageList usage={usage} />}
         </>
-      )}
-
-      {claude?.loggedIn && (
-        <Row
-          title="Model and effort"
-          text="Which model writes the scenes and how much it thinks first. Also under the chat box; a change applies to the current conversation."
-        >
-          <ModelControls />
-        </Row>
       )}
     </>
   )

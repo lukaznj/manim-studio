@@ -66,7 +66,7 @@ const usingApiKey = () => getSettings().claudeAuth === 'api-key'
 export const codexChosen = () => getSettings().agent === 'codex'
 /** Settings → Agent: Google's Antigravity CLI (ADR 0031), routed like Codex. */
 export const antigravityChosen = () => getSettings().agent === 'antigravity'
-/** Codex or Antigravity: an agent whose tools reach the open project only, so the background agents stay Claude's. */
+/** Codex or Antigravity: no Claude plan usage to show. */
 export const claudeNotChosen = () => codexChosen() || antigravityChosen()
 
 /** cleanEnv() strips inherited ANTHROPIC_* variables; the key saved in Settings goes back only when it's the chosen method. */
@@ -96,9 +96,13 @@ function runClaude(args: string[]): Promise<{ code: number | null; out: string }
   })
 }
 
-export async function claudeStatus(): Promise<ClaudeStatus> {
-  if (codexChosen()) return { ...(await codexStatus()), agent: 'codex' }
-  if (antigravityChosen()) return { ...(await antigravityStatus()), agent: 'antigravity' }
+/** The chosen agent, or `agent` (Settings → Accounts manages every agent's sign-in, chosen or not). */
+const agentOr = (agent?: Agent): Agent => agent ?? getSettings().agent
+
+export async function claudeStatus(agent?: Agent): Promise<ClaudeStatus> {
+  const a = agentOr(agent)
+  if (a === 'codex') return { ...(await codexStatus()), agent: 'codex' }
+  if (a === 'antigravity') return { ...(await antigravityStatus()), agent: 'antigravity' }
   return { ...(await claudeOnlyStatus()), agent: 'claude' }
 }
 
@@ -120,9 +124,10 @@ async function claudeOnlyStatus(): Promise<ClaudeStatus> {
 
 let loginChild: ChildProcess | null = null
 
-export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
-  if (codexChosen()) return codexLogin(onEvent).then((st) => ({ ...st, agent: 'codex' }))
-  if (antigravityChosen()) return antigravityLogin(onEvent).then((st) => ({ ...st, agent: 'antigravity' }))
+export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void, agent?: Agent): Promise<ClaudeStatus> {
+  const a = agentOr(agent)
+  if (a === 'codex') return codexLogin(onEvent).then((st) => ({ ...st, agent: 'codex' }))
+  if (a === 'antigravity') return antigravityLogin(onEvent).then((st) => ({ ...st, agent: 'antigravity' }))
   loginChild?.kill()
   return new Promise((resolvePromise) => {
     const child = spawn(paths.claude(), ['auth', 'login', '--claudeai'], { env: claudeEnv(), windowsHide: true })
@@ -142,21 +147,22 @@ export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<Cla
     child.on('close', async () => {
       loginChild = null
       onEvent({ done: true })
-      resolvePromise(await claudeStatus())
+      resolvePromise(await claudeStatus('claude'))
     })
   })
 }
 
-export function claudeLoginCode(code: string): void {
-  if (antigravityChosen()) return antigravityLoginCode(code)
+export function claudeLoginCode(code: string, agent?: Agent): void {
+  if (agentOr(agent) === 'antigravity') return antigravityLoginCode(code)
   loginChild?.stdin?.write(code.trim() + '\n')
 }
 
-export async function claudeLogout(): Promise<ClaudeStatus> {
-  if (codexChosen()) return { ...(await codexLogout()), agent: 'codex' }
-  if (antigravityChosen()) return { ...(await antigravityLogout()), agent: 'antigravity' }
+export async function claudeLogout(agent?: Agent): Promise<ClaudeStatus> {
+  const a = agentOr(agent)
+  if (a === 'codex') return { ...(await codexLogout()), agent: 'codex' }
+  if (a === 'antigravity') return { ...(await antigravityLogout()), agent: 'antigravity' }
   await runClaude(['auth', 'logout'])
-  return claudeStatus()
+  return claudeStatus('claude')
 }
 
 // --- chat -------------------------------------------------------------------------------
@@ -387,14 +393,8 @@ export async function askClaude(
     images?: { name: string; mediaType: string; data: string }[] // pictures to read along with the prompt
   } = {},
 ): Promise<string> {
-  if (codexChosen()) {
-    if (opts.images?.length) throw new Error(`Codex can’t ${what} from pictures here. Choose Claude in Settings → Agent.`)
-    return askCodex(system, prompt, what) // Codex answers at once at the end
-  }
-  if (antigravityChosen()) {
-    if (opts.images?.length) throw new Error(`Antigravity can’t ${what} from pictures here. Choose Claude in Settings → Agent.`)
-    return askAntigravity(system, prompt, what)
-  }
+  if (codexChosen()) return askCodex(system, prompt, what, opts.images) // Codex answers at once at the end
+  if (antigravityChosen()) return askAntigravity(system, prompt, what, opts.images)
   const { query } = await sdk()
   const images = opts.images ?? []
   async function* withImages(): AsyncGenerator<SDKUserMessage> {
@@ -704,7 +704,7 @@ function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
 
 // --- prompt and tool text --------------------------------------------------------------------
 
-function studioPrompt(dir: string, agent: Agent, autopilot: boolean): string {
+export function studioPrompt(dir: string, agent: Agent, autopilot: boolean): string {
   const meta = metaOf(dir)
   const portrait = meta.aspect === '9:16'
   const site = join(paths.env(), '.pixi', 'envs', 'default', process.platform === 'win32' ? 'Lib' : 'lib/python3.12', 'site-packages')

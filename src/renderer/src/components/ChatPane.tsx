@@ -102,7 +102,7 @@ function UsageMeter() {
       className={`usage-chip ${usageLevel(top.percent)}`}
       title={`Your Claude plan (shared with claude.ai and Claude Desktop)\n${usageLines(usage).join('\n')}`}
       aria-label={`Claude plan: ${Math.round(top.percent)}% of the ${top.label.toLowerCase()} used`}
-      onClick={() => openDialog({ kind: 'settings', tab: 'account' })}
+      onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}
     >
       <span className="usage-bar">
         <span style={{ width: `${Math.min(100, top.percent)}%` }} />
@@ -174,7 +174,7 @@ function CodexSignIn() {
         </p>
       )}
       {!busy && (
-        <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
+        <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
           Use an OpenAI API key instead
         </button>
       )}
@@ -182,7 +182,7 @@ function CodexSignIn() {
   )
 }
 
-/** Antigravity instead of Claude: its install and Google sign-in (with the code to paste) live in Settings → Agent. */
+/** Antigravity instead of Claude: its install and Google sign-in (with the code to paste) live in Settings → Accounts. */
 function AntigravitySignIn() {
   return (
     <div className="chat-signin">
@@ -190,10 +190,10 @@ function AntigravitySignIn() {
       <h3>Set up Antigravity</h3>
       <p className="muted">
         Studio is set to use Antigravity, Google's agent with Gemini 4 Argon. Install it and sign in with your Google account (or add a Gemini API key) in
-        Settings → Agent. It edits only this project, and Studio never sees your password or tokens.
+        Settings → Accounts. It edits only this project, and Studio never sees your password or tokens.
       </p>
-      <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
-        <Sparkles /> Open Settings → Agent
+      <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
+        <Sparkles /> Open Settings → Accounts
       </button>
       <button className="link-btn" onClick={() => void updateSettings({ agent: 'claude' }).then(refreshClaude)}>
         Use Claude instead
@@ -236,7 +236,7 @@ function SignIn() {
   const useKey = async (claudeAuth: 'account' | 'api-key') => {
     await updateSettings({ claudeAuth })
     await refreshClaude()
-    if (claudeAuth === 'api-key') openDialog({ kind: 'settings', tab: 'account' })
+    if (claudeAuth === 'api-key') openDialog({ kind: 'settings', tab: 'accounts' })
   }
 
   if (settings?.claudeAuth === 'api-key')
@@ -244,8 +244,8 @@ function SignIn() {
       <div className="chat-signin">
         <Sparkles className="signin-mark" />
         <h3>Add your Anthropic API key</h3>
-        <p className="muted">Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Agent.</p>
-        <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}>
+        <p className="muted">Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Accounts.</p>
+        <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
           Open Claude settings
         </button>
         <button className="link-btn" onClick={() => void useKey('account')}>

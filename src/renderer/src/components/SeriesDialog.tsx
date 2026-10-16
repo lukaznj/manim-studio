@@ -18,7 +18,7 @@ export function SeriesDialog() {
   const defaultVoice = useStore((s) => s.settings?.defaultVoice)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
   const omnivoice = useStore((s) => s.setup?.omnivoice)
-  const codex = useStore((s) => s.settings?.agent !== 'claude') // Codex or Antigravity: one episode at a time, in the window
+  const codex = useStore((s) => s.settings?.agent !== 'claude') // Codex or Antigravity: their own model, from Settings → Agent
   const agents = useStore((s) => s.settings?.seriesAgents || 3)
   const [pdfs, setPdfs] = useState<string[]>([])
   const [title, setTitle] = useState('')
@@ -114,9 +114,7 @@ export function SeriesDialog() {
       closeDialog()
       toast(
         unattended
-          ? codex
-            ? `Making ${plan.episodes.length} episodes, one after another.`
-            : `Making ${plan.episodes.length} episodes. Home shows how each one is going.`
+          ? `Making ${plan.episodes.length} episodes. Home shows how each one is going.`
           : `Created ${plan.episodes.length} episodes. Here's the first.`,
         'ok',
       )
@@ -291,9 +289,7 @@ export function SeriesDialog() {
               <span>
                 Make every episode now, unattended{' '}
                 <span className="hint">
-                  {codex
-                    ? 'One after another, each exported when it’s done.'
-                    : `The scripts are written in order, and each video starts as soon as its script is ready, ${agents} agents at a time (Settings → Agent); each is exported when it’s done.`}{' '}
+                  {`The scripts are written in order, and each video starts as soon as its script is ready, ${agents} agents at a time (Settings → Agent); each is exported when it’s done.`}{' '}
                   Off: the episodes are created, and you make each in the editor.
                 </span>
               </span>

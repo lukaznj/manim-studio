@@ -8,6 +8,8 @@ import type { Commit } from '../shared/types'
 const AUTHORS = {
   user: { name: 'Manim Studio', email: 'studio@local' },
   claude: { name: 'Claude', email: 'claude@local' },
+  codex: { name: 'Codex', email: 'codex@local' },
+  antigravity: { name: 'Antigravity', email: 'antigravity@local' },
 }
 
 export async function initRepo(dir: string): Promise<void> {
