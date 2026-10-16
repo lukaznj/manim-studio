@@ -38,6 +38,8 @@
   - It ships inside the Agent SDK's platform package, unpacked from the asar archive.
   - It runs with the signed-in user's credentials.
   - The app gives it three in-process MCP tools (`render_preview`, `get_timeline`, `view_frames`) and the built-in file tools. Bash is not given, and edits are allowed only inside the project folder ([[../04-decisions/0004-claude-via-agent-sdk|ADR 0004]]).
+- **Codex and Antigravity CLIs.** Optional agents chosen in Settings → Agent, installed on demand into `userData/codex/` and `userData/antigravity/` (pinned, hash-checked). Both get Studio's scene tools through the same stdio MCP bridge as Claude Desktop and work on the open project only, so the background agents (series, exercise sets, follow-ups) stay Claude's ([[../04-decisions/0022-codex-as-second-agent|ADR 0022]], [[../04-decisions/0031-antigravity-as-third-agent|ADR 0031]]).
+  - Antigravity runs with its own home folder (`userData/antigravity/home`): its settings, permission rules, MCP config and Studio's brief (an always-on rule) are written there before every run, so the user's own `~/.gemini` is never touched.
 - **Claude Desktop extension.** A stdio MCP server that Claude Desktop runs. It forwards tool calls to the app's local endpoint (`src/main/mcp.ts`) and starts Studio if needed ([[../04-decisions/0009-mcp-server-later|ADR 0009]]).
 - **OmniVoice worker.**
   - It is optional and long-lived. Model loading is slow, so one HTTP server on localhost serves every render ([[voice-pipeline]]).
@@ -58,7 +60,8 @@
 | `<set>/lecture/` | The lecture video joined from the exercises' exports, its subtitles and chapter list | no |
 | `userData/python-env/` | pixi manifest + lock + `.pixi/envs/{default,omnivoice,transcribe}` | – |
 | `userData/tinytex/` | LaTeX | – |
-| `userData/settings.json`, `elevenlabs.secret`, `anthropic.secret` | Settings; API keys encrypted with the OS keychain | – |
+| `userData/settings.json`, `elevenlabs.secret`, `anthropic.secret`, `openai.secret`, `gemini.secret` | Settings; API keys encrypted with the OS keychain | – |
+| `userData/antigravity/` | The Antigravity CLI (`<version>/`) and its own home (`home/`: settings, rules, MCP config, conversations) | – |
 | `userData/mcp-endpoint.json` | Port and per-run token for the Claude Desktop extension; owner-only, removed on quit | – |
 
 ## IPC
