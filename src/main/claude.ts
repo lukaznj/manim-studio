@@ -41,6 +41,7 @@ import type { UsageEntry } from '../shared/usage'
 import { entryFrom, readUsage, recordTurn } from './usage'
 import { seriesBrief } from './series'
 import { exerciseBrief } from './exercises'
+import { momentNote } from '../shared/moment'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
@@ -238,8 +239,9 @@ export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
 
   const content: Exclude<SDKUserMessage['message']['content'], string> = []
   let frame: string | undefined
-  if (req.frameAt !== undefined && readTimeline(p.path)) {
-    const png = await frameBase64(req.frameAt, 854)
+  const at = req.watchingAt ?? req.frameAt
+  if (at !== undefined && readTimeline(p.path)) {
+    const png = await frameBase64(at, 854)
     content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: png } })
     frame = `data:image/png;base64,${png}`
   }
@@ -499,6 +501,12 @@ function contextNote(req: ChatRequest): string {
     )
   }
   if (req.frameAt !== undefined) notes.push(`[Attached image: the preview frame at ${req.frameAt.toFixed(2)} s]`)
+  if (req.watchingAt !== undefined) {
+    const p = requireProject()
+    notes.push(
+      `[The user is watching the finished video and paused ${momentNote(readTimeline(p.path), req.watchingAt)}. The attached image is that frame. Answer their question in the chat, as a patient tutor, about what is on screen there; change files only if they ask for a change to the video.]`,
+    )
+  }
   if (req.source) {
     const pages = req.source.pages?.length ? `, pages ${pageRanges(req.source.pages)}` : ''
     notes.push(`[Attached source: sources/${req.source.name}${pages}. Read it with read_source and look at its pages with view_source_pages.]`)
@@ -676,6 +684,7 @@ function studioPrompt(dir: string, agent: 'claude' | 'codex', autopilot: boolean
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),
+    'In narration, read labels and indices as names, not quantities: R_{23} is "R two three" (in Croatian "er dva tri"), not "R twenty-three"; x_{12} is "x one two"; a point A_1 is "A one". Read a number as a number only when it is an amount, and follow how the material names things.',
     meta.captionBand
       ? `Keep the band where viewers' subtitles appear free of text and formulas: the bottom ${meta.aspect === '9:16' ? '2.6 units, and the right 0.9 units where phone apps put their buttons' : '1.1 units'}. SAFE_W and SAFE_H already leave it out; centre a full layout on SAFE_CENTER (not ORIGIN) and use to_edge(DOWN, buff=BOTTOM_BUFF). Pictures, shapes and axes may cross it; the render warns about text that does.`
       : '',

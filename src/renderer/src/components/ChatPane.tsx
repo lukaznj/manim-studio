@@ -25,7 +25,8 @@ export function ChatPane() {
   const codex = useStore((s) => s.settings?.agent === 'codex')
   const all = useStore((s) => s.chat)
   // On the exercises screen the chat is the student's: the agents' own turns stay out of it.
-  const exercise = useStore((s) => s.screen === 'exercises')
+  const exercise = useStore((s) => s.screen === 'exercises' || s.screen === 'watch') // studying a finished video
+  const watching = useStore((s) => s.screen === 'watch')
   const chat = useMemo(() => (exercise ? all.filter((m) => !m.auto) : all), [all, exercise])
   const busy = useStore((s) => s.chatBusy)
   const streaming = useStore((s) => s.streaming)
@@ -67,7 +68,7 @@ export function ChatPane() {
       ) : (
         <>
           <div className="chat-list" ref={list}>
-            {chat.length === 0 && (exercise ? <ExerciseIntro /> : <Intro />)}
+            {chat.length === 0 && (watching ? <WatchIntro /> : exercise ? <ExerciseIntro /> : <Intro />)}
             {chat.map((m) => (
               <Message key={m.id} message={m} streaming={streaming[m.id]} busy={busy} />
             ))}
@@ -280,6 +281,28 @@ const EXERCISE_QUESTIONS = [
   'Give me a similar exercise to practise on.',
 ]
 
+const WATCH_QUESTIONS = [
+  'Explain what’s on screen right now more slowly.',
+  'Why does this step work?',
+  'Give me a short exercise to practise this.',
+  'Summarise this episode in five points.',
+]
+
+function WatchIntro() {
+  return (
+    <div className="chat-intro">
+      <p className="muted">Ask about anything in the video. Studio tells the agent where you paused and what was on screen and said there, so “this part” is enough.</p>
+      <div className="suggestions">
+        {WATCH_QUESTIONS.map((q) => (
+          <button key={q} className="suggestion" onClick={() => useStore.setState({ chatDraft: q })}>
+            {q}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ExerciseIntro() {
   return (
     <div className="chat-intro">
@@ -372,7 +395,7 @@ function Composer() {
   const selection = useStore((s) => s.selection)
   const [text, setText] = useState('')
   const [frame, setFrame] = useState(true)
-  const exercise = useStore((s) => s.screen === 'exercises') // a student's questions: no frames, no clips
+  const exercise = useStore((s) => s.screen === 'exercises' || s.screen === 'watch') // a student's questions: the moment, not clips
   const area = useRef<HTMLTextAreaElement>(null)
   const draft = useStore((s) => s.chatDraft)
   const source = useStore((s) => s.chatSource)
@@ -408,7 +431,7 @@ function Composer() {
 
   return (
     <div className="composer">
-      {useStore.getState().chat.length === 0 && useStore.getState().screen !== 'exercises' && (
+      {useStore.getState().chat.length === 0 && !['exercises', 'watch'].includes(useStore.getState().screen) && (
         <div className="suggestions">
           {SUGGESTIONS.map((s) => (
             <button key={s} className="suggestion" onClick={() => setText(s)}>
@@ -460,7 +483,7 @@ function Composer() {
           ref={area}
           className="composer-input"
           rows={2}
-          placeholder={busy ? 'Claude is working…' : exercise ? 'Ask about this exercise (Enter sends)' : 'What should I make? (Enter sends, Shift+Enter for a new line)'}
+          placeholder={busy ? 'Claude is working…' : exercise ? 'Ask about what you’re watching (Enter sends)' : 'What should I make? (Enter sends, Shift+Enter for a new line)'}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
