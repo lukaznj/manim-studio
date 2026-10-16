@@ -8,6 +8,7 @@ import { delimiter, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { Component, ComponentState, SetupEvent, SetupStatus } from '../shared/types'
+import { antigravityInstalled, installAntigravity } from './antigravity'
 import { codexInstalled, installCodex } from './codex'
 import { paths } from './paths'
 
@@ -70,6 +71,7 @@ export function setupStatus(): SetupStatus {
     omnivoice: omnivoiceSupported ? envState('omnivoice', 'omnivoice') : 'unsupported',
     transcribe: envState('transcribe', 'transcribe'),
     codex: installing.has('codex') ? 'installing' : errors.codex ? 'error' : codexInstalled() ? 'ready' : 'missing',
+    antigravity: installing.has('antigravity') ? 'installing' : errors.antigravity ? 'error' : antigravityInstalled() ? 'ready' : 'missing',
     errors,
   }
 }
@@ -143,6 +145,7 @@ export async function install(component: Component): Promise<void> {
   try {
     if (component === 'latex') await installLatex(component)
     else if (component === 'codex') await installCodex(emit)
+    else if (component === 'antigravity') await installAntigravity(emit)
     else await installEnv(component === 'env' ? 'default' : component, component)
     installing.delete(component)
     emit({ component, state: 'ready', line: 'Done.' })

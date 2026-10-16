@@ -42,6 +42,7 @@ export interface ProjectMeta {
   scriptFirst?: boolean // Claude plans script.md and gets it approved before writing scene.py (ADR 0016)
   claudeSessionId?: string
   codexThreadId?: string // the project's Codex conversation, resumed after a restart
+  antigravityConversationId?: string // the project's Antigravity conversation, resumed the same way
 }
 
 export interface ProjectSummary {
@@ -82,7 +83,7 @@ export interface ElevenLabsCheck {
   problem?: string // it's allowed, but something else stops it (an invalid key, no characters left)
 }
 
-/** What an Anthropic or OpenAI key may do (src/main/keys.ts), tried for real. */
+/** What an Anthropic, OpenAI or Gemini key may do (src/main/keys.ts), tried for real. */
 export interface KeyCheck {
   items: { label: string; ok: boolean; why?: string }[]
   problem?: string // something stops it: an invalid key, no credit left
@@ -403,7 +404,7 @@ export type RenderEvent = { id: number; quality: Quality } & (
 // --- setup ----------------------------------------------------------------------------
 
 export type ComponentState = 'missing' | 'installing' | 'ready' | 'outdated' | 'unsupported' | 'error'
-export type Component = 'env' | 'latex' | 'omnivoice' | 'transcribe' | 'codex'
+export type Component = 'env' | 'latex' | 'omnivoice' | 'transcribe' | 'codex' | 'antigravity'
 
 export interface SetupStatus {
   env: ComponentState
@@ -411,6 +412,7 @@ export interface SetupStatus {
   omnivoice: ComponentState
   transcribe: ComponentState
   codex: ComponentState // the Codex CLI, installed when Codex is chosen (ADR 0022)
+  antigravity: ComponentState // the Antigravity CLI, installed when Antigravity is chosen (ADR 0031)
   pixi: boolean
   errors: Partial<Record<Component, string>>
 }
@@ -432,8 +434,8 @@ export interface ClaudeStatus {
   error?: string
 }
 
-/** The agent that writes the scenes: Claude (the Agent SDK) or Codex (OpenAI's CLI). */
-export type Agent = 'claude' | 'codex'
+/** The agent that writes the scenes: Claude (the Agent SDK), Codex (OpenAI's CLI) or Antigravity (Google's CLI, ADR 0031). */
+export type Agent = 'claude' | 'codex' | 'antigravity'
 
 /** How Studio's Claude authenticates: the Claude Code account sign-in, or the user's own API key. */
 export type ClaudeAuth = 'account' | 'api-key'
@@ -622,6 +624,8 @@ export interface Settings {
   agent: Agent // who writes the scenes (ADR 0022)
   codexModel: string // '' = Codex's default for the account
   codexEffort: Effort | ''
+  antigravityModel: string // '' = Gemini 4 Argon
+  antigravityEffort: Effort | ''
   exerciseSets?: string[] // exercise set folders (Home lists them; search looks in them)
   seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed
   seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
@@ -629,6 +633,7 @@ export interface Settings {
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
   hasOpenAIKey: boolean
+  hasGeminiKey: boolean
   defaultVoice: VoiceSettings
   renderServers: RenderServer[] // paired render workers (ADR 0021); their tokens are secrets
   sidebarWidth: number
@@ -752,6 +757,9 @@ export interface StudioApi {
   /** Codex uses an OpenAI API key instead of the ChatGPT sign-in while one is saved. */
   setOpenAIKey(key: string): Promise<Settings>
   checkOpenAIKey(again?: boolean): Promise<KeyCheck>
+  /** Antigravity uses a Gemini API key instead of the Google sign-in while one is saved. */
+  setGeminiKey(key: string): Promise<Settings>
+  checkGeminiKey(again?: boolean): Promise<KeyCheck>
 
   claudeStatus(): Promise<ClaudeStatus>
   /** Plan limits used, or null with an API key or when Claude Code can't tell. */

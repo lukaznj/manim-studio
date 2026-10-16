@@ -8,7 +8,7 @@ import { SCRIPT_FILE } from '../shared/script'
 import { momentNote } from '../shared/moment'
 import type { FollowUp, ProjectMeta, WatchDetail, WatchEpisode, WatchSeries } from '../shared/types'
 import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
-import { claudeStatus, codexChosen } from './claude'
+import { claudeStatus, claudeNotChosen } from './claude'
 import { fakeAgents } from './agent-fake'
 import { setupStatus } from './env'
 import { queueExport } from './exports'
@@ -114,7 +114,7 @@ export function watchDetail(dir: string): WatchDetail {
 }
 
 async function ensureReady(): Promise<void> {
-  if (codexChosen()) throw new Error('Follow-up videos are made by a Claude agent in the background. Choose Claude in Settings → Agent.')
+  if (claudeNotChosen()) throw new Error('Follow-up videos are made by a Claude agent in the background. Choose Claude in Settings → Agent.')
   if (setupStatus().env !== 'ready') throw new Error('The manim environment isn’t installed yet (Settings → Environment).')
   if (!fakeAgents() && !(await claudeStatus()).loggedIn) throw new Error('Sign in to Claude first (Settings → Agent): it makes the video.')
 }

@@ -176,14 +176,15 @@ function AccountTab() {
           items={[
             { value: 'claude', label: 'Claude' },
             { value: 'codex', label: 'Codex' },
+            { value: 'antigravity', label: 'Antigravity' },
           ]}
         />
       </Row>
       <Row
         title="Series episodes at once"
         text={
-          agent === 'codex'
-            ? 'With Codex, a series is made one episode at a time.'
+          agent !== 'claude'
+            ? `With ${agent === 'codex' ? 'Codex' : 'Antigravity'}, a series is made one episode at a time.`
             : 'How many Claude agents an unattended series runs at once: one writes the scripts in order, the others make each video as soon as its script is ready. More is faster, but uses your plan’s limits faster and renders more at once on this computer.'
         }
       >
@@ -194,7 +195,7 @@ function AccountTab() {
           items={['1', '2', '3', '4'].map((n) => ({ value: n, label: n }))}
         />
       </Row>
-      {agent === 'codex' ? <CodexAccount /> : <ClaudeAccount />}
+      {agent === 'codex' ? <CodexAccount /> : agent === 'antigravity' ? <AntigravityAccount /> : <ClaudeAccount />}
       {editing && <ClaudeDesktopRow />}
     </div>
   )
@@ -275,6 +276,122 @@ function CodexAccount() {
         </Row>
       )}
       {installed && settings.hasOpenAIKey && <KeyStatus check={(again) => api.checkOpenAIKey(again)} fix="platform.openai.com → API keys" />}
+      {status?.loggedIn && (
+        <Row title="Model and effort" text="Which model writes the scenes and how much it reasons first. Also under the chat box.">
+          <ModelControls />
+        </Row>
+      )}
+    </>
+  )
+}
+
+/** Settings → Agent → Antigravity (ADR 0031): install the CLI, then the Google sign-in or a Gemini API key. */
+function AntigravityAccount() {
+  const status = useStore((s) => s.claude)
+  const settings = useStore((s) => s.settings)!
+  const setup = useStore((s) => s.setup)
+  const windows = useStore((s) => s.app?.platform === 'win32') // its sign-in opens in a console window there
+  const [busy, setBusy] = useState(false)
+  const [url, setUrl] = useState<string | null>(null)
+  const [code, setCode] = useState('')
+  const installed = setup?.antigravity === 'ready'
+  useEffect(() => api.on('claude-login', (e) => e.url && setUrl(e.url)), [])
+
+  const login = async () => {
+    setBusy(true)
+    setUrl(null)
+    setCode('')
+    try {
+      const st = await api.claudeLogin()
+      await refreshClaude()
+      if (!st.loggedIn) toast('The Google sign-in wasn’t completed.', 'error')
+    } catch (e) {
+      toast(errorText(e), 'error')
+    } finally {
+      setBusy(false)
+      setUrl(null)
+    }
+  }
+
+  return (
+    <>
+      <Row
+        title="Antigravity"
+        text="Google's coding agent, with Gemini 4 Argon. Its program is downloaded once (about 60 MB, 180 MB unpacked) from Google's GitHub release and checked against its published hash. It works only inside the project."
+      >
+        <InstallButton component="antigravity" state={setup?.antigravity ?? 'missing'} />
+      </Row>
+      {installed && !settings.hasGeminiKey && (
+        <div className={`account-card ${status?.loggedIn ? 'on' : ''}`}>
+          <Sparkles />
+          <div>
+            <strong>{status?.loggedIn ? 'Signed in' : 'Not signed in'}</strong>
+            <div className="hint">
+              {status?.loggedIn ? status.subscription : 'Antigravity signs in with your Google account. Usage counts against your Google AI plan.'}
+            </div>
+          </div>
+          {status?.loggedIn ? (
+            <button
+              className="btn ghost small"
+              onClick={async () => {
+                await api.claudeLogout()
+                await refreshClaude()
+              }}
+            >
+              <LogOut /> Sign out
+            </button>
+          ) : (
+            <button className="btn primary small" disabled={busy} onClick={() => void login()}>
+              {busy && <span className="spinner" />} Sign in with Google
+            </button>
+          )}
+        </div>
+      )}
+      {busy && (
+        <div className="code-entry">
+          {url ? (
+            <>
+              <p className="hint">
+                <a href="#" onClick={() => void api.openExternal(url)}>
+                  Open the Google sign-in
+                </a>
+                , then paste the code it shows:
+              </p>
+              <input className="input mono" placeholder="Authorization code" value={code} onChange={(e) => setCode(e.target.value)} />
+              <button className="btn" disabled={!code.trim()} onClick={() => void api.claudeLoginCode(code)}>
+                Confirm
+              </button>
+            </>
+          ) : (
+            <p className="hint">
+              {windows
+                ? 'In the Antigravity window: choose Google OAuth, sign in in the browser and paste the code there. It closes by itself once you’re signed in.'
+                : 'Starting the sign-in…'}
+            </p>
+          )}
+        </div>
+      )}
+      {installed && (
+        <Row
+          title="Gemini API key"
+          text={
+            settings.hasGeminiKey
+              ? 'Saved and encrypted on this computer. Antigravity uses it, billed per use, instead of a Google sign-in.'
+              : 'Optional: instead of signing in, a key from aistudio.google.com, billed per use.'
+          }
+        >
+          <KeyField
+            saved={settings.hasGeminiKey}
+            placeholder="AIza…"
+            onSave={async (key) => {
+              useStore.setState({ settings: await api.setGeminiKey(key) })
+              await refreshClaude()
+              toast(key ? 'API key saved' : 'API key removed', 'ok')
+            }}
+          />
+        </Row>
+      )}
+      {installed && settings.hasGeminiKey && <KeyStatus check={(again) => api.checkGeminiKey(again)} fix="aistudio.google.com → API keys" />}
       {status?.loggedIn && (
         <Row title="Model and effort" text="Which model writes the scenes and how much it reasons first. Also under the chat box.">
           <ModelControls />
