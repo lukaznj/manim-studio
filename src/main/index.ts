@@ -42,6 +42,7 @@ import {
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
+import { videoEncoder } from './encoder'
 import { requestFollowUp, retryFollowUp, setupWatch, setWatched, watchDetail, watchSeries } from './watch'
 import { checkAnthropicKey, checkGeminiKey, checkOpenAIKey, keyUsable } from './keys'
 import { refreshMenu, setupMenu } from './menu'
@@ -350,6 +351,7 @@ function registerIpc(): void {
   handle('retryFollowUp', (dir: string) => retryFollowUp(dir))
   handle('setWatched', (dir: string, watched: boolean) => setWatched(dir, watched, ex.watchedChanged))
   handle('renderServers', () => listServers())
+  handle('videoEncoder', (again?: boolean) => videoEncoder(again))
   handle('addServer', (code: string) => addServer(code))
   handle('removeServer', (id: string) => removeServer(id))
   handle('checkServer', (id: string) => checkServer(id))
