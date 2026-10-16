@@ -1198,6 +1198,22 @@ function AboutTab() {
           ]}
         />
       </Row>
+      {settings.mode && settings.mode !== 'create' && (
+        <Row
+          title="Study videos"
+          text="The size of the videos Studio makes for you to study: exercises, follow-ups and courses. 720p renders about twice as fast and is plenty on a laptop; 1080p is sharper on a big screen."
+        >
+          <Tabs
+            radio="Study videos"
+            value={String(settings.studySize ?? 720)}
+            onChange={(v) => void updateSettings({ studySize: Number(v) as 720 | 1080 })}
+            items={[
+              { value: '720', label: '720p' },
+              { value: '1080', label: '1080p' },
+            ]}
+          />
+        </Row>
+      )}
       <Row title="Appearance" text="System follows your computer’s light or dark setting.">
         <Tabs
           radio="Appearance"
@@ -1236,7 +1252,7 @@ function AboutTab() {
       </Row>
       <Row
         title="Preview quality"
-        text="The preview while you work: higher is sharper, but renders take longer. Exports are always 1080p at the project's frame rate."
+        text="The preview while you work: higher is sharper, but renders take longer. Exports have their own size: the one chosen in the export dialog, or Study videos above for videos made to study."
       >
         <div className="stack-controls">
           <Tabs
