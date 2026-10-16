@@ -1,8 +1,8 @@
-import { Check, CircleAlert, Circle, FolderOpen, Square, Zap } from 'lucide-react'
+import { Check, Circle, CircleAlert, FolderOpen, Play, Square, Zap } from 'lucide-react'
 import type { QuickStep } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
-import { closeProject, openDialog, useStore } from '../store'
+import { canEdit, closeProject, openDialog, openWatch, useStore } from '../store'
 import { ProgressLine } from './ui'
 
 const ORDER: QuickStep[] = ['setup', 'sources', 'script', 'scene', 'check', 'export', 'done']
@@ -16,6 +16,7 @@ const STEPS: { step: QuickStep; label: string }[] = [
 
 /** Quick mode's progress, in place of the editor while Studio makes the video on its own. */
 export function QuickView() {
+  const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
   const run = useStore((s) => s.quick)!
   const timeline = useStore((s) => s.timeline)
   const job = useStore((s) => s.exports.find((j) => j.id === run.exportJob))
@@ -94,9 +95,11 @@ export function QuickView() {
         <div className="quick-actions">
           {working ? (
             <>
-              <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>
-                Watch in the editor
-              </button>
+              {editing && (
+                <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>
+                  Watch in the editor
+                </button>
+              )}
               <button className="btn" onClick={() => void api.stopQuick()}>
                 <Square /> Stop
               </button>
@@ -106,9 +109,17 @@ export function QuickView() {
               <button className="btn ghost" onClick={() => void closeProject()}>
                 Back to projects
               </button>
-              <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>
-                Open in the editor
-              </button>
+              {editing ? (
+                <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>
+                  Open in the editor
+                </button>
+              ) : (
+                run.state === 'done' && (
+                  <button className="btn" onClick={() => void openWatch(run.project)}>
+                    <Play /> Watch it
+                  </button>
+                )
+              )}
               {run.result && (
                 <button className="btn" onClick={() => void api.reveal(run.result!.files[0] ?? run.result!.folder)}>
                   <FolderOpen /> {revealLabel}

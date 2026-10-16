@@ -34,6 +34,7 @@ export function refreshMenu(): void {
   if (process.platform !== 'darwin') return
   const open = !!project()
   const appearance = getSettings().appearance
+  const learn = getSettings().mode === 'learn'
   const item = (label: string, action: MenuAction, accelerator?: string, extra: Partial<MenuItemConstructorOptions> = {}): MenuItemConstructorOptions => ({
     label,
     accelerator,
@@ -66,34 +67,44 @@ export function refreshMenu(): void {
     {
       label: 'File',
       submenu: [
-        item('New Project…', 'new-project', 'Cmd+N'),
+        // Learn mode has no editor (ADR 0029): only what makes something to watch.
+        ...(learn ? [] : [item('New Project…', 'new-project', 'Cmd+N')]),
         item('Quick Video…', 'quick', 'Shift+Cmd+N'),
         item('New Series…', 'series'),
-        item('Open Project…', 'open-project', 'Cmd+O'),
+        item('New Exercise Set…', 'exercises'),
+        ...(learn ? [] : [item('Open Project…', 'open-project', 'Cmd+O')]),
         {
           label: 'Open Recent',
           enabled: recent.length > 0,
           submenu: recent.map((p) => ({ label: p.name, click: () => send('open-recent', { path: p.path }) })),
         },
-        { type: 'separator' },
-        item('Save and Render', 'save', 'Cmd+S', { enabled: open }),
-        item('Export Video…', 'export', 'Cmd+E', { enabled: open }),
+        ...(learn
+          ? []
+          : ([
+              { type: 'separator' },
+              item('Save and Render', 'save', 'Cmd+S', { enabled: open }),
+              item('Export Video…', 'export', 'Cmd+E', { enabled: open }),
+            ] as MenuItemConstructorOptions[])),
         { type: 'separator' },
         { label: 'Show in Finder', enabled: open, click: () => open && shell.showItemInFolder(project()!.path) },
         item('Close Project', 'close-project', 'Shift+Cmd+W', { enabled: open }),
       ],
     },
     { role: 'editMenu' },
-    {
-      label: 'Video',
-      submenu: [
-        item('Play / Pause', 'play', undefined, { enabled: open }),
-        item('Render Preview', 'render', undefined, { enabled: open }),
-        { type: 'separator' },
-        item('Record Voice…', 'booth', 'Shift+Cmd+R', { enabled: open }),
-        item('Version History…', 'history', 'Cmd+Y', { enabled: open }),
-      ],
-    },
+    ...(learn
+      ? []
+      : ([
+          {
+            label: 'Video',
+            submenu: [
+              item('Play / Pause', 'play', undefined, { enabled: open }),
+              item('Render Preview', 'render', undefined, { enabled: open }),
+              { type: 'separator' },
+              item('Record Voice…', 'booth', 'Shift+Cmd+R', { enabled: open }),
+              item('Version History…', 'history', 'Cmd+Y', { enabled: open }),
+            ],
+          },
+        ] as MenuItemConstructorOptions[])),
     {
       label: 'Claude',
       submenu: [

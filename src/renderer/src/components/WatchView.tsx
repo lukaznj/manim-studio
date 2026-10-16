@@ -2,7 +2,7 @@ import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, MessageCircleQ
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { api } from '../lib/api'
-import { errorText, selectWatched, toast, useStore } from '../store'
+import { canEdit, errorText, selectWatched, toast, useStore } from '../store'
 import { ChatPane } from './ChatPane'
 import { StudyPlayer } from './StudyPlayer'
 
@@ -16,6 +16,7 @@ export function WatchView() {
   const series = useStore((s) => s.watchSeries)
   const path = useStore((s) => s.project?.path)
   if (!series) return null
+  const single = series.episodes.length === 1 && series.episodes[0].dir === series.folder // a video on its own, not a series
   const episode = series.episodes.find((e) => e.dir === path || e.followUps.some((f) => f.dir === path))
   const followUp = episode?.followUps.find((f) => f.dir === path)
   return (
@@ -24,7 +25,7 @@ export function WatchView() {
         <div className="ex-side-head">
           <h2 className="ex-set-title">{series.title}</h2>
           <p className="faint">
-            {series.episodes.length === 1 ? '1 episode' : `${series.episodes.length} episodes`}, {series.episodes.filter((e) => e.watched).length} watched
+            {single ? 'A single video' : `${series.episodes.length} episodes, ${series.episodes.filter((e) => e.watched).length} watched`}
           </p>
         </div>
         <ul className="ex-list">
@@ -33,7 +34,13 @@ export function WatchView() {
           ))}
         </ul>
       </aside>
-      <main className="ex-main">{episode && path ? <Watched key={path} dir={path} episode={episode} followUp={followUp} /> : <div className="ex-empty faint">Choose an episode.</div>}</main>
+      <main className="ex-main">
+        {episode && path ? (
+          <Watched key={path} dir={path} episode={episode} followUp={followUp} single={single} />
+        ) : (
+          <div className="ex-empty faint">Choose an episode.</div>
+        )}
+      </main>
       <aside className="ex-chat">{path ? <ChatPane /> : null}</aside>
     </div>
   )
@@ -58,7 +65,13 @@ function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?
             <CornerDownRight className="ex-follow-icon" />
             <span className="ex-row-body">
               <span className="ex-row-title">{f.request}</span>
-              <span className="ex-row-state">{f.state === 'making' ? (f.activity ?? 'Making the video') : f.state === 'failed' ? (f.error ?? 'Didn’t finish') : `Follow-up from ${clock(f.at)}`}</span>
+              <span className="ex-row-state">
+                {f.state === 'making'
+                  ? (f.activity ?? 'Making the video')
+                  : f.state === 'failed'
+                    ? (f.error ?? 'Didn’t finish')
+                    : `Follow-up from ${clock(f.at)}`}
+              </span>
             </span>
             {f.state === 'making' ? (
               <span className="spinner" />
@@ -77,7 +90,8 @@ function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?
 }
 
 /** The selected episode or follow-up: the player, its transcript, and asking for a follow-up. */
-function Watched({ dir, episode, followUp }: { dir: string; episode: WatchEpisode; followUp?: FollowUp }) {
+function Watched({ dir, episode, followUp, single }: { dir: string; episode: WatchEpisode; followUp?: FollowUp; single: boolean }) {
+  const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
   const [detail, setDetail] = useState<WatchDetail | null>(null)
   const video = useRef<HTMLVideoElement>(null)
   useEffect(() => {
@@ -90,7 +104,7 @@ function Watched({ dir, episode, followUp }: { dir: string; episode: WatchEpisod
     <div className="ex-detail">
       <header className="ex-detail-head">
         <div>
-          <span className="eyebrow">{followUp ? `Follow-up to episode ${episode.number}` : `Episode ${episode.number}`}</span>
+          <span className="eyebrow">{followUp ? `Follow-up to episode ${episode.number}` : single ? 'Video' : `Episode ${episode.number}`}</span>
           <h1>{followUp ? followUp.request : episode.title}</h1>
         </div>
         <div className="ex-detail-actions">
@@ -100,9 +114,11 @@ function Watched({ dir, episode, followUp }: { dir: string; episode: WatchEpisod
               <RotateCcw /> Try again
             </button>
           )}
-          <button className="btn small ghost" title="The code, timeline and voice of this video" onClick={() => useStore.setState({ screen: 'editor' })}>
-            <Code2 /> Open in editor
-          </button>
+          {editing && (
+            <button className="btn small ghost" title="The code, timeline and voice of this video" onClick={() => useStore.setState({ screen: 'editor' })}>
+              <Code2 /> Open in editor
+            </button>
+          )}
         </div>
       </header>
       {followUp?.state === 'failed' && followUp.error && <p className="ex-error">{followUp.error}</p>}
@@ -131,8 +147,14 @@ function Watched({ dir, episode, followUp }: { dir: string; episode: WatchEpisod
         </section>
       )}
 
-      {!!detail?.subtitles.length && <Transcript detail={detail} video={video} onAsk={(line, t) => ask(`At ${clock(t)} it says: “${line}”. I don’t understand this part. Explain it more thoroughly.`)} />}
-      {!followUp && src && <FollowUpRequest dir={dir} />}
+      {!!detail?.subtitles.length && (
+        <Transcript
+          detail={detail}
+          video={video}
+          onAsk={(line, t) => ask(`At ${clock(t)} it says: “${line}”. I don’t understand this part. Explain it more thoroughly.`)}
+        />
+      )}
+      {!followUp && !single && src && <FollowUpRequest dir={dir} />}
     </div>
   )
 }
@@ -140,14 +162,26 @@ function Watched({ dir, episode, followUp }: { dir: string; episode: WatchEpisod
 /** Watched or not: marked by itself at 90%, or here by hand. */
 export function WatchedToggle({ dir, watched }: { dir: string; watched: boolean }) {
   return (
-    <button className={`btn small ${watched ? '' : 'ghost'}`} onClick={() => void api.setWatched(dir, !watched)} title={watched ? 'Mark as not watched' : 'Mark as watched'}>
+    <button
+      className={`btn small ${watched ? '' : 'ghost'}`}
+      onClick={() => void api.setWatched(dir, !watched)}
+      title={watched ? 'Mark as not watched' : 'Mark as watched'}
+    >
       {watched ? <Eye /> : <EyeOff />} {watched ? 'Watched' : 'Not watched'}
     </button>
   )
 }
 
 /** What's said, line by line, following the video: click a line to go there, ask about it. */
-function Transcript({ detail, video, onAsk }: { detail: WatchDetail; video: React.RefObject<HTMLVideoElement | null>; onAsk: (line: string, t: number) => void }) {
+function Transcript({
+  detail,
+  video,
+  onAsk,
+}: {
+  detail: WatchDetail
+  video: React.RefObject<HTMLVideoElement | null>
+  onAsk: (line: string, t: number) => void
+}) {
   const now = useStore((s) => s.watchTime ?? 0)
   const list = useRef<HTMLOListElement>(null)
   const current = detail.subtitles.findIndex((s) => now >= s.start && now < s.end)
