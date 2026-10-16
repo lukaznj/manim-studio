@@ -34,3 +34,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0028-watching-a-series]] | A series can be watched: study player, synced transcript, a chat that knows the moment, follow-up videos per episode | accepted |
 | [[0029-learn-and-create]] | Learn, Create or Both: chosen at first launch; Learn hides the editor everywhere and opens every video on a study screen; Both has a Home tab for each | accepted |
 | [[0030-courses]] | A course is a series with its own exercise set in it, studied on one screen with its lessons and exercises together | accepted |
+| [[0032-searchable-transcript]] | The study screen's transcript follows the video line by line; searching what's said moves the video to each match | accepted |

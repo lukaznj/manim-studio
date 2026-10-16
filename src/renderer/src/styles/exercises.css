@@ -487,48 +487,6 @@
 .ex-row.follow .ex-row-title {
   font-weight: 500;
 }
-.watch-transcript ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 260px;
-  overflow: auto;
-  display: grid;
-  gap: 2px;
-}
-.watch-transcript li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 4px;
-  border-radius: var(--r-sm);
-}
-.watch-transcript li.on {
-  background: var(--sun-soft);
-}
-.watch-transcript li .icon-btn {
-  opacity: 0;
-}
-.watch-transcript li:hover .icon-btn,
-.watch-transcript li.on .icon-btn,
-.watch-transcript li .icon-btn:focus-visible {
-  opacity: 1;
-}
-.watch-line {
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-  padding: 5px 8px;
-  font: inherit;
-  font-size: 13.5px;
-  line-height: 1.45;
-  cursor: pointer;
-}
-.watch-line .mono {
-  font-size: 11px;
-  margin-right: 6px;
-}
 
 /* The study screen's list headings, when a course has both lessons and exercises (ADR 0030). */
 .ex-group {
@@ -536,4 +494,100 @@
 }
 .ex-group:first-child {
   padding-top: 4px;
+}
+
+/* The transcript column (Transcript.tsx, ADR 0032): the video's lines, like lyrics, the one being
+   said lit and kept in the middle; search marks the matches. */
+.lyrics-pane {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
+.lyrics-search {
+  padding: 10px 12px 8px;
+  display: grid;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.lyrics-count {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+}
+.lyrics-count > span {
+  flex: 1;
+}
+.lyrics {
+  list-style: none;
+  margin: 0;
+  padding: 40% 10px;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  /* lines fade out at the top and bottom edges */
+  mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent);
+}
+.lyric {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px;
+  border-radius: var(--r-sm);
+}
+.lyric-line {
+  border: 0;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  text-align: left;
+  font: 700 19px/1.35 var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--text-3);
+  cursor: pointer;
+  white-space: pre-line;
+  transition: color 0.25s ease;
+}
+.lyric.past .lyric-line {
+  color: var(--text-2);
+  opacity: 0.6;
+}
+.lyric.now .lyric-line {
+  color: var(--text);
+}
+.lyric-line:hover {
+  background: var(--raised);
+}
+.lyric-side {
+  display: grid;
+  justify-items: end;
+  padding-top: 8px;
+  gap: 2px;
+  opacity: 0;
+}
+.lyric-side .mono {
+  font-size: 11px;
+}
+.lyric:hover .lyric-side,
+.lyric.now .lyric-side,
+.lyric-side:focus-within {
+  opacity: 1;
+}
+.lyric mark {
+  background: var(--sun-soft);
+  color: inherit;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px var(--sun-soft);
+}
+.lyric mark.chosen {
+  background: var(--sun);
+  color: var(--sun-ink);
+  box-shadow: 0 0 0 2px var(--sun);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lyric-line {
+    transition: none;
+  }
 }

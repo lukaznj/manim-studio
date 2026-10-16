@@ -21,6 +21,16 @@ function save(key: string, t: number): void {
   }
 }
 
+let playing: HTMLVideoElement | null = null // the study screen's video, for the transcript to move
+
+/** Moves the study screen's video to `t` (a transcript line or search hit); `play` starts it there. */
+export function seekStudy(t: number, play = false): void {
+  if (!playing) return
+  playing.currentTime = t + 0.01
+  useStore.setState({ watchTime: t + 0.01 })
+  if (play) void playing.play()
+}
+
 /**
  * A finished video to study (the exercises and Watch screens): chapters, speed, subtitles, and the
  * spot where it was left, per video, on this computer. Its position goes to the store, so a chat
@@ -43,6 +53,13 @@ export function StudyPlayer(props: {
     if (video.current) video.current.playbackRate = rate
   }, [rate, src])
   useEffect(() => () => useStore.setState({ watchTime: null }), [])
+  useEffect(() => {
+    const el = video.current // the element itself: by cleanup time the ref already points elsewhere
+    playing = el
+    return () => {
+      if (playing === el) playing = null
+    }
+  }, [src])
 
   const seek = (t: number) => {
     if (!video.current) return
@@ -83,7 +100,12 @@ export function StudyPlayer(props: {
       <div className="ex-player-bar">
         <div className="ex-chapters" role="list" aria-label="Chapters">
           {chapters.map((c) => (
-            <button key={`${c.name}-${c.start}`} role="listitem" className={`ex-chapter ${now >= c.start && now < c.end ? 'on' : ''}`} onClick={() => seek(c.start)}>
+            <button
+              key={`${c.name}-${c.start}`}
+              role="listitem"
+              className={`ex-chapter ${now >= c.start && now < c.end ? 'on' : ''}`}
+              onClick={() => seek(c.start)}
+            >
               {c.name || '—'}
             </button>
           ))}
