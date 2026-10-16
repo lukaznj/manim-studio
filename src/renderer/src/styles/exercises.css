@@ -1,4 +1,4 @@
-/* ---- exercise sets (ExercisesView.tsx, ExerciseDialogs.tsx) ---------------------------------- */
+/* ---- exercise sets (ExerciseView.tsx, StudyView.tsx, ExerciseDialogs.tsx) ---------------------------------- */
 
 .ex-view {
   height: 100%;
@@ -473,7 +473,7 @@
   }
 }
 
-/* the Watch screen (WatchView.tsx) */
+/* a course's lessons (LessonView.tsx) */
 .ex-row.follow {
   grid-template-columns: 26px minmax(0, 1fr) auto;
   padding-left: 14px;
@@ -528,4 +528,12 @@
 .watch-line .mono {
   font-size: 11px;
   margin-right: 6px;
+}
+
+/* The study screen's list headings, when a course has both lessons and exercises (ADR 0030). */
+.ex-group {
+  padding: 12px 8px 4px;
+}
+.ex-group:first-child {
+  padding-top: 4px;
 }

@@ -2,55 +2,20 @@ import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, MessageCircleQ
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { api } from '../lib/api'
-import { canEdit, errorText, selectWatched, toast, useStore } from '../store'
-import { ChatPane } from './ChatPane'
+import { canEdit, errorText, selectStudied, toast, useStore } from '../store'
 import { StudyPlayer } from './StudyPlayer'
+
+// The study screen's lessons (StudyView.tsx): a series' episodes and follow-ups, or a single video
+// (src/main/watch.ts, ADR 0028).
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
-/**
- * A series to study (src/main/watch.ts, ADR 0028): its episodes and their follow-up videos, the
- * selected video with its transcript, and the chat, which knows where in the video you are.
- */
-export function WatchView() {
-  const series = useStore((s) => s.watchSeries)
-  const path = useStore((s) => s.project?.path)
-  if (!series) return null
-  const single = series.episodes.length === 1 && series.episodes[0].dir === series.folder // a video on its own, not a series
-  const episode = series.episodes.find((e) => e.dir === path || e.followUps.some((f) => f.dir === path))
-  const followUp = episode?.followUps.find((f) => f.dir === path)
-  return (
-    <div className="ex-view">
-      <aside className="ex-side">
-        <div className="ex-side-head">
-          <h2 className="ex-set-title">{series.title}</h2>
-          <p className="faint">
-            {single ? 'A single video' : `${series.episodes.length} episodes, ${series.episodes.filter((e) => e.watched).length} watched`}
-          </p>
-        </div>
-        <ul className="ex-list">
-          {series.episodes.map((e) => (
-            <EpisodeRow key={e.dir} episode={e} selected={path} />
-          ))}
-        </ul>
-      </aside>
-      <main className="ex-main">
-        {episode && path ? (
-          <Watched key={path} dir={path} episode={episode} followUp={followUp} single={single} />
-        ) : (
-          <div className="ex-empty faint">Choose an episode.</div>
-        )}
-      </main>
-      <aside className="ex-chat">{path ? <ChatPane /> : null}</aside>
-    </div>
-  )
-}
-
-function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?: string }) {
+/** A lesson in the study screen's list, with its follow-up videos under it. */
+export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?: string }) {
   return (
     <>
       <li>
-        <button className={`ex-row ${e.dir === selected ? 'on' : ''}`} onClick={() => void selectWatched(e.dir)}>
+        <button className={`ex-row ${e.dir === selected ? 'on' : ''}`} onClick={() => void selectStudied(e.dir)}>
           <span className="ex-num mono">{e.number}</span>
           <span className="ex-row-body">
             <span className="ex-row-title">{e.title}</span>
@@ -61,7 +26,7 @@ function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?
       </li>
       {e.followUps.map((f) => (
         <li key={f.dir}>
-          <button className={`ex-row follow ${f.dir === selected ? 'on' : ''} state-${f.state}`} onClick={() => void selectWatched(f.dir)}>
+          <button className={`ex-row follow ${f.dir === selected ? 'on' : ''} state-${f.state}`} onClick={() => void selectStudied(f.dir)}>
             <CornerDownRight className="ex-follow-icon" />
             <span className="ex-row-body">
               <span className="ex-row-title">{f.request}</span>
@@ -90,7 +55,7 @@ function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?
 }
 
 /** The selected episode or follow-up: the player, its transcript, and asking for a follow-up. */
-function Watched({ dir, episode, followUp, single }: { dir: string; episode: WatchEpisode; followUp?: FollowUp; single: boolean }) {
+export function Watched({ dir, episode, followUp, single }: { dir: string; episode: WatchEpisode; followUp?: FollowUp; single: boolean }) {
   const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
   const [detail, setDetail] = useState<WatchDetail | null>(null)
   const video = useRef<HTMLVideoElement>(null)
