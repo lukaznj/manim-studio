@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Section } from '../../../shared/types'
 import { api } from '../lib/api'
 import { useStore } from '../store'
@@ -26,10 +26,18 @@ function save(key: string, t: number): void {
  * spot where it was left, per video, on this computer. Its position goes to the store, so a chat
  * question says where in the video it was asked.
  */
-export function StudyPlayer(props: { src: string; vtt?: string; chapters: Section[]; video: RefObject<HTMLVideoElement | null>; resume?: boolean }) {
+export function StudyPlayer(props: {
+  src: string
+  vtt?: string
+  chapters: Section[]
+  video: RefObject<HTMLVideoElement | null>
+  resume?: boolean
+  onWatched?: () => void // once, when playback passes 90%
+}) {
   const { src, vtt, video } = props
   const [rate, setRate] = useState(1)
   const [now, setNow] = useState(0)
+  const marked = useRef(false)
   const chapters = useMemo(() => props.chapters.filter((c) => c.end > c.start), [props.chapters])
   useEffect(() => {
     if (video.current) video.current.playbackRate = rate
@@ -56,6 +64,11 @@ export function StudyPlayer(props: { src: string; vtt?: string; chapters: Sectio
           setNow(t)
           useStore.setState({ watchTime: t })
           if (props.resume && Math.round(t) % 5 === 0) save(src, t)
+          const d = e.currentTarget.duration
+          if (!marked.current && d && t >= d * 0.9) {
+            marked.current = true
+            props.onWatched?.()
+          }
         }}
         onLoadedMetadata={(e) => {
           const v = e.currentTarget

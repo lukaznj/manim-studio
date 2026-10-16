@@ -50,6 +50,7 @@ import { cancel } from './render'
 import { runRunner } from './runner'
 import { getSettings, setSettings } from './settings'
 import { slugify } from './slug'
+import { isWatched } from './watched'
 
 /** exercises.json: the set's settings and its exercises' folders, in order. */
 interface SetFile {
@@ -137,6 +138,7 @@ function itemFrom(dir: string, number: number): ExerciseItem {
     answer: solution?.answer,
     video,
     subtitles: saved.subtitles && existsSync(saved.subtitles) ? saved.subtitles : undefined,
+    watched: isWatched(dir),
   }
 }
 
@@ -342,6 +344,14 @@ export async function removeExercise(dir: string): Promise<void> {
   set.items.forEach((i, n) => (i.number = n + 1))
   changed(set)
   await shell.trashItem(dir)
+}
+
+/** After a video was marked watched or not: the set's list shows it. */
+export function watchedChanged(dir: string, watched: boolean): void {
+  const folder = readMeta(dir).exercise?.set
+  const set = folder ? sets.get(folder) : undefined
+  const it = set?.items.find((i) => i.dir === dir)
+  if (set && it) update(set, it, { watched })
 }
 
 /** A pasted picture as a file the intake can read, like one added from disk. */

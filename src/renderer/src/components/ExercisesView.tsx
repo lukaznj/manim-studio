@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Code2, Film, FolderOpen, MessageCircleQuestion, Pause, Play, Plus, RotateCcw, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { Check, CircleAlert, Code2, Eye, Film, FolderOpen, MessageCircleQuestion, Pause, Play, Plus, RotateCcw, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ExerciseDetail, ExerciseHit, ExerciseItem, ExerciseSet, Section } from '../../../shared/types'
 import { fold } from '../../../shared/exercise'
@@ -8,6 +8,7 @@ import { errorText, openDialog, openExerciseSet, selectExercise, toast, useStore
 import { ChatPane } from './ChatPane'
 import { Markdown } from './Markdown'
 import { StudyPlayer } from './StudyPlayer'
+import { WatchedToggle } from './WatchView'
 
 const LABEL: Record<ExerciseItem['state'], string> = {
   waiting: 'Waiting to be solved',
@@ -51,7 +52,7 @@ function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: strin
         <h2 className="ex-set-title">{set.title}</h2>
         <p className="faint">
           {set.items.length === 1 ? '1 exercise' : `${set.items.length} exercises`}
-          {set.items.length ? `, ${done} with a video` : ''}
+          {set.items.length ? `, ${done} with a video, ${set.items.filter((i) => i.watched).length} watched` : ''}
           {set.level ? ` · ${set.level}` : ''}
         </p>
         <label className="ex-search">
@@ -121,7 +122,7 @@ function ExerciseSidebar({ set, selected }: { set: ExerciseSet; selected?: strin
 }
 
 function StateIcon({ item, paused }: { item: ExerciseItem; paused: boolean }) {
-  if (item.state === 'done') return <Check className="ex-state-icon done" />
+  if (item.state === 'done') return item.watched ? <Eye className="ex-state-icon watched" /> : <Check className="ex-state-icon done" />
   if (item.state === 'failed') return <CircleAlert className="ex-state-icon failed" />
   if (['solving', 'video', 'export'].includes(item.state)) return <span className="spinner" />
   if (paused) return <Pause className="ex-state-icon" />
@@ -203,6 +204,7 @@ function ExerciseMain({ item }: { item: ExerciseItem }) {
           <h1>{item.title}</h1>
         </div>
         <div className="ex-detail-actions">
+          {item.video && <WatchedToggle dir={item.dir} watched={!!item.watched} />}
           {item.state === 'failed' && (
             <button className="btn small" onClick={() => void api.retryExercise(item.dir).catch((e) => toast(errorText(e), 'error'))}>
               <RotateCcw /> Try again
@@ -304,7 +306,13 @@ function ExercisePlayer({ item, detail, video }: { item: ExerciseItem; detail: E
     )
   return (
     <>
-      <StudyPlayer src={src} vtt={item.video ? item.subtitles : undefined} chapters={detail?.chapters ?? []} video={video} />
+      <StudyPlayer
+        src={src}
+        vtt={item.video ? item.subtitles : undefined}
+        chapters={detail?.chapters ?? []}
+        video={video}
+        onWatched={() => item.video && !item.watched && void api.setWatched(item.dir, true)}
+      />
       {!item.video && <p className="faint ex-preview-note">The preview, until the video is exported.</p>}
     </>
   )

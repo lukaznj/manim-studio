@@ -20,4 +20,5 @@ A finished series is studied more than it's edited. The editor is the wrong plac
 
 - An episode is watched with the subtitles players would show, and a question costs no render; a follow-up costs a video.
 - Follow-ups need Claude (background agents) and an episode's preview or export to ask from.
-- Later: a quiz at the end of an episode, the whole series joined into one lecture, marking episodes watched.
+- **Watched marks** for episodes, follow-ups and exercises (`.studio/watched.json` in the project): set when playback passes 90%, or by hand; the lists show them and count them.
+- Later: a quiz at the end of an episode, the whole series joined into one lecture.

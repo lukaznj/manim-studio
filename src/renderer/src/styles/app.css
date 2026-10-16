@@ -565,6 +565,9 @@
 .home-crumbs .btn {
   margin-left: auto;
 }
+.home-crumbs .btn + .btn {
+  margin-left: 0;
+}
 .thumb.theme-light .thumb-empty {
   background: #f7f8fa;
 }
