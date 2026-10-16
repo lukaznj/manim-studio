@@ -15,13 +15,14 @@ import { availableParallelism, totalmem } from 'node:os'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { dirname, join, relative, sep } from 'node:path'
-import type { ExportOptions, ExportResult, ProjectMeta, Timeline } from '../shared/types'
+import type { ExportOptions, ExportResult, ExportSize, ProjectMeta, Timeline } from '../shared/types'
 import { languageName, translateNarration } from './claude'
 import { readMeta, readTimeline, slugify } from './projects'
 import { exportEncoder, partialFolder } from './encoder'
 import { renderFinal, type RenderVariant } from './render'
 import { renderRemote } from './remote'
 import { runRunner } from './runner'
+import { getSettings } from './settings'
 import { voiceEnv } from './voice'
 
 type Progress = (e: { stage: string; percent?: number }) => void
@@ -39,6 +40,15 @@ function cardArgs(meta: ProjectMeta): string[] {
   return ['--text', meta.name, ...(badge ? ['--badge', badge] : []), ...(kicker ? ['--kicker', kicker] : [])]
 }
 
+/**
+ * An export that names no size: videos made to study (Learn and Both, ADR 0035) are 720p unless
+ * Settings → General says 1080p; 720p renders about twice as fast. Create's are 1080p, to publish.
+ */
+function defaultSize(): ExportSize {
+  const { mode, studySize } = getSettings()
+  return mode === 'create' || !mode ? 1080 : (studySize ?? 720)
+}
+
 /** Exports `project` by rendering a copy of it in `work` (an empty folder the caller removes). */
 export async function exportVideo(project: string, work: string, options: ExportOptions, progress: Progress, signal?: AbortSignal, tag?: string): Promise<ExportResult> {
   progress({ stage: 'Copying the project' })
@@ -51,7 +61,7 @@ export async function exportVideo(project: string, work: string, options: Export
   const original = meta.voice.language
   const themes = options.themes.length ? options.themes : [meta.theme]
   // Claude Desktop's export_video passes no choices: it gets the project's last ones.
-  const size = options.size ?? meta.export?.size ?? 1080
+  const size = options.size ?? meta.export?.size ?? defaultSize()
   const fps = options.fps ?? meta.export?.fps ?? meta.fps ?? 30
   const last = readTimeline(project)
   const duration = last?.duration

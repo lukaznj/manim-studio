@@ -462,8 +462,8 @@ export interface PlanUsage {
   checkedAt: number
 }
 
-/** The video's short side in pixels: 1080 is 1920 × 1080 (or 1080 × 1920 in portrait), 1440 is 2560 × 1440. */
-export type ExportSize = 1080 | 1440
+/** The video's short side in pixels: 1080 is 1920 × 1080 (or 1080 × 1920 in portrait), 720 is 1280 × 720, 1440 is 2560 × 1440. */
+export type ExportSize = 720 | 1080 | 1440
 export type ExportFps = 30 | 60
 
 export interface ExportOptions {
@@ -646,6 +646,7 @@ export interface Settings {
   defaultVoice: VoiceSettings
   renderServers: RenderServer[] // paired render workers (ADR 0021); their tokens are secrets
   gpuEncoding?: 'auto' | 'off' // exports encode on the GPU when one works (ADR 0034); unset: auto
+  studySize?: 720 | 1080 // Learn and Both: the size of videos made to study (exercises, follow-ups, courses); unset: 720 (ADR 0035)
   sidebarWidth: number
   chatWidth: number
   timelineHeight: number
