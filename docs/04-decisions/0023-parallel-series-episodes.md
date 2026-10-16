@@ -19,7 +19,7 @@ An unattended series (ADR 0019) made its episodes one after another, each in the
 - **Home shows the run** (SeriesPanel): each episode's state, what its agent is doing and what it cost, with Pause and Stop for the series and Pause for an episode.
 - **The run is its states.** A loop (`series.ts` `drive`) hands out the work from each episode's state, and the run is saved in the series folder (`.studio/series-run.json`) on every change. So pausing (the series, or one episode, whose script the writer then skips), stopping and continuing are only states. Stopped also cancels the exports. Continue, also after quitting the app, gives an interrupted step its agent session back with "carry on where you stopped", exports again what didn't finish, and retries what failed.
 - **Its own model and effort** (New series), for planning and every episode; the chat keeps the Settings choice.
-- **Codex** keeps the old one-at-a-time path: its tools reach Studio through the MCP bridge, which works on the open project only.
+- **Codex** kept the old one-at-a-time path at first; since [[0033-every-agent-in-the-background|ADR 0033]] Codex and Antigravity run the same background agents.
 
 ## Consequences
 

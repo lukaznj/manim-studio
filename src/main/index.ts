@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, sh
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
-import type { EventChannel, ExerciseInput, ExportOptions, NewExerciseSet, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
+import type { Agent, EventChannel, ExerciseInput, ExportOptions, NewExerciseSet, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
 import {
   applyChatSettings,
   chatInterrupt,
@@ -43,7 +43,7 @@ import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
 import { requestFollowUp, retryFollowUp, setupWatch, setWatched, watchDetail, watchSeries } from './watch'
-import { checkAnthropicKey, checkOpenAIKey, keyUsable } from './keys'
+import { checkAnthropicKey, checkGeminiKey, checkOpenAIKey, keyUsable } from './keys'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
@@ -142,7 +142,9 @@ async function openInWindow(dir: string): Promise<void> {
 function registerMediaProtocol(): void {
   protocol.handle('studio-media', async (req) => {
     const file = decodeURIComponent(new URL(req.url).pathname.slice(1))
-    const allowed = [projects.project()?.path, ...getSettings().recentProjects, ...(getSettings().exerciseSets ?? []), paths.userData()].filter(Boolean) as string[]
+    const allowed = [projects.project()?.path, ...getSettings().recentProjects, ...(getSettings().exerciseSets ?? []), paths.userData()].filter(
+      Boolean,
+    ) as string[]
     const full = resolve(file)
     if (!allowed.some((root) => full === resolve(root) || full.startsWith(resolve(root) + sep)) || !existsSync(full)) {
       return new Response('not found', { status: 404 })
@@ -222,12 +224,18 @@ function registerIpc(): void {
     return setSecret('openai', key.trim())
   })
   handle('checkOpenAIKey', (again?: boolean) => checkOpenAIKey(undefined, again))
+  handle('setGeminiKey', async (key: string) => {
+    if (key.trim()) await keyUsable('gemini', key.trim())
+    closeChat() // Antigravity picks the key up on its next run
+    return setSecret('gemini', key.trim())
+  })
+  handle('checkGeminiKey', (again?: boolean) => checkGeminiKey(undefined, again))
 
-  handle('claudeStatus', () => claudeStatus())
+  handle('claudeStatus', (agent?: Agent) => claudeStatus(agent))
   handle('claudeUsage', () => claudeUsage())
-  handle('claudeLogin', () => claudeLogin((e) => send('claude-login', e)))
-  handle('claudeLoginCode', (code: string) => claudeLoginCode(code))
-  handle('claudeLogout', () => claudeLogout())
+  handle('claudeLogin', (agent?: Agent) => claudeLogin((e) => send('claude-login', e), agent))
+  handle('claudeLoginCode', (code: string, agent?: Agent) => claudeLoginCode(code, agent))
+  handle('claudeLogout', (agent?: Agent) => claudeLogout(agent))
 
   handle('listProjects', () => projects.listProjects())
   handle('createProject', (input: Parameters<typeof projects.createProject>[0]) => projects.createProject(input))

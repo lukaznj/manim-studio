@@ -13,6 +13,7 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/c
 import { pageRanges } from '../shared/pages'
 import { sceneTools } from '../shared/studio-tools'
 import type {
+  Agent,
   ChatEvent,
   ChatMessage,
   ChatPart,
@@ -25,6 +26,17 @@ import type {
   UsageWindow,
 } from '../shared/types'
 import { agentBusy } from './agent'
+import {
+  antigravityLogin,
+  antigravityLoginCode,
+  antigravityLogout,
+  antigravityModels,
+  antigravityStatus,
+  antigravityTurn,
+  askAntigravity,
+  closeAntigravity,
+  interruptAntigravity,
+} from './antigravity'
 import { askCodex, closeCodex, codexLogin, codexLogout, codexModels, codexStatus, codexTurn, interruptCodex } from './codex'
 import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
@@ -52,6 +64,10 @@ const usingApiKey = () => getSettings().claudeAuth === 'api-key'
 
 /** Settings → Agent: Codex instead of Claude (ADR 0022). The chat, quick mode and translation follow it. */
 export const codexChosen = () => getSettings().agent === 'codex'
+/** Settings → Agent: Google's Antigravity CLI (ADR 0031), routed like Codex. */
+export const antigravityChosen = () => getSettings().agent === 'antigravity'
+/** Codex or Antigravity: no Claude plan usage to show. */
+export const claudeNotChosen = () => codexChosen() || antigravityChosen()
 
 /** cleanEnv() strips inherited ANTHROPIC_* variables; the key saved in Settings goes back only when it's the chosen method. */
 const claudeEnv = (): NodeJS.ProcessEnv => {
@@ -80,8 +96,13 @@ function runClaude(args: string[]): Promise<{ code: number | null; out: string }
   })
 }
 
-export async function claudeStatus(): Promise<ClaudeStatus> {
-  if (codexChosen()) return { ...(await codexStatus()), agent: 'codex' }
+/** The chosen agent, or `agent` (Settings → Accounts manages every agent's sign-in, chosen or not). */
+const agentOr = (agent?: Agent): Agent => agent ?? getSettings().agent
+
+export async function claudeStatus(agent?: Agent): Promise<ClaudeStatus> {
+  const a = agentOr(agent)
+  if (a === 'codex') return { ...(await codexStatus()), agent: 'codex' }
+  if (a === 'antigravity') return { ...(await antigravityStatus()), agent: 'antigravity' }
   return { ...(await claudeOnlyStatus()), agent: 'claude' }
 }
 
@@ -103,8 +124,10 @@ async function claudeOnlyStatus(): Promise<ClaudeStatus> {
 
 let loginChild: ChildProcess | null = null
 
-export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
-  if (codexChosen()) return codexLogin(onEvent).then((st) => ({ ...st, agent: 'codex' }))
+export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void, agent?: Agent): Promise<ClaudeStatus> {
+  const a = agentOr(agent)
+  if (a === 'codex') return codexLogin(onEvent).then((st) => ({ ...st, agent: 'codex' }))
+  if (a === 'antigravity') return antigravityLogin(onEvent).then((st) => ({ ...st, agent: 'antigravity' }))
   loginChild?.kill()
   return new Promise((resolvePromise) => {
     const child = spawn(paths.claude(), ['auth', 'login', '--claudeai'], { env: claudeEnv(), windowsHide: true })
@@ -124,19 +147,22 @@ export function claudeLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<Cla
     child.on('close', async () => {
       loginChild = null
       onEvent({ done: true })
-      resolvePromise(await claudeStatus())
+      resolvePromise(await claudeStatus('claude'))
     })
   })
 }
 
-export function claudeLoginCode(code: string): void {
+export function claudeLoginCode(code: string, agent?: Agent): void {
+  if (agentOr(agent) === 'antigravity') return antigravityLoginCode(code)
   loginChild?.stdin?.write(code.trim() + '\n')
 }
 
-export async function claudeLogout(): Promise<ClaudeStatus> {
-  if (codexChosen()) return { ...(await codexLogout()), agent: 'codex' }
+export async function claudeLogout(agent?: Agent): Promise<ClaudeStatus> {
+  const a = agentOr(agent)
+  if (a === 'codex') return { ...(await codexLogout()), agent: 'codex' }
+  if (a === 'antigravity') return { ...(await antigravityLogout()), agent: 'antigravity' }
   await runClaude(['auth', 'logout'])
-  return claudeStatus()
+  return claudeStatus('claude')
 }
 
 // --- chat -------------------------------------------------------------------------------
@@ -224,6 +250,7 @@ export function loadChat(dir: string): void {
 
 export function closeChat(): void {
   closeCodex()
+  closeAntigravity()
   session?.inbox.close()
   session?.query.close()
   session = null
@@ -264,12 +291,12 @@ export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
   emit({ type: 'busy', busy: true })
   pauseCommits(true)
 
-  if (codexChosen()) return void codexChat(p.path, contextNote(req) + req.text, frame)
+  if (codexChosen() || antigravityChosen()) return void codexChat(p.path, contextNote(req) + req.text, frame)
   if (!session || session.dir !== p.path) await startSession(p.path)
   session!.inbox.push({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null, origin: { kind: 'human' } })
 }
 
-/** One turn with Codex: its items become the same chat parts Claude's do. */
+/** One turn with Codex or Antigravity: their events become the same chat parts Claude's do. */
 async function codexChat(dir: string, text: string, frame?: string): Promise<void> {
   const reply = turn!.message
   const images: string[] = []
@@ -280,23 +307,32 @@ async function codexChat(dir: string, text: string, frame?: string): Promise<voi
     images.push(file)
   }
   const meta = requireProject().meta
-  const result = await codexTurn(dir, studioPrompt(dir, 'codex', autopilot), text, images, meta.codexThreadId, {
-    part: (part) => {
+  const on = {
+    part: (part: ChatPart) => {
       reply.parts.push(part)
       emit({ type: 'part', messageId: reply.id, part })
     },
-    status: (id, status) => {
+    status: (id: string, status: 'ok' | 'error') => {
       const part = reply.parts.find((x) => x.kind === 'tool' && x.id === id)
       if (part && part.kind === 'tool') part.status = status
       emit({ type: 'tool-status', messageId: reply.id, toolId: id, status })
     },
-    thread: (id) => project() && project()!.meta.codexThreadId !== id && updateMeta({ codexThreadId: id }),
-  })
+  }
+  const result = antigravityChosen()
+    ? await antigravityTurn(dir, studioPrompt(dir, 'antigravity', autopilot), text, images, meta.antigravityConversationId, {
+        ...on,
+        conversation: (id) => project() && project()!.meta.antigravityConversationId !== id && updateMeta({ antigravityConversationId: id }),
+      })
+    : await codexTurn(dir, studioPrompt(dir, 'codex', autopilot), text, images, meta.codexThreadId, {
+        ...on,
+        thread: (id) => project() && project()!.meta.codexThreadId !== id && updateMeta({ codexThreadId: id }),
+      })
   finishTurn(result.ok, result.error)
 }
 
 export async function chatInterrupt(): Promise<void> {
   interruptCodex()
+  interruptAntigravity()
   await session?.query.interrupt().catch(() => undefined)
 }
 
@@ -321,6 +357,7 @@ export async function chatReset(): Promise<void> {
 /** What this account can use. Not cached: it changes with the sign-in or API key (the renderer asks once per account). */
 export async function chatModels(): Promise<ModelOption[]> {
   if (codexChosen()) return codexModels()
+  if (antigravityChosen()) return antigravityModels()
   const { query } = await sdk()
   const inbox = new Inbox()
   const q = query({ prompt: inbox, options: { env: claudeEnv(), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
@@ -356,10 +393,8 @@ export async function askClaude(
     images?: { name: string; mediaType: string; data: string }[] // pictures to read along with the prompt
   } = {},
 ): Promise<string> {
-  if (codexChosen()) {
-    if (opts.images?.length) throw new Error(`Codex can’t ${what} from pictures here. Choose Claude in Settings → Agent.`)
-    return askCodex(system, prompt, what) // Codex answers at once at the end
-  }
+  if (codexChosen()) return askCodex(system, prompt, what, opts.images) // Codex answers at once at the end
+  if (antigravityChosen()) return askAntigravity(system, prompt, what, opts.images)
   const { query } = await sdk()
   const images = opts.images ?? []
   async function* withImages(): AsyncGenerator<SDKUserMessage> {
@@ -449,7 +484,7 @@ type UsageAnswer = {
  * The SDK marks this call experimental, so a missing or renamed method only hides the meter.
  */
 export async function claudeUsage(): Promise<PlanUsage | null> {
-  if (usingApiKey() || codexChosen()) return null
+  if (usingApiKey() || claudeNotChosen()) return null
   const read = async (q: Query) => {
     const usage = (q as unknown as Record<string, unknown>).usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET
     if (typeof usage !== 'function') return null
@@ -669,7 +704,7 @@ function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
 
 // --- prompt and tool text --------------------------------------------------------------------
 
-function studioPrompt(dir: string, agent: 'claude' | 'codex', autopilot: boolean): string {
+export function studioPrompt(dir: string, agent: Agent, autopilot: boolean): string {
   const meta = metaOf(dir)
   const portrait = meta.aspect === '9:16'
   const site = join(paths.env(), '.pixi', 'envs', 'default', process.platform === 'win32' ? 'Lib' : 'lib/python3.12', 'site-packages')
@@ -678,9 +713,11 @@ function studioPrompt(dir: string, agent: 'claude' | 'codex', autopilot: boolean
     'You are working inside Manim Studio, a desktop editor for making educational maths videos with manim.',
     `The project folder is ${dir}. The video is scene.py; the app renders it on every save and shows a timeline produced by the render. Read the project's CLAUDE.md first; it holds the conventions.`,
     `Format: ${meta.aspect} (${portrait ? 'portrait for phones, frame 8 × 14.2 units' : 'landscape, frame 14.2 × 8 units'}), theme "${meta.theme}", voice provider "${meta.voice.provider}".`,
-    agent === 'codex'
-      ? 'Edit files in the project yourself. Never run manim or python to render: Studio renders. To see your work, call the studio tools: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done. Read PDF sources with read_source and view_source_pages.'
-      : 'You cannot run shell commands. To see your work: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done.',
+    agent === 'antigravity'
+      ? "Edit files in the project yourself (your write tools; Studio allows writes inside the project only). You cannot run shell commands: they are refused and end your turn, so never run manim or python. To see your work, call the studio MCP server's tools with call_mcp_tool: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done. Read PDF sources with read_source and view_source_pages, and check maths with calculate."
+      : agent === 'codex'
+        ? 'Edit files in the project yourself. Never run manim or python to render: Studio renders. To see your work, call the studio tools: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done. Read PDF sources with read_source and view_source_pages.'
+        : 'You cannot run shell commands. To see your work: render_preview (waits for the render and reports errors and layout warnings), then view_frames at the moments you changed. Always look before saying something is done.',
     `The manim 0.21 and manim-voiceover sources are readable under ${site} (manim/, manim_voiceover/); the studio helpers under ${paths.python()}/studio. Read them instead of guessing an API.`,
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),

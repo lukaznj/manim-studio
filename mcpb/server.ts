@@ -33,7 +33,12 @@ function readEndpoint(): Endpoint | null {
   }
 }
 
-const auth = (e: Endpoint) => ({ authorization: `Bearer ${e.token}` })
+// Codex and Antigravity run this bridge with STUDIO_PROJECT: their tool calls are for that project,
+// which may be one a background agent is making rather than the open one.
+const auth = (e: Endpoint) => ({
+  authorization: `Bearer ${e.token}`,
+  ...(process.env.STUDIO_PROJECT ? { 'x-studio-project': encodeURIComponent(process.env.STUDIO_PROJECT) } : {}),
+})
 
 async function healthy(e: Endpoint): Promise<boolean> {
   try {

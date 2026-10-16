@@ -73,7 +73,7 @@ export function renderProgress(r: RenderState): { label: string; detail: string;
 
 export type Dialog =
   | { kind: 'new-project' }
-  | { kind: 'settings'; tab?: 'account' | 'voice' | 'video' | 'env' | 'about' }
+  | { kind: 'settings'; tab?: 'account' | 'accounts' | 'voice' | 'video' | 'env' | 'about' }
   | { kind: 'booth'; key?: string }
   | { kind: 'export' }
   | { kind: 'quick' }

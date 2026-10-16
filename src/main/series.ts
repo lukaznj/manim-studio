@@ -11,12 +11,12 @@ import { SCRIPT_FILE, scriptStatus } from '../shared/script'
 import { TONES } from '../shared/tone'
 import type { Effort, EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
 import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
-import { askClaude, claudeStatus, codexChosen, languageName } from './claude'
+import { askClaude, claudeStatus, languageName } from './claude'
 import { cancelExport, queueExport } from './exports'
 import { cancel } from './render'
 import { createProject, readMeta, readScript } from './projects'
 import { parsePlan, titlesSoFar } from '../shared/series-plan'
-import { checkAndFix, ensureQuickReady, makeVideo, quickStopped } from './quick'
+import { checkAndFix, ensureQuickReady } from './quick'
 import { runRunner } from './runner'
 import { getSettings, setSettings } from './settings'
 import { slugify } from './slug'
@@ -34,7 +34,7 @@ export async function planSeries(
   signal?: AbortSignal,
 ): Promise<SeriesPlan> {
   if (!req.pdfs.length) throw new Error('Add the PDFs the series is made from.')
-  if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Agent): it reads the PDFs and plans the episodes.')
+  if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Accounts): it reads the PDFs and plans the episodes.')
   const work = join(tmpdir(), 'manim-studio-series', randomUUID())
   try {
     const material: string[] = []
@@ -133,22 +133,7 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
     return
   }
   if (plan.usage) appendUsage(folder, plan.usage)
-  if (!codexChosen()) return startRun(plan.title, folder, dirs, start, plan.usage && costOf(plan.usage.models))
-  // Codex's tools work on the open project only, so with Codex the episodes are made one at a time, in the window.
-  void (async () => {
-    const episodes = plan.episodes.map((ep) => ({ title: ep.title, state: 'todo' as 'done' | 'failed' | 'now' | 'todo' }))
-    for (const [i, dir] of dirs.entries()) {
-      writeEpisodeBible(dir)
-      const meta = readMeta(dir)
-      episodes[i].state = 'now'
-      const series = { title: plan.title, episode: i + 1, of: dirs.length, episodes: episodes.map((e) => ({ ...e })) }
-      episodes[i].state = await makeVideo(dir, meta.name, { prompt: episodePrompt(meta), sources: [], export: start.export }, series).then(
-        () => 'done' as const,
-        () => 'failed' as const,
-      )
-      if (quickStopped()) break
-    }
-  })()
+  return startRun(plan.title, folder, dirs, start, plan.usage && costOf(plan.usage.models))
 }
 
 // --- making a series unattended, several episodes at once (ADR 0023) ---------------------------

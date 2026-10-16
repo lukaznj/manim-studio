@@ -9,12 +9,13 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { z } from 'zod'
 import { desktopTools, type DesktopToolName } from '../shared/studio-tools'
 import type { ClaudeDesktopStatus, ExportResult, Tone } from '../shared/types'
 import { languageName, mediaNote } from './claude'
-import { createProject, listProjects, readScene, readScript, requireProject, saveScene, saveScript } from './projects'
+import { createProject, listProjects, project, readScene, readScript, requireProject, saveScene, saveScript } from './projects'
+import { agentProjects } from './agent-projects'
 import { getSettings } from './settings'
 import { calculate, getTimeline, readSource, renderPreview, textResult, viewFrames, viewSourcePages } from './scene-tools'
 import { slugify } from './slug'
@@ -38,6 +39,20 @@ const MAX_WAIT_MS = 45_000
 
 const endpointFile = () => join(app.getPath('userData'), 'mcp-endpoint.json')
 
+/**
+ * The project a scene tool works on: the one the bridge names (x-studio-project, sent by Codex's
+ * and Antigravity's runs), if it's open or an agent is working in it; otherwise the open project
+ * (Claude Desktop).
+ */
+function projectFor(req: IncomingMessage): string {
+  const named = req.headers['x-studio-project']
+  if (typeof named !== 'string' || !named) return requireProject().path
+  const dir = resolve(decodeURIComponent(named))
+  const open = project()?.path
+  if ((open && resolve(open) === dir) || [...agentProjects].some((d) => resolve(d) === dir)) return dir
+  throw new Error('That project isn’t open in Manim Studio, and no agent is working in it.')
+}
+
 export function startDesktopEndpoint(host: DesktopHost): void {
   const token = randomBytes(32).toString('hex')
   const server = createServer(async (req, res) => {
@@ -48,7 +63,7 @@ export function startDesktopEndpoint(host: DesktopHost): void {
     if (req.method !== 'POST' || !name || !(name in desktopTools)) return reply(404)
     try {
       const args = z.object(desktopTools[name as DesktopToolName].shape).parse(JSON.parse((await body(req)) || '{}'))
-      reply(200, await run(host, name as DesktopToolName, args as Record<string, unknown>))
+      reply(200, await run(host, name as DesktopToolName, args as Record<string, unknown>, req))
     } catch (e) {
       reply(200, textResult((e as Error).message, true))
     }
@@ -95,7 +110,7 @@ function body(req: IncomingMessage): Promise<string> {
   })
 }
 
-async function run(host: DesktopHost, name: DesktopToolName, args: Record<string, unknown>): Promise<CallToolResult> {
+async function run(host: DesktopHost, name: DesktopToolName, args: Record<string, unknown>, req: IncomingMessage): Promise<CallToolResult> {
   switch (name) {
     case 'list_projects': {
       const list = listProjects().filter((p) => !p.missing)
@@ -151,17 +166,17 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
       )
     }
     case 'render_preview':
-      return renderPreview(requireProject().path, MAX_WAIT_MS)
+      return renderPreview(projectFor(req), MAX_WAIT_MS)
     case 'get_timeline':
-      return getTimeline(requireProject().path)
+      return getTimeline(projectFor(req))
     case 'view_frames':
-      return viewFrames(requireProject().path, args.times as number[])
+      return viewFrames(projectFor(req), args.times as number[])
     case 'read_source':
-      return readSource(requireProject().path, String(args.source), args.from_page as number | undefined, args.to_page as number | undefined)
+      return readSource(projectFor(req), String(args.source), args.from_page as number | undefined, args.to_page as number | undefined)
     case 'view_source_pages':
-      return viewSourcePages(requireProject().path, String(args.source), args.pages as number[])
+      return viewSourcePages(projectFor(req), String(args.source), args.pages as number[])
     case 'calculate':
-      return calculate(requireProject().path, String(args.code))
+      return calculate(projectFor(req), String(args.code))
     case 'export_video':
       return exportVideo(host)
   }

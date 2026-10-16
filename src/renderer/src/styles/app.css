@@ -1096,6 +1096,29 @@
   background: var(--line);
   margin: 4px 0;
 }
+/* Settings → Accounts: one section per agent and service. */
+.account-section {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.account-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.account-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-head strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+.account-head-end {
+  margin-left: auto;
+}
 .account-card {
   display: flex;
   align-items: center;

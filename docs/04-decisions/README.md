@@ -34,4 +34,6 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0028-watching-a-series]] | A series can be watched: study player, synced transcript, a chat that knows the moment, follow-up videos per episode | accepted |
 | [[0029-learn-and-create]] | Learn, Create or Both: chosen at first launch; Learn hides the editor everywhere and opens every video on a study screen; Both has a Home tab for each | accepted |
 | [[0030-courses]] | A course is a series with its own exercise set in it, studied on one screen with its lessons and exercises together | accepted |
+| [[0031-antigravity-as-third-agent]] | Antigravity (Gemini 4 Argon) as a third agent: pinned CLI with its own home, contained by permission rules without the skip flag, Google sign-in through a pseudo-terminal or a Gemini key | accepted |
 | [[0032-searchable-transcript]] | The study screen's transcript follows the video line by line; searching what's said moves the video to each match | accepted |
+| [[0033-every-agent-in-the-background]] | Codex and Antigravity run the background agents too (the bridge names its project); Settings → Accounts shows every agent's sign-in and key | accepted |
