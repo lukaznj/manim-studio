@@ -604,11 +604,12 @@ export interface ClaudeLoginEvent {
 
 export type Appearance = 'system' | 'light' | 'dark'
 
-/** Who the app is for (ADR 0029): Learn hides the editor everywhere; Create is the full studio. */
-export type AppMode = 'learn' | 'create'
+/** Who the app is for (ADR 0029): Learn hides the editor everywhere; Create is the full studio; Both has a tab for each on Home. */
+export type AppMode = 'learn' | 'create' | 'both'
 
 export interface Settings {
   mode?: AppMode // unset until chosen at first launch
+  homeTab?: 'learn' | 'create' // Both: the Home tab last shown (unset: Create)
   appearance: Appearance // 'system' follows the OS
   projectsDir: string
   recentProjects: string[]

@@ -449,9 +449,13 @@ export async function installComponent(c: Component): Promise<void> {
 /** Whether the editor exists for this user: not in Learn mode (ADR 0029). Every way into it asks here. */
 export const canEdit = (s: Pick<State, 'settings'> = get()): boolean => s.settings?.mode !== 'learn'
 
+/** Whether Home is the library, where everything opens on the study screen: Learn, or Both on its Learn tab. */
+export const studying = (s: Pick<State, 'settings'> = get()): boolean =>
+  s.settings?.mode === 'learn' || (s.settings?.mode === 'both' && s.settings.homeTab === 'learn')
+
 export async function openProject(path: string): Promise<void> {
   // Quick mode's progress screen isn't the editor: it opens the same way, and its video is watched after.
-  if (!canEdit() && get().quick?.project !== path) return studyProject(path)
+  if (studying() && get().quick?.project !== path) return studyProject(path)
   const opened = await guard(api.openProject(path))
   if (!opened) return
   withTransition(() => applyOpened(opened))
