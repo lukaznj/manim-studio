@@ -350,6 +350,15 @@ export interface VoiceBlock {
   bookmarks: { mark: string; t: number }[]
 }
 
+/** studio_runner encoders: the first hardware encoder that worked, and what each one tried said (ADR 0034). */
+export interface VideoEncoderInfo {
+  encoder: string | null // h264_videotoolbox, h264_nvenc or h264_mf
+  label?: string // "NVIDIA NVENC"
+  tried: { encoder: string; error: string | null }[]
+  waiting?: boolean // the Python environment isn't installed yet
+  error?: string // the check itself failed
+}
+
 export interface Subtitle {
   start: number
   end: number
@@ -636,6 +645,7 @@ export interface Settings {
   hasGeminiKey: boolean
   defaultVoice: VoiceSettings
   renderServers: RenderServer[] // paired render workers (ADR 0021); their tokens are secrets
+  gpuEncoding?: 'auto' | 'off' // exports encode on the GPU when one works (ADR 0034); unset: auto
   sidebarWidth: number
   chatWidth: number
   timelineHeight: number
@@ -853,6 +863,8 @@ export interface StudioApi {
   /** Marks a video (an episode, follow-up or exercise) watched or not; its list updates. */
   setWatched(dir: string, watched: boolean): Promise<void>
   renderServers(): Promise<RenderServer[]>
+  /** The GPU video encoder exports use on this computer, if any; `again` tests it anew. */
+  videoEncoder(again?: boolean): Promise<VideoEncoderInfo>
   /** Pairs with a render worker from the code it printed; checks that it answers first. */
   addServer(code: string): Promise<RenderServer[]>
   removeServer(id: string): Promise<RenderServer[]>

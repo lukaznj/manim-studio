@@ -1,4 +1,4 @@
-import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Settings2, Sparkles, Square, Sun, X } from 'lucide-react'
+import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, RefreshCw, Settings2, Sparkles, Square, Sun, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
   Agent,
@@ -17,6 +17,7 @@ import type {
   Settings,
   Theme,
   VoiceProvider,
+  VideoEncoderInfo,
   VoiceSettings,
 } from '../../../shared/types'
 import { DEFAULT_TONE, TONES } from '../../../shared/tone'
@@ -1012,7 +1013,51 @@ function EnvTab() {
           <span />
         </label>
       </Row>
+      {setup.env === 'ready' && <GpuEncoding />}
     </div>
+  )
+}
+
+/** Exports encode on the GPU when one works here (ADR 0034): which one, and a way to turn it off. */
+function GpuEncoding() {
+  const mode = useStore((s) => s.settings!.gpuEncoding ?? 'auto')
+  const [info, setInfo] = useState<VideoEncoderInfo | null>(null)
+  const [checking, setChecking] = useState(false)
+  const check = async (again: boolean) => {
+    setChecking(true)
+    try {
+      setInfo(await api.videoEncoder(again))
+    } finally {
+      setChecking(false)
+    }
+  }
+  useEffect(() => void check(false), [])
+  const text = checking
+    ? 'Checking this computer’s graphics…'
+    : info?.encoder
+      ? `Exports encode their video on the GPU with ${info.label}, which is faster than the CPU. Previews stay on the CPU. If it fails, the export carries on on the CPU.`
+      : info?.error
+        ? `The check failed: ${info.error}`
+        : 'No GPU encoder works on this computer, so exports encode on the CPU. Supported: Apple VideoToolbox on Macs, NVIDIA (NVENC), and AMD on Windows (Media Foundation).'
+  return (
+    <Row title="GPU video encoding" text={text}>
+      <div className="inline-form">
+        {info?.encoder && (
+          <Tabs
+            radio="GPU video encoding"
+            value={mode}
+            onChange={(v) => void updateSettings({ gpuEncoding: v })}
+            items={[
+              { value: 'auto', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+          />
+        )}
+        <button className="btn small ghost" disabled={checking} onClick={() => void check(true)}>
+          {checking ? <span className="spinner" /> : <RefreshCw />} Check again
+        </button>
+      </div>
+    </Row>
   )
 }
 
