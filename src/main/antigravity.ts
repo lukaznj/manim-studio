@@ -39,7 +39,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { app } from 'electron'
 import { desktopTools, sceneTools } from '../shared/studio-tools'
-import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, ModelOption, SetupEvent } from '../shared/types'
+import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, SetupEvent } from '../shared/types'
 import { agyFollower, type AgyEvent, type AgyResult } from './antigravity-events'
 import { cleanEnv } from './env'
 import { paths } from './paths'
@@ -381,9 +381,9 @@ export async function antigravityModels(): Promise<ModelOption[]> {
 }
 
 /** The CLI's model slug for the chosen model and effort: gemini-4-argon-medium. */
-function slug(): string {
+function slug(selection: { model?: string; effort?: Effort } = {}): string {
   const { antigravityModel, antigravityEffort } = getSettings()
-  return `${antigravityModel || DEFAULT_MODEL}-${antigravityEffort || 'medium'}`
+  return `${selection.model ?? (antigravityModel || DEFAULT_MODEL)}-${selection.effort || antigravityEffort || 'medium'}`
 }
 
 // --- turns ------------------------------------------------------------------------------
@@ -400,6 +400,7 @@ export interface AntigravityTurnHandlers {
   part(part: ChatPart): void
   status(id: string, status: 'ok' | 'error'): void
   conversation(id: string): void
+  usage?(usage: Record<string, number>, model: string): void
 }
 
 type Outcome = { ok: boolean; error?: string; result?: AgyResult }
@@ -412,10 +413,11 @@ function runTurn(
   conversation: string | undefined,
   on: AntigravityTurnHandlers,
   started: (child: ChildProcess) => void,
+  selection: { model?: string; effort?: Effort } = {},
 ): Promise<Outcome> {
   const bin = installed()
   if (!bin) return Promise.resolve({ ok: false, error: 'Install Antigravity first (Settings → Accounts).' })
-  const args = ['-p', prompt, '--output-format', 'stream-json', '--model', slug(), ...(conversation ? ['--conversation', conversation] : [])]
+  const args = ['-p', prompt, '--output-format', 'stream-json', '--model', slug(selection), ...(conversation ? ['--conversation', conversation] : [])]
   return new Promise((resolve) => {
     const child = spawn(bin, args, { cwd, env: agyEnv(home), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     started(child)
@@ -471,7 +473,13 @@ export async function antigravityTurn(
 }
 
 /** A background agent's conversation in one project (agent.ts): turns one after another, its own process to stop. */
-export function antigravitySession(dir: string, instructions: string, conversation: string | undefined, on: AntigravityTurnHandlers) {
+export function antigravitySession(
+  dir: string,
+  instructions: string,
+  conversation: string | undefined,
+  on: AntigravityTurnHandlers,
+  selection: { model?: string; effort?: Effort } = {},
+) {
   let child: ChildProcess | null = null
   let closed = false
   let id = conversation
@@ -480,7 +488,8 @@ export function antigravitySession(dir: string, instructions: string, conversati
     async turn(text: string): Promise<{ ok: boolean; error?: string }> {
       if (closed) return { ok: false, error: 'Stopped' }
       const home = await prepare(dir, instructions)
-      const { ok, error } = await runTurn(home, dir, text, id, handlers, (c) => (child = c))
+      const { ok, error, result } = await runTurn(home, dir, text, id, handlers, (c) => (child = c), selection)
+      if (result?.usage) on.usage?.({ ...result.usage }, selection.model || getSettings().antigravityModel || DEFAULT_MODEL)
       child = null
       return { ok, error: error && friendly(error) }
     },
@@ -497,6 +506,7 @@ export async function askAntigravity(
   prompt: string,
   what: string,
   images: { name: string; mediaType: string; data: string }[] = [],
+  selection: { model?: string; effort?: Effort } = {},
 ): Promise<string> {
   const dir = join(tmpdir(), 'manim-studio-antigravity', String(Date.now()))
   mkdirSync(dir, { recursive: true })
@@ -509,7 +519,7 @@ export async function askAntigravity(
     })
     const named = images.length ? `${prompt}\n\nThe pictures, in order: ${images.map((img, i) => `${files[i]} is "${img.name}"`).join('; ')}.` : prompt
     home = await prepare(dir, system)
-    const out = await runTurn(home, dir, withImages(named, files), undefined, { part: () => {}, status: () => {}, conversation: () => {} }, () => {})
+    const out = await runTurn(home, dir, withImages(named, files), undefined, { part: () => {}, status: () => {}, conversation: () => {} }, () => {}, selection)
     if (!out.ok || !out.result) throw new Error(out.error ?? 'no answer')
     return out.result.response
   } catch (e) {

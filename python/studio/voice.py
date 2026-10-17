@@ -15,8 +15,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 import wave
@@ -127,6 +129,7 @@ class StudioSpeech(SpeechService):
         # Narration already made needs no key: a render worker (studio_worker) has none.
         rel, path, starts = self._cached(words, key, ".mp3", "elevenlabs", voice_id, model_id)
         if path.exists():
+            _usage(words, model_id, cached=True)
             return rel, starts
         _offline()
         if not api_key:
@@ -197,14 +200,38 @@ def _elevenlabs_post(voice_id: str, api_key: str, body: dict) -> dict:
     )
     try:
         with urllib.request.urlopen(req, timeout=180) as r:
+            _usage(body["text"], body.get("model_id", ""), cost=r.headers.get("character-cost"))
             return json.load(r)
     except urllib.error.HTTPError as e:
+        _usage(body["text"], body.get("model_id", ""), success=False)
         text = e.read().decode("utf-8", "replace")
         try:  # ElevenLabs explains failures in detail.message (e.g. a missing key permission)
             detail = json.loads(text)["detail"]["message"]
         except (ValueError, KeyError, TypeError):
             detail = text[:300]
         raise _HTTPError(e.code, detail) from None
+    except (urllib.error.URLError, TimeoutError):
+        _usage(body["text"], body.get("model_id", ""), success=False)
+        raise
+
+
+def _usage(words: str, model: str, *, cost=None, cached=False, success=True) -> None:
+    """Developer-only request counters. Never store narration, keys or response contents."""
+    file = os.environ.get("STUDIO_VOICE_METRICS_FILE")
+    if not file:
+        return
+    try:
+        billed = 0 if cached else float(cost) if cost is not None else None
+        if billed is not None and (not math.isfinite(billed) or billed < 0):
+            billed = None
+    except (ValueError, TypeError):
+        billed = None
+    try:
+        entry = {"at": int(time.time() * 1000), "model": model, "characters": len(words), "billedCharacters": billed, "cached": cached, "success": success}
+        with open(file, "a", encoding="utf-8") as out:
+            out.write(json.dumps(entry) + "\n")
+    except (OSError, ValueError):
+        pass  # measurement must never break narration
 
 
 # --- word timing helpers -----------------------------------------------------------------

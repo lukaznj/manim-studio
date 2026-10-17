@@ -2,9 +2,10 @@ import { t as uiText, format } from '../lib/i18n'
 import { ArrowDown, ArrowUp, Check, Circle, FileText, Library, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_TONE } from '../../../shared/tone'
-import type { Aspect, Effort, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
+import type { Agent, AgentSelection, Aspect, Effort, ModelOption, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
+import { defaultAgentSelection } from '../../../shared/agent-selection'
 import { api } from '../lib/api'
-import { canEdit, closeDialog, errorText, toast, useStore } from '../store'
+import { studying, closeDialog, errorText, toast, useStore } from '../store'
 import { ModelPicker } from './ChatPane'
 import { ExportOn } from './ExportDialog'
 import { voiceProblem } from './SettingsDialog'
@@ -20,7 +21,6 @@ export function SeriesDialog() {
   const defaults = useStore((s) => s.settings)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
   const omnivoice = useStore((s) => s.setup?.omnivoice)
-  const codex = useStore((s) => s.settings?.agent !== 'claude') // Codex or Antigravity: their own model, from Settings → Agent
   const agents = useStore((s) => s.settings?.seriesAgents || 3)
   const [pdfs, setPdfs] = useState<string[]>([])
   const [title, setTitle] = useState('')
@@ -30,7 +30,12 @@ export function SeriesDialog() {
   const tone: Tone = defaults?.defaultTone ?? DEFAULT_TONE
   const voice: VoiceSettings = defaultVoice ?? { provider: 'elevenlabs', language: 'en' }
   const [unattended, setUnattended] = useState(true)
-  const editing = useStore((s) => canEdit(s)) // Learn mode makes every episode itself: there is no editor to make them in
+  const editing = useStore((s) => !studying(s))
+  const comparison = !!defaults?.developerMode && !!defaults.developerEpisodeModels && !editing
+  const measuring = !!defaults?.developerMode && !!(defaults.developerUsageMetrics || defaults.developerTimingMetrics || defaults.developerResourceMetrics)
+  const [catalog, setCatalog] = useState<{ agent: Agent; models: ModelOption[] }[]>([])
+  const [catalogReady, setCatalogReady] = useState(false)
+  const [catalogErrors, setCatalogErrors] = useState<string[]>([])
   const settings = useStore((s) => s.settings)
   const [model, setModel] = useState('')
   const [effort, setEffort] = useState<Effort>('high')
@@ -46,11 +51,65 @@ export function SeriesDialog() {
     setPdfs([])
     setTitle('')
     setInstructions('')
-    setModel(settings?.claudeModel ?? '')
-    setEffort(settings?.claudeEffort || 'high')
+    const selection = settings && defaultAgentSelection(settings)
+    setModel(selection?.model ?? '')
+    setEffort(selection?.effort || 'high')
     setPlan(null)
     setBusy(null)
   }, [open]) // a fresh form each time
+
+  useEffect(() => {
+    if (!open || !comparison) return
+    let active = true
+    setCatalogReady(false)
+    setCatalogErrors([])
+    void Promise.all(
+      (['claude', 'codex', 'antigravity'] as const).map(async (agent) => {
+        try {
+          const status = await api.claudeStatus(agent)
+          if (!status.loggedIn) return { agent, models: [] }
+          return { agent, models: (await api.chatModels(agent)).filter((m) => m.value) }
+        } catch (e) {
+          return { agent, models: [], error: `${AGENT_LABELS[agent]}: ${errorText(e)}` }
+        }
+      }),
+    ).then((results) => {
+      if (!active) return
+      setCatalog(results.filter((r) => r.models.length))
+      setCatalogErrors(results.flatMap((r) => (r.error ? [r.error] : [])))
+      setCatalogReady(true)
+    })
+    return () => {
+      active = false
+    }
+  }, [open, comparison])
+
+  const selectionFor = (ep: SeriesPlan['episodes'][number]): AgentSelection | undefined => {
+    if (ep.assignment) return ep.assignment
+    const entry = catalog.find((c) => c.agent === settings?.agent) ?? catalog[0]
+    if (!entry) return undefined
+    const preferred = settings && defaultAgentSelection({ ...settings, agent: entry.agent })
+    const chosen = entry.models.find((m) => m.value === (entry.agent === settings?.agent ? model : preferred?.model)) ?? entry.models[0]
+    const effort = preferred?.effort ?? 'high'
+    return {
+      agent: entry.agent,
+      model: chosen.value,
+      effort: chosen.efforts.includes(effort) ? effort : chosen.efforts.includes('medium') ? 'medium' : chosen.efforts[0],
+    }
+  }
+  const assignmentsReady =
+    !comparison ||
+    (catalogReady &&
+      !!plan &&
+      plan.episodes.every((ep) => {
+        const selection = selectionFor(ep)
+        return (
+          selection &&
+          catalog
+            .find((c) => c.agent === selection.agent)
+            ?.models.some((m) => m.value === selection.model && (!selection.effort || m.efforts.includes(selection.effort)))
+        )
+      }))
 
   const language = voice.language
   // Checked before planning, so a series never gets made without a voice.
@@ -102,7 +161,11 @@ export function SeriesDialog() {
       await api.startSeries({
         model: model || undefined,
         effort,
-        plan: { ...plan, instructions: instructions.trim() || undefined },
+        plan: {
+          ...plan,
+          instructions: instructions.trim() || undefined,
+          episodes: plan.episodes.map((ep) => ({ ...ep, assignment: comparison ? selectionFor(ep) : undefined })),
+        },
         pdfs,
         aspect,
         theme,
@@ -143,7 +206,7 @@ export function SeriesDialog() {
             </button>
             <button
               className="btn primary"
-              disabled={!!busy || !plan.episodes.length || !!voiceIssue}
+              disabled={!!busy || !plan.episodes.length || !!voiceIssue || !assignmentsReady}
               title={voiceIssue ?? undefined}
               onClick={() => void start()}
             >
@@ -226,7 +289,7 @@ export function SeriesDialog() {
             ))}
             <div className="series-add">
               <button className="btn small" onClick={() => void api.pickPdfs().then(add)}>
-                <Plus /> {uiText(" Add PDFs")}
+                <Plus /> {uiText(' Add PDFs')}
               </button>
               <span className="hint">
                 {pdfs.length ? uiText('In course order: drag more in, or reorder with the arrows.') : uiText('or drop them here, in course order.')}
@@ -235,12 +298,17 @@ export function SeriesDialog() {
           </div>
           {voiceIssue && (
             <div className="quick-warning">
-              {voiceIssue} {uiText(" The episodes are made without you, so the voice has to be ready first.")}
+              {voiceIssue} {uiText(' The episodes are made without you, so the voice has to be ready first.')}
             </div>
           )}
-          {!codex && (
+          {measuring && (
+            <p className="quick-warning">
+              {uiText('Developer measurements are enabled. Episodes will run one at a time, through export, and produce HTML reports.')}
+            </p>
+          )}
+          {
             <div className="field">
-              <span className="label">{uiText('Claude model')}</span>
+              <span className="label">{uiText('Model')}</span>
               <ModelPicker
                 model={model}
                 effort={effort}
@@ -253,7 +321,7 @@ export function SeriesDialog() {
                 {uiText('For planning and every episode of this series; the chat keeps its own. Opus and higher effort cost much more of your plan.')}
               </span>
             </div>
-          )}
+          }
           {unattended && <ExportOn value={server} onChange={setServer} />}
           {editing && (
             <label className="export-check">
@@ -277,6 +345,23 @@ export function SeriesDialog() {
             <label htmlFor="series-plan-title">{uiText('Series title')}</label>
             <input id="series-plan-title" className="input" value={plan.title} onChange={(e) => setPlan({ ...plan, title: e.target.value })} />
           </div>
+          {comparison && (
+            <div className="quick-warning">
+              <strong>{uiText('Episode model comparison')}</strong>
+              <p className="hint">
+                {uiText(
+                  'Each episode uses its assigned model for the script, video and fixes. Automatic model fallback is off. Connect accounts in Settings → Accounts before planning.',
+                )}
+              </p>
+              {!catalogReady && <p role="status">{uiText('Loading connected models…')}</p>}
+              {catalogReady && !catalog.length && <p role="alert">{uiText('No connected models are available. Connect an agent account and try again.')}</p>}
+              {catalogErrors.map((error) => (
+                <p className="hint" key={error}>
+                  {error}
+                </p>
+              ))}
+            </div>
+          )}
           <ol className="series-episodes">
             {plan.episodes.map((ep, i) => (
               <li key={i} className="series-episode">
@@ -299,6 +384,40 @@ export function SeriesDialog() {
                     {ep.sources.map((s) => `${s.file}${s.pages ? ` p. ${s.pages}` : ''}`).join(' · ') || uiText('No source pages')}
                     {ep.buildsOn?.length ? format(' · builds on {0}', [ep.buildsOn.join(', ')]) : ''}
                   </span>
+                  {comparison &&
+                    selectionFor(ep) &&
+                    (() => {
+                      const selection = selectionFor(ep)!
+                      const entry = catalog.find((c) => c.agent === selection.agent)
+                      return (
+                        <fieldset className="episode-models">
+                          <legend className="hint">{format('Episode {0} model', [i + 1])}</legend>
+                          <select
+                            className="input"
+                            aria-label={format('Episode {0} agent', [i + 1])}
+                            value={selection.agent}
+                            onChange={(e) => {
+                              const agent = e.target.value as Agent
+                              const model = catalog.find((c) => c.agent === agent)!.models[0]
+                              setEpisode(i, { assignment: { agent, model: model.value, effort: model.efforts.includes('high') ? 'high' : model.efforts[0] } })
+                            }}
+                          >
+                            {catalog.map((c) => (
+                              <option key={c.agent} value={c.agent}>
+                                {AGENT_LABELS[c.agent]}
+                              </option>
+                            ))}
+                            {!entry && <option value={selection.agent}>{AGENT_LABELS[selection.agent]}</option>}
+                          </select>
+                          <ModelPicker
+                            model={selection.model}
+                            effort={selection.effort ?? 'high'}
+                            models={entry?.models ?? []}
+                            onChange={(model, effort) => setEpisode(i, { assignment: { ...selection, model, effort: effort ?? undefined } })}
+                          />
+                        </fieldset>
+                      )
+                    })()}
                 </div>
                 <div className="series-episode-actions">
                   <button
@@ -339,6 +458,8 @@ export function SeriesDialog() {
 }
 
 /** What planning is doing: each PDF as it's read, then the episodes as the agent writes them. */
+const AGENT_LABELS: Record<Agent, string> = { claude: 'Claude · Anthropic', codex: 'Codex · OpenAI', antigravity: 'Antigravity · Google' }
+
 function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlanProgress | null }) {
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
@@ -377,7 +498,7 @@ function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlan
                 <span className="series-progress-name">{file}</span>
                 {read && (
                   <span className="mono faint">
-                    {read.pages} {uiText(" pages")}
+                    {read.pages} {uiText(' pages')}
                   </span>
                 )}
               </li>
@@ -389,9 +510,9 @@ function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlan
         <>
           <div className="series-progress-head">
             <span className="muted">
-              {uiText("Read ")}
-              {pdfs.length} {uiText(" PDFs, ")}
-              {pages} {uiText(" pages.")}{' '}
+              {uiText('Read ')}
+              {pdfs.length} {uiText(' PDFs, ')}
+              {pages} {uiText(' pages.')}{' '}
               {!episodes.length
                 ? uiText('The episodes appear here as Claude writes them; this usually takes a few minutes.')
                 : progress.stage === 'bible'

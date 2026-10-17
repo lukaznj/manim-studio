@@ -2004,3 +2004,45 @@
     transition: none;
   }
 }
+
+.version-unlock {
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: start;
+  cursor: pointer;
+}
+.version-unlock:focus-visible {
+  outline: 2px solid var(--sun);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+.account-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 70px;
+}
+.episode-models {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.episode-models legend {
+  padding: 0 4px;
+}
+.episode-models > select {
+  width: auto;
+}
+.episode-models .model-controls {
+  flex-wrap: wrap;
+}

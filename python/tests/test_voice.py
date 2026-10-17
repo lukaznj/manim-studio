@@ -1,6 +1,8 @@
 """ElevenLabs requests: the language is pinned, and a model that rejects that still speaks."""
 
 import base64
+import io
+import json
 import os
 import tempfile
 import unittest
@@ -65,6 +67,45 @@ class CachedNarrationTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "narration missing"):
                 voice.StudioSpeech(self.dir, self.settings)._elevenlabs("Not made yet", "k2")
             post.assert_not_called()
+
+
+class VoiceUsageTest(unittest.TestCase):
+    def test_network_failure_keeps_billing_unknown(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "usage.jsonl"
+            with mock.patch.dict(os.environ, {"STUDIO_VOICE_METRICS_FILE": str(file)}), mock.patch.object(voice.urllib.request, "urlopen", side_effect=voice.urllib.error.URLError("connection lost")):
+                with self.assertRaises(voice.urllib.error.URLError):
+                    voice._elevenlabs_post("v", "secret", {"text": "Hello", "model_id": "v4"})
+            entry = json.loads(file.read_text())
+            self.assertFalse(entry["success"])
+            self.assertIsNone(entry["billedCharacters"])
+
+    def test_response_billing_is_recorded_without_text_or_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "usage.jsonl"
+            response = io.BytesIO(b'{"audio_base64": ""}')
+            response.headers = {"character-cost": "2.5"}
+            with mock.patch.dict(os.environ, {"STUDIO_VOICE_METRICS_FILE": str(file)}), mock.patch.object(voice.urllib.request, "urlopen", return_value=response):
+                voice._elevenlabs_post("v", "secret-key", {"text": "Privatno č", "model_id": "v4"})
+            entry = json.loads(file.read_text())
+            self.assertEqual(entry["billedCharacters"], 2.5)
+            self.assertEqual(entry["characters"], len("Privatno č"))
+            self.assertNotIn("Privatno", file.read_text())
+            self.assertNotIn("secret-key", file.read_text())
+
+    def test_cached_zero_and_unknown_billing_are_distinct(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "usage.jsonl"
+            with mock.patch.dict(os.environ, {"STUDIO_VOICE_METRICS_FILE": str(file)}):
+                voice._usage("text", "v4", cached=True)
+                voice._usage("text", "v4")
+                voice._usage("text", "v4", cost="NaN")
+                voice._usage("text", "v4", success=False)
+            entries = [json.loads(line) for line in file.read_text().splitlines()]
+            self.assertEqual(entries[0]["billedCharacters"], 0)
+            self.assertIsNone(entries[1]["billedCharacters"])
+            self.assertIsNone(entries[2]["billedCharacters"])
+            self.assertFalse(entries[3]["success"])
 
 
 if __name__ == "__main__":

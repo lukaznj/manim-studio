@@ -15,7 +15,9 @@ import { pipeline } from 'node:stream/promises'
 import { app } from 'electron'
 import type { Thread, ThreadEvent, ThreadItem } from '@openai/codex-sdk'
 import { sceneTools } from '../shared/studio-tools'
-import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, ModelOption, SetupEvent } from '../shared/types'
+import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, SetupEvent } from '../shared/types'
+import { recoverModelCapacity, type CapacityResult } from '../shared/codex-recovery'
+import { listCodexModels, readCodexRateLimits } from './codex-models'
 import { cleanEnv } from './env'
 import { paths } from './paths'
 import { getSecret, getSettings } from './settings'
@@ -45,13 +47,20 @@ function installed(): { bin: string; path: string } | null {
 
 export const codexInstalled = (): boolean => installed() !== null
 
+export const codexPlanUsage = async () => {
+  const bin = installed()?.bin
+  return bin && !codexUsesKey() ? readCodexRateLimits(bin, codexEnv()).catch(() => null) : null
+}
+
 /** Downloads the CLI for this platform from npm, checks its sha512, unpacks it. */
 export async function installCodex(onEvent: (e: SetupEvent) => void): Promise<void> {
   const platform = NPM_PLATFORM[`${process.platform}-${process.arch}`]
   if (!platform) throw new Error(`Codex has no build for this computer (${process.platform} ${process.arch}).`)
   const log = (line: string, progress?: number) => onEvent({ component: 'codex', state: 'installing', line, progress })
   log(`Downloading Codex ${CODEX_VERSION}…`)
-  const meta = (await (await fetch(`https://registry.npmjs.org/@openai/codex/${CODEX_VERSION}-${platform}`)).json()) as { dist: { tarball: string; integrity: string } }
+  const meta = (await (await fetch(`https://registry.npmjs.org/@openai/codex/${CODEX_VERSION}-${platform}`)).json()) as {
+    dist: { tarball: string; integrity: string }
+  }
   const res = await fetch(meta.dist.tarball)
   if (!res.ok || !res.body) throw new Error(`Couldn’t download Codex (HTTP ${res.status}).`)
   const total = Number(res.headers.get('content-length')) || 0
@@ -121,7 +130,11 @@ export async function codexStatus(): Promise<ClaudeStatus> {
       child.on('error', () => resolve(''))
     })
     const loggedIn = /logged in/i.test(out) && !/not logged in/i.test(out)
-    return { loggedIn, method: loggedIn ? (/api key/i.test(out) ? 'api-key' : 'chatgpt') : undefined, subscription: loggedIn ? out.trim().split('\n')[0] : undefined }
+    return {
+      loggedIn,
+      method: loggedIn ? (/api key/i.test(out) ? 'api-key' : 'chatgpt') : undefined,
+      subscription: loggedIn ? out.trim().split('\n')[0] : undefined,
+    }
   } catch (e) {
     return { loggedIn: false, error: (e as Error).message }
   }
@@ -138,7 +151,10 @@ export function codexLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<Clau
     const child = spawn(bin, ['login'], { env: codexEnv(), windowsHide: true })
     loginChild = child
     const onData = (b: Buffer) => {
-      for (const line of b.toString().split('\n').map((l) => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim())) {
+      for (const line of b
+        .toString()
+        .split('\n')
+        .map((l) => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim())) {
         if (line) onEvent({ line, url: line.match(/https:\/\/\S+/)?.[0] })
       }
     }
@@ -159,9 +175,40 @@ export async function codexLogout(): Promise<ClaudeStatus> {
 }
 
 /** Codex picks its default model for the account; effort is the reasoning effort. */
-export function codexModels(): ModelOption[] {
-  return [{ value: '', label: 'Default (Codex chooses)', description: 'The model your OpenAI account defaults to', efforts: ['low', 'medium', 'high', 'xhigh'] }]
+let knownModels: ModelOption[] = []
+export async function codexModels(): Promise<ModelOption[]> {
+  const bin = installed()?.bin
+  if (!bin) throw new Error('Install Codex first (Settings → Accounts).')
+  const env = codexEnv()
+  if (apiKey()) env.OPENAI_API_KEY = apiKey()
+  knownModels = await listCodexModels(bin, env)
+  if (!knownModels.length) throw new Error('Codex returned no models. Check your account in Settings → Accounts.')
+  return [
+    { value: '', label: 'Default (Codex chooses)', description: 'The model your OpenAI account defaults to', efforts: ['low', 'medium', 'high', 'xhigh'] },
+    ...knownModels,
+  ]
 }
+
+export interface CodexOptions {
+  model?: string
+  effort?: Effort
+  allowFallback?: boolean
+  strictModel?: boolean
+}
+
+const pauseForCapacity = (signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    const stop = () => {
+      clearTimeout(timer)
+      reject(new Error('Stopped'))
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', stop)
+      resolve()
+    }, 1500)
+    if (signal?.aborted) stop()
+    else signal?.addEventListener('abort', stop, { once: true })
+  })
 
 // --- turns ------------------------------------------------------------------------------
 
@@ -207,6 +254,7 @@ async function client(dir: string, instructions: string, withTools = true) {
 }
 
 let thread: { dir: string; thread: Thread } | null = null
+const threadModels = new WeakMap<Thread, string>()
 let abort: AbortController | null = null
 
 export function closeCodex(): void {
@@ -223,6 +271,7 @@ export interface CodexTurnHandlers {
   part(part: ChatPart): void
   status(id: string, status: 'ok' | 'error'): void
   thread(id: string): void
+  usage?(usage: Record<string, number>, model: string): void
 }
 
 /**
@@ -240,7 +289,9 @@ export async function codexTurn(
   try {
     if (!thread || thread.dir !== dir) thread = { dir, thread: await openThread(dir, instructions, threadId) }
     abort = new AbortController()
-    return await runOn(thread.thread, text, images, on, abort.signal)
+    return await runRecovering(thread.thread, dir, instructions, text, images, on, abort.signal, {}, (next) => {
+      thread = { dir, thread: next }
+    })
   } catch (e) {
     if (abort?.signal.aborted) return { ok: false, error: 'Stopped' }
     return { ok: false, error: friendly((e as Error).message) }
@@ -250,32 +301,85 @@ export async function codexTurn(
 }
 
 /** The project's thread, resumed from `threadId` when there is one, sandboxed to the project. */
-async function openThread(dir: string, instructions: string, threadId: string | undefined): Promise<Thread> {
-  const codex = await client(dir, instructions)
+async function openThread(dir: string, instructions: string, threadId: string | undefined, selection: CodexOptions = {}, withTools = true): Promise<Thread> {
+  const codex = await client(dir, instructions, withTools)
   const { codexModel, codexEffort } = getSettings()
+  const model = selection.model ?? codexModel
+  const offered = knownModels.find((m) => m.value === model)?.efforts
+  const effort = selection.effort || codexEffort || 'high'
   const options = {
     workingDirectory: dir,
     skipGitRepoCheck: true,
-    sandboxMode: 'workspace-write' as const,
+    sandboxMode: withTools ? ('workspace-write' as const) : ('read-only' as const),
     approvalPolicy: 'never' as const, // nobody to ask: the sandbox keeps writes inside the project
-    model: codexModel || undefined,
-    modelReasoningEffort: (codexEffort || 'high') as 'high',
+    model: model || undefined,
+    modelReasoningEffort:
+      selection.strictModel && !selection.effort
+        ? undefined
+        : offered
+          ? offered.includes(effort)
+            ? effort
+            : offered.includes('medium')
+              ? 'medium'
+              : offered[0]
+          : effort,
   }
-  return threadId ? codex.resumeThread(threadId, options) : codex.startThread(options)
+  const thread = threadId ? codex.resumeThread(threadId, options) : codex.startThread(options)
+  threadModels.set(thread, model)
+  return thread
 }
 
-async function runOn(t: Thread, text: string, images: string[], on: CodexTurnHandlers, signal: AbortSignal): Promise<{ ok: boolean; error?: string }> {
+async function runOn(t: Thread, text: string, images: string[], on: CodexTurnHandlers, signal: AbortSignal): Promise<CapacityResult> {
   const input = images.length ? [{ type: 'text' as const, text }, ...images.map((path) => ({ type: 'local_image' as const, path }))] : text
-  const { events } = await t.runStreamed(input, { signal })
-  for await (const event of events) {
-    const r = follow(event, on)
-    if (r) return r
+  let started = false
+  try {
+    const { events } = await t.runStreamed(input, { signal })
+    for await (const event of events) {
+      if ((event.type === 'item.started' || event.type === 'item.completed') && !['reasoning', 'error'].includes(event.item.type)) started = true
+      if (event.type === 'turn.completed') on.usage?.({ ...event.usage }, threadModels.get(t) || 'Codex account default (exact model unreported)')
+      const r = follow(event, on)
+      if (r) return { ...r, started }
+    }
+  } catch (e) {
+    return { ok: false, error: signal.aborted ? 'Stopped' : friendly((e as Error).message), started }
   }
-  return { ok: true }
+  return { ok: false, error: signal.aborted ? 'Stopped' : 'The connection to Codex ended before the turn completed.', started }
+}
+
+async function runRecovering(
+  t: Thread,
+  dir: string,
+  instructions: string,
+  text: string,
+  images: string[],
+  on: CodexTurnHandlers,
+  signal: AbortSignal,
+  options: CodexOptions,
+  replace: (thread: Thread) => void,
+): Promise<CapacityResult> {
+  let active = t
+  let model = threadModels.get(t) ?? options.model ?? getSettings().codexModel
+  return recoverModelCapacity({
+    model,
+    fallback: options.allowFallback === false ? undefined : getSettings().codexFallbackModel,
+    wait: () => pauseForCapacity(signal),
+    notice: (text) => on.part({ kind: 'text', text }),
+    attempt: async (next) => {
+      if (signal.aborted) return { ok: false, error: 'Stopped' }
+      if (next !== model) {
+        // Preserve the existing conversation; only a rejected turn before output may switch models.
+        if (!knownModels.length) await codexModels()
+        active = await openThread(dir, instructions, active.id ?? undefined, { ...options, model: next })
+        model = next
+        replace(active)
+      }
+      return runOn(active, text, images, on, signal)
+    },
+  })
 }
 
 /** A background agent's thread in one project (agent.ts): its own client and bridge, turns one after another. */
-export function codexSession(dir: string, instructions: string, threadId: string | undefined, on: CodexTurnHandlers) {
+export function codexSession(dir: string, instructions: string, threadId: string | undefined, on: CodexTurnHandlers, options: CodexOptions = {}) {
   let t: Thread | null = null
   let stop: AbortController | null = null
   let closed = false
@@ -284,8 +388,10 @@ export function codexSession(dir: string, instructions: string, threadId: string
       if (closed) return { ok: false, error: 'Stopped' }
       stop = new AbortController()
       try {
-        t ??= await openThread(dir, instructions, threadId)
-        return await runOn(t, text, [], on, stop.signal)
+        t ??= await openThread(dir, instructions, threadId, options)
+        return await runRecovering(t, dir, instructions, text, [], on, stop.signal, options, (next) => {
+          t = next
+        })
       } catch (e) {
         if (stop.signal.aborted) return { ok: false, error: 'Stopped' }
         return { ok: false, error: friendly((e as Error).message) }
@@ -345,7 +451,13 @@ function toPart(item: ThreadItem, done: boolean): ChatPart | null {
         status: done ? (item.status === 'failed' ? 'error' : 'ok') : 'running',
       }
     case 'mcp_tool_call':
-      return { kind: 'tool', id: item.id, name: `mcp__studio__${item.tool}`, summary: TOOL_SUMMARY[item.tool] ?? item.tool, status: done ? (item.status === 'failed' ? 'error' : 'ok') : 'running' }
+      return {
+        kind: 'tool',
+        id: item.id,
+        name: `mcp__studio__${item.tool}`,
+        summary: TOOL_SUMMARY[item.tool] ?? item.tool,
+        status: done ? (item.status === 'failed' ? 'error' : 'ok') : 'running',
+      }
     case 'web_search':
       return { kind: 'tool', id: item.id, name: 'WebSearch', summary: `Searching the web for ${item.query.slice(0, 50)}`, status: done ? 'ok' : 'running' }
     default:
@@ -368,19 +480,27 @@ function friendly(message: string): string {
 }
 
 /** A one-off request with no tools (translation, series planning, reading exercises from pictures), in an empty folder. */
-export async function askCodex(system: string, prompt: string, what: string, images: { name: string; mediaType: string; data: string }[] = []): Promise<string> {
+export async function askCodex(
+  system: string,
+  prompt: string,
+  what: string,
+  images: { name: string; mediaType: string; data: string }[] = [],
+  options: CodexOptions & { signal?: AbortSignal } = {},
+): Promise<string> {
   const dir = join(tmpdir(), 'manim-studio-codex', String(Date.now()))
   mkdirSync(dir, { recursive: true })
   try {
-    const codex = await client(dir, system, false)
-    const t = codex.startThread({ workingDirectory: dir, skipGitRepoCheck: true, sandboxMode: 'read-only', approvalPolicy: 'never', model: getSettings().codexModel || undefined })
+    const t = await openThread(dir, system, undefined, options, false)
     const files = images.map((img, i) => {
       const file = join(dir, `picture-${i + 1}.${img.mediaType.endsWith('jpeg') ? 'jpg' : (img.mediaType.split('/')[1] ?? 'png')}`)
       writeFileSync(file, Buffer.from(img.data, 'base64'))
       return file
     })
     const named = images.length ? `${prompt}\n\nThe pictures, in order: ${images.map((img) => `"${img.name}"`).join('; ')}.` : prompt
-    const turn = await t.run(images.length ? [{ type: 'text' as const, text: named }, ...files.map((path) => ({ type: 'local_image' as const, path }))] : named)
+    const turn = await t.run(
+      images.length ? [{ type: 'text' as const, text: named }, ...files.map((path) => ({ type: 'local_image' as const, path }))] : named,
+      { signal: options.signal },
+    )
     return turn.finalResponse
   } catch (e) {
     throw new Error(`Codex couldn’t ${what}: ${friendly((e as Error).message)}`)

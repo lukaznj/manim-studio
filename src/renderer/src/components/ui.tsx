@@ -76,11 +76,20 @@ export function Tabs<T extends string>(props: {
   disabled?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [position, setPosition] = useState({ left: 3, width: 0 })
+  const [position, setPosition] = useState({ left: 3, width: 0, animate: false })
+  const measuredValue = useRef(props.value)
   useLayoutEffect(() => {
     const measure = () => {
       const selected = ref.current?.querySelector<HTMLElement>('[aria-selected="true"], [aria-checked="true"]')
-      if (selected) setPosition({ left: selected.offsetLeft, width: selected.offsetWidth })
+      if (selected) {
+        const changed = measuredValue.current !== props.value
+        measuredValue.current = props.value
+        setPosition((before) =>
+          before.left === selected.offsetLeft && before.width === selected.offsetWidth
+            ? before
+            : { left: selected.offsetLeft, width: selected.offsetWidth, animate: changed && before.width > 0 },
+        )
+      }
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -89,7 +98,11 @@ export function Tabs<T extends string>(props: {
   }, [props.value, props.items.length])
   return (
     <div ref={ref} className="tabs" role={props.radio ? 'radiogroup' : 'tablist'} aria-label={props.radio}>
-      <span aria-hidden className="tabs-indicator" style={{ transform: `translateX(${position.left}px)`, width: position.width }} />
+      <span
+        aria-hidden
+        className="tabs-indicator"
+        style={{ transform: `translateX(${position.left}px)`, width: position.width, ...(!position.animate ? { transition: 'none' } : {}) }}
+      />
       {props.items.map((it) => (
         <button
           key={it.value}

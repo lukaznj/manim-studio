@@ -2,6 +2,7 @@
 // Timeline shapes mirror what python/studio_runner/render.py emits.
 
 import type { UsageEntry } from './usage'
+import type { DeveloperMetricsOptions } from './episode-metrics'
 
 export type Aspect = '16:9' | '9:16'
 export type Theme = 'dark' | 'light'
@@ -73,6 +74,7 @@ export interface SeriesEpisode {
   summary: string // what it covers, and its one central idea
   sources: { file: string; pages?: string }[] // file names as given; pages like "3-9"
   buildsOn?: number[] // 1-based episode numbers
+  assignment?: AgentSelection // developer comparison: this agent makes the whole episode
 }
 
 /** What an ElevenLabs key may do (src/main/voice.ts checkElevenLabsKey). */
@@ -242,6 +244,9 @@ export interface SeriesPlanProgress {
 export interface EpisodeRun {
   dir: string
   title: string
+  assignment?: AgentSelection
+  report?: string // standalone developer HTML report
+  elapsedMs?: number
   // waiting → script (its turn in the first pass) → scripted → scene → check → export → done
   state: 'waiting' | 'script' | 'scripted' | 'scene' | 'check' | 'export' | 'done' | 'failed' | 'stopped'
   activity?: string // what its agent is doing right now
@@ -261,6 +266,9 @@ export interface SeriesRun {
   title: string
   folder: string
   agents: number
+  agent?: Agent // captured at creation; changing Settings does not reroute a running series
+  metrics?: DeveloperMetricsOptions // measured episodes run serially, including export
+  report?: string // combined developer report
   model?: string // the series' own model and effort; otherwise the chat's
   effort?: Effort
   // paused: its agents stop until resumed; stopped: also its exports, and it carries on with Continue,
@@ -446,6 +454,12 @@ export interface ClaudeStatus {
 /** The agent that writes the scenes: Claude (the Agent SDK), Codex (OpenAI's CLI) or Antigravity (Google's CLI, ADR 0031). */
 export type Agent = 'claude' | 'codex' | 'antigravity'
 
+export interface AgentSelection {
+  agent: Agent
+  model: string
+  effort?: Effort
+}
+
 /** How Studio's Claude authenticates: the Claude Code account sign-in, or the user's own API key. */
 export type ClaudeAuth = 'account' | 'api-key'
 
@@ -619,6 +633,12 @@ export type Appearance = 'system' | 'light' | 'dark'
 export type AppMode = 'learn' | 'create' | 'both'
 
 export interface Settings {
+  developerMode?: boolean
+  developerEpisodeModels?: boolean
+  developerUsageMetrics?: boolean
+  developerTimingMetrics?: boolean
+  developerResourceMetrics?: boolean
+  codexFallbackModel?: string // opt-in, same-account fallback for capacity failures only
   uiLanguage?: 'en' | 'hr'
   onboardingDone?: boolean
   defaultAspect?: Aspect
@@ -933,7 +953,8 @@ export interface StudioApi {
   chatSend(request: ChatRequest): Promise<void>
   chatInterrupt(): Promise<void>
   chatReset(): Promise<void>
-  chatModels(): Promise<ModelOption[]>
+  chatModels(agent?: Agent): Promise<ModelOption[]>
+  openEpisodeReport(dir: string): Promise<void>
   /** Opens the bundled Claude Desktop extension, which Claude Desktop offers to install. */
   installClaudeExtension(): Promise<void>
   claudeDesktopStatus(): Promise<ClaudeDesktopStatus>

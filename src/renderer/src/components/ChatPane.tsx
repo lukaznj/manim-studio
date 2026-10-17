@@ -599,12 +599,15 @@ export function ModelPicker({
   model,
   effort: savedEffort,
   onChange: save,
+  models: offeredModels,
 }: {
   model: string
   effort: Effort
   onChange: (model: string, effort: Effort | null) => void
+  models?: ModelOption[]
 }) {
-  const models = useStore((s) => s.models)
+  const activeModels = useStore((s) => s.models)
+  const models = offeredModels ?? activeModels
   const list: ModelOption[] = models.length ? [...models] : [{ value: '', label: 'Default model', description: '', efforts: [] }]
   // A model picked under another account still shows, so the picker never claims the wrong one.
   if (!list.some((m) => m.value === model)) list.push({ value: model, label: modelName(model), description: '', efforts: [] })

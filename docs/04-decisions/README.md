@@ -41,3 +41,6 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0035-720p-study-videos]] | Videos made to study (Learn and Both) export at 720p by default, about 2.3× faster; 720p is in the export dialog; no 24 fps | accepted |
 | [[0036-settings-onboarding-and-languages]] | Guided onboarding, English/Croatian UI, shared Voice/Video defaults and plus-button libraries | accepted |
 | [[0037-desktop-conversation-videos]] | Desktop chat video jobs, mode-aware delivery and shared Claude/Codex/ChatGPT local bridge | accepted |
+| [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
+| [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI model discovery and opt-in OpenAI capacity fallback for conversational video turns | accepted |
+| [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
