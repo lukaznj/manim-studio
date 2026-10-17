@@ -24,7 +24,7 @@ import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, 
 import { importMedia, listMedia, removeMedia } from './media'
 import { importSources, listSources, removeSource, sourcePages } from './sources'
 import { history, restore } from './git'
-import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
+import { claudeDesktopStatus, startDesktopEndpoint, desktopVideosBusy, stopDesktopVideos } from './mcp'
 import { watchMemory } from './memory'
 import { quickRun, setupQuick, startQuick, stopQuick } from './quick'
 import {
@@ -73,10 +73,13 @@ if (process.env.STUDIO_USER_DATA) app.setPath('userData', process.env.STUDIO_USE
 // One running copy per data folder. A second launch (Claude Desktop starting Studio, a
 // manim-studio:// link) brings this one forward instead.
 if (!app.requestSingleInstanceLock()) app.exit(0)
-app.on('second-instance', () => void showWindow())
-app.on('open-url', (e) => {
+const backgroundLaunch = process.argv.some((a) => a === '--background' || a.startsWith('manim-studio://background'))
+app.on('second-instance', (_e, argv) => {
+  if (!argv.some((a) => a.startsWith('manim-studio://background') || a === '--background')) void showWindow()
+})
+app.on('open-url', (e, url) => {
   e.preventDefault()
-  void app.whenReady().then(showWindow)
+  if (!url.startsWith('manim-studio://background')) void app.whenReady().then(showWindow)
 })
 
 protocol.registerSchemesAsPrivileged([
@@ -108,7 +111,9 @@ function createWindow(): void {
       contextIsolation: true,
     },
   })
-  win.once('ready-to-show', () => win?.show())
+  win.once('ready-to-show', () => {
+    if (!backgroundLaunch) win?.show()
+  })
   win.on('closed', () => (win = null))
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
@@ -368,6 +373,16 @@ function registerIpc(): void {
   handle('sourcePages', (name: string, pages: number[], width: number) => sourcePages(name, pages, width))
   handle('installClaudeExtension', installClaudeExtension)
   handle('claudeDesktopStatus', () => claudeDesktopStatus())
+  handle('desktopConnection', () => {
+    const connection = { command: process.execPath, args: [paths.mcpBridge()], env: { ELECTRON_RUN_AS_NODE: '1' } }
+    const quote = (value: string) => `'${process.platform === 'win32' ? value.replaceAll("'", "''") : value.replaceAll("'", "'\\''")}'`
+    return {
+      ...connection,
+      config: JSON.stringify({ mcpServers: { 'manim-studio': connection } }, null, 2),
+      codexCommand: `codex mcp add manim-studio --env ELECTRON_RUN_AS_NODE=1 -- ${quote(connection.command)} ${quote(connection.args[0])}`,
+    }
+  })
+  handle('showDesktopPlugin', () => shell.showItemInFolder(paths.desktopPlugin()))
 
   handle('saveRecording', async (key: string, wav: ArrayBuffer) => {
     const text = projects.readTimeline(projects.requireProject().path)?.voice.find((v) => v.key === key)?.text
@@ -442,6 +457,7 @@ app.whenReady().then(() => {
   projects.onScriptChangedOnDisk((text) => send('script', { text }))
   setupUpdater((e) => send('update', e))
   startDesktopEndpoint({
+    projectsChanged: () => send('projects-changed', undefined),
     openInWindow,
     sceneWritten: (source) => send('file-changed', { source, external: true, agent: true }),
     scriptWritten: (text) => send('script', { text }),
@@ -470,11 +486,11 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', (e) => {
   // Exports and a series being made live in memory: quitting would stop them, so ask first.
-  const making = seriesRun()?.state === 'working'
+  const making = seriesRun()?.state === 'working' || desktopVideosBusy()
   if (exportsBusy() || making) {
     const choice = dialog.showMessageBoxSync({
       type: 'warning',
-      message: making ? 'A series is still being made' : 'Exports are still running',
+      message: making ? 'Videos are still being made' : 'Exports are still running',
       detail: making ? 'Quitting stops its agents and exports. The episodes keep what was made so far.' : 'Quitting stops them and drops the ones waiting.',
       buttons: [making ? 'Keep making it' : 'Keep exporting', 'Quit anyway'],
       defaultId: 0,
@@ -488,6 +504,7 @@ app.on('before-quit', (e) => {
   }
   resumeAll() // nothing stays stopped behind the app
   stopSeries()
+  stopDesktopVideos()
   stopTtsWorker()
   closeChat()
 })

@@ -75,3 +75,7 @@
 - Every project is a git repository (isomorphic-git, so there is no git install to depend on).
 - A commit is made after every successful preview render that changed something, and once per Claude turn.
 - A restore first commits the current state, so restoring is itself undoable ([[../04-decisions/0007-history-is-git|ADR 0007]]).
+
+## Video jobs from desktop conversations
+
+The Claude extension and Codex/compatible ChatGPT desktop plugin share the stdio bridge. `create_video` starts a project-bound background agent using Studio’s configured account, then checks and exports its video. `get_video` reports progress and returns readable media resources. Learn stays in the background, Create opens the editor, and Both defaults to Learn unless the caller explicitly requests production. These agents do not replace the editor’s open chat; the library receives project-change events. The endpoint only serves media belonging to completed jobs. See [[../04-decisions/0037-desktop-conversation-videos|ADR 0037]].

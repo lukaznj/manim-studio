@@ -87,6 +87,7 @@ async function shareSignIn(home: string): Promise<void> {
   }
 }
 const KEYCHAIN_ITEM = 'antigravity' // the service the CLI stores its sign-in under (macOS: seen in its keychain prompt)
+const WIN_CREDENTIAL = 'gemini:antigravity' // go-keyring's "<service>:<user>" in Windows Credential Manager
 
 /**
  * macOS: the CLI keeps its Google sign-in in the keychain through /usr/bin/security, which looks
@@ -113,8 +114,13 @@ const lstatExists = (path: string) => {
   }
 }
 
-/** Whether the CLI's keychain item exists. `security` without -w prints the item's attributes, never the secret. */
+/** Whether the CLI's keychain or Credential Manager item exists. Prints attributes only, never the secret. */
 async function inKeychain(): Promise<boolean> {
+  if (process.platform === 'win32')
+    return run('cmdkey', [`/list:${WIN_CREDENTIAL}`]).then(
+      (out) => /Target:/i.test(out),
+      () => false,
+    )
   if (process.platform !== 'darwin') return false
   await ensureKeychain()
   return run('/usr/bin/security', ['find-generic-password', '-s', KEYCHAIN_ITEM], agyEnvBase()).then(
@@ -208,6 +214,9 @@ function agyEnvBase(home = agyHome()): Record<string, string> {
 async function prepare(project: string, instructions: string): Promise<string> {
   const home = homeFor(project)
   await shareSignIn(home)
+  mkdirSync(join(cliDir(home), 'brain'), { recursive: true })
+  mkdirSync(join(cliDir(home), 'mcp'), { recursive: true })
+  mkdirSync(join(home, '.gemini', 'config', 'rules'), { recursive: true })
   // The CLI checks real paths (it follows symlinks, and /var is /private/var on macOS), so the rules name them.
   const real = (p: string) => (existsSync(p) ? realpathSync(p) : p)
   const dir = real(project)
@@ -223,10 +232,6 @@ async function prepare(project: string, instructions: string): Promise<string> {
     `read_file(${real(join(cliDir(home), 'mcp'))})`,
     ...Object.keys(sceneTools).map((t) => `mcp(studio/${t})`),
   ]
-  mkdirSync(join(cliDir(home), 'rules'), { recursive: true })
-  mkdirSync(join(cliDir(home), 'brain'), { recursive: true })
-  mkdirSync(join(cliDir(home), 'mcp'), { recursive: true })
-  mkdirSync(join(home, '.gemini', 'config', 'rules'), { recursive: true })
   const settings = { trustedWorkspaces: [dir], permissions: { allow }, ...(apiKey() ? { modelProvider: 'gemini' } : {}) }
   writeFileSync(join(cliDir(home), 'settings.json'), JSON.stringify(settings, null, 2))
   // The bridge's calls name this project: it may be one a background agent is making, not the open one.
@@ -249,32 +254,26 @@ async function prepare(project: string, instructions: string): Promise<string> {
 export async function antigravityStatus(): Promise<ClaudeStatus> {
   if (!installed()) return { loggedIn: false, method: 'not-installed' }
   if (antigravityUsesKey()) return { loggedIn: !!apiKey(), method: 'api-key', subscription: apiKey() ? 'Gemini API key' : undefined }
-  // Where the CLI keeps it: its keychain item, or the file it falls back to. Existence only: the app never reads it.
-  // Windows: where it keeps it there is untested (Credential Manager, probably), so ask the CLI itself.
-  const loggedIn = (existsSync(tokenFile()) && statSync(tokenFile()).size > 0) || (await inKeychain()) || (await signedInOnWindows())
+  // Where the CLI keeps it: its keychain / Credential Manager item, or the file it falls back to. Existence only: the app never reads it.
+  const loggedIn = (existsSync(tokenFile()) && statSync(tokenFile()).size > 0) || (await inKeychain())
   return { loggedIn, method: loggedIn ? 'google' : undefined, subscription: loggedIn ? 'Google account' : undefined }
 }
 
 let loginChild: ChildProcess | null = null
 
-/** The CLI's own Google sign-in, driven in a pseudo-terminal: the link to open, then the code to paste. */
-/** Windows: `agy models` lists the models only when the CLI is signed in, wherever it keeps the sign-in. */
-let windowsSignedIn: boolean | null = null
-async function signedInOnWindows(): Promise<boolean> {
-  const bin = installed()
-  if (process.platform !== 'win32' || !bin) return false
-  windowsSignedIn ??= await run(bin, ['models'], agyEnvBase(), tmpdir()).then(
-    (out) => /\t/.test(out),
-    () => false,
-  )
-  return windowsSignedIn
+function killLogin(): void {
+  if (!loginChild) return
+  if (process.platform === 'win32' && loginChild.pid) void run('taskkill', ['/F', '/T', '/PID', String(loginChild.pid)]).catch(() => undefined)
+  else loginChild.kill()
+  loginChild = null
 }
 
+/** The CLI's own Google sign-in, driven in a pseudo-terminal: the link to open, then the code to paste. */
 export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
   const bin = installed()
   if (!bin) throw new Error('Install Antigravity first (Settings → Accounts).')
   if (process.platform === 'win32') return windowsLogin(bin, onEvent)
-  loginChild?.kill()
+  killLogin()
   mkdirSync(agyHome(), { recursive: true })
   await ensureKeychain()
   const job = await runRunner('default', ['agy-login', bin, agyHome()], {
@@ -289,26 +288,33 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
 
 /**
  * Windows has no pty for Python, so the CLI's own sign-in opens in a console window of its own
- * (a detached console program gets one), with Studio's home for it. The user signs in there;
- * Studio checks every few seconds and closes the window once the CLI is signed in.
+ * (`cmd /c start /wait`: Node's own `detached` + `stdio: 'ignore'` gives the child `DETACHED_PROCESS`
+ * and `NUL` stdin, so its TUI exits right away without a window). The user signs in there; Studio
+ * checks Credential Manager (and the fallback token file) and closes the window once signed in.
  */
 async function windowsLogin(bin: string, onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
-  loginChild?.kill()
+  killLogin()
   const work = join(agyHome(), 'login')
   mkdirSync(work, { recursive: true })
+  mkdirSync(cliDir(), { recursive: true })
+  writeFileSync(join(cliDir(), 'settings.json'), JSON.stringify({ trustedWorkspaces: [realpathSync(work)] }, null, 2))
   onEvent({
     line: 'In the Antigravity window: choose Google OAuth, sign in in the browser and paste the code there. It closes by itself once you’re signed in.',
   })
-  const child = spawn(bin, [], { cwd: work, env: agyEnvBase(), detached: true, stdio: 'ignore', windowsHide: false })
+  const child = spawn('cmd.exe', ['/d', '/s', '/c', `"start "Antigravity" /wait "${bin}""`], {
+    cwd: work,
+    env: agyEnvBase(),
+    windowsHide: true,
+    windowsVerbatimArguments: true,
+    stdio: 'ignore',
+  })
   loginChild = child
-  const closed = new Promise<void>((resolve) => child.on('exit', () => resolve()))
+  const closed = new Promise<boolean>((resolve) => child.on('exit', () => resolve(false)))
   for (let open = true; open; ) {
-    open = await Promise.race([closed.then(() => false), new Promise<boolean>((r) => setTimeout(() => r(true), 4000))])
-    windowsSignedIn = null
-    if (await signedInOnWindows()) break
+    open = await Promise.race([closed, new Promise<boolean>((r) => setTimeout(() => r(true), 1500))])
+    if ((await antigravityStatus()).loggedIn) break
   }
-  child.kill()
-  loginChild = null
+  if (loginChild === child) killLogin()
   onEvent({ done: true })
   return antigravityStatus()
 }
@@ -323,7 +329,6 @@ export async function antigravityLogout(): Promise<ClaudeStatus> {
   rmSync(tokenFile(), { force: true })
   const homes = join(root(), 'projects')
   if (existsSync(homes)) for (const h of readdirSync(homes)) rmSync(tokenFile(join(homes, h)), { force: true }) // their links to it
-  windowsSignedIn = null
   if (process.platform === 'win32') await forgetOnWindows()
   await ensureKeychain()
   if (process.platform === 'darwin')
@@ -338,12 +343,12 @@ export async function antigravityLogout(): Promise<ClaudeStatus> {
 
 /**
  * Windows: the CLI keeps its sign-in in Credential Manager through go-keyring, whose items are
- * named "<service>:<user>" (antigravity:…). cmdkey lists them as "Target: LegacyGeneric:target=…";
- * every Antigravity one is deleted. Untested on a real sign-in.
+ * named "<service>:<user>" (`gemini:antigravity`). cmdkey lists them as "Target: LegacyGeneric:target=…";
+ * every Antigravity one is deleted.
  */
 async function forgetOnWindows(): Promise<void> {
   const list = await run('cmdkey', ['/list']).catch(() => '')
-  const targets = [...list.matchAll(/target=(\S+)/gi)].map((m) => m[1]).filter((t) => new RegExp(`^${KEYCHAIN_ITEM}(:|$)`, 'i').test(t))
+  const targets = [...list.matchAll(/target=(\S+)/gi)].map((m) => m[1]).filter((t) => new RegExp(`(^|:)${KEYCHAIN_ITEM}(:|$)`, 'i').test(t))
   for (const t of targets) await run('cmdkey', [`/delete:${t}`]).catch(() => undefined)
 }
 

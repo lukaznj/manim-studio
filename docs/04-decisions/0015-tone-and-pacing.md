@@ -12,7 +12,7 @@ Claude wrote every video in the same voice, and the project conventions asked fo
 ## Decision
 
 - **Tone** is a project setting on one scale with three stops: professional (a neutral lecture, no jokes), warm (a clear, friendly teacher; the default) and playful (light humour and real-life analogies where they fit, the maths stays exact). `src/shared/tone.ts` holds the labels and the exact text Claude is given.
-- It's chosen in the new-project dialog and in Settings → Video, and Claude Desktop's `create_project` takes it too.
+- It's chosen in Settings → Voice, with a default for new projects ([[0036-settings-onboarding-and-languages]]), and Claude Desktop's `create_project` takes it too.
 - It's a default, not a rule. The brief tells Claude to follow it unless the user asks for something else in the chat, so "make this part funnier" works for one request. Changing it applies from Claude's next turn; nothing is rewritten or re-rendered.
 - **Pacing** has no target length: take the time the material needs to be explained clearly, and no more. Both Claudes get this in their brief, which overrides the old target in the `CLAUDE.md` of existing projects. New projects get the new wording from the template.
 

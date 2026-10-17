@@ -98,8 +98,10 @@ const apiKey = () => (codexUsesKey() ? getSecret('openai') : '')
 /** The CLI's environment: no inherited agent variables, its helpers on the PATH. */
 function codexEnv(): Record<string, string> {
   const env = Object.fromEntries(Object.entries(cleanEnv()).filter(([k, v]) => v !== undefined && !/^(OPENAI_|CODEX_)/.test(k))) as Record<string, string>
-  const helpers = installed()?.path
-  if (helpers) env.PATH = [helpers, env.PATH].filter(Boolean).join(delimiter)
+  // Windows has "Path"; keep a single "PATH" key so Node's spawn doesn't drop System32 when prepending helpers.
+  const path = Object.entries(env).find(([k]) => k.toUpperCase() === 'PATH')?.[1]
+  for (const k of Object.keys(env)) if (k.toUpperCase() === 'PATH') delete env[k]
+  env.PATH = [installed()?.path, path].filter(Boolean).join(delimiter)
   return env
 }
 
@@ -167,7 +169,7 @@ type Sdk = typeof import('@openai/codex-sdk')
 let sdkPromise: Promise<Sdk> | null = null
 const sdk = () => (sdkPromise ??= import('@openai/codex-sdk'))
 
-async function client(dir: string, instructions: string) {
+async function client(dir: string, instructions: string, withTools = true) {
   const { Codex } = await sdk()
   const bin = installed()?.bin
   if (!bin) throw new Error('Install Codex first (Settings → Accounts).')
@@ -180,15 +182,25 @@ async function client(dir: string, instructions: string) {
     env: codexEnv(),
     config: {
       developer_instructions: instructions,
+      // Windows needs its restricted-token sandbox enabled, or Codex silently falls back from workspace-write to read-only.
+      ...(process.platform === 'win32' ? { windows: { sandbox: 'unelevated' } } : {}),
+      // Keep Codex Desktop's own computer-use / browser plugins out of Studio turns.
+      features: { apps: false, plugins: false, computer_use: false, browser_use: false },
       mcp_servers: {
-        studio: {
-          command: process.execPath,
-          args: [paths.mcpBridge()],
-          env: bridgeEnv,
-          enabled_tools: Object.keys(sceneTools),
-          startup_timeout_sec: 30,
-          tool_timeout_sec: 120,
-        },
+        node_repl: { enabled: false },
+        ...(withTools
+          ? {
+              studio: {
+                command: process.execPath,
+                args: [paths.mcpBridge()],
+                env: bridgeEnv,
+                enabled_tools: Object.keys(sceneTools),
+                default_tools_approval_mode: 'approve',
+                startup_timeout_sec: 30,
+                tool_timeout_sec: 120,
+              },
+            }
+          : {}),
       },
     },
   })
@@ -317,8 +329,13 @@ function toPart(item: ThreadItem, done: boolean): ChatPart | null {
   switch (item.type) {
     case 'agent_message':
       return done && item.text.trim() ? { kind: 'text', text: item.text } : null
-    case 'command_execution':
-      return { kind: 'tool', id: item.id, name: 'Shell', summary: `Running ${item.command.slice(0, 60)}`, status: done ? (item.exit_code ? 'error' : 'ok') : 'running' }
+    case 'command_execution': {
+      const cmd = item.command
+        .replace(/^"?[^"]*powershell(?:\.exe)?"?\s+(?:-\w+\s+)*-Command\s+['"]?(.*?)['"]?$/is, '$1')
+        .replace(/^\/bin\/(?:z|ba)?sh\s+-\w+\s+['"]?(.*?)['"]?$/s, '$1')
+        .trim()
+      return { kind: 'tool', id: item.id, name: 'Shell', summary: `Running ${cmd.slice(0, 60)}`, status: done ? (item.exit_code ? 'error' : 'ok') : 'running' }
+    }
     case 'file_change':
       return {
         kind: 'tool',
@@ -355,7 +372,7 @@ export async function askCodex(system: string, prompt: string, what: string, ima
   const dir = join(tmpdir(), 'manim-studio-codex', String(Date.now()))
   mkdirSync(dir, { recursive: true })
   try {
-    const codex = await client(dir, system)
+    const codex = await client(dir, system, false)
     const t = codex.startThread({ workingDirectory: dir, skipGitRepoCheck: true, sandboxMode: 'read-only', approvalPolicy: 'never', model: getSettings().codexModel || undefined })
     const files = images.map((img, i) => {
       const file = join(dir, `picture-${i + 1}.${img.mediaType.endsWith('jpeg') ? 'jpg' : (img.mediaType.split('/')[1] ?? 'png')}`)

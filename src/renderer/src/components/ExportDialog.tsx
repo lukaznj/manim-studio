@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { AudioLines, Captions, Download, FileVideo, FolderOpen, Image, Languages, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ExportFps, ExportOptions, ExportSize, Theme } from '../../../shared/types'
@@ -23,13 +24,14 @@ export function ExportOn({ value, onChange }: { value?: string; onChange: (serve
   const current = servers.some((s) => s.id === value) ? value : undefined
   return (
     <div className="field">
-      <label htmlFor="export-on">Render on</label>
+      <label htmlFor="export-on">{uiText('Render on')}</label>
       <select id="export-on" className="select" value={current ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
-        <option value="">This computer</option>
+        <option value="">{uiText('This computer')}</option>
         {servers.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
-            {s.cores ? ` (${s.cores} cores)` : ''}: this computer stays free
+            {s.cores ? format(' ({0} cores)', [s.cores]) : ''}
+            {uiText(': this computer stays free')}
           </option>
         ))}
       </select>
@@ -41,6 +43,7 @@ export function ExportDialog() {
   const open = useStore((s) => s.dialog?.kind === 'export')
   const project = useStore((s) => s.project)
   const timeline = useStore((s) => s.timeline)
+  const settings = useStore((s) => s.settings)
   const [options, setOptions] = useState<ExportOptions>({
     themes: ['dark'],
     languages: [],
@@ -59,7 +62,7 @@ export function ExportDialog() {
         languages: [],
         languageVideos: false,
         ...meta.export,
-        size: meta.export?.size ?? 1080,
+        size: meta.export?.size ?? settings?.studySize ?? (settings?.mode === 'create' ? 1080 : 720),
         fps: meta.export?.fps ?? (meta.fps === 60 ? 60 : 30),
       })
   }, [open])
@@ -131,16 +134,16 @@ export function ExportDialog() {
     <Modal
       open={open}
       onClose={closeDialog}
-      title="Export video"
+      title={uiText('Export video')}
       icon={<Download className="head-icon" />}
       width={600}
       footer={
         <>
           <button className="btn ghost" onClick={closeDialog}>
-            Cancel
+            {uiText('Cancel')}
           </button>
           <button className="btn primary" disabled={running || !timeline} onClick={() => void start()}>
-            <Download /> Export
+            <Download /> {uiText(" Export")}
           </button>
         </>
       }
@@ -148,8 +151,8 @@ export function ExportDialog() {
       <div className="modal-body export">
         <div className="export-option">
           <div>
-            <strong>Versions</strong>
-            <div className="hint">The same video in the light and the dark theme, from one scene.</div>
+            <strong>{uiText('Versions')}</strong>
+            <div className="hint">{uiText('The same video in the light and the dark theme, from one scene.')}</div>
           </div>
           <div className="theme-swatches">
             {(['dark', 'light'] as Theme[]).map((t) => (
@@ -158,10 +161,9 @@ export function ExportDialog() {
                 role="checkbox"
                 aria-checked={options.themes.includes(t)}
                 className={`swatch theme-${t} ${options.themes.includes(t) ? 'on' : ''}`}
-
                 onClick={() => toggleTheme(t)}
               >
-                <span className="swatch-chip" /> {t === 'dark' ? 'Dark' : 'Light'}
+                <span className="swatch-chip" /> {t === 'dark' ? uiText('Dark') : uiText('Light')}
               </button>
             ))}
           </div>
@@ -169,9 +171,11 @@ export function ExportDialog() {
 
         <div className="export-option">
           <div>
-            <strong>Quality</strong>
+            <strong>{uiText('Quality')}</strong>
             <div className="hint">
-              720p is the fastest, plenty to watch on a laptop. 1440p keeps thin lines and small text sharp, also after YouTube compresses the video. 60 fps makes motion smoother.
+              {uiText(
+                '720p is the fastest, plenty to watch on a laptop. 1440p keeps thin lines and small text sharp, also after YouTube compresses the video. 60 fps makes motion smoother.',
+              )}
               {slower && ` Exporting takes ${slower}.`}
             </div>
           </div>
@@ -179,7 +183,6 @@ export function ExportDialog() {
             <Tabs
               radio="Resolution"
               value={String(size)}
-
               onChange={(v) => setOptions((o) => ({ ...o, size: Number(v) as ExportSize }))}
               items={[
                 { value: '720', label: '720p' },
@@ -190,7 +193,6 @@ export function ExportDialog() {
             <Tabs
               radio="Frame rate"
               value={String(fps)}
-
               onChange={(v) => setOptions((o) => ({ ...o, fps: Number(v) as ExportFps }))}
               items={[
                 { value: '30', label: '30 fps' },
@@ -202,10 +204,11 @@ export function ExportDialog() {
 
         <div className="export-option">
           <div>
-            <strong>Narration languages</strong>
+            <strong>{uiText('Narration languages')}</strong>
             <div className="hint">
-              {languageName.of(original)} plus any you add: Claude translates the narration (kept in voice/translations/, so you can correct it), and{' '}
-              {meta ? PROVIDER_NAMES[meta.voice.provider] : 'the project’s voice'} speaks it over the same video.
+              {languageName.of(original)}{' '}
+              {uiText(" plus any you add: Claude translates the narration (kept in voice/translations/, so you can correct it), and")}{' '}
+              {meta ? PROVIDER_NAMES[meta.voice.provider] : uiText('the project’s voice')} {uiText(" speaks it over the same video.")}
             </div>
           </div>
           <div className="language-picker">
@@ -213,7 +216,7 @@ export function ExportDialog() {
             {extra.map((l) => (
               <span key={l} className="lang-chip">
                 {languageName.of(l)}
-                <button aria-label={`Remove ${languageName.of(l)}`} onClick={() => setLanguages(options.languages.filter((x) => x !== l))}>
+                <button aria-label={format('Remove {0}', [languageName.of(l)])} onClick={() => setLanguages(options.languages.filter((x) => x !== l))}>
                   <X />
                 </button>
               </span>
@@ -221,11 +224,10 @@ export function ExportDialog() {
             <select
               className="select lang-add"
               value=""
-
               onChange={(e) => e.target.value && setLanguages([...options.languages, e.target.value])}
-              aria-label="Add a language"
+              aria-label={uiText('Add a language')}
             >
-              <option value="">Add a language…</option>
+              <option value="">{uiText('Add a language…')}</option>
               {offered.map((l) => (
                 <option key={l} value={l}>
                   {languageName.of(l)}
@@ -236,60 +238,62 @@ export function ExportDialog() {
         </div>
         {extra.length > 0 && (
           <label className="export-check">
-            <input
-              type="checkbox"
-              checked={options.languageVideos}
-
-              onChange={(e) => setOptions((o) => ({ ...o, languageVideos: e.target.checked }))}
-            />
-            Also a full video per language, for sites without audio tracks
+            <input type="checkbox" checked={options.languageVideos} onChange={(e) => setOptions((o) => ({ ...o, languageVideos: e.target.checked }))} />
+            {uiText('Also a full video per language, for sites without audio tracks')}
           </label>
         )}
 
         <ul className="export-files">
           <li>
-            <FileVideo /> <strong>{both ? 'Two videos' : 'Video'}</strong>{' '}
+            <FileVideo /> <strong>{both ? uiText('Two videos') : uiText('Video')}</strong>{' '}
             <span className="mono faint">
-              .mp4 · {res} · {fps} fps{both ? ' · dark and light' : ''}
+              {uiText(".mp4 · ")}
+              {res} · {fps} {uiText(" fps")}
+              {both ? uiText(' · dark and light') : ''}
             </span>
           </li>
           {extra.length > 0 && (
             <li>
-              <AudioLines /> <strong>Audio tracks</strong> <span className="mono faint">.m4a · {extra.map((l) => languageName.of(l)).join(', ')}</span>
+              <AudioLines /> <strong>{uiText('Audio tracks')}</strong>{' '}
+              <span className="mono faint">.m4a · {extra.map((l) => languageName.of(l)).join(', ')}</span>
             </li>
           )}
           <li>
-            <Captions /> <strong>Subtitles</strong>{' '}
-            <span className="mono faint">.srt + .vtt · {[original, ...extra].map((l) => languageName.of(l)).join(', ')}</span>
+            <Captions /> <strong>{uiText('Subtitles')}</strong>{' '}
+            <span className="mono faint">
+              {uiText(".srt + .vtt · ")}
+              {[original, ...extra].map((l) => languageName.of(l)).join(', ')}
+            </span>
           </li>
           {extra.length > 0 && options.languageVideos && (
             <li>
-              <Languages /> <strong>A video per language</strong> <span className="mono faint">.mp4 with that language’s narration</span>
+              <Languages /> <strong>{uiText('A video per language')}</strong>{' '}
+              <span className="mono faint">{uiText('.mp4 with that language’s narration')}</span>
             </li>
           )}
           <li>
-            <Image /> <strong>Thumbnail</strong> <span className="mono faint">.jpg, the key picture with its hook</span>
+            <Image /> <strong>{uiText('Thumbnail')}</strong> <span className="mono faint">{uiText('.jpg, the key picture with its hook')}</span>
           </li>
         </ul>
 
         <ExportOn value={options.server} onChange={(server) => setOptions((o) => ({ ...o, server }))} />
 
         <div className="field">
-          <span className="label">Save to</span>
+          <span className="label">{uiText('Save to')}</span>
           <div className="path-pick">
             <span className="mono path-text" title={destination}>
               {destination}
             </span>
             {options.folder && (
               <button className="btn small ghost" onClick={() => setOptions((o) => ({ ...o, folder: undefined }))}>
-                Use project folder
+                {uiText('Use project folder')}
               </button>
             )}
             <button className="btn small" onClick={() => void chooseFolder()}>
-              <FolderOpen /> Change
+              <FolderOpen /> {uiText(" Change")}
             </button>
           </div>
-          <span className="hint">The files go in a folder named after the video.</span>
+          <span className="hint">{uiText('The files go in a folder named after the video.')}</span>
         </div>
       </div>
     </Modal>

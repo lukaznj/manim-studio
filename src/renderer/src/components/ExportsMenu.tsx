@@ -1,3 +1,4 @@
+import { t as uiText } from '../lib/i18n'
 import { CircleAlert, Download, FolderOpen, Pause, Play, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ExportJob } from '../../../shared/types'
@@ -28,7 +29,7 @@ export function ExportsMenu() {
 
   return (
     <div className="popover-anchor">
-      <button className={`exports-pill ${running ? 'busy' : ''} ${failed ? 'failed' : ''}`} onClick={() => setOpen(!open)} title="Exports">
+      <button className={`exports-pill ${running ? 'busy' : ''} ${failed ? 'failed' : ''}`} onClick={() => setOpen(!open)} title={uiText('Exports')}>
         {running?.paused ? <Pause /> : running ? <Ring value={running.percent ?? 0} size={15} /> : failed ? <CircleAlert /> : <Download />}
         {label}
         {running && waiting > 0 && <span className="faint">+{waiting}</span>}
@@ -50,12 +51,12 @@ function ExportsPopover({ jobs, onClose }: { jobs: ExportJob[]; onClose: () => v
     <div className="popover exports" ref={ref}>
       <div className="popover-head exports-head">
         <div>
-          <strong>Exports</strong>
-          <div className="hint">One at a time, in the background. A notification says when each is done.</div>
+          <strong>{uiText('Exports')}</strong>
+          <div className="hint">{uiText('One at a time, in the background. A notification says when each is done.')}</div>
         </div>
         {jobs.some((j) => !active(j)) && (
           <button className="link-btn" onClick={() => void api.clearExports()}>
-            Clear finished
+            {uiText('Clear finished')}
           </button>
         )}
       </div>
@@ -77,8 +78,8 @@ function ExportsPopover({ jobs, onClose }: { jobs: ExportJob[]; onClose: () => v
                 <button
                   className="icon-btn"
                   onClick={() => void api.pauseExport(j.id, !j.paused)}
-                  title={j.paused ? 'Resume this export' : 'Pause this export'}
-                  aria-label={j.paused ? 'Resume this export' : 'Pause this export'}
+                  title={j.paused ? uiText('Resume this export') : uiText('Pause this export')}
+                  aria-label={j.paused ? uiText('Resume this export') : uiText('Pause this export')}
                 >
                   {j.paused ? <Play /> : <Pause />}
                 </button>
@@ -96,8 +97,8 @@ function ExportsPopover({ jobs, onClose }: { jobs: ExportJob[]; onClose: () => v
               <button
                 className="icon-btn"
                 onClick={() => void api.cancelExport(j.id)}
-                title={active(j) ? 'Stop this export' : 'Remove from the list'}
-                aria-label={active(j) ? 'Stop this export' : 'Remove from the list'}
+                title={active(j) ? uiText('Stop this export') : uiText('Remove from the list')}
+                aria-label={active(j) ? uiText('Stop this export') : uiText('Remove from the list')}
               >
                 <X />
               </button>

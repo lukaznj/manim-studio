@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Download, FileText, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { pageRanges } from '../../../shared/pages'
@@ -45,7 +46,7 @@ export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
       <div className="pane-head">
         {head ?? (
           <div className="file-tab">
-            <Sparkles className="claude-mark" /> {agent === 'claude' ? 'Claude Agent' : agentName}
+            <Sparkles className="claude-mark" /> {agent === 'claude' ? uiText('Claude Agent') : agentName}
           </div>
         )}
         <div className="pane-actions">
@@ -53,7 +54,7 @@ export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
           <UsageMeter />
           <button
             className="icon-btn"
-            title="New conversation"
+            title={uiText('New conversation')}
             disabled={busy || chat.length === 0}
             onClick={() => {
               if (confirm(`Start a new conversation? ${agentName} forgets the context of this project’s current one.`)) void api.chatReset()
@@ -100,8 +101,8 @@ function UsageMeter() {
   return (
     <button
       className={`usage-chip ${usageLevel(top.percent)}`}
-      title={`Your Claude plan (shared with claude.ai and Claude Desktop)\n${usageLines(usage).join('\n')}`}
-      aria-label={`Claude plan: ${Math.round(top.percent)}% of the ${top.label.toLowerCase()} used`}
+      title={format('Your Claude plan (shared with claude.ai and Claude Desktop)\n{0}', [usageLines(usage).join('\n')])}
+      aria-label={format('Claude plan: {0}% of the {1} used', [Math.round(top.percent), top.label.toLowerCase()])}
       onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}
     >
       <span className="usage-bar">
@@ -139,17 +140,19 @@ function CodexSignIn() {
     return (
       <div className="chat-signin">
         <Sparkles className="signin-mark" />
-        <h3>Install Codex</h3>
+        <h3>{uiText('Install Codex')}</h3>
         <p className="muted">
-          Studio is set to use Codex, OpenAI's agent, instead of Claude. Its program is a one-time download of about 140 MB, straight from OpenAI's npm package.
+          {uiText(
+            "Studio is set to use Codex, OpenAI's agent, instead of Claude. Its program is a one-time download of about 140 MB, straight from OpenAI's npm package.",
+          )}
         </p>
         <button className="btn primary" disabled={state === 'installing'} onClick={() => void installComponent('codex').then(refreshClaude)}>
           {state === 'installing' ? <span className="spinner" /> : <Download />}{' '}
-          {state === 'installing' ? `Installing…${progress !== undefined ? ` ${Math.round(progress * 100)}%` : ''}` : 'Install Codex'}
+          {state === 'installing' ? format('Installing…{0}', [progress !== undefined ? ` ${Math.round(progress * 100)}%` : '']) : uiText('Install Codex')}
         </button>
         {state === 'error' && <p className="hint">{setup?.errors.codex}</p>}
         <button className="link-btn" onClick={() => void updateSettings({ agent: 'claude' }).then(refreshClaude)}>
-          Use Claude instead
+          {uiText('Use Claude instead')}
         </button>
       </div>
     )
@@ -157,25 +160,26 @@ function CodexSignIn() {
   return (
     <div className="chat-signin">
       <Sparkles className="signin-mark" />
-      <h3>Sign in to use Codex</h3>
+      <h3>{uiText('Sign in to use Codex')}</h3>
       <p className="muted">
-        Codex writes and fixes the scene, renders it and looks at the frames. It signs in with your ChatGPT account in your browser, and usage counts against
-        your plan; Studio never sees your password or tokens.
+        {uiText(
+          'Codex writes and fixes the scene, renders it and looks at the frames. It signs in with your ChatGPT account in your browser, and usage counts against your plan; Studio never sees your password or tokens.',
+        )}
       </p>
       <button className="btn primary" disabled={busy} onClick={() => void login()}>
-        {busy ? <span className="spinner" /> : <Sparkles />} {busy ? 'Waiting for the browser…' : 'Sign in with ChatGPT'}
+        {busy ? <span className="spinner" /> : <Sparkles />} {busy ? uiText('Waiting for the browser…') : uiText('Sign in with ChatGPT')}
       </button>
       {busy && url && (
         <p className="hint">
-          Didn’t a browser open?{' '}
+          {uiText('Didn’t a browser open?')}{' '}
           <a href="#" onClick={() => void api.openExternal(url)}>
-            Open the sign-in link
+            {uiText('Open the sign-in link')}
           </a>
         </p>
       )}
       {!busy && (
         <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
-          Use an OpenAI API key instead
+          {uiText('Use an OpenAI API key instead')}
         </button>
       )}
     </div>
@@ -187,16 +191,17 @@ function AntigravitySignIn() {
   return (
     <div className="chat-signin">
       <Sparkles className="signin-mark" />
-      <h3>Set up Antigravity</h3>
+      <h3>{uiText('Set up Antigravity')}</h3>
       <p className="muted">
-        Studio is set to use Antigravity, Google's agent with Gemini 4 Argon. Install it and sign in with your Google account (or add a Gemini API key) in
-        Settings → Accounts. It edits only this project, and Studio never sees your password or tokens.
+        {uiText(
+          "Studio is set to use Antigravity, Google's agent with Gemini 4 Argon. Install it and sign in with your Google account (or add a Gemini API key) in Settings → Accounts. It edits only this project, and Studio never sees your password or tokens.",
+        )}
       </p>
       <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
-        <Sparkles /> Open Settings → Accounts
+        <Sparkles /> {uiText(" Open Settings → Accounts")}
       </button>
       <button className="link-btn" onClick={() => void updateSettings({ agent: 'claude' }).then(refreshClaude)}>
-        Use Claude instead
+        {uiText('Use Claude instead')}
       </button>
     </div>
   )
@@ -243,13 +248,13 @@ function SignIn() {
     return (
       <div className="chat-signin">
         <Sparkles className="signin-mark" />
-        <h3>Add your Anthropic API key</h3>
-        <p className="muted">Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Accounts.</p>
+        <h3>{uiText('Add your Anthropic API key')}</h3>
+        <p className="muted">{uiText('Studio is set to use an API key from console.anthropic.com, billed per use. Add it in Settings → Accounts.')}</p>
         <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
-          Open Claude settings
+          {uiText('Open Claude settings')}
         </button>
         <button className="link-btn" onClick={() => void useKey('account')}>
-          Sign in with a Claude account instead
+          {uiText('Sign in with a Claude account instead')}
         </button>
       </div>
     )
@@ -257,32 +262,33 @@ function SignIn() {
   return (
     <div className="chat-signin">
       <Sparkles className="signin-mark" />
-      <h3>Sign in to use Claude</h3>
+      <h3>{uiText('Sign in to use Claude')}</h3>
       <p className="muted">
-        Claude writes and fixes the scene, looks at the frames and checks the layout. Studio runs Claude Code with your own Claude account: sign-in happens in
-        your browser, usage counts against your plan, and the app never sees your password or tokens.
+        {uiText(
+          'Claude writes and fixes the scene, looks at the frames and checks the layout. Studio runs Claude Code with your own Claude account: sign-in happens in your browser, usage counts against your plan, and the app never sees your password or tokens.',
+        )}
       </p>
       <button className="btn primary" disabled={busy} onClick={() => void login()}>
-        {busy ? <span className="spinner" /> : <Sparkles />} {busy ? 'Waiting for the browser…' : 'Sign in'}
+        {busy ? <span className="spinner" /> : <Sparkles />} {busy ? uiText('Waiting for the browser…') : uiText('Sign in')}
       </button>
       {busy && url && (
         <p className="hint">
-          Didn’t a browser open?{' '}
+          {uiText('Didn’t a browser open?')}{' '}
           <a href="#" onClick={() => void api.openExternal(url)}>
-            Open the sign-in link
+            {uiText('Open the sign-in link')}
           </a>
         </p>
       )}
       {!busy && (
         <button className="link-btn" onClick={() => void useKey('api-key')}>
-          Use an Anthropic API key instead
+          {uiText('Use an Anthropic API key instead')}
         </button>
       )}
       {busy && needsCode && (
         <div className="code-entry">
-          <input className="input mono" placeholder="Paste the code from the browser" value={code} onChange={(e) => setCode(e.target.value)} />
+          <input className="input mono" placeholder={uiText('Paste the code from the browser')} value={code} onChange={(e) => setCode(e.target.value)} />
           <button className="btn" onClick={() => void api.claudeLoginCode(code)}>
-            Confirm
+            {uiText('Confirm')}
           </button>
         </div>
       )}
@@ -296,9 +302,15 @@ function Intro() {
   return (
     <div className="chat-intro">
       <p className="muted">
-        Describe what the video should show. {name} edits <span className="mono">scene.py</span>, renders it and looks at the frames before it says it’s done.
+        {uiText("Describe what the video should show. ")}
+        {name} {uiText(" edits ")}
+        <span className="mono">{uiText('scene.py')}</span>
+        {uiText(', renders it and looks at the frames before it says it’s done.')}
       </p>
-      <p className="hint">Select clips on the timeline so {name} knows which part you mean.</p>
+      <p className="hint">
+        {uiText("Select clips on the timeline so ")}
+        {name} {uiText(" knows which part you mean.")}
+      </p>
     </div>
   )
 }
@@ -321,7 +333,7 @@ function WatchIntro() {
   return (
     <div className="chat-intro">
       <p className="muted">
-        Ask about anything in the video. Studio tells the agent where you paused and what was on screen and said there, so “this part” is enough.
+        {uiText('Ask about anything in the video. Studio tells the agent where you paused and what was on screen and said there, so “this part” is enough.')}
       </p>
       <div className="suggestions">
         {WATCH_QUESTIONS.map((q) => (
@@ -338,8 +350,9 @@ function ExerciseIntro() {
   return (
     <div className="chat-intro">
       <p className="muted">
-        Ask anything about this exercise: a step you don’t follow, why a method works, a similar one to practise. The answer comes right away, without a new
-        video.
+        {uiText(
+          'Ask anything about this exercise: a step you don’t follow, why a method works, a similar one to practise. The answer comes right away, without a new video.',
+        )}
       </p>
       <div className="suggestions">
         {EXERCISE_QUESTIONS.map((q) => (
@@ -494,7 +507,7 @@ function Composer() {
           {source && (
             <span className="context-chip">
               <FileText /> {sourceLabel(source)}
-              <button onClick={() => useStore.setState({ chatSource: null })} aria-label="Don’t attach the PDF">
+              <button onClick={() => useStore.setState({ chatSource: null })} aria-label={uiText('Don’t attach the PDF')}>
                 <X />
               </button>
             </span>
@@ -502,14 +515,14 @@ function Composer() {
           {sel && (
             <span className="context-chip">
               <Film /> {sel}
-              <button onClick={() => selectClips([])} aria-label="Clear the selection">
+              <button onClick={() => selectClips([])} aria-label={uiText('Clear the selection')}>
                 <X />
               </button>
             </span>
           )}
           {timeline && !exercise && (
-            <button className={`attach-toggle ${frame ? 'on' : ''}`} onClick={() => setFrame((f) => !f)} title="Attach the current preview frame">
-              <Camera /> Frame
+            <button className={`attach-toggle ${frame ? 'on' : ''}`} onClick={() => setFrame((f) => !f)} title={uiText('Attach the current preview frame')}>
+              <Camera /> {uiText(" Frame")}
             </button>
           )}
         </div>
@@ -519,10 +532,10 @@ function Composer() {
           rows={2}
           placeholder={
             busy
-              ? 'Claude is working…'
+              ? uiText('Claude is working…')
               : exercise
-                ? 'Ask about what you’re watching (Enter sends)'
-                : 'What should I make? (Enter sends, Shift+Enter for a new line)'
+                ? uiText('Ask about what you’re watching (Enter sends)')
+                : uiText('What should I make? (Enter sends, Shift+Enter for a new line)')
           }
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -536,11 +549,11 @@ function Composer() {
         <div className="composer-foot">
           <ModelControls />
           {busy ? (
-            <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title="Stop">
+            <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title={uiText('Stop')}>
               <Square />
             </button>
           ) : (
-            <button className="send-btn" disabled={!text.trim()} onClick={() => void send()} title="Send (Enter)">
+            <button className="send-btn" disabled={!text.trim()} onClick={() => void send()} title={uiText('Send (Enter)')}>
               <ArrowUp />
             </button>
           )}
@@ -607,9 +620,9 @@ export function ModelPicker({
 
   return (
     <div className="model-controls">
-      <label className="chip-select" title={current.description || 'Model'}>
+      <label className="chip-select" title={current.description || uiText('Model')}>
         <Sparkles />
-        <select aria-label="Model" value={model} onChange={(e) => pickModel(e.target.value)}>
+        <select aria-label={uiText('Model')} value={model} onChange={(e) => pickModel(e.target.value)}>
           {list.map((m) => (
             <option key={m.value} value={m.value} title={m.description}>
               {m.label}
@@ -620,18 +633,20 @@ export function ModelPicker({
       </label>
       <label
         className="chip-select"
-        title={effort ? 'How much the agent thinks before acting. Higher is slower and uses more of your plan.' : 'This model has no effort setting'}
+        title={
+          effort ? uiText('How much the agent thinks before acting. Higher is slower and uses more of your plan.') : uiText('This model has no effort setting')
+        }
       >
         <Gauge />
-        <select aria-label="Effort" value={effort ?? ''} disabled={!effort} onChange={(e) => save(model, e.target.value as Effort)}>
+        <select aria-label={uiText('Effort')} value={effort ?? ''} disabled={!effort} onChange={(e) => save(model, e.target.value as Effort)}>
           {effort ? (
             efforts.map((e) => (
               <option key={e} value={e}>
-                {EFFORTS[e]} effort
+                {EFFORTS[e]} {uiText(" effort")}
               </option>
             ))
           ) : (
-            <option value="">No effort setting</option>
+            <option value="">{uiText('No effort setting')}</option>
           )}
         </select>
         <ChevronDown className="chev" />

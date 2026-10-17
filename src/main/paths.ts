@@ -24,6 +24,7 @@ export const paths = {
 
   /** The Claude Desktop extension (built by scripts/build-mcpb.mjs; extraResources in a package). */
   mcpb: () => (app.isPackaged ? join(process.resourcesPath, 'manim-studio.mcpb') : join(app.getAppPath(), 'out', 'manim-studio.mcpb')),
+  desktopPlugin: () => (app.isPackaged ? join(process.resourcesPath, 'manim-studio-plugin.zip') : join(app.getAppPath(), 'out', 'manim-studio-plugin.zip')),
 
   /** The stdio MCP bridge to the app's local endpoint (mcpb/server.ts), which Codex runs for Studio's tools. */
   mcpBridge: () => (app.isPackaged ? join(process.resourcesPath, 'mcp-bridge.js') : join(app.getAppPath(), 'out', 'mcpb', 'server', 'index.js')),
@@ -32,9 +33,7 @@ export const paths = {
   claude(): string {
     const pkg = `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`
     const exe = process.platform === 'win32' ? 'claude.exe' : 'claude'
-    const base = app.isPackaged
-      ? join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', pkg)
-      : join(app.getAppPath(), 'node_modules', pkg)
+    const base = app.isPackaged ? join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', pkg) : join(app.getAppPath(), 'node_modules', pkg)
     return join(base, exe)
   },
 }

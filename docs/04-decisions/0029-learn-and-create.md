@@ -22,3 +22,7 @@ Two kinds of people use the app. Creators make and polish videos to publish; the
 - A learner can't reach the code, the timeline or the narration booth; switching to Create in Settings is the way back.
 - New features have to say which mode they belong to: a learning feature lives on the study screens, a publishing one in the editor or exports.
 - Exercise sets and series are still separate kinds in Learn; ADR 0030 makes them one.
+
+## 2026-10-17 revision
+
+First-install mode selection is part of the guided language, mode, agent/account and voice setup in [[0036-settings-onboarding-and-languages]]. Video preferences are available in both workspaces, with production controls only in Create.

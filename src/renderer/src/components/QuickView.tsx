@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { Check, Circle, CircleAlert, FolderOpen, Play, Square, Zap } from 'lucide-react'
 import type { QuickStep } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -28,17 +29,17 @@ export function QuickView() {
     <div className="quick-view">
       <div className="quick-card">
         <div className="eyebrow">
-          <Zap /> {run.series ? `${run.series.title} · episode ${run.series.episode} of ${run.series.of}` : 'Quick mode'}
+          <Zap /> {run.series ? format('{0} · episode {1} of {2}', [run.series.title, run.series.episode, run.series.of]) : uiText('Quick mode')}
         </div>
         <h1>{run.name}</h1>
         <p className="muted">
           {working
-            ? 'Claude is making this video and will export it when it’s done. You can leave it running; a notification says when it’s ready.'
+            ? uiText('Claude is making this video and will export it when it’s done. You can leave it running; a notification says when it’s ready.')
             : run.state === 'done'
-              ? 'Your video is ready.'
+              ? uiText('Your video is ready.')
               : run.state === 'stopped'
-                ? 'Stopped. The project keeps what was made so far.'
-                : 'It didn’t finish.'}
+                ? uiText('Stopped. The project keeps what was made so far.')
+                : uiText('It didn’t finish.')}
         </p>
 
         <ol className="quick-steps">
@@ -59,7 +60,9 @@ export function QuickView() {
         {run.series?.episodes && (
           <details className="quick-series" open>
             <summary>
-              Episode {run.series.episode} of {run.series.of} · {run.series.episodes.filter((e) => e.state === 'done').length} made
+              {uiText("Episode ")}
+              {run.series.episode} {uiText(" of ")}
+              {run.series.of} · {run.series.episodes.filter((e) => e.state === 'done').length} {uiText(" made")}
             </summary>
             <ol className="quick-steps">
               {run.series.episodes.map((ep, i) => {
@@ -97,26 +100,26 @@ export function QuickView() {
             <>
               {editing && (
                 <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>
-                  Watch in the editor
+                  {uiText('Watch in the editor')}
                 </button>
               )}
               <button className="btn" onClick={() => void api.stopQuick()}>
-                <Square /> Stop
+                <Square /> {uiText(" Stop")}
               </button>
             </>
           ) : (
             <>
               <button className="btn ghost" onClick={() => void closeProject()}>
-                Back to projects
+                {uiText('Back to projects')}
               </button>
               {editing ? (
                 <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>
-                  Open in the editor
+                  {uiText('Open in the editor')}
                 </button>
               ) : (
                 run.state === 'done' && (
                   <button className="btn" onClick={() => void openWatch(run.project)}>
-                    <Play /> Watch it
+                    <Play /> {uiText(" Watch it")}
                   </button>
                 )
               )}
@@ -126,7 +129,7 @@ export function QuickView() {
                 </button>
               )}
               <button className="btn primary" onClick={() => openDialog({ kind: 'quick' })}>
-                <Zap /> Make another
+                <Zap /> {uiText(" Make another")}
               </button>
             </>
           )}

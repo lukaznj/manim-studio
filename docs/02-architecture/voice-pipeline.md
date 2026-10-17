@@ -17,7 +17,7 @@ with self.voiceover("The vertex is the <bookmark mark='v'/>lowest point.") as v:
 
    | Provider | Where | Word timings | Notes |
    |---|---|---|---|
-   | `elevenlabs` (default) | REST `/with-timestamps` | exact, from the character alignment | Needs an API key (Settings → Voice, stored encrypted). v4 by default, or v3; voices from the account or ElevenLabs' library |
+   | `elevenlabs` (default) | REST `/with-timestamps` | exact, from the character alignment | Needs an API key (Settings → Accounts, stored encrypted). v4 by default, or v3; voices from the account or ElevenLabs' library |
    | `omnivoice` | local worker, `k2-fsa/OmniVoice` | proportional | Apache-2.0, 600+ languages, clones your voice from a 5–10 s reference. The worker quits after 10 idle minutes to free its memory |
 3. **Silence of an estimated length**, if the provider fails. The render never blocks on TTS; the timeline marks the block in coral and a toast says why.
 

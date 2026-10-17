@@ -1,3 +1,4 @@
+import { t as uiText } from '../lib/i18n'
 import { Sparkles, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Commit } from '../../../shared/types'
@@ -13,7 +14,10 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    api.history().then(setCommits).catch(() => setCommits([]))
+    api
+      .history()
+      .then(setCommits)
+      .catch(() => setCommits([]))
     const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose()
     setTimeout(() => window.addEventListener('mousedown', onDown))
     return () => window.removeEventListener('mousedown', onDown)
@@ -33,12 +37,12 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
   return (
     <div className="popover history" ref={ref}>
       <div className="popover-head">
-        <strong>Version history</strong>
-        <span className="hint">A version is saved after every successful render and every Claude reply.</span>
+        <strong>{uiText('Version history')}</strong>
+        <span className="hint">{uiText('A version is saved after every successful render and every Claude reply.')}</span>
       </div>
       <div className="history-list">
-        {commits === null && <div className="hint pad">Loading…</div>}
-        {commits?.length === 0 && <div className="hint pad">No versions yet.</div>}
+        {commits === null && <div className="hint pad">{uiText('Loading…')}</div>}
+        {commits?.length === 0 && <div className="hint pad">{uiText('No versions yet.')}</div>}
         {commits?.map((c, i) => (
           <div key={c.oid} className="history-row">
             <span className={`who ${AGENTS.has(c.author) ? 'claude' : ''}`}>{AGENTS.has(c.author) ? <Sparkles /> : <UserRound />}</span>
@@ -50,11 +54,15 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             </div>
             {confirm === c.oid ? (
               <button className="btn small primary" onClick={() => void restore(c.oid)}>
-                Confirm
+                {uiText('Confirm')}
               </button>
             ) : (
-              <button className="btn small ghost" onClick={() => setConfirm(c.oid)} title={i === 0 ? 'Discard changes made since this version' : undefined}>
-                Restore
+              <button
+                className="btn small ghost"
+                onClick={() => setConfirm(c.oid)}
+                title={i === 0 ? uiText('Discard changes made since this version') : undefined}
+              >
+                {uiText('Restore')}
               </button>
             )}
           </div>

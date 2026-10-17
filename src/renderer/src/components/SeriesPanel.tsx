@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { Check, Circle, CircleAlert, FolderOpen, Pause, Play, Square, X } from 'lucide-react'
 import { useEffect } from 'react'
 import type { EpisodeRun } from '../../../shared/types'
@@ -47,16 +48,18 @@ export function SeriesPanel() {
   return (
     <section className="setup series-panel" aria-live="polite">
       <div className="setup-head">
-        <span className="eyebrow">{working ? 'Making a series' : run.state === 'paused' ? 'Series paused' : 'Series'}</span>
+        <span className="eyebrow">{working ? uiText('Making a series') : run.state === 'paused' ? uiText('Series paused') : uiText('Series')}</span>
         <h2>{run.title}</h2>
         <p className="muted">{status}</p>
         <p
           className="faint series-cost"
-          title="What these agent turns would cost on the API. On a Claude plan they count against its limits instead; the relative sizes show where the usage went."
+          title={uiText(
+            'What these agent turns would cost on the API. On a Claude plan they count against its limits instead; the relative sizes show where the usage went.',
+          )}
         >
           {modelName(run.model || 'claude-sonnet-5-5')}
-          {run.effort ? `, ${run.effort} effort` : ''} · {dollars(cost)} at API prices so far
-          {run.planningCostUSD ? ` (planning ${dollars(run.planningCostUSD)})` : ''}
+          {run.effort ? format(', {0} effort', [run.effort]) : ''} · {dollars(cost)} {uiText(" at API prices so far")}
+          {run.planningCostUSD ? format(' (planning {0})', [dollars(run.planningCostUSD)]) : ''}
         </p>
       </div>
       <ol className="quick-steps series-run">
@@ -84,7 +87,7 @@ export function SeriesPanel() {
               <div className="series-run-body">
                 <span className="series-run-title">{ep.title}</span>
                 <span className="series-run-state">
-                  {ep.held ? 'Paused · ' : held ? `${run.state === 'stopped' ? 'Stopped' : 'Paused'} · ` : ''}
+                  {ep.held ? uiText('Paused · ') : held ? `${run.state === 'stopped' ? 'Stopped' : 'Paused'} · ` : ''}
                   {LABEL[ep.state]}
                   {ep.state === 'export' && job?.percent !== undefined ? ` ${Math.round(job.percent * 100)}%` : ''}
                   {ep.state === 'failed' && ep.error ? `: ${ep.error}` : ''}
@@ -92,7 +95,7 @@ export function SeriesPanel() {
                 </span>
               </div>
               {!!ep.costUSD && (
-                <span className="mono faint series-run-cost" title="This episode’s agent turns at API prices; its chat’s Usage shows each step.">
+                <span className="mono faint series-run-cost" title={uiText('This episode’s agent turns at API prices; its chat’s Usage shows each step.')}>
                   {dollars(ep.costUSD)}
                 </span>
               )}
@@ -100,8 +103,8 @@ export function SeriesPanel() {
                 <button
                   className="icon-btn"
                   onClick={() => void api.pauseEpisode(ep.dir, !ep.held)}
-                  title={ep.held ? 'Resume this episode' : 'Pause this episode'}
-                  aria-label={ep.held ? 'Resume this episode' : 'Pause this episode'}
+                  title={ep.held ? uiText('Resume this episode') : uiText('Pause this episode')}
+                  aria-label={ep.held ? uiText('Resume this episode') : uiText('Pause this episode')}
                 >
                   {ep.held ? <Play /> : <Pause />}
                 </button>
@@ -109,9 +112,9 @@ export function SeriesPanel() {
               <button
                 className="btn small ghost"
                 onClick={() => void openProject(ep.dir)}
-                title={active && !held ? 'Watch its renders; the chat waits until the agent is done' : undefined}
+                title={active && !held ? uiText('Watch its renders; the chat waits until the agent is done') : undefined}
               >
-                Open
+                {uiText('Open')}
               </button>
             </li>
           )
@@ -123,27 +126,27 @@ export function SeriesPanel() {
         </button>
         {working && (
           <button className="btn" onClick={() => void api.pauseSeries(true)}>
-            <Pause /> Pause the series
+            <Pause /> {uiText(" Pause the series")}
           </button>
         )}
         {run.state === 'paused' && (
           <button className="btn primary" onClick={() => void api.pauseSeries(false)}>
-            <Play /> Resume
+            <Play /> {uiText(" Resume")}
           </button>
         )}
         {(working || run.state === 'paused') && (
           <button className="btn" onClick={() => void api.stopSeries()}>
-            <Square /> Stop
+            <Square /> {uiText(" Stop")}
           </button>
         )}
         {run.state === 'stopped' && (
           <button className="btn primary" onClick={() => void api.continueSeries().catch((e) => toast(errorText(e), 'error'))}>
-            <Play /> Continue
+            <Play /> {uiText(" Continue")}
           </button>
         )}
         {!working && run.state !== 'paused' && (
           <button className="btn" onClick={() => void api.dismissSeries()}>
-            <X /> Dismiss
+            <X /> {uiText(" Dismiss")}
           </button>
         )}
       </div>
