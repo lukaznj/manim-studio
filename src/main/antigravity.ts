@@ -177,8 +177,11 @@ function run(cmd: string, args: string[], env?: Record<string, string>, cwd?: st
   })
 }
 
-/** A Gemini API key saved in Settings → Agent is used instead of the Google sign-in. */
-const apiKey = () => getSecret('gemini')
+/** Settings → Accounts: the Google sign-in or a Gemini API key (before the switch existed, a saved key meant the key). */
+export const antigravityUsesKey = (): boolean => (getSettings().antigravityAuth ?? (getSecret('gemini') ? 'api-key' : 'account')) === 'api-key'
+
+/** The Gemini key, only while the switch says API key. */
+const apiKey = () => (antigravityUsesKey() ? getSecret('gemini') : '')
 
 /** The CLI's environment: no inherited agent or Google variables, its own home, no self-updates. */
 function agyEnv(home = agyHome()): Record<string, string> {
@@ -245,7 +248,7 @@ async function prepare(project: string, instructions: string): Promise<string> {
 
 export async function antigravityStatus(): Promise<ClaudeStatus> {
   if (!installed()) return { loggedIn: false, method: 'not-installed' }
-  if (apiKey()) return { loggedIn: true, method: 'api-key', subscription: 'Gemini API key' }
+  if (antigravityUsesKey()) return { loggedIn: !!apiKey(), method: 'api-key', subscription: apiKey() ? 'Gemini API key' : undefined }
   // Where the CLI keeps it: its keychain item, or the file it falls back to. Existence only: the app never reads it.
   // Windows: where it keeps it there is untested (Credential Manager, probably), so ask the CLI itself.
   const loggedIn = (existsSync(tokenFile()) && statSync(tokenFile()).size > 0) || (await inKeychain()) || (await signedInOnWindows())

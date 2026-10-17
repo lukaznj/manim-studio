@@ -625,6 +625,8 @@ export interface Settings {
   projectsDir: string
   recentProjects: string[]
   claudeAuth: ClaudeAuth
+  codexAuth?: ClaudeAuth // ChatGPT sign-in or an OpenAI key (Settings → Accounts); unset: the key if one is saved
+  antigravityAuth?: ClaudeAuth // Google sign-in or a Gemini key; unset: the key if one is saved
   previewSize: 480 | 720 | 1080 // short side of the preview render, in pixels
   previewFps: 15 | 24 | 30
   tutorialDone: boolean // the first-run tour of the editor was finished or skipped
