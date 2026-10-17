@@ -22,5 +22,5 @@ This folder is an [Obsidian](https://obsidian.md) vault. Open `docs/` as a vault
 
 - One topic per note, short filenames, link liberally with `[[wikilinks]]`.
 - Prefer a decision note over a long comment thread. Decisions rot less when they're addressable.
-- This vault is the source of truth for *why*. `CLAUDE.md` and `.claude/rules/` are the source of truth for *how to work in the repo*.
+- This vault is the source of truth for *why*. `CLAUDE.md`, `AGENTS.md` and `.claude/rules/` are the source of truth for *how to work in the repo*.
 - When a PR makes or changes a decision, add or update an ADR and its row in the index in the same PR. A pure refactor or bugfix needs no docs change.

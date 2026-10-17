@@ -48,6 +48,20 @@ test('a refused tool fails the turn and says why', () => {
   )
   assert.equal(outcome?.ok, false)
   assert.match(outcome?.error ?? '', /doesn’t allow writing \/elsewhere\/outside\.txt/)
+
+  const feed = agyFollower({ part: () => {}, status: () => {}, conversation: () => {} })
+  feed({
+    event: 'step_update',
+    step_update: {
+      conversation_id: 'c',
+      step_index: 1,
+      state: 'ERROR',
+      step_type: 'tool',
+      tool_info: { name: 'write_to_file', error: { message: 'permission check failed for write_file "C:\\\\elsewhere\\\\outside.txt"' } },
+    },
+  })
+  const win = feed({ event: 'result', result: { conversation_id: 'c', status: 'SUCCESS', response: '', denied_actions: [{ action: 'write_file' }] } })
+  assert.match(win?.error ?? '', /doesn’t allow writing C:\\elsewhere\\outside\.txt/)
 })
 
 test('an error result fails the turn with the CLI’s message', () => {

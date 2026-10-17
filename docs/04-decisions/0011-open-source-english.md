@@ -12,8 +12,8 @@ Manim Studio was built for Maturita's admins: Croatian UI, Croatian narration, a
 ## Decision
 
 - **Public, MIT-licensed** at `lukaznj/manim-studio`.
-- **English everywhere** in the product: UI copy, the project template and the `CLAUDE.md` Claude follows inside projects, docs, and identifiers.
-- **Narration language is per project** (`project.json` `voice.language`), picked in the new-project dialog and in Settings:
+- **English source language**, with English and Croatian UI catalogs ([[0036-settings-onboarding-and-languages]]): the project template and the `CLAUDE.md` Claude follows inside projects, docs, and identifiers.
+- **Narration language is per project** (`project.json` `voice.language`), seeded from the onboarding language, then chosen independently in Settings → Voice:
   - Claude writes narration and on-screen text in it, and replies in whatever language the user writes in.
   - The ElevenLabs voices on offer, Whisper alignment and the OmniVoice reference text follow it.
   - Slugs keep non-English titles readable ("Kvadratna funkcija — tjeme" → `kvadratna-funkcija-tjeme`).

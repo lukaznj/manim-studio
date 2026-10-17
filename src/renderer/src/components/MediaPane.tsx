@@ -1,3 +1,4 @@
+import { t as uiText } from '../lib/i18n'
 import { FolderOpen, ImagePlus, Plus, Sparkles, SquarePlay, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { MediaItem } from '../../../shared/types'
@@ -8,7 +9,11 @@ import { errorText, toast, useStore } from '../store'
 
 /** A Python name for the file: "class-photo-2.png" → class_photo_2. */
 const variable = (name: string) => {
-  const v = name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase()
+  const v = name
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()
   return /^[0-9]/.test(v) || !v ? `media_${v}` : v
 }
 
@@ -73,12 +78,12 @@ export function MediaPane() {
         <div className="media-empty">
           <ImagePlus />
           <p>
-            <strong>Your pictures and videos</strong>
+            <strong>{uiText('Your pictures and videos')}</strong>
             <br />
-            <span className="muted">Drop them here or add them. Insert one into the scene, or ask Claude to use it.</span>
+            <span className="muted">{uiText('Drop them here or add them. Insert one into the scene, or ask Claude to use it.')}</span>
           </p>
           <button className="btn" onClick={() => void add([])}>
-            <Plus /> Add pictures and videos
+            <Plus /> {uiText(" Add pictures and videos")}
           </button>
         </div>
       ) : (
@@ -87,7 +92,7 @@ export function MediaPane() {
             <div key={item.name} className="media-card">
               <div className="media-thumb">
                 {item.thumb ? <img src={api.mediaUrl(item.thumb)} alt="" /> : <SquarePlay />}
-                {item.kind === 'video' && <span className="media-kind">video</span>}
+                {item.kind === 'video' && <span className="media-kind">{uiText('video')}</span>}
               </div>
               <div className="media-meta">
                 <span className="media-name mono" title={item.name}>
@@ -96,31 +101,31 @@ export function MediaPane() {
                 <span className="faint">{size(item.size)}</span>
               </div>
               <div className="media-actions">
-                <button className="btn small" onClick={() => insert(item)} title="Put it into scene.py below the cursor">
-                  <Plus /> Insert
+                <button className="btn small" onClick={() => insert(item)} title={uiText('Put it into scene.py below the cursor')}>
+                  <Plus /> {uiText(" Insert")}
                 </button>
                 <button
                   className="btn small ghost"
                   onClick={() => useStore.setState({ chatDraft: `Use media/${item.name} in the video: ` })}
-                  title="Ask Claude to use it"
+                  title={uiText('Ask Claude to use it')}
                 >
-                  <Sparkles /> Ask Claude
+                  <Sparkles /> {uiText(" Ask Claude")}
                 </button>
                 <button className="icon-btn" onClick={() => project && void api.reveal(`${project.path}/media/${item.name}`)} title={revealLabel}>
                   <FolderOpen />
                 </button>
-                <button className="icon-btn" onClick={() => void remove(item)} title="Move to the Trash">
+                <button className="icon-btn" onClick={() => void remove(item)} title={uiText('Move to the Trash')}>
                   <Trash2 />
                 </button>
               </div>
             </div>
           ))}
           <button className="media-add" onClick={() => void add([])}>
-            <Plus /> Add
+            <Plus /> {uiText(" Add")}
           </button>
         </div>
       )}
-      {dragging && <div className="media-drop">Drop to add to media/</div>}
+      {dragging && <div className="media-drop">{uiText('Drop to add to media/')}</div>}
     </div>
   )
 }

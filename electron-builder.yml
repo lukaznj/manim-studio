@@ -21,6 +21,8 @@ asarUnpack:
   - node_modules/@anthropic-ai/claude-agent-sdk-*/**
 
 extraResources:
+  - from: out/manim-studio-plugin.zip
+    to: manim-studio-plugin.zip
   - from: python
     to: python
     filter: ['**/*', '!**/__pycache__/**', '!.pixi/**', '!tests/**']

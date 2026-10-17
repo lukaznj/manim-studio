@@ -1,10 +1,15 @@
+import { t as uiText } from '../lib/i18n'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { endTour, useStore } from '../store'
 
 /** What the tour shows, in order. `target` is a data-tour attribute in the editor. */
 const STEPS = [
   { target: 'code', title: 'This is the video', text: 'scene.py is manim code: Claude writes it, or you do. Every save renders a new preview.' },
-  { target: 'chat', title: 'Ask Claude', text: 'Describe what the video should show. Claude edits the scene, renders it, and looks at the frames before it answers.' },
+  {
+    target: 'chat',
+    title: 'Ask Claude',
+    text: 'Describe what the video should show. Claude edits the scene, renders it, and looks at the frames before it answers.',
+  },
   { target: 'preview', title: 'Watch it', text: 'The latest render plays here. Space plays and pauses, R renders again.' },
   {
     target: 'timeline',
@@ -81,22 +86,23 @@ export function Tour() {
       <div className="tour-spot" style={spot} />
       <div className="tour-card" style={card}>
         <div className="eyebrow">
-          {i + 1} of {steps.length}
+          {i + 1} {uiText(" of ")}
+          {steps.length}
         </div>
         <h3 id="tour-title">{step.title}</h3>
         <p>{step.text}</p>
         <div className="tour-actions">
           <button className="link-btn" onClick={endTour}>
-            Skip tutorial
+            {uiText('Skip tutorial')}
           </button>
           <div>
             {i > 0 && (
               <button className="btn small ghost" onClick={() => setI(i - 1)}>
-                Back
+                {uiText('Back')}
               </button>
             )}
             <button ref={next} className="btn small primary" onClick={() => (last ? endTour() : setI(i + 1))}>
-              {last ? 'Start making videos' : 'Next'}
+              {last ? uiText('Start making videos') : uiText('Next')}
             </button>
           </div>
         </div>

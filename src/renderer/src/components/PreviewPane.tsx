@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { Captions, ChevronDown, CircleAlert, Code2, Pause, Sparkles, TriangleAlert, Wrench } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { captionBand } from '../../../shared/caption'
@@ -43,24 +44,26 @@ export function PreviewPane() {
               {env !== 'ready' ? (
                 <>
                   <Wrench />
-                  <p>The preview needs the manim environment installed.</p>
+                  <p>{uiText('The preview needs the manim environment installed.')}</p>
                   <button className="btn" onClick={() => openDialog({ kind: 'settings', tab: 'env' })}>
-                    Open environment settings
+                    {uiText('Open environment settings')}
                   </button>
                 </>
               ) : render.status === 'rendering' ? (
                 <>
                   <span className="spinner big" />
-                  <p>First render… manim draws every frame now; later renders reuse its cache.</p>
+                  <p>{uiText('First render… manim draws every frame now; later renders reuse its cache.')}</p>
                 </>
               ) : (
                 <>
                   <Code2 />
                   <p>
-                    Save the scene (<span className="kbd">{shortcut('S')}</span>) to render the first preview.
+                    {uiText('Save the scene (')}
+                    <span className="kbd">{shortcut('S')}</span>
+                    {uiText(') to render the first preview.')}
                   </p>
                   <button className="btn" onClick={() => void saveScene({ render: true })}>
-                    Render
+                    {uiText('Render')}
                   </button>
                 </>
               )}
@@ -80,14 +83,15 @@ export function PreviewPane() {
       <div className="preview-foot">
         <div className="preview-flags">
           {(dirty || stale) && render.status !== 'rendering' && (
-            <button className="flag sun" onClick={() => void saveScene({ render: true })} title="Save and render">
-              Preview is out of date · <span className="kbd">{shortcut('S')}</span>
+            <button className="flag sun" onClick={() => void saveScene({ render: true })} title={uiText('Save and render')}>
+              {uiText("Preview is out of date · ")}
+              <span className="kbd">{shortcut('S')}</span>
             </button>
           )}
           {warnings.length > 0 && (
             <div className="popover-anchor">
               <button className="flag coral" onClick={() => setWarningsOpen((o) => !o)}>
-                <TriangleAlert /> {warnings.length === 1 ? '1 warning' : `${warnings.length} warnings`} <ChevronDown />
+                <TriangleAlert /> {warnings.length === 1 ? uiText('1 warning') : format('{0} warnings', [warnings.length])} <ChevronDown />
               </button>
               {warningsOpen && (
                 <div className="popover warnings-pop" onMouseLeave={() => setWarningsOpen(false)}>
@@ -115,7 +119,7 @@ export function PreviewPane() {
                       )
                     }}
                   >
-                    <Sparkles /> Ask Claude to fix the layout
+                    <Sparkles /> {uiText(" Ask Claude to fix the layout")}
                   </button>
                 </div>
               )}
@@ -125,10 +129,11 @@ export function PreviewPane() {
         <div className="preview-tools">
           {timeline && (
             <span className="faint mono">
-              {timeline.width}×{timeline.height} · {timeline.fps} fps · rendered in {timeline.renderSeconds.toFixed(1)} s
+              {timeline.width}×{timeline.height} · {timeline.fps} {uiText(" fps · rendered in ")}
+              {timeline.renderSeconds.toFixed(1)} s
             </span>
           )}
-          <button className={`icon-btn ${captions ? 'on' : ''}`} onClick={() => setCaptions((c) => !c)} title="Show subtitles in the preview">
+          <button className={`icon-btn ${captions ? 'on' : ''}`} onClick={() => setCaptions((c) => !c)} title={uiText('Show subtitles in the preview')}>
             <Captions />
           </button>
         </div>
@@ -142,8 +147,14 @@ function CaptionBand({ aspect }: { aspect: Aspect }) {
   const band = captionBand(aspect)
   return (
     <>
-      <div className="caption-band bottom" style={{ height: `${band.bottom * 100}%` }} title="Kept clear for subtitles" />
-      {band.right > 0 && <div className="caption-band right" style={{ width: `${band.right * 100}%`, bottom: `${band.bottom * 100}%` }} title="Kept clear for the app's buttons" />}
+      <div className="caption-band bottom" style={{ height: `${band.bottom * 100}%` }} title={uiText('Kept clear for subtitles')} />
+      {band.right > 0 && (
+        <div
+          className="caption-band right"
+          style={{ width: `${band.right * 100}%`, bottom: `${band.bottom * 100}%` }}
+          title={uiText("Kept clear for the app's buttons")}
+        />
+      )}
     </>
   )
 }
@@ -163,17 +174,17 @@ function ErrorCard() {
     <div className="error-card">
       <div className="error-title">
         <CircleAlert />
-        <strong>{error.line ? `Error on line ${error.line}` : 'The render failed'}</strong>
+        <strong>{error.line ? format('Error on line {0}', [error.line]) : uiText('The render failed')}</strong>
       </div>
       <p className="mono error-msg">{error.message}</p>
       {details && <pre className="mono error-trace">{error.traceback || error.log}</pre>}
       <div className="error-actions">
         <button className="btn ghost small" onClick={() => setDetails((d) => !d)}>
-          {details ? 'Hide details' : 'Show details'}
+          {details ? uiText('Hide details') : uiText('Show details')}
         </button>
         {error.line && (
           <button className="btn small" onClick={() => editorBridge.revealLine(error.line!, true)}>
-            Go to line
+            {uiText('Go to line')}
           </button>
         )}
         <button
@@ -183,10 +194,10 @@ function ErrorCard() {
             void sendChat(`The render failed${error.line ? ` on line ${error.line}` : ''}:\n${error.message}\n\nFix it and check the render.`, false)
           }
         >
-          <Sparkles /> Fix with Claude
+          <Sparkles /> {uiText(" Fix with Claude")}
         </button>
         <button className="btn ghost small" onClick={() => void renderNow()}>
-          Retry
+          {uiText('Retry')}
         </button>
       </div>
     </div>

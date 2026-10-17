@@ -45,6 +45,23 @@ export const sceneTools = {
 }
 
 export const desktopTools = {
+  create_video: {
+    description:
+      'Make a complete narrated video from a concept or explanation using Studio’s configured agent and voice. Returns a job ID immediately; poll get_video until done. Learn runs in the background and returns media to this chat; Create opens the studio. Both defaults to Learn unless intent is create. The video stays in the library.',
+    shape: {
+      prompt: z
+        .string()
+        .min(1)
+        .describe('Self-contained explanation, target audience, examples and desired visuals. Include relevant context from this conversation.'),
+      title: z.string().optional(),
+      intent: z.enum(['learn', 'create']).optional(),
+    },
+  },
+  get_video: {
+    description:
+      'Check a create_video job. When finished returns the exported video as a readable MCP resource link, plus subtitles and warnings. Share the resource with the user.',
+    shape: { job: z.string().min(1) },
+  },
   list_projects: {
     description: 'List the video projects in Manim Studio: title, format, length, when it last changed and its folder.',
     shape: {},
@@ -60,7 +77,9 @@ export const desktopTools = {
       tone: z
         .enum(['professional', 'warm', 'playful'])
         .optional()
-        .describe('How the narration talks: professional (a neutral lecture), warm (a friendly teacher; the default) or playful (light humour and real-life analogies)'),
+        .describe(
+          'How the narration talks: professional (a neutral lecture), warm (a friendly teacher; the default) or playful (light humour and real-life analogies)',
+        ),
     },
   },
   open_project: {
@@ -83,7 +102,8 @@ export const desktopTools = {
     },
   },
   get_script: {
-    description: 'The open project’s script.md (the plan of the video: sections, narration, visuals) and whether the user approved it. Empty when there is none.',
+    description:
+      'The open project’s script.md (the plan of the video: sections, narration, visuals) and whether the user approved it. Empty when there is none.',
     shape: {},
   },
   write_script: {
@@ -103,6 +123,7 @@ export type DesktopToolName = keyof typeof desktopTools
 
 /** What Claude Desktop is told about the server as a whole. */
 export const desktopInstructions = [
+  'For a complete video from a discussion, prefer create_video. Include the explanation and audience from the conversation, then poll get_video with its job ID until done or failed. Share the returned video resource, mention any warnings, and tell the user it is also in their Studio library. Never claim completion before the job is done. Learn stays in the background; Create opens the editor; Both defaults to Learn unless the user asks for production/editing.',
   'Manim Studio is a desktop app that makes short maths explainer videos from manim code, with narration, subtitles and a timeline.',
   'When the user asks for a maths, explainer or manim video: create_project (or open_project), read the guide it returns, write scene.py, then render_preview and view_frames until it looks right. Fix every error and layout warning before you call it done.',
   'The app opens and shows the video, its code and its timeline while you work. Tell the user it is there: they can watch it, retime clips, record their own narration and export (or ask you to call export_video).',

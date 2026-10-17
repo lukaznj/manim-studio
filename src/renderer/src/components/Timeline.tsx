@@ -1,19 +1,5 @@
-import {
-  AudioLines,
-  Cpu,
-  Download,
-  Lock,
-  Maximize2,
-  Mic,
-  Minus,
-  Pause,
-  Play,
-  Plus,
-  Repeat,
-  SkipBack,
-  SkipForward,
-  VolumeX,
-} from 'lucide-react'
+import { t as uiText, format } from '../lib/i18n'
+import { AudioLines, Cpu, Download, Lock, Maximize2, Mic, Minus, Pause, Play, Plus, Repeat, SkipBack, SkipForward, VolumeX } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Clip, Timeline as TimelineData, VoiceBlock, VoiceSource } from '../../../shared/types'
 import { RevoiceButton } from './Revoice'
@@ -162,10 +148,10 @@ export function Timeline() {
         <div className="tl-labels" style={{ width: LABEL_W }}>
           <div className="tl-label ruler-label" />
           <div className="tl-label warn-label" />
-          <div className="tl-label">Sections</div>
-          <div className="tl-label tall">Animations</div>
-          <div className="tl-label taller">Voice</div>
-          <div className="tl-label">Subtitles</div>
+          <div className="tl-label">{uiText('Sections')}</div>
+          <div className="tl-label tall">{uiText('Animations')}</div>
+          <div className="tl-label taller">{uiText('Voice')}</div>
+          <div className="tl-label">{uiText('Subtitles')}</div>
         </div>
         <div className="tl-scroll" ref={scroller} onWheel={onWheel}>
           <div className={`tl-content ${zooming ? 'zooming' : ''} ${stale ? 'stale' : ''}`} style={{ width }} onPointerDown={scrub}>
@@ -178,7 +164,15 @@ export function Timeline() {
                       key={i}
                       className={`warn-bar ${w.kind}`}
                       style={{ left: w.start * scale, width: Math.max(4, (w.end - w.start) * scale) }}
-                      onMouseMove={(e) => showTip(e, <span>{w.message}{w.line ? ` · line ${w.line}` : ''}</span>)}
+                      onMouseMove={(e) =>
+                        showTip(
+                          e,
+                          <span>
+                            {w.message}
+                            {w.line ? format(' · line {0}', [w.line]) : ''}
+                          </span>,
+                        )
+                      }
                       onMouseLeave={hideTip}
                       onPointerDown={(e) => {
                         e.stopPropagation()
@@ -203,7 +197,7 @@ export function Timeline() {
                           if (s.line) editorBridge.revealLine(s.line)
                         }}
                       >
-                        <span>{s.name || 'Untitled'}</span>
+                        <span>{s.name || uiText('Untitled')}</span>
                       </div>
                     ))}
                 </div>
@@ -242,7 +236,11 @@ export function Timeline() {
                 </div>
               </>
             ) : (
-              <div className="tl-empty">The timeline comes from the render. Save the scene ({shortcut("S")}) to make one.</div>
+              <div className="tl-empty">
+                {uiText('The timeline comes from the render. Save the scene (')}
+                {shortcut('S')}
+                {uiText(') to make one.')}
+              </div>
             )}
             <div className="playhead" ref={playhead}>
               <div className="playhead-head" />
@@ -300,13 +298,13 @@ function Toolbar(props: {
   return (
     <div className="tl-toolbar">
       <div className="transport">
-        <button className="icon-btn" onClick={() => playback.step(-1 / fps)} title="Previous frame (←)" disabled={!timeline}>
+        <button className="icon-btn" onClick={() => playback.step(-1 / fps)} title={uiText('Previous frame (←)')} disabled={!timeline}>
           <SkipBack />
         </button>
-        <button className="play-btn" onClick={() => playback.toggle()} title="Play / pause (Space)" disabled={!timeline}>
+        <button className="play-btn" onClick={() => playback.toggle()} title={uiText('Play / pause (Space)')} disabled={!timeline}>
           {playing ? <Pause /> : <Play />}
         </button>
-        <button className="icon-btn" onClick={() => playback.step(1 / fps)} title="Next frame (→)" disabled={!timeline}>
+        <button className="icon-btn" onClick={() => playback.step(1 / fps)} title={uiText('Next frame (→)')} disabled={!timeline}>
           <SkipForward />
         </button>
         <span className="timecode mono">
@@ -314,8 +312,8 @@ function Toolbar(props: {
           <span className="faint"> / {timecode(timeline?.duration ?? 0)}</span>
         </span>
         {stale && (
-          <span className="badge sun" title="The timeline is from the last successful render">
-            from last render
+          <span className="badge sun" title={uiText('The timeline is from the last successful render')}>
+            {uiText('from last render')}
           </span>
         )}
         <RevoiceButton />
@@ -324,11 +322,11 @@ function Toolbar(props: {
       <div className="tl-selection">
         {sel && (
           <>
-            <span className="badge blue">{sel.count === 1 ? '1 clip' : `${sel.count} clips`}</span>
+            <span className="badge blue">{sel.count === 1 ? uiText('1 clip') : format('{0} clips', [sel.count])}</span>
             <span className="mono faint">
               {sel.span.toFixed(1)} s {sel.lines && `· ${sel.lines}`}
             </span>
-            <button className={`icon-btn ${props.loop ? 'on' : ''}`} onClick={() => props.setLoop(!props.loop)} title="Loop the selection">
+            <button className={`icon-btn ${props.loop ? 'on' : ''}`} onClick={() => props.setLoop(!props.loop)} title={uiText('Loop the selection')}>
               <Repeat />
             </button>
           </>
@@ -337,7 +335,7 @@ function Toolbar(props: {
 
       <div className="tl-right">
         <div className="zoom">
-          <button className="icon-btn" onClick={() => props.zoomTo(props.scale / 1.4)} title={`Zoom out (${modKey} + scroll)`}>
+          <button className="icon-btn" onClick={() => props.zoomTo(props.scale / 1.4)} title={format('Zoom out ({0} + scroll)', [modKey])}>
             <Minus />
           </button>
           <input
@@ -347,20 +345,26 @@ function Toolbar(props: {
             step={0.01}
             value={Math.log(props.scale)}
             onChange={(e) => props.zoomTo(Math.exp(Number(e.target.value)))}
-            aria-label="Timeline zoom"
+            aria-label={uiText('Timeline zoom')}
           />
-          <button className="icon-btn" onClick={() => props.zoomTo(props.scale * 1.4)} title="Zoom in">
+          <button className="icon-btn" onClick={() => props.zoomTo(props.scale * 1.4)} title={uiText('Zoom in')}>
             <Plus />
           </button>
-          <button className={`icon-btn ${props.fit ? 'on' : ''}`} onClick={props.onFit} title="Fit the whole video">
+          <button className={`icon-btn ${props.fit ? 'on' : ''}`} onClick={props.onFit} title={uiText('Fit the whole video')}>
             <Maximize2 />
           </button>
         </div>
-        <button className="btn small" onClick={() => openDialog({ kind: 'booth' })} disabled={!timeline?.voice.length} title={shortcut("R", true)} data-tour="voice">
-          <Mic /> Record voice
+        <button
+          className="btn small"
+          onClick={() => openDialog({ kind: 'booth' })}
+          disabled={!timeline?.voice.length}
+          title={shortcut('R', true)}
+          data-tour="voice"
+        >
+          <Mic /> {uiText(" Record voice")}
         </button>
-        <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })} disabled={!timeline} title={shortcut("E")} data-tour="export">
-          <Download /> Export
+        <button className="btn small primary" onClick={() => openDialog({ kind: 'export' })} disabled={!timeline} title={shortcut('E')} data-tour="export">
+          <Download /> {uiText(" Export")}
         </button>
       </div>
     </div>
@@ -449,7 +453,7 @@ function ClipView(props: {
 
   const tip = (
     <div className="clip-tip">
-      <strong>{c.kind === 'wait' ? 'Wait' : c.anims.map((a) => a.name).join(' + ')}</strong>
+      <strong>{c.kind === 'wait' ? uiText('Wait') : c.anims.map((a) => a.name).join(' + ')}</strong>
       {c.anims
         .filter((a) => a.target)
         .slice(0, 4)
@@ -459,15 +463,20 @@ function ClipView(props: {
           </div>
         ))}
       <div className="mono">
-        {(c.end - c.start).toFixed(2)} s · {c.start.toFixed(2)}–{c.end.toFixed(2)} {c.line ? `· line ${c.line}` : ''}
+        {(c.end - c.start).toFixed(2)} s · {c.start.toFixed(2)}–{c.end.toFixed(2)} {c.line ? format('· line {0}', [c.line]) : ''}
       </div>
-      {c.edit && c.repeat && c.repeat > 1 && <div className="tip-warn">In a loop: the change applies to all {c.repeat} repeats.</div>}
+      {c.edit && c.repeat && c.repeat > 1 && (
+        <div className="tip-warn">
+          {uiText("In a loop: the change applies to all ")}
+          {c.repeat} {uiText(" repeats.")}
+        </div>
+      )}
       {c.locked && (
         <div className="tip-lock">
           <Lock /> {lockText(c.locked)}
         </div>
       )}
-      {c.edit && <div className="faint">Drag the right edge to change the duration.</div>}
+      {c.edit && <div className="faint">{uiText('Drag the right edge to change the duration.')}</div>}
     </div>
   )
 
@@ -529,7 +538,7 @@ function VoiceView(props: { block: VoiceBlock; scale: number; showTip: (e: React
               {src.label} · {(v.end - v.start).toFixed(1)} s
             </strong>
             <div>“{v.text}”</div>
-            <div className="faint">Double-click to record this sentence.</div>
+            <div className="faint">{uiText('Double-click to record this sentence.')}</div>
           </div>,
         )
       }
@@ -538,7 +547,7 @@ function VoiceView(props: { block: VoiceBlock; scale: number; showTip: (e: React
       <canvas ref={canvas} />
       <span className="voice-icon">{src.icon}</span>
       {v.bookmarks.map((b) => (
-        <span key={b.mark} className="bookmark" style={{ left: (b.t - v.start) * scale }} title={`bookmark “${b.mark}”`} />
+        <span key={b.mark} className="bookmark" style={{ left: (b.t - v.start) * scale }} title={format('bookmark “{0}”', [b.mark])} />
       ))}
     </div>
   )

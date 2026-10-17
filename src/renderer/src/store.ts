@@ -1,3 +1,4 @@
+import { setLanguage } from './lib/i18n'
 import { create } from 'zustand'
 import type {
   AppInfo,
@@ -219,6 +220,7 @@ export const closeDialog = () => set({ dialog: null })
 
 export async function boot(): Promise<void> {
   const [app, settings, setup] = await Promise.all([api.appInfo(), api.getSettings(), api.setupStatus()])
+  setLanguage(settings.uiLanguage ?? 'en')
   set({ app, settings, setup })
   void refreshProjects()
   void refreshClaude()
@@ -244,6 +246,7 @@ export async function boot(): Promise<void> {
     void openProject(path).then(() => get().quick?.project !== path && toast('Claude Desktop opened this project'))
   })
   api.on('exports', (exports) => set({ exports }))
+  api.on('projects-changed', () => void refreshProjects())
   api.on('quick', (quick) => set((s) => ({ quick, quickEditor: quick?.id === s.quick?.id ? s.quickEditor : false })))
   void api.quickRun().then((quick) => set({ quick }))
   api.on('series', (series) => set({ series }))
@@ -442,7 +445,10 @@ export async function refreshSetup(): Promise<void> {
 }
 
 export async function updateSettings(patch: Partial<Settings>): Promise<void> {
-  set({ settings: await api.setSettings(patch) })
+  const settings = await api.setSettings(patch)
+  setLanguage(settings.uiLanguage ?? 'en')
+  if (patch.homeTab) withTransition(() => set({ settings }))
+  else set({ settings })
 }
 
 export async function installComponent(c: Component): Promise<void> {
@@ -491,7 +497,15 @@ async function studyProject(path: string): Promise<void> {
   if (!summary) {
     const opened = await guard(api.openProject(path))
     if (!opened) return
-    summary = { path, name: opened.meta.name, aspect: opened.meta.aspect, theme: opened.meta.theme, updatedAt: 0, series: opened.meta.series, exercise: opened.meta.exercise }
+    summary = {
+      path,
+      name: opened.meta.name,
+      aspect: opened.meta.aspect,
+      theme: opened.meta.theme,
+      updatedAt: 0,
+      series: opened.meta.series,
+      exercise: opened.meta.exercise,
+    }
   }
   if (summary.exercise) return openExerciseSet(summary.exercise.set, path)
   return openWatch(summary.series?.folder ?? path, path)
@@ -535,7 +549,20 @@ function firstRunTour(): void {
 export async function closeProject(): Promise<void> {
   if (get().dirty) await saveScene()
   await api.closeProject()
-  withTransition(() => set({ screen: 'home', exerciseSet: null, watchSeries: null, watchTime: null, project: null, timeline: null, chat: [], selection: [], historyOpen: false, chatSource: null }))
+  withTransition(() =>
+    set({
+      screen: 'home',
+      exerciseSet: null,
+      watchSeries: null,
+      watchTime: null,
+      project: null,
+      timeline: null,
+      chat: [],
+      selection: [],
+      historyOpen: false,
+      chatSource: null,
+    }),
+  )
   void refreshProjects()
 }
 

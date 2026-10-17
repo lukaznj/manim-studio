@@ -1,3 +1,4 @@
+import { t as uiText } from '../lib/i18n'
 import { Captions, Plus, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { addCourseExercises, openDialog, useStore } from '../store'
@@ -38,12 +39,12 @@ export function StudyView() {
   const both = !!series && !!set
   const version = item ? `${item.state}:${item.video ?? ''}` : `${episode?.video ?? ''}:${followUp?.state ?? ''}`
   const tabs = (
-    <div className="pane-tabs" role="tablist" aria-label="Transcript or chat">
+    <div className="pane-tabs" role="tablist" aria-label={uiText('Transcript or chat')}>
       <button role="tab" aria-selected={tab === 'transcript'} className="file-tab" onClick={() => useStore.setState({ studyTab: 'transcript' })}>
-        <Captions /> Transcript
+        <Captions /> {uiText(" Transcript")}
       </button>
       <button role="tab" aria-selected={tab === 'chat'} className="file-tab" onClick={() => useStore.setState({ studyTab: 'chat' })}>
-        <Sparkles className="claude-mark" /> Chat
+        <Sparkles className="claude-mark" /> {uiText(" Chat")}
       </button>
     </div>
   )
@@ -70,11 +71,11 @@ export function StudyView() {
           <ExerciseHits hits={hits} query={query} set={set} selected={path} />
         ) : (
           <ul className="ex-list">
-            {series && both && <li className="ex-group eyebrow">Lessons</li>}
+            {series && both && <li className="ex-group eyebrow">{uiText('Lessons')}</li>}
             {series?.episodes.map((e) => (
               <EpisodeRow key={e.dir} episode={e} selected={path} />
             ))}
-            {set && both && <li className="ex-group eyebrow">Exercises</li>}
+            {set && both && <li className="ex-group eyebrow">{uiText('Exercises')}</li>}
             {set && <ExerciseRows set={set} selected={path} />}
           </ul>
         )}
@@ -82,10 +83,10 @@ export function StudyView() {
           <div className="ex-side-foot">
             <button
               className={`btn ${set ? 'primary' : ''}`}
-              title={set ? undefined : 'Exercises for this course, solved in writing and on video with its notation'}
+              title={set ? undefined : uiText('Exercises for this course, solved in writing and on video with its notation')}
               onClick={() => (set ? openDialog({ kind: 'add-exercises' }) : void addCourseExercises())}
             >
-              <Plus /> Add exercises
+              <Plus /> {uiText(" Add exercises")}
             </button>
             {set && <ExerciseActions set={set} />}
           </div>
@@ -99,12 +100,12 @@ export function StudyView() {
         ) : set && !series ? (
           <ExerciseEmpty set={set} />
         ) : (
-          <div className="ex-empty faint">Choose a lesson or an exercise.</div>
+          <div className="ex-empty faint">{uiText('Choose a lesson or an exercise.')}</div>
         )}
       </main>
       <aside className="ex-chat">
         {!path ? (
-          <div className="ex-empty faint">The chat opens with the first exercise.</div>
+          <div className="ex-empty faint">{uiText('The chat opens with the first exercise.')}</div>
         ) : tab === 'transcript' ? (
           <Transcript key={path} dir={path} version={version} head={tabs} />
         ) : (

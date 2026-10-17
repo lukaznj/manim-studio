@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
 import { FileCode2, FileText, Images, NotebookPen, Play, Save, Sparkles } from 'lucide-react'
@@ -172,43 +173,62 @@ export function CodePane() {
     <div className="code-pane">
       <div className="pane-head">
         <div className="pane-tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'code'} className="file-tab" onClick={() => setTab('code')} title="scene.py">
+          <button role="tab" aria-selected={tab === 'code'} className="file-tab" onClick={() => setTab('code')} title={uiText('scene.py')}>
             <FileCode2 />
-            <span className="tab-label">scene.py</span>
+            <span className="tab-label">{uiText('scene.py')}</span>
             {dirty && <span className="dirty-dot" />}
           </button>
           {showScript && (
-            <button role="tab" aria-selected={tab === 'script'} className="file-tab" onClick={() => setTab('script')} title="script.md: the plan of the video">
+            <button
+              role="tab"
+              aria-selected={tab === 'script'}
+              className="file-tab"
+              onClick={() => setTab('script')}
+              title={uiText('script.md: the plan of the video')}
+            >
               <NotebookPen />
-              <span className="tab-label">Script</span>
+              <span className="tab-label">{uiText('Script')}</span>
             </button>
           )}
-          <button role="tab" aria-selected={tab === 'media'} className="file-tab" onClick={() => setTab('media')} data-tour="media" title="Media: your pictures and videos">
+          <button
+            role="tab"
+            aria-selected={tab === 'media'}
+            className="file-tab"
+            onClick={() => setTab('media')}
+            data-tour="media"
+            title={uiText('Media: your pictures and videos')}
+          >
             <Images />
-            <span className="tab-label">Media</span>
+            <span className="tab-label">{uiText('Media')}</span>
           </button>
-          <button role="tab" aria-selected={tab === 'sources'} className="file-tab" onClick={() => setTab('sources')} title="Sources: PDFs the video is made from">
+          <button
+            role="tab"
+            aria-selected={tab === 'sources'}
+            className="file-tab"
+            onClick={() => setTab('sources')}
+            title={uiText('Sources: PDFs the video is made from')}
+          >
             <FileText />
-            <span className="tab-label">Sources</span>
+            <span className="tab-label">{uiText('Sources')}</span>
           </button>
         </div>
         <div className={`pane-actions ${tab !== 'code' ? 'hidden' : ''}`}>
-          <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title="Save without rendering">
-            <Save /> <span className="btn-label">Save</span>
+          <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title={uiText('Save without rendering')}>
+            <Save /> <span className="btn-label">{uiText('Save')}</span>
           </button>
-          <button className="btn small" onClick={() => void saveScene({ render: true })} title={`Save and render (${shortcut("S")})`}>
-            <Play /> <span className="render-label">Render</span> <span className="kbd">{shortcut("S")}</span>
+          <button className="btn small" onClick={() => void saveScene({ render: true })} title={format('Save and render ({0})', [shortcut('S')])}>
+            <Play /> <span className="render-label">{uiText('Render')}</span> <span className="kbd">{shortcut('S')}</span>
           </button>
         </div>
       </div>
       {conflict !== null && (
         <div className="banner">
-          <span>The file changed on disk while you were editing it.</span>
+          <span>{uiText('The file changed on disk while you were editing it.')}</span>
           <button className="btn small" onClick={() => resolveConflict('theirs')}>
-            Load the new version
+            {uiText('Load the new version')}
           </button>
           <button className="btn ghost small" onClick={() => resolveConflict('mine')}>
-            Keep mine
+            {uiText('Keep mine')}
           </button>
         </div>
       )}
@@ -218,7 +238,7 @@ export function CodePane() {
       {tab === 'media' && <MediaPane />}
       {tab === 'sources' && <SourcesPane />}
       <div className={`claude-editing ${chatBusy ? 'on' : ''}`}>
-        <Sparkles /> Claude is editing the scene…
+        <Sparkles /> {uiText(" Claude is editing the scene…")}
       </div>
     </div>
   )

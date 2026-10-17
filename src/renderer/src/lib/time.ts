@@ -33,8 +33,11 @@ export async function sha1(text: string): Promise<string> {
 }
 
 /** When a plan limit resets: "at 18:40" today, otherwise "Mon 09:00". */
-export function resetTime(iso: string): string {
+export function resetTime(iso: string, language: 'en' | 'hr' = 'en'): string {
   const d = new Date(iso)
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  return d.toDateString() === new Date().toDateString() ? `at ${time}` : `${d.toLocaleDateString('en-GB', { weekday: 'short' })} ${time}`
+  const locale = language === 'hr' ? 'hr-HR' : 'en-GB'
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+  return d.toDateString() === new Date().toDateString()
+    ? `${language === 'hr' ? 'u' : 'at'} ${time}`
+    : `${d.toLocaleDateString(locale, { weekday: 'short' })} ${time}`
 }
