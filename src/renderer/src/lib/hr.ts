@@ -1,5 +1,40 @@
 // Croatian interface copy. English source strings are stable catalog keys.
 export const hr: Record<string, string> = {
+  Develop: 'Razvoj',
+  'Usage graphs': 'Grafovi korištenja',
+  'Episode timing': 'Trajanje epizode',
+  'Hardware graphs': 'Grafovi hardvera',
+  'Record per-turn agent tokens, ElevenLabs request billing and account plan windows. Account percentages are shared with other apps; missing provider counters remain unavailable.':
+    'Bilježi tokene agenta po koraku, naplatu zahtjeva ElevenLabsa i ograničenja plana računa. Postotci računa zajednički su drugim aplikacijama; nedostajući brojači ostaju nedostupni.',
+  'Measure scripting, implementation, render checks, fixes and export, with active and wall time.': 'Mjeri pisanje scenarija, izradu, provjere prikaza, popravke i izvoz, uz aktivno i ukupno vrijeme.',
+  'Sample Studio process-tree RAM and CPU, whole-computer CPU, and supported device-wide GPU counters about every five seconds. Unsupported counters are marked unavailable.':
+    'Uzorkuje RAM i CPU stabla procesa Studija, CPU cijelog računala i podržane GPU brojače uređaja približno svakih pet sekundi. Nepodržani brojači označeni su kao nedostupni.',
+  'Measured episodes run one at a time, including export, for clearer attribution. Each episode gets an offline HTML report, and the series gets a combined report. Data stays in the project; measurement adds some overhead.':
+    'Mjerene epizode rade pojedinačno, uključujući izvoz, radi jasnijeg pripisivanja potrošnje. Svaka dobiva lokalno HTML izvješće, a serijal objedinjeno izvješće. Podaci ostaju u projektu; mjerenje stvara dodatno opterećenje.',
+  'Developer measurements are enabled. Episodes will run one at a time, through export, and produce HTML reports.': 'Razvojna mjerenja su uključena. Epizode će raditi pojedinačno do završetka izvoza i izrađivati HTML izvješća.',
+  'Measuring one episode at a time, from script through export. HTML reports appear as episodes finish.': 'Mjerenje pojedinačnih epizoda od scenarija do izvoza. HTML izvješća pojavljuju se nakon završetka epizoda.',
+  'Elapsed: {0}': 'Trajanje: {0}',
+  'HTML report': 'HTML izvješće',
+  'Open series report': 'Otvori izvješće serijala',
+  'Checking account…': 'Provjera računa…',
+  'Developer mode enabled': 'Razvojni način je uključen',
+  'Episode model comparison': 'Usporedba modela po epizodi',
+  'In Learn, choose an agent and model for each episode after reviewing a course or mini-series plan. Only connected accounts are offered. Assignments stay with the episodes when reordered and resumed.':
+    'U načinu Uči odaberite agenta i model za svaku epizodu nakon pregleda plana tečaja ili serijala. Nude se samo povezani računi. Odabiri se čuvaju pri promjeni redoslijeda i nastavku rada.',
+  'Each assigned model writes the script, makes the video and fixes its render. Automatic model fallback is disabled for comparisons so the results keep the model you selected.':
+    'Svaki odabrani model piše scenarij, izrađuje videozapis i popravlja prikaz. Automatska zamjena modela isključena je tijekom usporedbe kako bi rezultat odgovarao vašem odabiru.',
+  'Turn off developer mode': 'Isključi razvojni način',
+  'When an OpenAI model is busy': 'Kada je OpenAI model zauzet',
+  'For chat and background video turns: retry once, then use this model on the same account. Account limits, sign-in errors and interrupted tool work never trigger a model switch. Episode model comparisons keep their assigned model.':
+    'Za razgovor i izradu videozapisa u pozadini: ponovi jednom pa koristi ovaj model s istim računom. Ograničenja računa, pogreške prijave i započeti rad alata ne mijenjaju model. Usporedbe epizoda zadržavaju dodijeljeni model.',
+  'OpenAI fallback model': 'Rezervni OpenAI model',
+  'No automatic fallback': 'Bez automatske zamjene',
+  'Each episode uses its assigned model for the script, video and fixes. Automatic model fallback is off. Connect accounts in Settings → Accounts before planning.':
+    'Svaka epizoda koristi dodijeljeni model za scenarij, videozapis i popravke. Automatska zamjena modela je isključena. Prije planiranja povežite račune pod Postavke → Računi.',
+  'Loading connected models…': 'Učitavanje povezanih modela…',
+  'No connected models are available. Connect an agent account and try again.': 'Nema dostupnih povezanih modela. Povežite račun agenta i pokušajte ponovno.',
+  'Episode {0} model': 'Model epizode {0}',
+  'Episode {0} agent': 'Agent epizode {0}',
   'Complete setup': 'Dovrši postavljanje',
   'Copy Codex setup command': 'Kopiraj naredbu za postavljanje Codexa',
   Settings: 'Postavke',

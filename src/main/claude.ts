@@ -355,9 +355,9 @@ export async function chatReset(): Promise<void> {
 }
 
 /** What this account can use. Not cached: it changes with the sign-in or API key (the renderer asks once per account). */
-export async function chatModels(): Promise<ModelOption[]> {
-  if (codexChosen()) return codexModels()
-  if (antigravityChosen()) return antigravityModels()
+export async function chatModels(agent?: Agent): Promise<ModelOption[]> {
+  if (agentOr(agent) === 'codex') return codexModels()
+  if (agentOr(agent) === 'antigravity') return antigravityModels()
   const { query } = await sdk()
   const inbox = new Inbox()
   const q = query({ prompt: inbox, options: { env: claudeEnv(), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
@@ -393,8 +393,8 @@ export async function askClaude(
     images?: { name: string; mediaType: string; data: string }[] // pictures to read along with the prompt
   } = {},
 ): Promise<string> {
-  if (codexChosen()) return askCodex(system, prompt, what, opts.images) // Codex answers at once at the end
-  if (antigravityChosen()) return askAntigravity(system, prompt, what, opts.images)
+  if (codexChosen()) return askCodex(system, prompt, what, opts.images, opts) // Codex answers at once at the end
+  if (antigravityChosen()) return askAntigravity(system, prompt, what, opts.images, opts)
   const { query } = await sdk()
   const images = opts.images ?? []
   async function* withImages(): AsyncGenerator<SDKUserMessage> {
@@ -483,12 +483,16 @@ type UsageAnswer = {
  * The plan's limits as /usage shows them: shared with claude.ai and Claude Desktop, not just Studio.
  * The SDK marks this call experimental, so a missing or renamed method only hides the meter.
  */
-export async function claudeUsage(): Promise<PlanUsage | null> {
-  if (usingApiKey() || claudeNotChosen()) return null
+export async function claudeUsage(includeUnselected = false): Promise<PlanUsage | null> {
+  if (usingApiKey() || (!includeUnselected && claudeNotChosen())) return null
   const read = async (q: Query) => {
     const usage = (q as unknown as Record<string, unknown>).usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET
     if (typeof usage !== 'function') return null
-    const answer = (await usage.call(q, { skipBehaviors: true })) as UsageAnswer
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const answer = await Promise.race([
+      usage.call(q, { skipBehaviors: true }) as Promise<UsageAnswer>,
+      new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('Plan usage read timed out')), 8000) }),
+    ]).finally(() => clearTimeout(timer))
     if (!answer.rate_limits_available || !answer.rate_limits) return null
     const windows: UsageWindow[] = []
     for (const [key, label] of Object.entries(WINDOW_LABELS)) {
@@ -557,7 +561,7 @@ const metaOf = (dir: string) => (project()?.path === dir ? project()!.meta : rea
  * file permissions (writes only inside it) and the brief. The chat and a series' background agents
  * (agent.ts) share it. `resume` continues the project's conversation when this machine has it.
  */
-export async function studioOptions(dir: string, opts: { autopilot: boolean; model?: string; effort?: Effort }): Promise<Options> {
+export async function studioOptions(dir: string, opts: { autopilot: boolean; model?: string; effort?: Effort | null }): Promise<Options> {
   const { createSdkMcpServer, tool, getSessionInfo } = await sdk()
   const meta = metaOf(dir)
   // A project synced from another machine carries a session id this machine doesn't have.
@@ -586,7 +590,7 @@ export async function studioOptions(dir: string, opts: { autopilot: boolean; mod
     env: claudeEnv(),
     pathToClaudeCodeExecutable: paths.claude(),
     model: opts.model || getSettings().claudeModel || 'claude-sonnet-5-5',
-    effort: opts.effort || getSettings().claudeEffort || 'high',
+    ...(opts.effort === null ? {} : { effort: opts.effort || getSettings().claudeEffort || 'high' }),
     resume: resumable ? meta.claudeSessionId : undefined,
     includePartialMessages: true,
     settingSources: ['project'],

@@ -50,15 +50,19 @@ export function SeriesPanel() {
       <div className="setup-head">
         <span className="eyebrow">{working ? uiText('Making a series') : run.state === 'paused' ? uiText('Series paused') : uiText('Series')}</span>
         <h2>{run.title}</h2>
-        <p className="muted">{status}</p>
+        <p className="muted">
+          {run.metrics && working ? uiText('Measuring one episode at a time, from script through export. HTML reports appear as episodes finish.') : status}
+        </p>
         <p
           className="faint series-cost"
           title={uiText(
             'What these agent turns would cost on the API. On a Claude plan they count against its limits instead; the relative sizes show where the usage went.',
           )}
         >
-          {modelName(run.model || 'claude-sonnet-5-5')}
-          {run.effort ? format(', {0} effort', [run.effort]) : ''} · {dollars(cost)} {uiText(" at API prices so far")}
+          {run.episodes.some((ep) => ep.assignment)
+            ? uiText('Episode model comparison')
+            : modelName(run.model || (run.agent === 'codex' ? 'Codex default' : run.agent === 'antigravity' ? 'Gemini default' : 'claude-sonnet-5-5'))}
+          {run.effort ? format(', {0} effort', [run.effort]) : ''} · {dollars(cost)} {uiText(' at API prices so far')}
           {run.planningCostUSD ? format(' (planning {0})', [dollars(run.planningCostUSD)]) : ''}
         </p>
       </div>
@@ -86,6 +90,15 @@ export function SeriesPanel() {
               <span className="mono faint">{i + 1}</span>
               <div className="series-run-body">
                 <span className="series-run-title">{ep.title}</span>
+                {run.metrics?.timing && ep.elapsedMs !== undefined && (
+                  <span className="hint">{format('Elapsed: {0}', [`${Math.floor(ep.elapsedMs / 60000)}m ${Math.round((ep.elapsedMs % 60000) / 1000)}s`])}</span>
+                )}
+                {ep.assignment && (
+                  <span className="hint">
+                    {ep.assignment.agent === 'claude' ? 'Claude' : ep.assignment.agent === 'codex' ? 'Codex' : 'Antigravity'} · {modelName(ep.assignment.model)}
+                    {ep.assignment.effort ? ` · ${ep.assignment.effort}` : ''}
+                  </span>
+                )}
                 <span className="series-run-state">
                   {ep.held ? uiText('Paused · ') : held ? `${run.state === 'stopped' ? 'Stopped' : 'Paused'} · ` : ''}
                   {LABEL[ep.state]}
@@ -116,37 +129,47 @@ export function SeriesPanel() {
               >
                 {uiText('Open')}
               </button>
+              {ep.report && (
+                <button className="btn small" onClick={() => void api.openEpisodeReport(ep.dir).catch((e) => toast(errorText(e), 'error'))}>
+                  {uiText('HTML report')}
+                </button>
+              )}
             </li>
           )
         })}
       </ol>
       <div className="series-panel-actions">
+        {run.report && (
+          <button className="btn" onClick={() => void api.openEpisodeReport(run.folder).catch((e) => toast(errorText(e), 'error'))}>
+            {uiText('Open series report')}
+          </button>
+        )}
         <button className="btn ghost" onClick={() => void api.reveal(run.folder)}>
           <FolderOpen /> {revealLabel}
         </button>
         {working && (
           <button className="btn" onClick={() => void api.pauseSeries(true)}>
-            <Pause /> {uiText(" Pause the series")}
+            <Pause /> {uiText(' Pause the series')}
           </button>
         )}
         {run.state === 'paused' && (
           <button className="btn primary" onClick={() => void api.pauseSeries(false)}>
-            <Play /> {uiText(" Resume")}
+            <Play /> {uiText(' Resume')}
           </button>
         )}
         {(working || run.state === 'paused') && (
           <button className="btn" onClick={() => void api.stopSeries()}>
-            <Square /> {uiText(" Stop")}
+            <Square /> {uiText(' Stop')}
           </button>
         )}
         {run.state === 'stopped' && (
           <button className="btn primary" onClick={() => void api.continueSeries().catch((e) => toast(errorText(e), 'error'))}>
-            <Play /> {uiText(" Continue")}
+            <Play /> {uiText(' Continue')}
           </button>
         )}
         {!working && run.state !== 'paused' && (
           <button className="btn" onClick={() => void api.dismissSeries()}>
-            <X /> {uiText(" Dismiss")}
+            <X /> {uiText(' Dismiss')}
           </button>
         )}
       </div>
