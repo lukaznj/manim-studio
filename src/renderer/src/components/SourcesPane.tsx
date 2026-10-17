@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { ArrowLeft, FilePlus, FileText, FolderOpen, Paperclip, Plus, ScanText, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { pageRanges } from '../../../shared/pages'
@@ -15,7 +16,11 @@ const size = (bytes: number) => (bytes > 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` 
 
 /** A Python name for a page: ("class-notes.pdf", 3) → class_notes_p3. */
 const variable = (name: string, page: number) => {
-  const v = name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase()
+  const v = name
+    .replace(/\.pdf$/i, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()
   return `${/^[0-9]/.test(v) || !v ? `pdf_${v}` : v}_p${page}`
 }
 
@@ -87,20 +92,22 @@ export function SourcesPane() {
         <div className="media-empty">
           <FileText />
           <p>
-            <strong>Your PDFs</strong>
+            <strong>{uiText('Your PDFs')}</strong>
             <br />
-            <span className="muted">Notes, worksheets, a textbook chapter. Claude reads them and makes the video from them, and can show their pages in it.</span>
+            <span className="muted">
+              {uiText('Notes, worksheets, a textbook chapter. Claude reads them and makes the video from them, and can show their pages in it.')}
+            </span>
           </p>
           <button className="btn" onClick={() => void add([])} disabled={busy}>
-            {busy ? <span className="spinner" /> : <Plus />} Add PDFs
+            {busy ? <span className="spinner" /> : <Plus />} {uiText(" Add PDFs")}
           </button>
         </div>
       ) : (
         <div className="source-list">
-          {items === null && <div className="faint source-loading">Reading PDFs…</div>}
+          {items === null && <div className="faint source-loading">{uiText('Reading PDFs…')}</div>}
           {items?.map((item) => (
             <div key={item.name} className="source-card">
-              <button className="source-thumb" onClick={() => item.pages && setOpen(item.name)} disabled={!item.pages} title="Look through the pages">
+              <button className="source-thumb" onClick={() => item.pages && setOpen(item.name)} disabled={!item.pages} title={uiText('Look through the pages')}>
                 {item.thumb ? <img src={`${api.mediaUrl(item.thumb)}?v=${item.size}`} alt="" /> : <FileText />}
               </button>
               <div className="source-body">
@@ -118,8 +125,9 @@ export function SourcesPane() {
                   </span>
                 ) : (
                   !!item.noText?.length && (
-                    <span className="source-note" title="Claude looks at these pages as pictures instead of reading their text">
-                      <ScanText /> {item.noText.length === item.pages ? 'Scanned: no text layer' : `No text on page ${pageRanges(item.noText)}`}
+                    <span className="source-note" title={uiText('Claude looks at these pages as pictures instead of reading their text')}>
+                      <ScanText />{' '}
+                      {item.noText.length === item.pages ? uiText('Scanned: no text layer') : format('No text on page {0}', [pageRanges(item.noText)])}
                     </span>
                   )
                 )}
@@ -128,17 +136,17 @@ export function SourcesPane() {
                     className="btn small"
                     disabled={!item.pages}
                     onClick={() => attachSource(item.name, undefined, 'Make a video from this PDF: ')}
-                    title="Attach it to the chat and ask Claude for a video"
+                    title={uiText('Attach it to the chat and ask Claude for a video')}
                   >
-                    <Sparkles /> Make a video
+                    <Sparkles /> {uiText(" Make a video")}
                   </button>
-                  <button className="btn small ghost" disabled={!item.pages} onClick={() => setOpen(item.name)} title="Look through the pages">
-                    <FileText /> Pages
+                  <button className="btn small ghost" disabled={!item.pages} onClick={() => setOpen(item.name)} title={uiText('Look through the pages')}>
+                    <FileText /> {uiText(" Pages")}
                   </button>
                   <button className="icon-btn" onClick={() => project && void api.reveal(`${project.path}/sources/${item.name}`)} title={revealLabel}>
                     <FolderOpen />
                   </button>
-                  <button className="icon-btn" onClick={() => void remove(item)} title="Move to the Trash">
+                  <button className="icon-btn" onClick={() => void remove(item)} title={uiText('Move to the Trash')}>
                     <Trash2 />
                   </button>
                 </div>
@@ -147,12 +155,12 @@ export function SourcesPane() {
           ))}
           {items && (
             <button className="media-add source-add" onClick={() => void add([])} disabled={busy}>
-              {busy ? <span className="spinner" /> : <FilePlus />} Add PDFs
+              {busy ? <span className="spinner" /> : <FilePlus />} {uiText(" Add PDFs")}
             </button>
           )}
         </div>
       )}
-      {dragging && <div className="media-drop">Drop to add to sources/</div>}
+      {dragging && <div className="media-drop">{uiText('Drop to add to sources/')}</div>}
     </div>
   )
 }
@@ -208,13 +216,15 @@ function Pages({ item, onBack }: { item: SourceItem; onBack: () => void }) {
   return (
     <div className="source-pages">
       <div className="source-pages-head">
-        <button className="icon-btn" onClick={onBack} title="Back to all PDFs" aria-label="Back to all PDFs">
+        <button className="icon-btn" onClick={onBack} title={uiText('Back to all PDFs')} aria-label={uiText('Back to all PDFs')}>
           <ArrowLeft />
         </button>
         <span className="media-name mono" title={item.name}>
           {item.name}
         </span>
-        <span className="faint">{selected.length ? `${selected.length} selected` : 'Click pages to pick them; Shift-click for a range'}</span>
+        <span className="faint">
+          {selected.length ? format('{0} selected', [selected.length]) : uiText('Click pages to pick them; Shift-click for a range')}
+        </span>
       </div>
       <div className="page-grid">
         {thumbs.map((path, i) => (
@@ -223,7 +233,7 @@ function Pages({ item, onBack }: { item: SourceItem; onBack: () => void }) {
             className={`page-thumb ${selected.includes(i + 1) ? 'on' : ''}`}
             onClick={(e) => pick(i + 1, e.shiftKey)}
             aria-pressed={selected.includes(i + 1)}
-            title={`Page ${i + 1}`}
+            title={format('Page {0}', [i + 1])}
           >
             <img src={api.mediaUrl(path)} alt="" loading="lazy" />
             <span className="page-num">{i + 1}</span>
@@ -232,22 +242,26 @@ function Pages({ item, onBack }: { item: SourceItem; onBack: () => void }) {
       </div>
       {thumbs.length < count && (
         <button className="btn ghost small page-more" disabled={loading} onClick={() => void more(thumbs.length)}>
-          {loading ? <span className="spinner" /> : null} {loading ? 'Loading pages…' : `Show more pages (${thumbs.length} of ${count})`}
+          {loading ? <span className="spinner" /> : null} {loading ? uiText('Loading pages…') : format('Show more pages ({0} of {1})', [thumbs.length, count])}
         </button>
       )}
       {selected.length > 0 && (
         <div className="page-bar">
           <span className="mono">p. {pageRanges(sorted)}</span>
           <button className="btn small primary" onClick={() => attachSource(item.name, sorted, 'Make a video from these pages: ')}>
-            <Paperclip /> Attach to chat
+            <Paperclip /> {uiText(" Attach to chat")}
           </button>
           {selected.length === 1 && (
-            <button className="btn small" onClick={() => insert(sorted[0])} title="Show this page in the video: put pdf_page() into scene.py below the cursor">
-              <Plus /> Show in video
+            <button
+              className="btn small"
+              onClick={() => insert(sorted[0])}
+              title={uiText('Show this page in the video: put pdf_page() into scene.py below the cursor')}
+            >
+              <Plus /> {uiText(" Show in video")}
             </button>
           )}
           <button className="btn small ghost" onClick={() => setSelected([])}>
-            Clear
+            {uiText('Clear')}
           </button>
         </div>
       )}

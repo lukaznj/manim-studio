@@ -18,6 +18,8 @@ import { Tour } from './components/Tour'
 import { canEdit, leaveEditor, useStore } from './store'
 
 export function App() {
+  // Language updates rerender the complete interface without remounting open dialogs or editors.
+  useStore((s) => s.settings?.uiLanguage)
   const screen = useStore((s) => s.screen)
   const ready = useStore((s) => !!s.app)
   const toasts = useStore((s) => s.toasts)
@@ -33,16 +35,7 @@ export function App() {
     <div className={`app ${window.studio ? '' : 'no-bridge'}`}>
       <TitleBar />
       <main className="app-main">
-        {ready &&
-          (screen === 'home' ? (
-            <Home />
-          ) : screen === 'study' ? (
-            <StudyView />
-          ) : quickHere ? (
-            <QuickView />
-          ) : editorBarred ? null : (
-            <Editor />
-          ))}
+        {ready && (screen === 'home' ? <Home /> : screen === 'study' ? <StudyView /> : quickHere ? <QuickView /> : editorBarred ? null : <Editor />)}
       </main>
       <NewProjectDialog />
       <SettingsDialog />

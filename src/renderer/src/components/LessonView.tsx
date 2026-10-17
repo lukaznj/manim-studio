@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, RotateCcw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, WatchDetail, WatchEpisode } from '../../../shared/types'
@@ -19,7 +20,9 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
           <span className="ex-num mono">{e.number}</span>
           <span className="ex-row-body">
             <span className="ex-row-title">{e.title}</span>
-            <span className="ex-row-state">{e.watched ? 'Watched' : e.video ? 'Not watched yet' : 'Preview only: export it for the full quality'}</span>
+            <span className="ex-row-state">
+              {e.watched ? uiText('Watched') : e.video ? uiText('Not watched yet') : uiText('Preview only: export it for the full quality')}
+            </span>
           </span>
           {e.watched && <Eye className="ex-state-icon watched" />}
         </button>
@@ -32,10 +35,10 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
               <span className="ex-row-title">{f.request}</span>
               <span className="ex-row-state">
                 {f.state === 'making'
-                  ? (f.activity ?? 'Making the video')
+                  ? (f.activity ?? uiText('Making the video'))
                   : f.state === 'failed'
-                    ? (f.error ?? 'Didn’t finish')
-                    : `Follow-up from ${clock(f.at)}`}
+                    ? (f.error ?? uiText('Didn’t finish'))
+                    : format('Follow-up from {0}', [clock(f.at)])}
               </span>
             </span>
             {f.state === 'making' ? (
@@ -68,19 +71,25 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
     <div className="ex-detail">
       <header className="ex-detail-head">
         <div>
-          <span className="eyebrow">{followUp ? `Follow-up to episode ${episode.number}` : single ? 'Video' : `Episode ${episode.number}`}</span>
+          <span className="eyebrow">
+            {followUp ? format('Follow-up to episode {0}', [episode.number]) : single ? uiText('Video') : format('Episode {0}', [episode.number])}
+          </span>
           <h1>{followUp ? followUp.request : episode.title}</h1>
         </div>
         <div className="ex-detail-actions">
           <WatchedToggle dir={dir} watched={!!(followUp ? followUp.watched : episode.watched)} />
           {followUp?.state === 'failed' && (
             <button className="btn small" onClick={() => void api.retryFollowUp(dir).catch((e) => toast(errorText(e), 'error'))}>
-              <RotateCcw /> Try again
+              <RotateCcw /> {uiText(" Try again")}
             </button>
           )}
           {editing && (
-            <button className="btn small ghost" title="The code, timeline and voice of this video" onClick={() => useStore.setState({ screen: 'editor' })}>
-              <Code2 /> Open in editor
+            <button
+              className="btn small ghost"
+              title={uiText('The code, timeline and voice of this video')}
+              onClick={() => useStore.setState({ screen: 'editor' })}
+            >
+              <Code2 /> {uiText(" Open in editor")}
             </button>
           )}
         </div>
@@ -97,16 +106,16 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
             resume
             onWatched={() => !(followUp ? followUp.watched : episode.watched) && void api.setWatched(dir, true)}
           />
-          {!detail?.video && <p className="faint ex-preview-note">The preview: export the video for the full quality.</p>}
+          {!detail?.video && <p className="faint ex-preview-note">{uiText('The preview: export the video for the full quality.')}</p>}
         </>
       ) : (
         <section className="ex-card ex-player-wait faint">
           {followUp?.state === 'making' ? (
             <span>
-              <span className="spinner" /> {followUp.activity ?? 'Making the video'}…
+              <span className="spinner" /> {followUp.activity ?? uiText('Making the video')}…
             </span>
           ) : (
-            <span>Nothing rendered yet.</span>
+            <span>{uiText('Nothing rendered yet.')}</span>
           )}
         </section>
       )}
@@ -122,9 +131,9 @@ export function WatchedToggle({ dir, watched }: { dir: string; watched: boolean 
     <button
       className={`btn small ${watched ? '' : 'ghost'}`}
       onClick={() => void api.setWatched(dir, !watched)}
-      title={watched ? 'Mark as not watched' : 'Mark as watched'}
+      title={watched ? uiText('Mark as not watched') : uiText('Mark as watched')}
     >
-      {watched ? <Eye /> : <EyeOff />} {watched ? 'Watched' : 'Not watched'}
+      {watched ? <Eye /> : <EyeOff />} {watched ? uiText('Watched') : uiText('Not watched')}
     </button>
   )
 }
@@ -139,28 +148,29 @@ function FollowUpRequest({ dir }: { dir: string }) {
     return (
       <div className="ex-explain">
         <button className="btn small" onClick={() => setOpen(true)}>
-          <Sparkles /> Explain this part in a new video
+          <Sparkles /> {uiText(" Explain this part in a new video")}
         </button>
-        <span className="faint">For a quick question, ask in the chat: it knows where in the video you are.</span>
+        <span className="faint">{uiText('For a quick question, ask in the chat: it knows where in the video you are.')}</span>
       </div>
     )
   return (
     <div className="ex-explain open">
       <label className="label" htmlFor="watch-follow">
-        What should a new video explain further, around {clock(at)}?
+        {uiText("What should a new video explain further, around ")}
+        {clock(at)}?
       </label>
       <textarea
         id="watch-follow"
         className="textarea"
         rows={3}
         autoFocus
-        placeholder="e.g. I don’t see why the current splits here, and where R₂₃ comes from."
+        placeholder={uiText('e.g. I don’t see why the current splits here, and where R₂₃ comes from.')}
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
       <div className="ex-explain-actions">
         <button className="btn ghost small" onClick={() => setOpen(false)}>
-          Cancel
+          {uiText('Cancel')}
         </button>
         <button
           className="btn primary small"
@@ -179,7 +189,7 @@ function FollowUpRequest({ dir }: { dir: string }) {
             }
           }}
         >
-          {busy ? <span className="spinner" /> : <Sparkles />} Make the video
+          {busy ? <span className="spinner" /> : <Sparkles />} {uiText(" Make the video")}
         </button>
       </div>
     </div>

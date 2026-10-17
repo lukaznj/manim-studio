@@ -46,11 +46,18 @@ function cardArgs(meta: ProjectMeta): string[] {
  */
 function defaultSize(): ExportSize {
   const { mode, studySize } = getSettings()
-  return mode === 'create' || !mode ? 1080 : (studySize ?? 720)
+  return studySize ?? (mode === 'create' || !mode ? 1080 : 720)
 }
 
 /** Exports `project` by rendering a copy of it in `work` (an empty folder the caller removes). */
-export async function exportVideo(project: string, work: string, options: ExportOptions, progress: Progress, signal?: AbortSignal, tag?: string): Promise<ExportResult> {
+export async function exportVideo(
+  project: string,
+  work: string,
+  options: ExportOptions,
+  progress: Progress,
+  signal?: AbortSignal,
+  tag?: string,
+): Promise<ExportResult> {
   progress({ stage: 'Copying the project' })
   const snap = join(work, 'project')
   snapshotProject(project, snap)
@@ -89,12 +96,25 @@ export async function exportVideo(project: string, work: string, options: Export
     if (options.server) {
       // On a render server (ADR 0021): the narration is made here first, since the server has no voice.
       progress({ stage: 'Making the narration' })
-      await (await runRunner('default', ['render', snap, '--quality', 'preview', '--voice-only', '--out', 'voice-only'], { extraEnv: await voiceEnv(meta, snap), signal, tag })).done
+      await (
+        await runRunner('default', ['render', snap, '--quality', 'preview', '--voice-only', '--out', 'voice-only'], {
+          extraEnv: await voiceEnv(meta, snap),
+          signal,
+          tag,
+        })
+      ).done
       progress({ stage: 'Packing the project' })
       const archive = join(work, 'project.tar.gz')
       await packProject(snap, archive)
       // project.json's voice as is: narration is keyed by paths inside the project, so the server finds it.
-      await renderRemote(options.server, archive, { themes, size, fps, slug, voice: meta.voice, animations, duration, cacheKey: createHash('sha1').update(project).digest('hex').slice(0, 16) }, folder, progress, signal)
+      await renderRemote(
+        options.server,
+        archive,
+        { themes, size, fps, slug, voice: meta.voice, animations, duration, cacheKey: createHash('sha1').update(project).digest('hex').slice(0, 16) },
+        folder,
+        progress,
+        signal,
+      )
       for (const theme of themes) {
         // The server's timeline goes where a local render's would, for dubbing below.
         const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
@@ -107,21 +127,38 @@ export async function exportVideo(project: string, work: string, options: Export
       let encoder = await exportEncoder()
       for (const theme of themes) {
         const stage = themes.length > 1 ? `Rendering the ${theme} version` : 'Rendering at full quality'
-        const parts = await renderSlices(snap, meta, { theme, size, fps, encoder }, join(project, '.studio', 'cache'), animations, (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }), signal, tag)
+        const parts = await renderSlices(
+          snap,
+          meta,
+          { theme, size, fps, encoder },
+          join(project, '.studio', 'cache'),
+          animations,
+          (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }),
+          signal,
+          tag,
+        )
         const final = (on: string | undefined) =>
-          renderFinal(snap, meta, { theme, out: `final-${theme}`, size, fps, encoder: on }, {
-            cacheDir: join(project, '.studio', 'cache'),
-            signal,
-            tag,
-            onProgress: (t) => progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, percent: duration ? Math.min(t / duration, 1) : undefined }),
-          })
+          renderFinal(
+            snap,
+            meta,
+            { theme, out: `final-${theme}`, size, fps, encoder: on },
+            {
+              cacheDir: join(project, '.studio', 'cache'),
+              signal,
+              tag,
+              onProgress: (t) =>
+                progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, percent: duration ? Math.min(t / duration, 1) : undefined }),
+            },
+          )
         progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage })
         try {
           await final(encoder)
         } catch (e) {
           if (!encoder || signal?.aborted || (e as { cancelled?: boolean }).cancelled) throw e
           const why = (e as Error).message.replace(/^scene\.py line \d+: /, '').split(':')[0]
-          warnings.push(`The GPU’s video encoder (${encoder}) failed with ${why}, so this video was encoded on the CPU. Settings → Environment can turn GPU encoding off.`)
+          warnings.push(
+            `The GPU’s video encoder (${encoder}) failed with ${why}, so this video was encoded on the CPU. Settings → Environment can turn GPU encoding off.`,
+          )
           encoder = undefined
           progress({ stage: `${stage} on the CPU` })
           await final(undefined)
@@ -129,7 +166,9 @@ export async function exportVideo(project: string, work: string, options: Export
         progress({ stage: 'Saving the video' })
         const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
         const base = join(folder, themes.length > 1 ? `${slug}.${theme}` : slug)
-        await (await runRunner('default', ['export', timeline, base], { signal, tag })).done
+        await (
+          await runRunner('default', ['export', timeline, base], { signal, tag })
+        ).done
         keep(theme, base, timeline)
       }
     }
@@ -139,7 +178,9 @@ export async function exportVideo(project: string, work: string, options: Export
     progress({ stage: 'Making the thumbnail' })
     for (const c of cards) {
       try {
-        await (await runRunner('default', ['thumbnail-card', c.timeline, `${c.base}.jpg`, ...cardArgs(meta)], { signal, tag })).done
+        await (
+          await runRunner('default', ['thumbnail-card', c.timeline, `${c.base}.jpg`, ...cardArgs(meta)], { signal, tag })
+        ).done
       } catch (e) {
         if (signal?.aborted) throw e
         warnings.push(`The thumbnail stayed a plain frame: ${(e as Error).message}`)

@@ -1,3 +1,4 @@
+import { t as uiText } from '../lib/i18n'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Section } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -95,10 +96,10 @@ export function StudyPlayer(props: {
           useStore.setState({ watchTime: v.currentTime })
         }}
       >
-        {vtt && <track kind="subtitles" src={api.mediaUrl(vtt)} default label="Subtitles" />}
+        {vtt && <track kind="subtitles" src={api.mediaUrl(vtt)} default label={uiText('Subtitles')} />}
       </video>
       <div className="ex-player-bar">
-        <div className="ex-chapters" role="list" aria-label="Chapters">
+        <div className="ex-chapters" role="list" aria-label={uiText('Chapters')}>
           {chapters.map((c) => (
             <button
               key={`${c.name}-${c.start}`}
@@ -111,7 +112,7 @@ export function StudyPlayer(props: {
           ))}
         </div>
         <label className="ex-rate">
-          <span className="faint">Speed</span>
+          <span className="faint">{uiText('Speed')}</span>
           <select className="select small" value={rate} onChange={(e) => setRate(Number(e.target.value))}>
             {RATES.map((r) => (
               <option key={r} value={r}>

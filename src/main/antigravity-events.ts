@@ -94,7 +94,7 @@ export function agyFollower(on: AgyHandlers) {
         else if (status !== 'running') on.status(id, status)
         shown.add(id)
         const why = /permission check failed for (\w+) "([^"]*)"/.exec(s.tool_info.error?.message ?? '')
-        if (why) refused = `${VERB[why[1]] ?? why[1]} ${why[2]}`
+        if (why) refused = `${VERB[why[1]] ?? why[1]} ${why[2].replace(/\\\\/g, '\\')}`
       }
       return null
     }

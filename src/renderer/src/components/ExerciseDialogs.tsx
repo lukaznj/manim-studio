@@ -1,12 +1,12 @@
+import { t as uiText, format } from '../lib/i18n'
 import { Film, FileText, GraduationCap, Image, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { DEFAULT_TONE, TONES } from '../../../shared/tone'
+import { DEFAULT_TONE } from '../../../shared/tone'
 import type { Aspect, ExerciseInput, Theme, Tone } from '../../../shared/types'
 import { api } from '../lib/api'
-import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, createExerciseSet, errorText, openDialog, toast, useStore } from '../store'
 import { voiceProblem } from './SettingsDialog'
-import { Modal, Tabs } from './ui'
+import { Modal } from './ui'
 import { useVoiceFor } from './VoicePicker'
 
 const FILE = /\.(png|jpe?g|gif|webp|pdf)$/i
@@ -23,13 +23,15 @@ function ExerciseInputFields({ input, onChange }: { input: ExerciseInput; onChan
   return (
     <>
       <div className="field">
-        <label htmlFor="ex-text">Exercises</label>
+        <label htmlFor="ex-text">{uiText('Exercises')}</label>
         <textarea
           id="ex-text"
           className="textarea ex-input"
           data-autofocus
           rows={6}
-          placeholder={'Type or paste them here, one or many, e.g.\n1. Solve x² − 5x + 6 = 0.\n2. A ball is thrown at 12 m/s at 30°. How far does it fly?\n\nPaste a screenshot with ⌘V / Ctrl+V.'}
+          placeholder={uiText(
+            'Type or paste them here, one or many, e.g.\n1. Solve x² − 5x + 6 = 0.\n2. A ball is thrown at 12 m/s at 30°. How far does it fly?\n\nPaste a screenshot with ⌘V / Ctrl+V.',
+          )}
           value={input.text}
           onChange={(e) => onChange({ ...input, text: e.target.value })}
           onPaste={(e) => {
@@ -56,15 +58,15 @@ function ExerciseInputFields({ input, onChange }: { input: ExerciseInput; onChan
         {input.files.map((p) => (
           <span key={p} className="lang-chip" title={p}>
             {/\.pdf$/i.test(p) ? <FileText /> : <Image />} {fileName(p)}
-            <button aria-label={`Remove ${fileName(p)}`} onClick={() => onChange({ ...input, files: input.files.filter((x) => x !== p) })}>
+            <button aria-label={format('Remove {0}', [fileName(p)])} onClick={() => onChange({ ...input, files: input.files.filter((x) => x !== p) })}>
               <X />
             </button>
           </span>
         ))}
         <button className="btn small" onClick={() => void api.pickExerciseFiles().then(add)}>
-          <Plus /> {input.files.length ? 'Add more' : 'Add pictures or PDFs'}
+          <Plus /> {input.files.length ? uiText('Add more') : uiText('Add pictures or PDFs')}
         </button>
-        {!input.files.length && <span className="hint">or drop them here: photos of a textbook page, screenshots, a problem sheet.</span>}
+        {!input.files.length && <span className="hint">{uiText('or drop them here: photos of a textbook page, screenshots, a problem sheet.')}</span>}
       </div>
     </>
   )
@@ -77,16 +79,17 @@ const hasInput = (i: ExerciseInput) => !!i.text.trim() || !!i.files.length
 export function NewExerciseSetDialog() {
   const open = useStore((s) => s.dialog?.kind === 'exercises')
   const defaultVoice = useStore((s) => s.settings?.defaultVoice)
+  const defaults = useStore((s) => s.settings)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
   const omnivoice = useStore((s) => s.setup?.omnivoice)
   const elevenLabsCheck = useStore((s) => s.elevenLabsCheck)
   const [input, setInput] = useState(empty)
   const [title, setTitle] = useState('')
   const [level, setLevel] = useState('')
-  const [aspect, setAspect] = useState<Aspect>('16:9')
-  const [theme, setTheme] = useState<Theme>('dark')
-  const [tone, setTone] = useState<Tone>(DEFAULT_TONE)
-  const [language, setLanguage] = useState('en')
+  const aspect: Aspect = defaults?.defaultAspect ?? '16:9'
+  const theme: Theme = defaults?.defaultTheme ?? 'dark'
+  const tone: Tone = defaults?.defaultTone ?? DEFAULT_TONE
+  const language = defaultVoice?.language ?? 'en'
   const voice = useVoiceFor(language)
   const [busy, setBusy] = useState(false)
 
@@ -95,14 +98,12 @@ export function NewExerciseSetDialog() {
     setInput(empty())
     setTitle('')
     setBusy(false)
-    if (defaultVoice) setLanguage(defaultVoice.language)
   }, [open]) // a fresh form each time
   useEffect(() => {
     if (open && hasKey && defaultVoice?.provider === 'elevenlabs') void api.checkElevenLabsKey().then((c) => useStore.setState({ elevenLabsCheck: c }))
   }, [open, hasKey])
 
   const voiceIssue = voiceProblem(voice, hasKey, omnivoice, elevenLabsCheck)
-  const languages = LANGUAGES.includes(language) ? LANGUAGES : [language, ...LANGUAGES]
   const start = async () => {
     if (!hasInput(input) || busy || voiceIssue) return
     setBusy(true)
@@ -123,76 +124,46 @@ export function NewExerciseSetDialog() {
     <Modal
       open={open}
       onClose={closeDialog}
-      title="New exercise set"
+      title={uiText('New exercise set')}
       icon={<GraduationCap className="head-icon" />}
       width={680}
       footer={
         <>
           <button className="btn ghost" onClick={closeDialog}>
-            Cancel
+            {uiText('Cancel')}
           </button>
           <button className="btn primary" disabled={!hasInput(input) || busy || !!voiceIssue} title={voiceIssue ?? undefined} onClick={() => void start()}>
-            {busy ? <span className="spinner" /> : <GraduationCap />} Solve them
+            {busy ? <span className="spinner" /> : <GraduationCap />} {uiText(" Solve them")}
           </button>
         </>
       }
     >
       <div className="modal-body quick-form">
         <p className="hint">
-          Give it exercises, one or a whole sheet. Claude reads them, writes a checked step-by-step solution for each, then makes a short video of it. You can
-          add more at any time, ask about any step, and join the videos into a lecture.
+          {uiText(
+            'Give it exercises, one or a whole sheet. Claude reads them, writes a checked step-by-step solution for each, then makes a short video of it. You can add more at any time, ask about any step, and join the videos into a lecture.',
+          )}
         </p>
         <ExerciseInputFields input={input} onChange={setInput} />
         <div className="quick-row">
           <div className="field">
-            <label htmlFor="ex-title">Title</label>
-            <input id="ex-title" className="input" placeholder="Optional: taken from the exercises" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div className="field">
-            <label htmlFor="ex-level">Who it’s for</label>
-            <input id="ex-level" className="input" placeholder="e.g. Croatian matura, first-year physics" value={level} onChange={(e) => setLevel(e.target.value)} />
-          </div>
-        </div>
-        <div className="quick-row">
-          <div className="field">
-            <label htmlFor="ex-lang">Language</label>
-            <select id="ex-lang" className="select" value={language} onChange={(e) => setLanguage(e.target.value)}>
-              {languages.map((code) => (
-                <option key={code} value={code}>
-                  {languageName.of(code)}
-                </option>
-              ))}
-            </select>
-            {voice?.provider === 'elevenlabs' && voice.elevenlabs?.voiceName && <span className="hint">Voice: {voice.elevenlabs.voiceName}</span>}
-          </div>
-          <div className="field">
-            <span className="label">Format</span>
-            <Tabs
-              radio="Format"
-              value={aspect}
-              onChange={setAspect}
-              items={[
-                { value: '16:9', label: '16:9 landscape' },
-                { value: '9:16', label: '9:16 portrait' },
-              ]}
+            <label htmlFor="ex-title">{uiText('Title')}</label>
+            <input
+              id="ex-title"
+              className="input"
+              placeholder={uiText('Optional: taken from the exercises')}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
           </div>
-        </div>
-        <div className="quick-row">
           <div className="field">
-            <span className="label">Tone</span>
-            <Tabs radio="Tone" value={tone} onChange={setTone} items={TONES.map((t) => ({ value: t.value, label: t.label }))} />
-          </div>
-          <div className="field">
-            <span className="label">Theme</span>
-            <Tabs
-              radio="Theme"
-              value={theme}
-              onChange={setTheme}
-              items={[
-                { value: 'dark', label: 'Dark' },
-                { value: 'light', label: 'Light' },
-              ]}
+            <label htmlFor="ex-level">{uiText('Who it’s for')}</label>
+            <input
+              id="ex-level"
+              className="input"
+              placeholder={uiText('e.g. Croatian matura, first-year physics')}
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
             />
           </div>
         </div>
@@ -200,7 +171,7 @@ export function NewExerciseSetDialog() {
           <div className="quick-warning">
             {voiceIssue}{' '}
             <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'voice' })}>
-              Choose one in Settings → Voice
+              {uiText('Choose one in Settings → Voice')}
             </button>
           </div>
         )}
@@ -236,16 +207,16 @@ export function AddExercisesDialog() {
     <Modal
       open={open}
       onClose={closeDialog}
-      title={`Add exercises to “${set.title}”`}
+      title={format('Add exercises to “{0}”', [set.title])}
       icon={<Plus className="head-icon" />}
       width={640}
       footer={
         <>
           <button className="btn ghost" onClick={closeDialog}>
-            Cancel
+            {uiText('Cancel')}
           </button>
           <button className="btn primary" disabled={!hasInput(input) || busy} onClick={() => void add()}>
-            {busy ? <span className="spinner" /> : <Plus />} Add and solve
+            {busy ? <span className="spinner" /> : <Plus />} {uiText(" Add and solve")}
           </button>
         </>
       }
@@ -271,13 +242,13 @@ export function LectureDialog() {
     <Modal
       open={open}
       onClose={closeDialog}
-      title="Lecture video"
+      title={uiText('Lecture video')}
       icon={<Film className="head-icon" />}
       width={520}
       footer={
         <>
           <button className="btn ghost" onClick={closeDialog}>
-            Cancel
+            {uiText('Cancel')}
           </button>
           <button
             className="btn primary"
@@ -287,15 +258,16 @@ export function LectureDialog() {
               void api.makeLecture(set.folder, chosen).catch((e) => toast(errorText(e), 'error'))
             }}
           >
-            <Film /> Make the lecture video
+            <Film /> {uiText(" Make the lecture video")}
           </button>
         </>
       }
     >
       <div className="modal-body">
         <p className="hint">
-          The videos are joined in order, with their subtitles and a chapter list for YouTube, in the set’s lecture folder. Nothing is rendered again, so it
-          takes seconds.
+          {uiText(
+            'The videos are joined in order, with their subtitles and a chapter list for YouTube, in the set’s lecture folder. Nothing is rendered again, so it takes seconds.',
+          )}
         </p>
         <ul className="ex-lecture-list">
           {ready.map((i) => (
@@ -304,14 +276,18 @@ export function LectureDialog() {
                 <input
                   type="checkbox"
                   checked={chosen.includes(i.dir)}
-                  onChange={(e) => setChosen(e.target.checked ? ready.filter((x) => x.dir === i.dir || chosen.includes(x.dir)).map((x) => x.dir) : chosen.filter((d) => d !== i.dir))}
+                  onChange={(e) =>
+                    setChosen(
+                      e.target.checked ? ready.filter((x) => x.dir === i.dir || chosen.includes(x.dir)).map((x) => x.dir) : chosen.filter((d) => d !== i.dir),
+                    )
+                  }
                 />
                 <span className="mono faint">{i.number}</span> {i.title}
               </label>
             </li>
           ))}
         </ul>
-        {ready.length < set.items.length && <p className="faint">Exercises still being made can be added once their video is done.</p>}
+        {ready.length < set.items.length && <p className="faint">{uiText('Exercises still being made can be added once their video is done.')}</p>}
       </div>
     </Modal>
   )

@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { ArrowDownToLine, ChevronLeft, History, Pause, Play, RefreshCw, Settings, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
@@ -26,11 +27,11 @@ export function TitleBar() {
       <div className="titlebar-left">
         {screen === 'study' && (watchSeries || exerciseSet) ? (
           <>
-            <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
+            <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label={uiText('Back to projects')} title={uiText('Back to projects')}>
               <ChevronLeft />
             </button>
             <div className="crumb">
-              <span className="faint">Projects</span>
+              <span className="faint">{uiText('Projects')}</span>
               <span className="faint">/</span>
               <strong>{watchSeries?.title ?? exerciseSet!.title}</strong>
             </div>
@@ -41,21 +42,26 @@ export function TitleBar() {
               <button
                 className="icon-btn no-drag"
                 onClick={() => void openExerciseSet(project.meta.exercise!.set, project.path)}
-                aria-label="Back to the exercises"
-                title="Back to the exercises"
+                aria-label={uiText('Back to the exercises')}
+                title={uiText('Back to the exercises')}
               >
                 <ChevronLeft />
               </button>
             ) : (
-              <button className="icon-btn no-drag" onClick={() => void closeProject()} aria-label="Back to projects" title="Back to projects">
+              <button
+                className="icon-btn no-drag"
+                onClick={() => void closeProject()}
+                aria-label={uiText('Back to projects')}
+                title={uiText('Back to projects')}
+              >
                 <ChevronLeft />
               </button>
             )}
             <div className="crumb">
-              <span className="faint">{project.meta.exercise ? project.meta.exercise.title : 'Projects'}</span>
+              <span className="faint">{project.meta.exercise ? project.meta.exercise.title : uiText('Projects')}</span>
               <span className="faint">/</span>
               <strong>{project.meta.name}</strong>
-              {dirty && <span className="dirty-dot" title={`Unsaved changes (${shortcut('S')})`} />}
+              {dirty && <span className="dirty-dot" title={format('Unsaved changes ({0})', [shortcut('S')])} />}
               <span className="badge">{project.meta.aspect}</span>
             </div>
           </>
@@ -73,12 +79,12 @@ export function TitleBar() {
             <button
               className="pill-btn"
               onClick={() => void pausePreview(!render.paused)}
-              title={render.paused ? 'Resume the render' : 'Pause the render'}
-              aria-label={render.paused ? 'Resume the render' : 'Pause the render'}
+              title={render.paused ? uiText('Resume the render') : uiText('Pause the render')}
+              aria-label={render.paused ? uiText('Resume the render') : uiText('Pause the render')}
             >
               {render.paused ? <Play /> : <Pause />}
             </button>
-            <button className="pill-btn" onClick={() => void api.cancelRender()} title="Stop the render" aria-label="Stop the render">
+            <button className="pill-btn" onClick={() => void api.cancelRender()} title={uiText('Stop the render')} aria-label={uiText('Stop the render')}>
               <X />
             </button>
           </span>
@@ -88,7 +94,7 @@ export function TitleBar() {
         <UpdatePill />
         {screen === 'editor' && (
           <div className="popover-anchor">
-            <button className={`icon-btn ${historyOpen ? 'on' : ''}`} onClick={() => setHistoryOpen(!historyOpen)} title="Version history">
+            <button className={`icon-btn ${historyOpen ? 'on' : ''}`} onClick={() => setHistoryOpen(!historyOpen)} title={uiText('Version history')}>
               <History />
             </button>
             {historyOpen && <HistoryPopover onClose={() => setHistoryOpen(false)} />}
@@ -96,7 +102,7 @@ export function TitleBar() {
         )}
         {/* On macOS, Settings… is ⌘, in the menu bar (src/main/menu.ts), the standard place. */}
         {platform !== 'darwin' && (
-          <button className="icon-btn" onClick={() => openDialog({ kind: 'settings' })} title="Settings">
+          <button className="icon-btn" onClick={() => openDialog({ kind: 'settings' })} title={uiText('Settings')}>
             <Settings />
           </button>
         )}
@@ -112,7 +118,7 @@ function QuickPill() {
   if (!show) return null
   return (
     <button className="exports-pill busy" onClick={() => useStore.setState({ quickEditor: false })}>
-      <span className="spinner" /> Quick mode · Show progress
+      <span className="spinner" /> {uiText(" Quick mode · Show progress")}
     </button>
   )
 }
@@ -127,19 +133,22 @@ function UpdatePill() {
   if (update.state === 'available')
     return (
       <button className="update-pill" onClick={() => void api.downloadUpdate()} title={update.notes}>
-        <ArrowDownToLine /> Update to {update.version}
+        <ArrowDownToLine /> {uiText(" Update to ")}
+        {update.version}
       </button>
     )
   if (update.state === 'downloading')
     return (
       <span className="update-pill busy">
-        <Ring value={update.percent / 100} size={15} /> Downloading {Math.round(update.percent)}%
+        <Ring value={update.percent / 100} size={15} /> {uiText(" Downloading ")}
+        {Math.round(update.percent)}%
       </span>
     )
   if (update.state === 'ready')
     return (
       <button className="update-pill ready" onClick={() => void api.installUpdate()}>
-        <RefreshCw /> Restart to update to {update.version}
+        <RefreshCw /> {uiText(" Restart to update to ")}
+        {update.version}
       </button>
     )
   if (update.state === 'error' && update.manualUrl)
@@ -150,7 +159,7 @@ function UpdatePill() {
         onContextMenu={() => setDismissed(true)}
         title={update.message}
       >
-        <ArrowDownToLine /> Download the update manually
+        <ArrowDownToLine /> {uiText(" Download the update manually")}
       </button>
     )
   return null

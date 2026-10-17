@@ -21,6 +21,7 @@ apply(dark.matches)
 
 dark.addEventListener('change', (e) => {
   const doc = document as Document & { startViewTransition?: (o: { update: () => void; types: string[] }) => unknown }
-  if (!doc.startViewTransition || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) apply(e.matches)
+  if (!doc.startViewTransition || document.hidden || document.querySelector('dialog[open]') || matchMedia('(prefers-reduced-motion: reduce)').matches)
+    apply(e.matches)
   else doc.startViewTransition({ update: () => apply(e.matches), types: ['theme'] })
 })

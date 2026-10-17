@@ -7,7 +7,11 @@ import type { ReactNode } from 'react'
 
 function math(tex: string, display: boolean, key: number): ReactNode {
   const html = katex.renderToString(tex, { displayMode: display, throwOnError: false, output: 'html' })
-  return display ? <div key={key} className="md-math" dangerouslySetInnerHTML={{ __html: html }} /> : <span key={key} dangerouslySetInnerHTML={{ __html: html }} />
+  return display ? (
+    <div key={key} className="md-math" dangerouslySetInnerHTML={{ __html: html }} />
+  ) : (
+    <span key={key} dangerouslySetInnerHTML={{ __html: html }} />
+  )
 }
 
 const LIST = /^\s*([-*]|\d+[.)])\s/
@@ -66,7 +70,8 @@ export function Markdown({ text }: { text: string }) {
       continue
     }
     const para: string[] = []
-    while (i < lines.length && lines[i].trim() && !lines[i].startsWith('```') && !lines[i].trim().startsWith('$$') && !LIST.test(lines[i])) para.push(lines[i++])
+    while (i < lines.length && lines[i].trim() && !lines[i].startsWith('```') && !lines[i].trim().startsWith('$$') && !LIST.test(lines[i]))
+      para.push(lines[i++])
     blocks.push(<p key={blocks.length}>{inline(para.join(' '))}</p>)
   }
   return <>{blocks}</>

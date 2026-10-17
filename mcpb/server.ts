@@ -2,14 +2,14 @@
 // MCP server when it starts, so listing the tools must not touch Studio. On a tool call it finds
 // the running app through <userData>/mcp-endpoint.json, starting Studio if needed, and forwards
 // the call to it on 127.0.0.1 (src/main/mcp.ts). Bundled into an .mcpb by scripts/build-mcpb.mjs.
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { desktopInstructions, desktopTools, type DesktopToolName } from '../src/shared/studio-tools'
+import { desktopInstructions, desktopTools, sceneTools, type DesktopToolName } from '../src/shared/studio-tools'
 
 declare const VERSION: string // set by the build
 
@@ -51,10 +51,10 @@ async function healthy(e: Endpoint): Promise<boolean> {
 function launch(): void {
   const [cmd, args] =
     process.platform === 'darwin'
-      ? ['open', ['-b', 'cc.razem.manimstudio']]
+      ? ['open', ['-g', '-b', 'cc.razem.manimstudio', '--args', '--background']]
       : process.platform === 'win32'
-        ? ['cmd', ['/c', 'start', '""', 'manim-studio://open']]
-        : ['xdg-open', ['manim-studio://open']]
+        ? ['cmd', ['/c', 'start', '""', 'manim-studio://background']]
+        : ['xdg-open', ['manim-studio://background']]
   spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: true })
     .on('error', () => undefined)
     .unref()
@@ -90,8 +90,27 @@ async function call(name: DesktopToolName, args: Record<string, unknown>): Promi
   }
 }
 
-const server = new McpServer({ name: 'manim-studio', version: VERSION }, { instructions: desktopInstructions })
-for (const name of Object.keys(desktopTools) as DesktopToolName[]) {
+const internal = !!process.env.STUDIO_PROJECT
+const server = new McpServer(
+  { name: 'manim-studio', version: VERSION },
+  { instructions: internal ? 'Use these scene tools for the project in your authoring instructions. Render and inspect your changes.' : desktopInstructions },
+)
+server.registerResource(
+  'video',
+  new ResourceTemplate('studio-video://{job}/{index}', { list: undefined }),
+  { description: 'A video or subtitle made by Studio' },
+  async (uri, variables) => {
+    const job = String(variables.job)
+    const index = String(variables.index)
+    if (!/^[a-zA-Z0-9-]+$/.test(job) || !/^\d+$/.test(index)) throw new Error('Invalid video resource')
+    const e = await endpoint()
+    const res = await fetch(`http://127.0.0.1:${e.port}/video/${job}/${index}`, { headers: auth(e) })
+    if (!res.ok) throw new Error('Video resource is unavailable. Check get_video for the job status.')
+    const { blob, mimeType } = (await res.json()) as { blob: string; mimeType: string }
+    return { contents: [{ uri: uri.href, blob, mimeType }] }
+  },
+)
+for (const name of Object.keys(internal ? sceneTools : desktopTools) as DesktopToolName[]) {
   const { description, shape } = desktopTools[name]
   server.registerTool(name, { description, inputSchema: shape }, (args: Record<string, unknown>) => call(name, args))
 }

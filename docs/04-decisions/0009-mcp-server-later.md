@@ -48,3 +48,7 @@ Constraints:
 - `scripts/desktop-smoke.mjs` plays Claude Desktop: it starts the built extension over stdio and makes a short video through it.
 - Linux AppImages may not register `manim-studio://`. Then the extension asks the user to open Studio themselves.
 - Not done: Studio's in-app chat still uses its own in-process server rather than this endpoint. Merging them only pays off if the tool sets diverge.
+
+## 2026-10-17 revision
+
+[[0037-desktop-conversation-videos]] adds complete video jobs and media resources for Claude, Codex and compatible ChatGPT desktop clients. Learn requests stay in the background; Create opens the editor; Both defaults to Learn unless production is explicit. These jobs use the configured Studio agent and its usage, while the original low-level tools remain available. The endpoint remains loopback-only and authenticated.

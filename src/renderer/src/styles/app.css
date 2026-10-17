@@ -348,8 +348,7 @@
   overflow: auto;
   background:
     radial-gradient(1200px 500px at 85% -10%, rgb(47 109 246 / 0.08), transparent 60%),
-    radial-gradient(900px 400px at -10% 110%, rgb(255 209 102 / 0.05), transparent 60%),
-    var(--bg);
+    radial-gradient(900px 400px at -10% 110%, rgb(255 209 102 / 0.05), transparent 60%), var(--bg);
   view-transition-name: screen;
 }
 .home-inner {
@@ -1930,4 +1929,78 @@
 .el-usage {
   display: grid;
   gap: 4px;
+}
+.settings-modal {
+  margin: 7vh auto auto;
+}
+.settings-body {
+  min-height: min(420px, 58vh);
+  max-height: 68vh;
+  overflow-y: auto;
+}
+.settings-tabs .tabs button {
+  padding-inline: 9px;
+}
+.library-empty {
+  min-height: 52vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.library-add {
+  display: grid;
+  place-items: center;
+  width: 124px;
+  height: 124px;
+  border: 1px dashed var(--line);
+  border-radius: 30px;
+  background: var(--panel);
+  color: var(--sun-text);
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+.library-add svg {
+  width: 56px;
+  height: 56px;
+  stroke-width: 1.5;
+}
+.library-add:hover {
+  background: var(--raised-2);
+  transform: scale(1.04);
+}
+.creation-choices {
+  display: grid;
+  gap: 12px;
+}
+.creation-choice {
+  text-align: left;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 5px 12px;
+}
+.creation-choice .hint {
+  grid-column: 2;
+}
+.onboarding-progress {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.onboarding-progress span {
+  flex: 1;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--line);
+}
+.onboarding-progress span.on {
+  background: var(--sun);
+}
+@media (prefers-reduced-motion: reduce) {
+  .library-add {
+    transition: none;
+  }
 }

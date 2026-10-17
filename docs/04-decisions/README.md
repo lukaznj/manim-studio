@@ -39,3 +39,5 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0033-every-agent-in-the-background]] | Codex and Antigravity run the background agents too (the bridge names its project); Settings → Accounts shows every agent's sign-in and key | accepted |
 | [[0034-gpu-video-encoding]] | Exports encode on the GPU (VideoToolbox, NVENC, Media Foundation for AMD) when one works, in a cache of their own, with the CPU as the fallback | accepted |
 | [[0035-720p-study-videos]] | Videos made to study (Learn and Both) export at 720p by default, about 2.3× faster; 720p is in the export dialog; no 24 fps | accepted |
+| [[0036-settings-onboarding-and-languages]] | Guided onboarding, English/Croatian UI, shared Voice/Video defaults and plus-button libraries | accepted |
+| [[0037-desktop-conversation-videos]] | Desktop chat video jobs, mode-aware delivery and shared Claude/Codex/ChatGPT local bridge | accepted |
