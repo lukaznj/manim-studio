@@ -208,7 +208,7 @@ function registerIpc(): void {
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
     // Another sign-in method means another Claude Code process: the next message starts it.
-    if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch || 'agent' in patch) closeChat()
+    if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch || 'agent' in patch || 'codexModel' in patch || 'codexEffort' in patch) closeChat()
     if (patch.appearance || patch.recentProjects || patch.mode) refreshMenu()
     return settings
   })
@@ -323,6 +323,13 @@ function registerIpc(): void {
   handle('cancelSeriesPlan', () => planning?.abort())
   handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
   handle('seriesRun', () => seriesRun())
+  handle('openEpisodeReport', async (dir: string) => {
+    const root = resolve(dir)
+    const report = existsSync(join(root, 'project.json')) ? join(root, '.studio', 'episode-report.html') : existsSync(join(root, 'series.json')) ? join(root, 'developer-report.html') : ''
+    if (!report || !existsSync(report)) throw new Error('No developer report has been generated here yet.')
+    const error = await shell.openPath(report)
+    if (error) throw new Error(error)
+  })
   handle('stopSeries', () => stopSeries())
   handle('dismissSeries', () => dismissSeries())
   handle('continueSeries', () => continueSeries())
@@ -402,7 +409,7 @@ function registerIpc(): void {
   handle('chatSend', (req: Parameters<typeof chatSend>[0]) => chatSend(req))
   handle('chatInterrupt', () => chatInterrupt())
   handle('chatReset', () => chatReset())
-  handle('chatModels', () => chatModels())
+  handle('chatModels', (agent?: Agent) => chatModels(agent))
 
   handle('history', () => history(projects.requireProject().path))
   handle('restore', async (oid: string) => {

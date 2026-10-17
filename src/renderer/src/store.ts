@@ -348,7 +348,7 @@ export async function refreshClaude(): Promise<void> {
   const claude = await api.claudeStatus()
   set({ claude })
   void refreshUsage(true) // gone with an API key or after signing out
-  const who = claude.loggedIn ? `${claude.method}:${claude.email ?? ''}` : ''
+  const who = claude.loggedIn ? `${claude.agent}:${claude.method}:${claude.email ?? ''}` : ''
   if (who === modelsFor) return
   if (!who) {
     modelsFor = ''

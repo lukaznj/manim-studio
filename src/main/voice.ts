@@ -8,12 +8,15 @@ import { setupStatus } from './env'
 import { listRecordings, requireProject } from './projects'
 import { runRunner } from './runner'
 import { getSecret, setSecret } from './settings'
+import { voiceMetricsFile } from './metrics-state'
 
 /** STUDIO_VOICE + secrets for a render of the current project. */
 export async function voiceEnv(meta: ProjectMeta, dir: string): Promise<Record<string, string>> {
   const voice = structuredClone(meta.voice)
   if (voice.omnivoice?.refAudio) voice.omnivoice.refAudio = join(dir, voice.omnivoice.refAudio)
   const env: Record<string, string> = { STUDIO_VOICE: JSON.stringify(voice) }
+  const metrics = voiceMetricsFile(meta)
+  if (metrics) env.STUDIO_VOICE_METRICS_FILE = metrics
   if (voice.provider === 'elevenlabs') env.ELEVENLABS_API_KEY = getSecret('elevenlabs')
   if (voice.provider === 'omnivoice') env.STUDIO_TTS_URL = await ensureTtsWorker().catch(() => '')
   return env
@@ -118,7 +121,7 @@ export async function saveElevenLabsKey(key: string): Promise<void> {
 export async function elevenLabsUsage(): Promise<ElevenLabsUsage | null> {
   const key = getSecret('elevenlabs')
   if (!key) return null
-  const r = await call(key, '/v1/user/subscription')
+  const r = await call(key, '/v1/user/subscription', { signal: AbortSignal.timeout(8000) })
   if (!r.ok) return null
   const s = (await r.res.json()) as { character_count: number; character_limit: number; next_character_count_reset_unix?: number | null; tier: string }
   return {
