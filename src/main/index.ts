@@ -203,7 +203,7 @@ function registerIpc(): void {
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
     // Another sign-in method means another Claude Code process: the next message starts it.
-    if ('claudeAuth' in patch || 'agent' in patch) closeChat()
+    if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch || 'agent' in patch) closeChat()
     if (patch.appearance || patch.recentProjects || patch.mode) refreshMenu()
     return settings
   })

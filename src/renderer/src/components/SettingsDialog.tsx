@@ -277,6 +277,30 @@ function AgentAccount({ agent }: { agent: Agent }) {
 
 type AccountProps = { status: ClaudeStatus | null; refresh: () => Promise<void> }
 
+/** How an agent signs in: its account or an API key. One choice shows its own part; the other is hidden. */
+function AuthSwitch(props: {
+  agent: string
+  account: string
+  value: ClaudeAuth
+  onChange: (auth: ClaudeAuth) => void | Promise<void>
+  accountText: string
+  keyText: string
+}) {
+  return (
+    <Row title={`Use ${props.agent} with`} text={props.value === 'api-key' ? props.keyText : props.accountText}>
+      <Tabs
+        radio={`Use ${props.agent} with`}
+        value={props.value}
+        onChange={(v) => void props.onChange(v)}
+        items={[
+          { value: 'account', label: props.account },
+          { value: 'api-key', label: 'API key' },
+        ]}
+      />
+    </Row>
+  )
+}
+
 /** The ElevenLabs key, the same one Settings → Voice shows. */
 function ElevenLabsAccount() {
   const settings = useStore((s) => s.settings)!
@@ -311,6 +335,7 @@ function CodexAccount({ status, refresh }: AccountProps) {
   const setup = useStore((s) => s.setup)
   const [busy, setBusy] = useState(false)
   const installed = setup?.codex === 'ready'
+  const auth = settings.codexAuth ?? (settings.hasOpenAIKey ? 'api-key' : 'account') // as codex.ts reads it
 
   const login = async () => {
     setBusy(true)
@@ -332,14 +357,25 @@ function CodexAccount({ status, refresh }: AccountProps) {
       >
         <InstallButton component="codex" state={setup?.codex ?? 'missing'} />
       </Row>
-      {installed && !settings.hasOpenAIKey && (
+      {installed && (
+        <AuthSwitch
+          agent="Codex"
+          account="ChatGPT account"
+          value={auth}
+          onChange={async (codexAuth) => {
+            await updateSettings({ codexAuth })
+            await refresh()
+          }}
+          accountText="Your ChatGPT account, signed in in your browser. Usage counts against your plan."
+          keyText="Your own OpenAI API key, billed per use to its platform.openai.com account."
+        />
+      )}
+      {installed && auth === 'account' && (
         <div className={`account-card ${status?.loggedIn ? 'on' : ''}`}>
           <Sparkles />
           <div>
             <strong>{status?.loggedIn ? 'Signed in' : 'Not signed in'}</strong>
-            <div className="hint">
-              {status?.loggedIn ? status.subscription : 'Codex signs in with your ChatGPT account, in your browser. Usage counts against your plan.'}
-            </div>
+            <div className="hint">{status?.loggedIn ? status.subscription : 'Sign-in opens in your browser.'}</div>
           </div>
           {status?.loggedIn ? (
             <button
@@ -358,15 +394,8 @@ function CodexAccount({ status, refresh }: AccountProps) {
           )}
         </div>
       )}
-      {installed && (
-        <Row
-          title="OpenAI API key"
-          text={
-            settings.hasOpenAIKey
-              ? 'Saved and encrypted on this computer. Codex uses it, billed per use, instead of a ChatGPT sign-in.'
-              : 'Optional: instead of signing in, a key from platform.openai.com, billed per use.'
-          }
-        >
+      {installed && auth === 'api-key' && (
+        <Row title="OpenAI API key" text={settings.hasOpenAIKey ? 'Saved and encrypted on this computer.' : 'A key from platform.openai.com → API keys.'}>
           <KeyField
             saved={settings.hasOpenAIKey}
             placeholder="sk-…"
@@ -378,7 +407,9 @@ function CodexAccount({ status, refresh }: AccountProps) {
           />
         </Row>
       )}
-      {installed && settings.hasOpenAIKey && <KeyStatus check={(again) => api.checkOpenAIKey(again)} fix="platform.openai.com → API keys" />}
+      {installed && auth === 'api-key' && settings.hasOpenAIKey && (
+        <KeyStatus check={(again) => api.checkOpenAIKey(again)} fix="platform.openai.com → API keys" />
+      )}
     </>
   )
 }
@@ -392,6 +423,7 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const installed = setup?.antigravity === 'ready'
+  const auth = settings.antigravityAuth ?? (settings.hasGeminiKey ? 'api-key' : 'account') // as antigravity.ts reads it
   useEffect(() => api.on('claude-login', (e) => e.url && setUrl(e.url)), [])
 
   const login = async () => {
@@ -418,13 +450,26 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
       >
         <InstallButton component="antigravity" state={setup?.antigravity ?? 'missing'} />
       </Row>
-      {installed && !settings.hasGeminiKey && (
+      {installed && (
+        <AuthSwitch
+          agent="Antigravity"
+          account="Google account"
+          value={auth}
+          onChange={async (antigravityAuth) => {
+            await updateSettings({ antigravityAuth })
+            await refresh()
+          }}
+          accountText="Your Google account. Usage counts against your Google AI plan."
+          keyText="Your own Gemini API key, billed per use to its aistudio.google.com account."
+        />
+      )}
+      {installed && auth === 'account' && (
         <div className={`account-card ${status?.loggedIn ? 'on' : ''}`}>
           <Sparkles />
           <div>
             <strong>{status?.loggedIn ? 'Signed in' : 'Not signed in'}</strong>
             <div className="hint">
-              {status?.loggedIn ? status.subscription : 'Antigravity signs in with your Google account. Usage counts against your Google AI plan.'}
+              {status?.loggedIn ? status.subscription : windows ? 'Sign-in opens in a window of its own.' : 'Sign-in opens in your browser.'}
             </div>
           </div>
           {status?.loggedIn ? (
@@ -468,15 +513,8 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
           )}
         </div>
       )}
-      {installed && (
-        <Row
-          title="Gemini API key"
-          text={
-            settings.hasGeminiKey
-              ? 'Saved and encrypted on this computer. Antigravity uses it, billed per use, instead of a Google sign-in.'
-              : 'Optional: instead of signing in, a key from aistudio.google.com, billed per use.'
-          }
-        >
+      {installed && auth === 'api-key' && (
+        <Row title="Gemini API key" text={settings.hasGeminiKey ? 'Saved and encrypted on this computer.' : 'A key from aistudio.google.com → API keys.'}>
           <KeyField
             saved={settings.hasGeminiKey}
             placeholder="AIza…"
@@ -488,7 +526,9 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
           />
         </Row>
       )}
-      {installed && settings.hasGeminiKey && <KeyStatus check={(again) => api.checkGeminiKey(again)} fix="aistudio.google.com → API keys" />}
+      {installed && auth === 'api-key' && settings.hasGeminiKey && (
+        <KeyStatus check={(again) => api.checkGeminiKey(again)} fix="aistudio.google.com → API keys" />
+      )}
     </>
   )
 }
@@ -527,28 +567,21 @@ function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { cho
 
   return (
     <>
-      <Row
-        title="Use Claude with"
-        text={
-          apiKey
-            ? 'Your own Anthropic API key, billed per use to its Console account.'
-            : 'Your Claude account. Usage counts against your plan, shared with claude.ai and Claude Desktop.'
-        }
-      >
-        <Tabs
-          radio="Use Claude with"
-          value={settings.claudeAuth}
-          onChange={(v) => void setAuth(v)}
-          items={[
-            { value: 'account', label: 'Claude account' },
-            { value: 'api-key', label: 'API key' },
-          ]}
-        />
-      </Row>
+      <AuthSwitch
+        agent="Claude"
+        account="Claude account"
+        value={settings.claudeAuth}
+        onChange={setAuth}
+        accountText="Your Claude account. Usage counts against your plan, shared with claude.ai and Claude Desktop."
+        keyText="Your own Anthropic API key, billed per use to its Console account."
+      />
 
       {apiKey ? (
         <>
-          <Row title="Anthropic API key" text={settings.hasAnthropicKey ? 'Saved and encrypted on this computer.' : 'A key from console.anthropic.com.'}>
+          <Row
+            title="Anthropic API key"
+            text={settings.hasAnthropicKey ? 'Saved and encrypted on this computer.' : 'A key from console.anthropic.com → API keys.'}
+          >
             <div className="inline-form">
               <KeyField saved={settings.hasAnthropicKey} placeholder="sk-ant-…" onSave={saveKey} />
             </div>
