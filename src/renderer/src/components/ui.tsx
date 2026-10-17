@@ -1,5 +1,6 @@
+import { t as uiText, localize } from '../lib/i18n'
 import { X } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 export function Modal(props: {
   open: boolean
@@ -12,23 +13,39 @@ export function Modal(props: {
   className?: string
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const [visible, setVisible] = useState(props.open)
+  const lastOpen = useRef({ children: props.children, footer: props.footer, title: props.title })
+  if (props.open) lastOpen.current = { children: props.children, footer: props.footer, title: props.title }
+  const content = props.open ? props : lastOpen.current
   useEffect(() => {
     const d = ref.current
     if (!d) return
     if (props.open && !d.open) {
+      setVisible(true)
       d.showModal()
       // showModal focuses the first focusable element (the close button), which beats React's
       // autoFocus; typing a space would then close the dialog. Focus the marked field, or the
       // dialog itself so keyboard shortcuts inside it keep working.
       ;(d.querySelector<HTMLElement>('[data-autofocus]') ?? d).focus()
     }
-    if (!props.open && d.open) d.close()
+    if (!props.open && d.open) {
+      // Retain the complete layout until the fade ends, including the footer.
+      const timer = window.setTimeout(
+        () => {
+          d.close()
+          lastOpen.current = { children: null, footer: null, title: props.title }
+          setVisible(false)
+        },
+        matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 220,
+      )
+      return () => window.clearTimeout(timer)
+    }
   }, [props.open])
 
   return (
     <dialog
       ref={ref}
-      className={`modal ${props.className ?? ''}`}
+      className={`modal ${!props.open ? 'closing' : ''} ${props.className ?? ''}`}
       tabIndex={-1}
       style={{ width: props.width ?? 560 }}
       onCancel={(e) => {
@@ -39,13 +56,13 @@ export function Modal(props: {
     >
       <div className="modal-head">
         {props.icon}
-        <h2>{props.title}</h2>
-        <button className="icon-btn" onClick={props.onClose} aria-label="Close">
+        <h2>{localize(content.title)}</h2>
+        <button className="icon-btn" onClick={props.onClose} aria-label={uiText('Close')}>
           <X />
         </button>
       </div>
-      {props.open && props.children}
-      {props.footer && <div className="modal-foot">{props.footer}</div>}
+      {(props.open || visible) && content.children}
+      {content.footer && <div className="modal-foot">{content.footer}</div>}
     </dialog>
   )
 }
@@ -58,8 +75,21 @@ export function Tabs<T extends string>(props: {
   radio?: string
   disabled?: boolean
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ left: 3, width: 0 })
+  useLayoutEffect(() => {
+    const measure = () => {
+      const selected = ref.current?.querySelector<HTMLElement>('[aria-selected="true"], [aria-checked="true"]')
+      if (selected) setPosition({ left: selected.offsetLeft, width: selected.offsetWidth })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [props.value, props.items.length])
   return (
-    <div className="tabs" role={props.radio ? 'radiogroup' : 'tablist'} aria-label={props.radio}>
+    <div ref={ref} className="tabs" role={props.radio ? 'radiogroup' : 'tablist'} aria-label={props.radio}>
+      <span aria-hidden className="tabs-indicator" style={{ transform: `translateX(${position.left}px)`, width: position.width }} />
       {props.items.map((it) => (
         <button
           key={it.value}
@@ -68,7 +98,7 @@ export function Tabs<T extends string>(props: {
           disabled={props.disabled}
           onClick={() => props.onChange(it.value)}
         >
-          {it.label}
+          {localize(it.label)}
         </button>
       ))}
     </div>
@@ -121,7 +151,7 @@ export function Wordmark({ size = 15 }: { size?: number }) {
         <path d="M5.4 7 Q11 24.2 16.6 12.2" fill="none" stroke="url(#wm-curve)" strokeWidth="2.6" strokeLinecap="round" />
         <circle cx="16.6" cy="12.2" r="2.5" fill="var(--blue)" />
       </svg>
-      Manim Studio
+      {uiText('Manim Studio')}
     </span>
   )
 }

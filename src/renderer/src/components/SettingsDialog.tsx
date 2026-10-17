@@ -1,4 +1,5 @@
-import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, RefreshCw, Settings2, Sparkles, Square, Sun, X } from 'lucide-react'
+import { t as uiText, localize, format } from '../lib/i18n'
+import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Plus, RefreshCw, Settings2, Sparkles, Square, Sun, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
   Agent,
@@ -26,9 +27,9 @@ import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { encodeWav } from '../lib/audio'
 import { resetTime } from '../lib/time'
-import { shortcut } from '../lib/platform'
 import {
   canEdit,
+  studying,
   closeDialog,
   errorText,
   installComponent,
@@ -59,9 +60,8 @@ export function SettingsDialog() {
     if (dialog?.kind === 'settings') setTab(dialog.tab ?? 'account')
   }, [dialog])
 
-  const learn = useStore((s) => !canEdit(s))
   return (
-    <Modal open={open} onClose={closeDialog} title="Settings" icon={<Settings2 className="head-icon" />} width={720}>
+    <Modal open={open} onClose={closeDialog} title={uiText('Settings')} icon={<Settings2 className="head-icon" />} width={780} className="settings-modal">
       <div className="settings-tabs">
         <Tabs
           value={tab}
@@ -70,7 +70,7 @@ export function SettingsDialog() {
             { value: 'account', label: 'Agent' },
             { value: 'accounts', label: 'Accounts' },
             { value: 'voice', label: 'Voice' },
-            ...(learn ? [] : [{ value: 'video' as const, label: 'Video' }]), // the editor's preview and timeline
+            { value: 'video', label: 'Video' },
             { value: 'env', label: 'Environment' },
             { value: 'about', label: 'General' },
           ]}
@@ -92,8 +92,8 @@ function Row(props: { title: ReactNode; text?: ReactNode; children?: ReactNode }
   return (
     <div className="set-row">
       <div className="set-row-text">
-        <div className="set-row-title">{props.title}</div>
-        {props.text && <div className="hint">{props.text}</div>}
+        <div className="set-row-title">{localize(props.title)}</div>
+        {props.text && <div className="hint">{localize(props.text)}</div>}
       </div>
       <div className="set-row-control">{props.children}</div>
     </div>
@@ -106,20 +106,6 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
   const [replacing, setReplacing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  if (props.saved && !replacing)
-    return (
-      <div className="inline-form">
-        <span className="badge mint">
-          <Check /> Key saved
-        </span>
-        <button className="btn small" onClick={() => setReplacing(true)}>
-          Replace
-        </button>
-        <button className="btn small ghost" onClick={() => void props.onSave('')}>
-          Remove
-        </button>
-      </div>
-    )
   const save = async () => {
     setBusy(true)
     setError(null)
@@ -136,25 +122,53 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
   return (
     <>
       <div className="inline-form">
-        <input
-          className="input"
-          type="password"
-          placeholder={props.placeholder}
-          value={key}
-          autoFocus={replacing}
-          onChange={(e) => setKey(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && key.trim() && !busy && void save()}
-        />
-        <button className="btn" disabled={!key.trim() || busy} onClick={() => void save()}>
-          {busy ? <span className="spinner" /> : <KeyRound />} {busy ? 'Checking…' : 'Save'}
+        {props.saved && (
+          <span className="badge mint">
+            <Check /> {uiText(" Key saved")}
+          </span>
+        )}
+        <button className="btn small" onClick={() => setReplacing(true)}>
+          <KeyRound /> {props.saved ? uiText('Replace key') : uiText('Add key')}
         </button>
-        {replacing && (
-          <button className="btn ghost" onClick={() => setReplacing(false)}>
-            Cancel
+        {props.saved && (
+          <button className="btn small ghost" onClick={() => void props.onSave('')}>
+            {uiText('Remove')}
           </button>
         )}
       </div>
-      {error && <p className="key-error">{error}</p>}
+      <Modal
+        open={replacing}
+        onClose={() => {
+          setReplacing(false)
+          setKey('')
+          setError(null)
+        }}
+        title={uiText('Add API key')}
+        width={460}
+      >
+        <div className="modal-body set-group">
+          <p className="hint">{uiText('The key is checked and stored encrypted on this computer.')}</p>
+          <input
+            className="input"
+            aria-label={uiText('API key')}
+            data-autofocus
+            type="password"
+            autoComplete="off"
+            placeholder={props.placeholder}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && key.trim() && !busy && void save()}
+          />
+          {error && (
+            <p className="key-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="btn primary" disabled={!key.trim() || busy} onClick={() => void save()}>
+            {busy ? uiText('Checking…') : uiText('Save key')}
+          </button>
+        </div>
+      </Modal>
     </>
   )
 }
@@ -163,7 +177,6 @@ const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1
 
 /** Settings → Agent: who writes the scenes, Claude, Codex (ADR 0022) or Antigravity (ADR 0031), and its model. Sign-ins are under Accounts. */
 function AgentTab() {
-  const editing = useStore((s) => canEdit(s))
   const agent = useStore((s) => s.settings!.agent)
   const signedIn = useStore((s) => !!s.claude?.loggedIn)
   const seriesAgents = useStore((s) => s.settings!.seriesAgents)
@@ -174,8 +187,10 @@ function AgentTab() {
   return (
     <div className="set-group">
       <Row
-        title="Agent"
-        text="Who writes the scenes, solves exercises and makes series episodes. Quick mode, series planning and translation use it too. Switching starts a new conversation."
+        title={uiText('Agent')}
+        text={uiText(
+          'Who writes the scenes, solves exercises and makes series episodes. Quick mode, series planning and translation use it too. Switching starts a new conversation.',
+        )}
       >
         <Tabs
           radio="Agent"
@@ -189,19 +204,21 @@ function AgentTab() {
         />
       </Row>
       {signedIn ? (
-        <Row title="Model and effort" text="Which model writes the scenes and how much it reasons first. Also under the chat box.">
+        <Row title={uiText('Model and effort')} text={uiText('Which model writes the scenes and how much it reasons first. Also under the chat box.')}>
           <ModelControls />
         </Row>
       ) : (
-        <Row title={`${AGENT_NAMES[agent]} isn’t signed in`} text="Sign in, or add an API key, under Accounts.">
+        <Row title={format('{0} isn’t signed in', [AGENT_NAMES[agent]])} text={uiText('Sign in, or add an API key, under Accounts.')}>
           <button className="btn small primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
-            <KeyRound /> Accounts
+            <KeyRound /> {uiText(" Accounts")}
           </button>
         </Row>
       )}
       <Row
-        title="Agents at once"
-        text="How many agents an unattended series or an exercise set runs at once: for a series, one writes the scripts in order and the others make each video as soon as its script is ready. More is faster, but uses your plan’s limits faster and renders more at once on this computer."
+        title={uiText('Agents at once')}
+        text={uiText(
+          'How many agents an unattended series or an exercise set runs at once: for a series, one writes the scripts in order and the others make each video as soon as its script is ready. More is faster, but uses your plan’s limits faster and renders more at once on this computer.',
+        )}
       >
         <Tabs
           radio="Agents at once"
@@ -210,7 +227,6 @@ function AgentTab() {
           items={['1', '2', '3', '4'].map((n) => ({ value: n, label: n }))}
         />
       </Row>
-      {editing && <ClaudeDesktopRow />}
     </div>
   )
 }
@@ -228,12 +244,14 @@ function AccountsTab() {
         <AgentAccount key={a} agent={a} />
       ))}
       <ElevenLabsAccount />
+      <ClaudeDesktopRow />
+      <DesktopConnections />
     </div>
   )
 }
 
 /** One agent's account: whether it writes the scenes now, and its sign-in, read for that agent. */
-function AgentAccount({ agent }: { agent: Agent }) {
+export function AgentAccount({ agent }: { agent: Agent }) {
   const chosen = useStore((s) => s.settings!.agent === agent)
   const keys = useStore((s) => [s.settings!.hasAnthropicKey, s.settings!.hasOpenAIKey, s.settings!.hasGeminiKey, s.settings!.claudeAuth].join())
   const installs = useStore((s) => `${s.setup?.codex}:${s.setup?.antigravity}`)
@@ -247,29 +265,15 @@ function AgentAccount({ agent }: { agent: Agent }) {
     <section className="account-section">
       <header className="account-head">
         <strong>{AGENT_NAMES[agent]}</strong>
-        {status?.loggedIn ? <span className="badge mint">Ready</span> : <span className="badge">Not set up</span>}
-        <span className="account-head-end">
-          {chosen ? (
-            <span className="badge sun">Writes the scenes</span>
-          ) : (
-            <button
-              className="btn small ghost"
-              onClick={async () => {
-                await updateSettings({ agent })
-                await refreshClaude()
-              }}
-            >
-              Use this agent
-            </button>
-          )}
-        </span>
+        {status?.loggedIn ? <span className="badge mint">{uiText(" Ready")}</span> : <span className="badge">{uiText('Not set up')}</span>}
+        <span className="account-head-end">{chosen && <span className="badge">{uiText('Selected in Agent')}</span>}</span>
       </header>
       {agent === 'codex' ? (
-        <CodexAccount status={status} refresh={refresh} />
+        <CodexAccount status={localize(status)} refresh={refresh} />
       ) : agent === 'antigravity' ? (
-        <AntigravityAccount status={status} refresh={refresh} />
+        <AntigravityAccount status={localize(status)} refresh={refresh} />
       ) : (
-        <ClaudeAccount status={status} refresh={refresh} chosen={chosen} />
+        <ClaudeAccount status={localize(status)} refresh={refresh} chosen={chosen} />
       )}
     </section>
   )
@@ -302,22 +306,26 @@ function AuthSwitch(props: {
 }
 
 /** The ElevenLabs key, the same one Settings → Voice shows. */
-function ElevenLabsAccount() {
+export function ElevenLabsAccount() {
   const settings = useStore((s) => s.settings)!
   return (
     <section className="account-section">
       <header className="account-head">
-        <strong>ElevenLabs</strong>
-        {settings.hasElevenLabsKey ? <span className="badge mint">Ready</span> : <span className="badge">Not set up</span>}
-        <span className="account-head-end hint">For narration</span>
+        <strong>{uiText('ElevenLabs')}</strong>
+        {settings.hasElevenLabsKey ? <span className="badge mint">{uiText(" Ready")}</span> : <span className="badge">{uiText('Not set up')}</span>}
+        <span className="account-head-end hint">{uiText('For narration')}</span>
       </header>
       <Row
-        title="ElevenLabs API key"
-        text={settings.hasElevenLabsKey ? 'Saved and encrypted on this computer.' : 'A key from elevenlabs.io → Developers → API keys, for its voices.'}
+        title={uiText('ElevenLabs API key')}
+        text={
+          settings.hasElevenLabsKey
+            ? uiText('Saved and encrypted on this computer.')
+            : uiText('A key from elevenlabs.io → Developers → API keys, for its voices.')
+        }
       >
         <KeyField
           saved={settings.hasElevenLabsKey}
-          placeholder="sk_…"
+          placeholder={uiText('sk_…')}
           onSave={async (key) => {
             useStore.setState({ settings: await api.setElevenLabsKey(key), elevenLabsCheck: null })
             toast(key ? 'API key saved' : 'API key removed', 'ok')
@@ -352,8 +360,8 @@ function CodexAccount({ status, refresh }: AccountProps) {
   return (
     <>
       <Row
-        title="Program"
-        text="OpenAI's coding agent. Its program, about 140 MB, is downloaded once from OpenAI's npm package and checked against its published hash."
+        title={uiText('Program')}
+        text={uiText("OpenAI's coding agent. Its program, about 140 MB, is downloaded once from OpenAI's npm package and checked against its published hash.")}
       >
         <InstallButton component="codex" state={setup?.codex ?? 'missing'} />
       </Row>
@@ -374,8 +382,8 @@ function CodexAccount({ status, refresh }: AccountProps) {
         <div className={`account-card ${status?.loggedIn ? 'on' : ''}`}>
           <Sparkles />
           <div>
-            <strong>{status?.loggedIn ? 'Signed in' : 'Not signed in'}</strong>
-            <div className="hint">{status?.loggedIn ? status.subscription : 'Sign-in opens in your browser.'}</div>
+            <strong>{status?.loggedIn ? uiText('Signed in') : uiText('Not signed in')}</strong>
+            <div className="hint">{status?.loggedIn ? status.subscription : uiText('Sign-in opens in your browser.')}</div>
           </div>
           {status?.loggedIn ? (
             <button
@@ -385,11 +393,11 @@ function CodexAccount({ status, refresh }: AccountProps) {
                 await refresh()
               }}
             >
-              <LogOut /> Sign out
+              <LogOut /> {uiText(" Sign out")}
             </button>
           ) : (
             <button className="btn primary small" disabled={busy} onClick={() => void login()}>
-              {busy && <span className="spinner" />} Sign in with ChatGPT
+              {busy && <span className="spinner" />} {uiText(" Sign in with ChatGPT")}
             </button>
           )}
         </div>
@@ -398,7 +406,7 @@ function CodexAccount({ status, refresh }: AccountProps) {
         <Row title="OpenAI API key" text={settings.hasOpenAIKey ? 'Saved and encrypted on this computer.' : 'A key from platform.openai.com → API keys.'}>
           <KeyField
             saved={settings.hasOpenAIKey}
-            placeholder="sk-…"
+            placeholder={uiText('sk-…')}
             onSave={async (key) => {
               useStore.setState({ settings: await api.setOpenAIKey(key) })
               await refresh()
@@ -445,8 +453,10 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
   return (
     <>
       <Row
-        title="Program"
-        text="Google's coding agent, with Gemini 4 Argon. Its program is downloaded once (about 60 MB, 180 MB unpacked) from Google's GitHub release and checked against its published hash. It works only inside the project."
+        title={uiText('Program')}
+        text={uiText(
+          "Google's coding agent, with Gemini 4 Argon. Its program is downloaded once (about 60 MB, 180 MB unpacked) from Google's GitHub release and checked against its published hash. It works only inside the project.",
+        )}
       >
         <InstallButton component="antigravity" state={setup?.antigravity ?? 'missing'} />
       </Row>
@@ -467,9 +477,9 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
         <div className={`account-card ${status?.loggedIn ? 'on' : ''}`}>
           <Sparkles />
           <div>
-            <strong>{status?.loggedIn ? 'Signed in' : 'Not signed in'}</strong>
+            <strong>{status?.loggedIn ? uiText('Signed in') : uiText('Not signed in')}</strong>
             <div className="hint">
-              {status?.loggedIn ? status.subscription : windows ? 'Sign-in opens in a window of its own.' : 'Sign-in opens in your browser.'}
+              {status?.loggedIn ? status.subscription : uiText(windows ? 'Sign-in opens in a window of its own.' : 'Sign-in opens in your browser.')}
             </div>
           </div>
           {status?.loggedIn ? (
@@ -480,35 +490,37 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
                 await refresh()
               }}
             >
-              <LogOut /> Sign out
+              <LogOut /> {uiText(" Sign out")}
             </button>
           ) : (
             <button className="btn primary small" disabled={busy} onClick={() => void login()}>
-              {busy && <span className="spinner" />} Sign in with Google
+              {busy && <span className="spinner" />} {uiText(" Sign in with Google")}
             </button>
           )}
         </div>
       )}
-      {busy && (
+      {busy && !status?.loggedIn && (
         <div className="code-entry">
           {url ? (
             <>
               <p className="hint">
                 <a href="#" onClick={() => void api.openExternal(url)}>
-                  Open the Google sign-in
+                  {uiText('Open the Google sign-in')}
                 </a>
-                , then paste the code it shows:
+                {uiText(', then paste the code it shows:')}
               </p>
-              <input className="input mono" placeholder="Authorization code" value={code} onChange={(e) => setCode(e.target.value)} />
+              <input className="input mono" placeholder={uiText('Authorization code')} value={code} onChange={(e) => setCode(e.target.value)} />
               <button className="btn" disabled={!code.trim()} onClick={() => void api.claudeLoginCode(code, 'antigravity')}>
-                Confirm
+                {uiText('Confirm')}
               </button>
             </>
           ) : (
             <p className="hint">
               {windows
-                ? 'In the Antigravity window: choose Google OAuth, sign in in the browser and paste the code there. It closes by itself once you’re signed in.'
-                : 'Starting the sign-in…'}
+                ? uiText(
+                    'In the Antigravity window: choose Google OAuth, sign in in the browser and paste the code there. It closes by itself once you’re signed in.',
+                  )
+                : uiText('Starting the sign-in…')}
             </p>
           )}
         </div>
@@ -517,7 +529,7 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
         <Row title="Gemini API key" text={settings.hasGeminiKey ? 'Saved and encrypted on this computer.' : 'A key from aistudio.google.com → API keys.'}>
           <KeyField
             saved={settings.hasGeminiKey}
-            placeholder="AIza…"
+            placeholder={uiText('AIza…')}
             onSave={async (key) => {
               useStore.setState({ settings: await api.setGeminiKey(key) })
               await refresh()
@@ -583,7 +595,7 @@ function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { cho
             text={settings.hasAnthropicKey ? 'Saved and encrypted on this computer.' : 'A key from console.anthropic.com → API keys.'}
           >
             <div className="inline-form">
-              <KeyField saved={settings.hasAnthropicKey} placeholder="sk-ant-…" onSave={saveKey} />
+              <KeyField saved={settings.hasAnthropicKey} placeholder={uiText('sk-ant-…')} onSave={saveKey} />
             </div>
           </Row>
           {settings.hasAnthropicKey && <KeyStatus check={(again) => api.checkAnthropicKey(again)} fix="console.anthropic.com → API keys" />}
@@ -593,11 +605,11 @@ function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { cho
           <div className={`account-card ${claude?.loggedIn ? 'on' : ''}`}>
             <Sparkles />
             <div>
-              <strong>{claude?.loggedIn ? (claude.email ?? 'Signed in') : 'Not signed in'}</strong>
+              <strong>{claude?.loggedIn ? (claude.email ?? uiText('Signed in')) : uiText('Not signed in')}</strong>
               <div className="hint">
                 {claude?.loggedIn
-                  ? `Claude ${planName(claude.subscription)}`
-                  : 'Studio runs Claude Code with your own Claude account. Sign-in opens in your browser.'}
+                  ? format('Claude {0}', [planName(claude.subscription)])
+                  : uiText('Studio runs Claude Code with your own Claude account. Sign-in opens in your browser.')}
               </div>
             </div>
             {claude?.loggedIn ? (
@@ -608,11 +620,11 @@ function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { cho
                   await refresh()
                 }}
               >
-                <LogOut /> Sign out
+                <LogOut /> {uiText(" Sign out")}
               </button>
             ) : (
               <button className="btn primary small" disabled={busy} onClick={() => void login()}>
-                {busy && <span className="spinner" />} Sign in
+                {busy && <span className="spinner" />} {uiText(" Sign in")}
               </button>
             )}
           </div>
@@ -627,7 +639,7 @@ function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { cho
 function PlanUsageList({ usage }: { usage: PlanUsage }) {
   return (
     <div className="plan-usage">
-      <div className="eyebrow">Plan usage · shared with claude.ai and Claude Desktop</div>
+      <div className="eyebrow">{uiText('Plan usage · shared with claude.ai and Claude Desktop')}</div>
       {usage.windows.map((w) => (
         <div key={w.label} className={`plan-usage-row ${usageLevel(w.percent)}`}>
           <span>{w.label}</span>
@@ -635,7 +647,7 @@ function PlanUsageList({ usage }: { usage: PlanUsage }) {
             <span style={{ width: `${Math.min(100, w.percent)}%` }} />
           </span>
           <span className="mono">{Math.round(w.percent)}%</span>
-          <span className="hint">{w.resetsAt ? `resets ${resetTime(w.resetsAt)}` : ''}</span>
+          <span className="hint">{w.resetsAt ? format('resets {0}', [resetTime(w.resetsAt)]) : ''}</span>
         </div>
       ))}
     </div>
@@ -643,6 +655,62 @@ function PlanUsageList({ usage }: { usage: PlanUsage }) {
 }
 
 /** Installs the Claude Desktop extension, or says it's there (Claude Desktop's own records, re-read on focus). */
+function DesktopConnections() {
+  const [open, setOpen] = useState(false)
+  const [config, setConfig] = useState('')
+  const [codexCommand, setCodexCommand] = useState('')
+  return (
+    <>
+      <Row
+        title={uiText('Codex / ChatGPT Desktop')}
+        text={uiText(
+          'Make videos from your conversation through the local Studio plugin. Learn returns a video to the chat; Create opens the editor. In Both, requests default to Learn unless production is requested.',
+        )}
+      >
+        <button
+          className="btn small"
+          onClick={() => {
+            setOpen(true)
+            void api.desktopConnection().then((c) => {
+              setConfig(c.config)
+              setCodexCommand(c.codexCommand)
+            })
+          }}
+        >
+          <Plug /> {uiText('Connect')}
+        </button>
+      </Row>
+      <Modal open={open} onClose={() => setOpen(false)} title={uiText('Connect a desktop assistant')} width={600}>
+        <div className="modal-body set-group">
+          <p className="hint">
+            {uiText(
+              'Import the Studio plugin ZIP in a desktop client with local plugin support. It requires Node.js 18 or later. For Codex, you can also add a stdio MCP server using the configuration below. Restart the connection after updating Studio.',
+            )}
+          </p>
+          <button className="btn primary" onClick={() => void api.showDesktopPlugin()}>
+            {uiText('Show plugin ZIP')}
+          </button>
+          <pre className="env-log mono">{config}</pre>
+          <button
+            className="btn small"
+            onClick={() => void navigator.clipboard.writeText(codexCommand).then(() => toast(uiText('Configuration copied'), 'ok'))}
+          >
+            {uiText('Copy Codex setup command')}
+          </button>
+          <button className="btn small" onClick={() => void navigator.clipboard.writeText(config).then(() => toast('Configuration copied', 'ok'))}>
+            {uiText('Copy configuration')}
+          </button>
+          <p className="hint">
+            {uiText(
+              'Use local chats. ChatGPT web needs a hosted connection; this integration runs only on your computer. Video playback inside the chat depends on the client; every completed video is also in your Studio library.',
+            )}
+          </p>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
 function ClaudeDesktopRow() {
   const [status, setStatus] = useState<ClaudeDesktopStatus | null>(null)
   useEffect(() => {
@@ -653,21 +721,21 @@ function ClaudeDesktopRow() {
   }, [])
   const outdated = !!status?.installed && status.version !== status.current
   const text = !status?.installed
-    ? 'Ask Claude in the Claude desktop app for a maths video, and Manim Studio opens and makes it there. Installs the Manim Studio extension; Claude Desktop asks you to confirm.'
+    ? 'Ask Claude Desktop to make a video from your discussion. Learn works in the background; Create opens the editor. The video is returned as a chat resource and saved in your library. Install the extension to connect.'
     : outdated
       ? `Claude Desktop has version ${status.version} of the extension and this app ships ${status.current}. Update it so both have the same tools.`
       : status.enabled
         ? 'The Manim Studio extension is installed. Ask Claude in the Claude desktop app for a maths video.'
         : 'The extension is installed but turned off. Turn it on in Claude Desktop → Settings → Extensions.'
   return (
-    <Row title="Claude Desktop" text={text}>
+    <Row title={uiText('Claude Desktop')} text={text}>
       {status?.installed && !outdated ? (
         <span className={`badge ${status.enabled ? 'mint' : ''}`}>
-          <Check /> {status.enabled ? 'Installed' : 'Turned off'}
+          <Check /> {status.enabled ? uiText('Installed') : uiText('Turned off')}
         </span>
       ) : (
         <button className="btn small" onClick={() => void api.installClaudeExtension().catch((e) => toast(errorText(e), 'error'))}>
-          <Plug /> {outdated ? 'Update in Claude Desktop' : 'Add to Claude Desktop'}
+          <Plug /> {outdated ? uiText('Update in Claude Desktop') : uiText('Add to Claude Desktop')}
         </button>
       )}
     </Row>
@@ -684,6 +752,119 @@ const THEME_BG: Record<Theme, string> = { dark: '#0b1626', light: '#f7f8fa' }
 
 /** The open project's look: theme, background colours, a background picture. Changes re-render the preview. */
 function VideoTab() {
+  const settings = useStore((s) => s.settings)!
+  const project = useStore((s) => s.project)
+  const editing = useStore((s) => !studying(s))
+  return (
+    <div className="set-group">
+      {
+        <Row
+          title={uiText('Export quality')}
+          text={uiText(
+            'The size of the videos Studio makes for you to study: exercises, follow-ups and courses. 720p renders about twice as fast and is plenty on a laptop; 1080p is sharper on a big screen.',
+          )}
+        >
+          <Tabs
+            radio="Study videos"
+            value={String(settings.studySize ?? (settings.mode === 'create' ? 1080 : 720))}
+            onChange={(v) => void updateSettings({ studySize: Number(v) as 720 | 1080 })}
+            items={[
+              { value: '720', label: '720p' },
+              { value: '1080', label: '1080p' },
+            ]}
+          />
+        </Row>
+      }
+
+      <Row title={uiText('Aspect ratio')} text={uiText('Used for new videos. Existing videos keep their layout.')}>
+        <Tabs
+          radio="Aspect ratio"
+          value={settings.defaultAspect ?? '16:9'}
+          onChange={(defaultAspect) => void updateSettings({ defaultAspect })}
+          items={[
+            { value: '16:9', label: '16:9 landscape' },
+            { value: '9:16', label: '9:16 portrait' },
+          ]}
+        />
+      </Row>
+      <Row title={uiText('Video theme')}>
+        <Tabs
+          radio="Video theme"
+          value={settings.defaultTheme ?? 'dark'}
+          onChange={(defaultTheme) => void updateSettings({ defaultTheme })}
+          items={[
+            { value: 'dark', label: 'Dark' },
+            { value: 'light', label: 'Light' },
+          ]}
+        />
+      </Row>
+      <Row title={uiText('Background type')}>
+        <Tabs
+          radio="Background type"
+          value={settings.defaultBackground && Object.values(settings.defaultBackground).some(Boolean) ? 'custom' : 'theme'}
+          onChange={(value) => void updateSettings({ defaultBackground: value === 'theme' ? {} : { dark: THEME_BG.dark, light: THEME_BG.light } })}
+          items={[
+            { value: 'theme', label: 'Theme background' },
+            { value: 'custom', label: 'Custom colour' },
+          ]}
+        />
+      </Row>
+      <Row title={uiText('Background colour')} text={uiText('Default background for new videos.')}>
+        <input
+          aria-label={uiText('Default background colour')}
+          type="color"
+          value={settings.defaultBackground?.[settings.defaultTheme ?? 'dark'] ?? THEME_BG[settings.defaultTheme ?? 'dark']}
+          onChange={(e) => void updateSettings({ defaultBackground: { ...settings.defaultBackground, [settings.defaultTheme ?? 'dark']: e.target.value } })}
+        />
+      </Row>
+      {project && <ProjectVideo />}
+      {editing && (
+        <>
+          <Row
+            title={uiText('Preview quality')}
+            text={uiText(
+              'The preview while you work: higher is sharper, but renders take longer. Exports have their own size: the one chosen in the export dialog, or Study videos above for videos made to study.',
+            )}
+          >
+            <div className="stack-controls">
+              <Tabs
+                radio="Preview resolution"
+                value={String(settings.previewSize)}
+                onChange={(v) => void updateSettings({ previewSize: Number(v) as Settings['previewSize'] }).then(() => project && renderNow())}
+                items={[
+                  { value: '480', label: '480p' },
+                  { value: '720', label: '720p' },
+                  { value: '1080', label: '1080p' },
+                ]}
+              />
+              <Tabs
+                radio="Preview frame rate"
+                value={String(settings.previewFps)}
+                onChange={(v) => void updateSettings({ previewFps: Number(v) as Settings['previewFps'] }).then(() => project && renderNow())}
+                items={[
+                  { value: '15', label: '15 fps' },
+                  { value: '24', label: '24 fps' },
+                  { value: '30', label: '30 fps' },
+                ]}
+              />
+            </div>
+          </Row>
+
+          <Row title={uiText('Render on save')}>
+            <label className="switch">
+              <input type="checkbox" checked={settings.autoRender} onChange={(e) => void updateSettings({ autoRender: e.target.checked })} />
+              <span />
+            </label>
+          </Row>
+          <GpuEncoding />
+          <RenderServers />
+        </>
+      )}
+    </div>
+  )
+}
+
+function ProjectVideo() {
   const project = useStore((s) => s.project)
   const [pictures, setPictures] = useState<MediaItem[]>([])
   const [colours, setColours] = useState<Background>({})
@@ -695,7 +876,7 @@ function VideoTab() {
     void api.listMedia().then((items) => setPictures(items.filter((i) => i.kind === 'image')))
   }, [project?.path])
 
-  if (!project) return <p className="hint">Open a project to set its theme and background.</p>
+  if (!project) return <p className="hint">{uiText('Open a project to set its theme and background.')}</p>
   const meta = project.meta
   const background = meta.background ?? {}
   const save = async (patch: Partial<ProjectMeta>) => {
@@ -712,8 +893,11 @@ function VideoTab() {
 
   return (
     <div className="set-group">
-      <div className="eyebrow">Video of “{meta.name}”</div>
-      <Row title="Theme" text="Text and accent colours. Export can make the other version too.">
+      <div className="eyebrow">
+        {uiText('Video of “')}
+        {meta.name}”
+      </div>
+      <Row title={uiText('Theme')} text={uiText('Text and accent colours. Export can make the other version too.')}>
         <Tabs
           radio="Theme"
           value={meta.theme}
@@ -724,17 +908,11 @@ function VideoTab() {
           ]}
         />
       </Row>
-      <Row title="Tone" text={`${TONES.find((t) => t.value === (meta.tone ?? DEFAULT_TONE))?.hint} Applies to what Claude writes next.`}>
-        <Tabs
-          radio="Tone"
-          value={meta.tone ?? DEFAULT_TONE}
-          onChange={(tone) => void updateMeta({ tone })}
-          items={TONES.map((t) => ({ value: t.value, label: t.label }))}
-        />
-      </Row>
       <Row
-        title="Script first"
-        text="Claude plans the video in a script (the idea, each section's narration and visuals) and waits for your approval before writing the code."
+        title={uiText('Script first')}
+        text={uiText(
+          "Claude plans the video in a script (the idea, each section's narration and visuals) and waits for your approval before writing the code.",
+        )}
       >
         <Tabs
           radio="Script first"
@@ -746,28 +924,36 @@ function VideoTab() {
           ]}
         />
       </Row>
-      <Row title="Background colour" text="Each theme's background, if you want another than its own. Keep text readable.">
+      <Row title={uiText('Background colour')} text={uiText("Each theme's background, if you want another than its own. Keep text readable.")}>
         <div className="bg-colours">
           {(['dark', 'light'] as Theme[]).map((t) => (
             <label key={t} className="bg-colour">
-              <input type="color" value={colours[t] ?? THEME_BG[t]} onChange={(e) => pickColour(t, e.target.value)} aria-label={`${t} background`} />
-              <span>{t === 'dark' ? 'Dark' : 'Light'}</span>
+              <input
+                type="color"
+                value={colours[t] ?? THEME_BG[t]}
+                onChange={(e) => pickColour(t, e.target.value)}
+                aria-label={format('{0} background', [t])}
+              />
+              <span>{t === 'dark' ? uiText('Dark') : uiText('Light')}</span>
               {colours[t] && (
                 <button className="link-btn" onClick={() => pickColour(t, undefined)}>
-                  Reset
+                  {uiText('Reset')}
                 </button>
               )}
             </label>
           ))}
         </div>
       </Row>
-      <Row title="Background picture" text="A picture from the project's media, covering the frame behind everything. Add pictures in the Media tab.">
+      <Row
+        title={uiText('Background picture')}
+        text={uiText("A picture from the project's media, covering the frame behind everything. Add pictures in the Media tab.")}
+      >
         <select
           className="select"
           value={background.image ?? ''}
           onChange={(e) => void save({ background: { ...background, image: e.target.value || undefined } })}
         >
-          <option value="">None</option>
+          <option value="">{uiText('None')}</option>
           {pictures.map((p) => (
             <option key={p.name} value={p.name}>
               {p.name}
@@ -783,14 +969,16 @@ function VideoTab() {
 function VoiceTab() {
   const project = useStore((s) => s.project)
   const settings = useStore((s) => s.settings)!
-  const setup = useStore((s) => s.setup)
   const [scope, setScope] = useState<'project' | 'default'>('project')
   const forProject = !!project && scope === 'project'
 
   return (
     <div className="set-group">
       {project ? (
-        <Row title="Voice for" text={forProject ? `Only “${project.meta.name}”.` : 'What new projects start with; each can then pick its own.'}>
+        <Row
+          title={uiText('Voice for')}
+          text={forProject ? format('Only “{0}”.', [project.meta.name]) : uiText('What new projects start with; each can then pick its own.')}
+        >
           <Tabs
             radio="Voice for"
             value={scope}
@@ -802,18 +990,22 @@ function VoiceTab() {
           />
         </Row>
       ) : (
-        <div className="eyebrow">Default voice for new projects</div>
+        <div className="eyebrow">{uiText('Default voice for new projects')}</div>
       )}
       <VoiceForm
         voice={forProject ? project.meta.voice : settings.defaultVoice}
         inProject={forProject}
         onChange={(voice) => void (forProject ? updateMeta({ voice }) : updateSettings({ defaultVoice: voice }))}
       />
-      {forProject && <RevoiceRow />}
-      <div className="set-divider" />
-      <Row title="Exact bookmarks for recordings" text="Whisper (faster-whisper) finds where you said each word. About 500 MB.">
-        <InstallButton component="transcribe" state={setup?.transcribe ?? 'missing'} />
+      <Row title={uiText('Tone')} text={uiText('How the narration talks.')}>
+        <Tabs
+          radio="Tone"
+          value={(forProject ? project.meta.tone : settings.defaultTone) ?? DEFAULT_TONE}
+          onChange={(tone) => void (forProject ? updateMeta({ tone }) : updateSettings({ defaultTone: tone }))}
+          items={TONES.map((t) => ({ value: t.value, label: t.label }))}
+        />
       </Row>
+      {forProject && <RevoiceRow />}
     </div>
   )
 }
@@ -826,8 +1018,8 @@ function RevoiceRow() {
   return (
     <div className="revoice">
       <Row
-        title="The narration still has the old voice"
-        text={`It was made with ${voiceLabel(outdated.from)}. Re-voicing speaks it again; your recordings stay.${credit}`}
+        title={uiText('The narration still has the old voice')}
+        text={format('It was made with {0}. Re-voicing speaks it again; your recordings stay.{1}', [voiceLabel(outdated.from), credit])}
       >
         <RevoiceButton className="btn primary small" />
       </Row>
@@ -838,17 +1030,18 @@ function RevoiceRow() {
 /** Language, provider and voice: in Settings → Voice and in the new-project dialog. */
 /** What's missing before this voice can speak, or null when it's ready. */
 export function voiceProblem(voice: VoiceSettings | undefined, hasKey: boolean, omnivoice?: ComponentState, check?: ElevenLabsCheck | null): string | null {
-  if (!voice) return 'Choose a voice for the narration.'
-  if (voice.provider === 'elevenlabs' && !hasKey) return 'Add your ElevenLabs API key for the narration.'
-  if (voice.provider === 'elevenlabs' && check?.problem && !check.voices && !check.tts) return `${check.problem} Replace the key in the voice settings.`
+  if (!voice) return uiText('Choose a voice for the narration.')
+  if (voice.provider === 'elevenlabs' && !hasKey) return uiText('Add your ElevenLabs API key for the narration.')
+  if (voice.provider === 'elevenlabs' && check?.problem && !check.voices && !check.tts) return `${check.problem} Replace the key in Settings → Accounts.`
   if (voice.provider === 'elevenlabs' && check && (!check.tts || !check.voices))
     return `Your ElevenLabs key is missing ${[!check.tts && 'Text to Speech', !check.voices && 'Voices (Read)'].filter(Boolean).join(' and ')}: switch ${!check.tts && !check.voices ? 'them' : 'it'} on at elevenlabs.io → Developers → API keys, then check again in the voice settings.`
-  if (voice.provider === 'elevenlabs' && !voice.elevenlabs?.voiceId) return 'Choose an ElevenLabs voice for the narration.'
-  if (voice.provider === 'omnivoice' && omnivoice !== 'ready') return 'Install the OmniVoice model for the narration.'
+  if (voice.provider === 'elevenlabs' && !voice.elevenlabs?.voiceId) return uiText('Choose an ElevenLabs voice for the narration.')
+  if (voice.provider === 'omnivoice' && omnivoice !== 'ready') return uiText('Install the OmniVoice model for the narration.')
   return null
 }
 
 export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings; onChange: (voice: VoiceSettings) => void; inProject: boolean }) {
+  const [needsKey, setNeedsKey] = useState(false)
   const settings = useStore((s) => s.settings)!
   const setup = useStore((s) => s.setup)
   const save = (patch: Partial<VoiceSettings>) => onChange({ ...voice, ...patch })
@@ -874,7 +1067,44 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
 
   return (
     <>
-      <Row title="Narration language" text="Claude writes the narration and on-screen text in it; voices and subtitles follow it.">
+      <Modal open={needsKey} onClose={() => setNeedsKey(false)} title={uiText('Connect ElevenLabs')} width={480}>
+        <div className="modal-body set-group">
+          <p className="hint">
+            {uiText(
+              'Add an ElevenLabs key in Accounts before selecting it. ElevenLabs provides natural voices and accurate timings; usage is billed by ElevenLabs.',
+            )}
+          </p>
+          <button
+            className="btn primary"
+            onClick={() => {
+              setNeedsKey(false)
+              openDialog({ kind: 'settings', tab: 'accounts' })
+            }}
+          >
+            {uiText('Open Accounts')}
+          </button>
+        </div>
+      </Modal>
+      <div className="provider-cards" role="radiogroup" aria-label={uiText('Voice')}>
+        {PROVIDERS.map((p) => (
+          <button
+            key={p.value}
+            role="radio"
+            aria-checked={voice.provider === p.value}
+            className={`provider-card ${voice.provider === p.value ? 'on' : ''}`}
+            onClick={() => {
+              if (p.value === 'elevenlabs' && !settings.hasElevenLabsKey) setNeedsKey(true)
+              else save({ provider: p.value })
+            }}
+          >
+            {p.icon}
+            <strong>{p.title}</strong>
+            <span className="hint">{localize(p.text)}</span>
+          </button>
+        ))}
+      </div>
+
+      <Row title={uiText('Narration language')} text={uiText('Claude writes the narration and on-screen text in it; voices and subtitles follow it.')}>
         <select
           className="select"
           value={voice.language}
@@ -890,43 +1120,12 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
           ))}
         </select>
       </Row>
-      <div className="provider-cards" role="radiogroup" aria-label="Voice">
-        {PROVIDERS.map((p) => (
-          <button
-            key={p.value}
-            role="radio"
-            aria-checked={voice.provider === p.value}
-            className={`provider-card ${voice.provider === p.value ? 'on' : ''}`}
-            onClick={() => save({ provider: p.value })}
-          >
-            {p.icon}
-            <strong>{p.title}</strong>
-            <span className="hint">{p.text}</span>
-          </button>
-        ))}
-      </div>
-
       {voice.provider === 'elevenlabs' && (
         <>
           <Row
-            title="API key"
-            text={
-              settings.hasElevenLabsKey
-                ? 'Saved and encrypted on this computer.'
-                : 'elevenlabs.io → Developers → API keys. Give the key Text to Speech (Access) and Voices (Read); User (Access) adds the usage meter. Saving tries them.'
-            }
+            title={uiText('Voice')}
+            text={format('The most used voices in {0}, or search the library. ▶ plays a sample.', [languageName.of(voice.language)])}
           >
-            <KeyField
-              saved={settings.hasElevenLabsKey}
-              placeholder="sk_…"
-              onSave={async (key) => {
-                useStore.setState({ settings: await api.setElevenLabsKey(key), elevenLabsCheck: null })
-                toast(key ? 'Key saved' : 'Key removed', 'ok')
-              }}
-            />
-          </Row>
-          {settings.hasElevenLabsKey && <ElevenLabsStatus />}
-          <Row title="Voice" text={`The most used voices in ${languageName.of(voice.language)}, or search the library. ▶ plays a sample.`}>
             <VoicePicker
               language={voice.language}
               hasKey={settings.hasElevenLabsKey}
@@ -934,7 +1133,7 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
               onPick={(v) => save({ elevenlabs: { modelId, voiceId: v.id, voiceName: v.name } })}
             />
           </Row>
-          <Row title="Model">
+          <Row title={uiText('Model')}>
             <select
               className="select"
               value={modelId}
@@ -942,7 +1141,7 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
             >
               {models.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.label}
+                  {localize(m.label)}
                 </option>
               ))}
             </select>
@@ -952,10 +1151,17 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
 
       {voice.provider === 'omnivoice' && (
         <>
-          <Row title="OmniVoice model" text="About 3.3 GB of weights plus PyTorch, downloaded once. Uses the GPU on Apple Silicon and NVIDIA.">
+          <Row
+            title={uiText('OmniVoice model')}
+            text={uiText('About 3.3 GB of weights plus PyTorch, downloaded once. Uses the GPU on Apple Silicon and NVIDIA.')}
+          >
             <InstallButton component="omnivoice" state={setup?.omnivoice ?? 'missing'} />
           </Row>
-          {inProject ? <ReferenceRecorder /> : <p className="hint">You record your voice for cloning inside the project, under Settings → Voice.</p>}
+          {inProject ? (
+            <ReferenceRecorder />
+          ) : (
+            <p className="hint">{uiText('You record your voice for cloning inside the project, under Settings → Voice.')}</p>
+          )}
         </>
       )}
     </>
@@ -992,18 +1198,21 @@ function ReferenceRecorder() {
   }
   return (
     <div className="reference">
-      <div className="set-row-title">Your voice, for cloning {has && <span className="badge mint">saved</span>}</div>
-      <p className="hint">Read this naturally, 5–10 seconds:</p>
+      <div className="set-row-title">
+        {uiText("Your voice, for cloning ")}
+        {has && <span className="badge mint">{uiText('saved')}</span>}
+      </div>
+      <p className="hint">{uiText('Read this naturally, 5–10 seconds:')}</p>
       <blockquote>{text}</blockquote>
       <button className={`btn ${rec.state !== 'idle' ? 'danger' : ''}`} onClick={() => void toggle()}>
         {rec.state === 'idle' ? <Circle /> : <Square />}
         {rec.state === 'countdown'
-          ? `Starting in ${rec.count}…`
+          ? format('Starting in {0}…', [rec.count])
           : rec.state === 'recording'
-            ? `Stop (${rec.elapsed.toFixed(1)} s)`
+            ? format('Stop ({0} s)', [rec.elapsed.toFixed(1)])
             : has
-              ? 'Record again'
-              : 'Record'}
+              ? uiText('Record again')
+              : uiText('Record')}
       </button>
     </div>
   )
@@ -1013,14 +1222,13 @@ const COMPONENTS: { id: Component; title: string; text: string }[] = [
   { id: 'env', title: 'Manim environment', text: 'Python 3.12, manim 0.21, manim-voiceover, cairo/pango (pixi, conda-forge).' },
   { id: 'latex', title: 'LaTeX (TinyTeX)', text: 'For MathTex and Tex. Without it, only Text and shapes work.' },
   { id: 'omnivoice', title: 'OmniVoice', text: 'Local multilingual speech with voice cloning.' },
-  { id: 'transcribe', title: 'Whisper', text: 'Word timings for human recordings.' },
+  { id: 'transcribe', title: 'Exact bookmarks for recordings', text: 'Whisper (faster-whisper) finds where you said each word. About 500 MB.' },
 ]
 
 function EnvTab() {
   const setup = useStore((s) => s.setup)
   const log = useStore((s) => s.setupLog)
   const progress = useStore((s) => s.setupProgress)
-  const settings = useStore((s) => s.settings)!
   const [openLog, setOpenLog] = useState<Component | null>(null)
   if (!setup) return null
   return (
@@ -1033,20 +1241,12 @@ function EnvTab() {
           {setup[c.id] === 'installing' && <ProgressLine value={progress[c.id]} />}
           {!!log[c.id]?.length && (
             <button className="link-btn" onClick={() => setOpenLog(openLog === c.id ? null : c.id)}>
-              {openLog === c.id ? 'Hide log' : 'Show log'}
+              {openLog === c.id ? uiText('Hide log') : uiText('Show log')}
             </button>
           )}
           {openLog === c.id && <pre className="env-log mono">{log[c.id]?.join('\n')}</pre>}
         </div>
       ))}
-      <div className="set-divider" />
-      <Row title="Render on save" text={`Every save (${shortcut('S')}) renders a preview. Turn it off for very slow scenes.`}>
-        <label className="switch">
-          <input type="checkbox" checked={settings.autoRender} onChange={(e) => void updateSettings({ autoRender: e.target.checked })} />
-          <span />
-        </label>
-      </Row>
-      {setup.env === 'ready' && <GpuEncoding />}
     </div>
   )
 }
@@ -1066,14 +1266,17 @@ function GpuEncoding() {
   }
   useEffect(() => void check(false), [])
   const text = checking
-    ? 'Checking this computer’s graphics…'
+    ? uiText('Checking this computer’s graphics…')
     : info?.encoder
-      ? `Exports encode their video on the GPU with ${info.label}, which is faster than the CPU. Previews stay on the CPU. If it fails, the export carries on on the CPU.`
+      ? format(
+          'Exports encode their video on the GPU with {0}, which is faster than the CPU. Previews stay on the CPU. If it fails, the export carries on on the CPU.',
+          [info.label],
+        )
       : info?.error
-        ? `The check failed: ${info.error}`
+        ? format('The check failed: {0}', [info.error])
         : 'No GPU encoder works on this computer, so exports encode on the CPU. Supported: Apple VideoToolbox on Macs, NVIDIA (NVENC), and AMD on Windows (Media Foundation).'
   return (
-    <Row title="GPU video encoding" text={text}>
+    <Row title={uiText('GPU video encoding')} text={text}>
       <div className="inline-form">
         {info?.encoder && (
           <Tabs
@@ -1087,7 +1290,7 @@ function GpuEncoding() {
           />
         )}
         <button className="btn small ghost" disabled={checking} onClick={() => void check(true)}>
-          {checking ? <span className="spinner" /> : <RefreshCw />} Check again
+          {checking ? <span className="spinner" /> : <RefreshCw />} {uiText(" Check again")}
         </button>
       </div>
     </Row>
@@ -1107,13 +1310,13 @@ function InstallButton({ component, state }: { component: Component; state: Comp
   if (state === 'ready')
     return (
       <span className="badge mint">
-        <Check /> Ready
+        <Check /> {uiText(" Ready")}
       </span>
     )
-  if (state === 'unsupported') return <span className="badge">Not supported on this computer</span>
+  if (state === 'unsupported') return <span className="badge">{uiText('Not supported on this computer')}</span>
   return (
     <button className="btn small" disabled={state === 'installing'} onClick={() => void installComponent(component)}>
-      {state === 'installing' && <span className="spinner" />} {STATE_TEXT[state]}
+      {state === 'installing' && <span className="spinner" />} {localize(STATE_TEXT[state])}
     </button>
   )
 }
@@ -1123,6 +1326,8 @@ function InstallButton({ component, state }: { component: Component; state: Comp
  * with the code the server prints; each is checked when the tab opens.
  */
 function RenderServers() {
+  const [pairing, setPairing] = useState(false)
+  const [pairError, setPairError] = useState('')
   const servers = useStore((s) => s.settings?.renderServers ?? [])
   const [status, setStatus] = useState<Record<string, string>>({})
   const [code, setCode] = useState('')
@@ -1145,11 +1350,13 @@ function RenderServers() {
     setBusy(true)
     try {
       await api.addServer(code)
+      setPairing(false)
+      setPairError('')
       setCode('')
       await refresh()
       toast('Paired. Exports can now run there (Export → Export on).', 'ok')
     } catch (e) {
-      toast(errorText(e), 'error')
+      setPairError(errorText(e))
     } finally {
       setBusy(false)
     }
@@ -1158,33 +1365,56 @@ function RenderServers() {
   return (
     <div className="render-servers">
       <Row
-        title="Render servers"
-        text="Another computer renders your exports, so this one stays free. Run Manim Studio's render server there (github.com/lukaznj/manim-studio-renderer), then paste the pairing code it prints."
+        title={uiText('Render servers')}
+        text={uiText(
+          "Another computer renders your exports, so this one stays free. Run Manim Studio's render server there (github.com/lukaznj/manim-studio-renderer), then paste the pairing code it prints.",
+        )}
       />
       {servers.map((s) => (
         <div key={s.id} className="render-server">
           <Cpu />
           <div>
             <strong>{s.name}</strong> <span className="mono faint">{s.url}</span>
-            <div className="hint">{status[s.id] ?? 'Checking…'}</div>
+            <div className="hint">{status[s.id] ?? uiText('Checking…')}</div>
           </div>
           <button className="btn small ghost" onClick={() => void api.removeServer(s.id).then(refresh)}>
-            Remove
+            {uiText('Remove')}
           </button>
         </div>
       ))}
-      <div className="inline-form">
-        <input
-          className="input mono"
-          placeholder="msw1.… (the pairing code)"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && code.trim() && void add()}
-        />
-        <button className="btn" disabled={!code.trim() || busy} onClick={() => void add()}>
-          {busy && <span className="spinner" />} Pair
-        </button>
-      </div>
+      <button className="btn" onClick={() => setPairing(true)}>
+        <Plus /> {uiText('Pair render server')}
+      </button>
+      <Modal
+        open={pairing}
+        onClose={() => {
+          setPairing(false)
+          setCode('')
+          setPairError('')
+        }}
+        title={uiText('Pair render server')}
+        width={500}
+      >
+        <div className="modal-body set-group">
+          <p className="hint">{uiText('1. Start Manim Studio Renderer on the other computer.')}</p>
+          <button className="link-btn" onClick={() => void api.openExternal('https://github.com/lukaznj/manim-studio-renderer')}>
+            {uiText('Open server setup')}
+          </button>
+          <p className="hint">{uiText('2. Paste the pairing code it displays. Studio checks the connection before saving.')}</p>
+          <input
+            className="input mono"
+            data-autofocus
+            aria-label={uiText('Pairing code')}
+            placeholder={uiText('msw1.…')}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          {pairError && <p role="alert">{pairError}</p>}
+          <button className="btn primary" disabled={!code.trim() || busy} onClick={() => void add()}>
+            {busy ? uiText('Connecting…') : uiText('Pair server')}
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -1200,24 +1430,24 @@ function AboutTab() {
       : update.state === 'none'
         ? 'You have the latest version.'
         : update.state === 'available'
-          ? `Version ${update.version} is available.`
+          ? format('Version {0} is available.', [update.version])
           : update.state === 'downloading'
-            ? `Downloading ${Math.round(update.percent)}%`
+            ? format('Downloading {0}%', [Math.round(update.percent)])
             : update.state === 'ready'
-              ? `Version ${update.version} is ready. Restart to finish.`
+              ? format('Version {0} is ready. Restart to finish.', [update.version])
               : update.state === 'error'
                 ? update.message
                 : ''
   return (
     <div className="set-group">
       <Row
-        title="How you use Manim Studio"
+        title={uiText('How you use Manim Studio')}
         text={
           settings.mode === 'learn'
-            ? 'Learn: courses and exercises become videos to study, with a chat to ask about them. No editor.'
+            ? uiText('Learn: courses and exercises become videos to study, with a chat to ask about them. No editor.')
             : settings.mode === 'both'
-              ? 'Both: Home has a Create tab (projects and the editor) and a Learn tab (courses to study).'
-              : 'Create: the full studio, with the editor, the timeline and exports for publishing.'
+              ? uiText('Both: Home has a Create tab (projects and the editor) and a Learn tab (courses to study).')
+              : uiText('Create: the full studio, with the editor, the timeline and exports for publishing.')
         }
       >
         <Tabs
@@ -1231,23 +1461,18 @@ function AboutTab() {
           ]}
         />
       </Row>
-      {settings.mode && settings.mode !== 'create' && (
-        <Row
-          title="Study videos"
-          text="The size of the videos Studio makes for you to study: exercises, follow-ups and courses. 720p renders about twice as fast and is plenty on a laptop; 1080p is sharper on a big screen."
-        >
-          <Tabs
-            radio="Study videos"
-            value={String(settings.studySize ?? 720)}
-            onChange={(v) => void updateSettings({ studySize: Number(v) as 720 | 1080 })}
-            items={[
-              { value: '720', label: '720p' },
-              { value: '1080', label: '1080p' },
-            ]}
-          />
-        </Row>
-      )}
-      <Row title="Appearance" text="System follows your computer’s light or dark setting.">
+      <Row title={uiText('App language')} text={uiText('The interface language. Narration is chosen separately under Voice.')}>
+        <Tabs
+          radio="App language"
+          value={settings.uiLanguage ?? 'en'}
+          onChange={(uiLanguage) => void updateSettings({ uiLanguage })}
+          items={[
+            { value: 'en', label: 'English' },
+            { value: 'hr', label: 'Hrvatski' },
+          ]}
+        />
+      </Row>
+      <Row title={uiText('Appearance')} text={uiText('System follows your computer’s light or dark setting.')}>
         <Tabs
           radio="Appearance"
           value={settings.appearance}
@@ -1258,7 +1483,7 @@ function AboutTab() {
               label: (
                 <>
                   <Monitor />
-                  System
+                  {uiText('System')}
                 </>
               ),
             },
@@ -1267,7 +1492,7 @@ function AboutTab() {
               label: (
                 <>
                   <Sun />
-                  Light
+                  {uiText('Light')}
                 </>
               ),
             },
@@ -1276,58 +1501,14 @@ function AboutTab() {
               label: (
                 <>
                   <Moon />
-                  Dark
+                  {uiText('Dark')}
                 </>
               ),
             },
           ]}
         />
       </Row>
-      <Row
-        title="Preview quality"
-        text="The preview while you work: higher is sharper, but renders take longer. Exports have their own size: the one chosen in the export dialog, or Study videos above for videos made to study."
-      >
-        <div className="stack-controls">
-          <Tabs
-            radio="Preview resolution"
-            value={String(settings.previewSize)}
-            onChange={(v) => void updateSettings({ previewSize: Number(v) as Settings['previewSize'] }).then(() => project && renderNow())}
-            items={[
-              { value: '480', label: '480p' },
-              { value: '720', label: '720p' },
-              { value: '1080', label: '1080p' },
-            ]}
-          />
-          <Tabs
-            radio="Preview frame rate"
-            value={String(settings.previewFps)}
-            onChange={(v) => void updateSettings({ previewFps: Number(v) as Settings['previewFps'] }).then(() => project && renderNow())}
-            items={[
-              { value: '15', label: '15 fps' },
-              { value: '24', label: '24 fps' },
-              { value: '30', label: '30 fps' },
-            ]}
-          />
-        </div>
-      </Row>
-      <Row title={`Manim Studio ${app.version}`} text={`${app.platform} · ${app.arch} · open source (MIT)`}>
-        <button className="btn small" onClick={() => void api.checkForUpdates()}>
-          Check for updates
-        </button>
-      </Row>
-      {status && <p className="hint">{status}</p>}
-      {update.state === 'available' && (
-        <button className="btn primary small" onClick={() => void api.downloadUpdate()}>
-          Download {update.version}
-        </button>
-      )}
-      {update.state === 'ready' && (
-        <button className="btn primary small" onClick={() => void api.installUpdate()}>
-          Restart and update
-        </button>
-      )}
-      <RenderServers />
-      <Row title="Projects folder" text={<span className="mono">{settings.projectsDir}</span>}>
+      <Row title={uiText('Projects folder')} text={<span className="mono">{settings.projectsDir}</span>}>
         <button
           className="btn small"
           onClick={async () => {
@@ -1335,24 +1516,38 @@ function AboutTab() {
             if (dir) void updateSettings({ projectsDir: dir })
           }}
         >
-          Change
+          {uiText('Change')}
         </button>
       </Row>
       {canEdit({ settings }) && (
-        <Row title="Tutorial" text="A short tour of the editor: the code, Claude, the timeline, media, narration and export.">
-          <button className="btn small" disabled={!project} title={project ? undefined : 'Open a project first'} onClick={startTour}>
-            Show the tutorial
+        <Row title={uiText('Tutorial')} text={uiText('A short tour of the editor: the code, Claude, the timeline, media, narration and export.')}>
+          <button className="btn small" disabled={!project} title={project ? undefined : uiText('Open a project first')} onClick={startTour}>
+            {uiText('Show the tutorial')}
           </button>
         </Row>
       )}
-      <Row title="Releases" text="If an automatic update fails, download the new version from the releases page.">
-        <button className="btn small ghost" onClick={() => void api.openExternal(app.releasesUrl)}>
-          Open
+      <Row title={format('Manim Studio {0}', [app.version])} text={format('{0} · {1} · open source (MIT)', [app.platform, app.arch])}>
+        <button className="btn small" onClick={() => void api.checkForUpdates()}>
+          {uiText('Check for updates')}
         </button>
       </Row>
-      <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'env' })}>
-        Environment →
-      </button>
+      {status && <p className="hint">{localize(status)}</p>}
+      {update.state === 'available' && (
+        <button className="btn primary small" onClick={() => void api.downloadUpdate()}>
+          {uiText("Download ")}
+          {update.version}
+        </button>
+      )}
+      {update.state === 'ready' && (
+        <button className="btn primary small" onClick={() => void api.installUpdate()}>
+          {uiText('Restart and update')}
+        </button>
+      )}
+      {update.state === 'error' && (
+        <button className="btn small ghost" onClick={() => void api.openExternal(app.releasesUrl)}>
+          {uiText('Download from GitHub')}
+        </button>
+      )}
     </div>
   )
 }
@@ -1383,7 +1578,7 @@ function KeyStatus({ check, fix }: { check: (again: boolean) => Promise<KeyCheck
       <div className="el-permissions">
         {!result && (
           <span className="faint">
-            <span className="spinner" /> Checking the key…
+            <span className="spinner" /> {uiText(" Checking the key…")}
           </span>
         )}
         {result?.items.map((i) => (
@@ -1391,18 +1586,21 @@ function KeyStatus({ check, fix }: { check: (again: boolean) => Promise<KeyCheck
             {i.ok ? <Check /> : <X />} {i.label}
           </span>
         ))}
-        <button className="link-btn" disabled={busy} onClick={() => void run(true)} title="Tries the key again (one tiny request)">
-          Check again
+        <button className="link-btn" disabled={busy} onClick={() => void run(true)} title={uiText('Tries the key again (one tiny request)')}>
+          {uiText(" Check again")}
         </button>
       </div>
       {result?.problem && (
         <p className="key-error">
           {result.problem}
-          {result.rejected ? ` Replace it with a key from ${fix}.` : ''}
+          {result.rejected ? format(' Replace it with a key from {0}.', [fix]) : ''}
         </p>
       )}
       {result && !result.problem && result.items.some((i) => !i.ok) && (
-        <p className="key-error">Edit the key at {fix} and allow what’s crossed out, then check again.</p>
+        <p className="key-error">
+          {uiText("Edit the key at ")}
+          {fix} {uiText(" and allow what’s crossed out, then check again.")}
+        </p>
       )}
     </div>
   )
@@ -1434,30 +1632,35 @@ function ElevenLabsStatus() {
             {!check ? <span className="spinner" /> : check[p.key] ? <Check /> : <X />} {p.label}
           </span>
         ))}
-        <button className="link-btn" disabled={busy} onClick={() => void run(true)} title="Tries the key again (speaks one character)">
-          Check again
+        <button className="link-btn" disabled={busy} onClick={() => void run(true)} title={uiText('Tries the key again (speaks one character)')}>
+          {uiText(" Check again")}
         </button>
       </div>
       {rejected ? (
-        <p className="key-error">{check.problem} Replace it with a key from elevenlabs.io → Developers → API keys.</p>
+        <p className="key-error">
+          {check.problem} {uiText(" Replace it with a key from elevenlabs.io → Developers → API keys.")}
+        </p>
       ) : (
         <>
           {check?.problem && <p className="key-error">{check.problem}</p>}
           {check && (!check.tts || !check.voices) && (
-            <p className="key-error">Edit the key at elevenlabs.io → Developers → API keys and switch on what’s crossed out, then check again.</p>
+            <p className="key-error">{uiText('Edit the key at elevenlabs.io → Developers → API keys and switch on what’s crossed out, then check again.')}</p>
           )}
         </>
       )}
       {usage ? (
-        <div className="el-usage" title={`ElevenLabs ${usage.tier} plan`}>
+        <div className="el-usage" title={format('ElevenLabs {0} plan', [usage.tier])}>
           <ProgressLine value={usage.limit ? usage.used / usage.limit : 0} />
           <span className="hint">
-            {nf.format(usage.used)} of {nf.format(usage.limit)} characters this month
-            {usage.resetsAt ? ` · resets ${new Date(usage.resetsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : ''}
+            {nf.format(usage.used)} {uiText(" of ")}
+            {nf.format(usage.limit)} {uiText(" characters this month")}
+            {usage.resetsAt ? format(' · resets {0}', [new Date(usage.resetsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })]) : ''}
           </span>
         </div>
       ) : (
-        check && !check.user && !rejected && <span className="hint">Give the key the User permission to see how many characters are left this month.</span>
+        check &&
+        !check.user &&
+        !rejected && <span className="hint">{uiText('Give the key the User permission to see how many characters are left this month.')}</span>
       )}
     </div>
   )

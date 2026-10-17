@@ -619,6 +619,12 @@ export type Appearance = 'system' | 'light' | 'dark'
 export type AppMode = 'learn' | 'create' | 'both'
 
 export interface Settings {
+  uiLanguage?: 'en' | 'hr'
+  onboardingDone?: boolean
+  defaultAspect?: Aspect
+  defaultTheme?: Theme
+  defaultTone?: Tone
+  defaultBackground?: Background
   mode?: AppMode // unset until chosen at first launch
   homeTab?: 'learn' | 'create' // Both: the Home tab last shown (unset: Create)
   appearance: Appearance // 'system' follows the OS
@@ -747,7 +753,22 @@ export interface VoiceOption {
 }
 
 export type EventChannel =
-  'render' | 'setup' | 'claude-login' | 'chat' | 'file-changed' | 'update' | 'exports' | 'script' | 'quick' | 'series-plan' | 'series' | 'exercises' | 'watch' | 'open-project' | 'menu'
+  | 'projects-changed'
+  | 'render'
+  | 'setup'
+  | 'claude-login'
+  | 'chat'
+  | 'file-changed'
+  | 'update'
+  | 'exports'
+  | 'script'
+  | 'quick'
+  | 'series-plan'
+  | 'series'
+  | 'exercises'
+  | 'watch'
+  | 'open-project'
+  | 'menu'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -757,6 +778,8 @@ export interface StudioApi {
   install(component: Component): Promise<void>
 
   getSettings(): Promise<Settings>
+  desktopConnection(): Promise<{ command: string; args: string[]; env: Record<string, string>; config: string; codexCommand: string }>
+  showDesktopPlugin(): Promise<void>
   setSettings(patch: Partial<Settings>): Promise<Settings>
   /** Saves the key once it can list voices and speak (one character); throws which permissions are missing. */
   setElevenLabsKey(key: string): Promise<Settings>
@@ -924,6 +947,7 @@ export interface StudioApi {
   openExternal(url: string): Promise<void>
 
   on(channel: 'render', cb: (e: RenderEvent) => void): () => void
+  on(channel: 'projects-changed', cb: () => void): () => void
   on(channel: 'setup', cb: (e: SetupEvent) => void): () => void
   on(channel: 'claude-login', cb: (e: ClaudeLoginEvent) => void): () => void
   on(channel: 'chat', cb: (e: ChatEvent) => void): () => void

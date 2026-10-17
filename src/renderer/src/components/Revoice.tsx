@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { RefreshCw } from 'lucide-react'
 import type { VoiceSettings } from '../../../shared/types'
 import { DEFAULT_EL_MODEL } from '../../../shared/voice'
@@ -33,8 +34,13 @@ export function RevoiceButton({ className = 'btn small' }: { className?: string 
   const rendering = useStore((s) => s.render.status === 'rendering')
   if (!outdated) return null
   return (
-    <button className={className} disabled={rendering} onClick={() => void renderNow()} title={`The narration is still in ${voiceLabel(outdated.from)}'s voice`}>
-      {rendering ? <span className="spinner" /> : <RefreshCw />} {rendering ? 'Re-voicing…' : `Re-voice with ${voiceLabel(outdated.to)}`}
+    <button
+      className={className}
+      disabled={rendering}
+      onClick={() => void renderNow()}
+      title={format("The narration is still in {0}'s voice", [voiceLabel(outdated.from)])}
+    >
+      {rendering ? <span className="spinner" /> : <RefreshCw />} {rendering ? uiText('Re-voicing…') : format('Re-voice with {0}', [voiceLabel(outdated.to)])}
     </button>
   )
 }

@@ -1,45 +1,27 @@
-import {
-  Check,
-  ChevronLeft,
-  CircleAlert,
-  FolderOpen,
-  FolderSearch,
-  GraduationCap,
-  Library,
-  MoreHorizontal,
-  Play,
-  Plus,
-  Sigma,
-  Sparkles,
-  Terminal,
-  Trash2,
-  Zap,
-} from 'lucide-react'
+import { t as uiText, localize, format } from '../lib/i18n'
+import { ChevronLeft, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Trash2, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import type { ComponentState, ExerciseSet, ProjectSummary } from '../../../shared/types'
+import type { ExerciseSet, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { ago, timecode } from '../lib/time'
 import {
   studying,
-  installComponent,
   locateProject,
   openDialog,
   openExerciseSet,
   openProject,
   openWatch,
   pickAndOpenProject,
-  refreshClaude,
   refreshProjects,
-  toast,
-  errorText,
   updateSettings,
   useStore,
 } from '../store'
-import { ProgressLine } from './ui'
+import { Modal, Tabs } from './ui'
 import { SeriesPanel } from './SeriesPanel'
 
 export function Home() {
+  const [adding, setAdding] = useState(false)
   const all = useStore((s) => s.projects)
   const projects = useMemo(() => all.filter((p) => !p.exercise && !p.extra), [all]) // exercises show in their set's card, follow-ups under their episode
   const allSets = useStore((s) => s.exerciseSets)
@@ -72,71 +54,57 @@ export function Home() {
         <header className="home-head">
           <div>
             {both ? (
-              <div className="home-tabs" role="tablist" aria-label="Learn or create">
-                {(['create', 'learn'] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    role="tab"
-                    aria-selected={(tab === 'create') === editing}
-                    className={`home-tab ${(tab === 'create') === editing ? 'on' : ''}`}
-                    onClick={() => (useStore.setState({ homeSeries: null }), void updateSettings({ homeTab: tab }))}
-                  >
-                    {tab === 'create' ? 'Create' : 'Learn'}
-                  </button>
-                ))}
-              </div>
+              <Tabs
+                value={editing ? 'create' : 'learn'}
+                onChange={(tab) => {
+                  useStore.setState({ homeSeries: null })
+                  void updateSettings({ homeTab: tab })
+                }}
+                items={[
+                  { value: 'create', label: 'Create' },
+                  { value: 'learn', label: 'Learn' },
+                ]}
+              />
             ) : (
-              <h1>{editing ? 'Projects' : 'Library'}</h1>
+              <h1>{editing ? uiText('Projects') : uiText('Library')}</h1>
             )}
             <p className="muted">
               {editing
-                ? 'Each project is one video: a scene in code, its voice and its subtitles.'
-                : 'Your courses, exercises and videos, to watch and ask about.'}
+                ? uiText('Each project is one video: a scene in code, its voice and its subtitles.')
+                : uiText('Your courses, exercises and videos, to watch and ask about.')}
             </p>
           </div>
           <div className="home-actions">
-            {editing && (
-              <button className="btn ghost" onClick={() => void pickAndOpenProject()}>
-                <FolderOpen /> Open folder…
-              </button>
-            )}
-            <button className="btn large" onClick={() => openDialog({ kind: 'exercises' })} title="Exercises in, worked solutions and short videos out">
-              <GraduationCap /> Exercises
+            <button className="btn primary" aria-label={uiText('Add video, course or exercises')} onClick={() => setAdding(true)}>
+              <Plus />
             </button>
-            <button className="btn large" onClick={() => openDialog({ kind: 'series' })} title="A series of videos from a course's PDFs">
-              <Library /> {editing ? 'New series' : 'New course'}
-            </button>
-            <button className="btn large" onClick={() => openDialog({ kind: 'quick' })} title="Describe it, attach PDFs, and Studio makes and exports it">
-              <Zap /> Quick video
-            </button>
-            {editing && (
-              <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
-                <Plus /> New project
-              </button>
-            )}
           </div>
         </header>
 
-        {needsSetup && <SetupPanel />}
         <SeriesPanel />
 
         {projects.length === 0 && !sets.length ? (
-          <EmptyState />
+          <div className="library-empty">
+            <button className="library-add" aria-label={uiText('Add your first video, course or exercises')} onClick={() => setAdding(true)}>
+              <Plus />
+            </button>
+            <p className="muted">{uiText('Add a video, course or exercise set')}</p>
+          </div>
         ) : inSeries.length ? (
           <>
             <nav className="home-crumbs">
               <button className="link-btn" onClick={() => useStore.setState({ homeSeries: null })}>
-                <ChevronLeft /> Projects
+                <ChevronLeft /> {uiText(" Projects")}
               </button>
               <span className="faint">/</span>
               <strong>{inSeries[0].series!.title}</strong>
-              <span className="faint">{inSeries.length === 1 ? '1 episode' : `${inSeries.length} episodes`}</span>
+              <span className="faint">{inSeries.length === 1 ? uiText('1 episode') : format('{0} episodes', [inSeries.length])}</span>
               <button
                 className="btn small"
                 onClick={() => void openWatch(inSeries[0].series!.folder)}
-                title="Study the series: the videos, a transcript and a chat that knows where you are"
+                title={uiText('Study the series: the videos, a transcript and a chat that knows where you are')}
               >
-                <Play /> Watch
+                <Play /> {uiText(" Watch")}
               </button>
               <button className="btn small ghost" onClick={() => void api.reveal(inSeries[0].series!.folder)}>
                 <FolderOpen /> {revealLabel}
@@ -168,6 +136,58 @@ export function Home() {
             )}
           </section>
         )}
+        <Modal open={adding} onClose={() => setAdding(false)} title={uiText('What would you like to make?')} width={560}>
+          <div className="modal-body creation-choices">
+            {needsSetup && (
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  setAdding(false)
+                  openDialog({ kind: 'settings', tab: claude?.loggedIn ? 'env' : 'accounts' })
+                }}
+              >
+                {uiText('Complete setup')}
+              </button>
+            )}
+            {[
+              { kind: 'quick' as const, title: 'Quick video', text: 'Describe a topic and get a finished video.', icon: <Zap /> },
+              {
+                kind: 'series' as const,
+                title: editing ? 'New series' : 'New course',
+                text: 'Turn your material into a sequence of lessons.',
+                icon: <Library />,
+              },
+              { kind: 'exercises' as const, title: 'Exercises', text: 'Get checked solutions and a video for each exercise.', icon: <GraduationCap /> },
+              ...(editing
+                ? [{ kind: 'new-project' as const, title: 'New project', text: 'Open the editor and build a video with your agent.', icon: <Plus /> }]
+                : []),
+            ].map((item) => (
+              <button
+                className="provider-card creation-choice"
+                key={item.kind}
+                onClick={() => {
+                  setAdding(false)
+                  openDialog({ kind: item.kind })
+                }}
+              >
+                {item.icon}
+                <strong>{localize(item.title)}</strong>
+                <span className="hint">{localize(item.text)}</span>
+              </button>
+            ))}
+            {editing && (
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  setAdding(false)
+                  void pickAndOpenProject()
+                }}
+              >
+                <FolderOpen /> {uiText(" Open folder…")}
+              </button>
+            )}
+          </div>
+        </Modal>
       </div>
     </div>
   )
@@ -205,7 +225,7 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
       onClick={open}
       onKeyDown={(e) => e.key === 'Enter' && open()}
       tabIndex={0}
-      aria-label={`Exercise set ${set.title}, ${set.items.length} exercises`}
+      aria-label={format('Exercise set {0}, {1} exercises', [set.title, set.items.length])}
     >
       <div className="thumb landscape exercise-thumb">
         <GraduationCap />
@@ -215,9 +235,9 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
         <div className="project-name">{set.title}</div>
         <div className="project-sub">
           <span className="badge sun">
-            <GraduationCap /> Exercises
+            <GraduationCap /> {uiText(" Exercises")}
           </span>
-          <span className="faint">{working ? 'Solving…' : `${done} of ${set.items.length} with a video`}</span>
+          <span className="faint">{working ? uiText('Solving…') : format('{0} of {1} with a video', [done, set.items.length])}</span>
         </div>
       </div>
     </article>
@@ -238,7 +258,7 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
       onClick={open}
       onKeyDown={(e) => e.key === 'Enter' && open()}
       tabIndex={0}
-      aria-label={`Series ${first.series!.title}, ${episodes.length} episodes`}
+      aria-label={format('Series {0}, {1} episodes', [first.series!.title, episodes.length])}
     >
       <div className={`thumb stack ${cover.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${cover.theme}`}>
         {cover.thumbnail ? <img src={api.mediaUrl(cover.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
@@ -247,11 +267,11 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
         <div className="project-name">{first.series!.title}</div>
         <div className="project-sub">
           <span className="badge sun">
-            <Library /> Series
+            <Library /> {uiText(" Series")}
           </span>
-          <span className="faint">{episodes.length === 1 ? '1 episode' : `${episodes.length} episodes`}</span>
+          <span className="faint">{episodes.length === 1 ? uiText('1 episode') : format('{0} episodes', [episodes.length])}</span>
           {exercises ? (
-            <span className="faint">{exercises === 1 ? '1 exercise' : `${exercises} exercises`}</span>
+            <span className="faint">{exercises === 1 ? uiText('1 exercise') : format('{0} exercises', [exercises])}</span>
           ) : (
             <span className="faint project-ago">{ago(latest)}</span>
           )}
@@ -280,12 +300,17 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
         <div className="project-sub">
           {p.missing ? (
             <span className="badge coral" title={p.path}>
-              Folder not found
+              {uiText('Folder not found')}
             </span>
           ) : (
             <>
               <span className="badge">{p.aspect}</span>
-              {p.series && <span className="badge sun">Episode {p.series.episode}</span>}
+              {p.series && (
+                <span className="badge sun">
+                  {uiText("Episode ")}
+                  {p.series.episode}
+                </span>
+              )}
               <span className="faint project-ago">{ago(p.updatedAt)}</span>
             </>
           )}
@@ -294,17 +319,17 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
       {p.missing ? (
         <div className="missing-actions" onClick={(e) => e.stopPropagation()}>
           <button className="btn small" onClick={() => void locateProject(p.path)}>
-            <FolderSearch /> Locate…
+            <FolderSearch /> {uiText(" Locate…")}
           </button>
           <button
             className="btn small ghost"
-            title="Remove from list"
+            title={uiText('Remove from list')}
             onClick={async () => {
               await api.forgetProject(p.path)
               void refreshProjects()
             }}
           >
-            <Trash2 /> Remove
+            <Trash2 /> {uiText(" Remove")}
           </button>
         </div>
       ) : (
@@ -315,14 +340,14 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
               e.stopPropagation()
               setMenu((m) => !m)
             }}
-            aria-label="More"
+            aria-label={uiText('More')}
           >
             <MoreHorizontal />
           </button>
           {menu && (
             <div className="menu" onMouseLeave={() => setMenu(false)} onClick={(e) => e.stopPropagation()}>
               <button onClick={() => void api.reveal(p.path)}>
-                <FolderOpen /> Show in folder
+                <FolderOpen /> {uiText(" Show in folder")}
               </button>
               <button
                 onClick={async () => {
@@ -330,139 +355,12 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
                   void refreshProjects()
                 }}
               >
-                <Trash2 /> Remove from list
+                <Trash2 /> {uiText(" Remove from list")}
               </button>
             </div>
           )}
         </>
       )}
     </article>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="empty">
-      <svg viewBox="0 0 200 120" className="empty-art" aria-hidden>
-        <line x1="10" y1="100" x2="190" y2="100" stroke="var(--line-strong)" strokeWidth="1.5" />
-        <line x1="100" y1="10" x2="100" y2="110" stroke="var(--line-strong)" strokeWidth="1.5" />
-        <path d="M54 22 Q93.1 154.6 132.2 61.8" fill="none" stroke="var(--sun)" strokeWidth="3" strokeLinecap="round" className="draw" />
-        <circle cx="132.2" cy="61.8" r="6" fill="var(--blue)" className="pop" />
-      </svg>
-      {!studying() ? (
-        <>
-          <h2>Every video starts with an empty scene</h2>
-          <p className="muted">Pick a format, describe what to show, and Claude writes the animation, the narration and the subtitles with you.</p>
-        </>
-      ) : (
-        <>
-          <h2>Learn anything with a video made for you</h2>
-          <p className="muted">Describe a topic, add your notes or exercises, and Claude makes explained videos you can watch and ask about.</p>
-        </>
-      )}
-      {!studying() ? (
-        <button className="btn primary large" onClick={() => openDialog({ kind: 'new-project' })}>
-          <Plus /> New project
-        </button>
-      ) : (
-        <button className="btn primary large" onClick={() => openDialog({ kind: 'quick' })}>
-          <Zap /> Make a video to learn from
-        </button>
-      )}
-    </div>
-  )
-}
-
-const STATE_LABEL: Record<ComponentState, string> = {
-  missing: 'Not installed',
-  installing: 'Installing…',
-  ready: 'Ready',
-  outdated: 'Needs an update',
-  unsupported: 'Not supported',
-  error: 'Failed',
-}
-
-function SetupPanel() {
-  const setup = useStore((s) => s.setup)!
-  const claude = useStore((s) => s.claude)
-  const log = useStore((s) => s.setupLog)
-  const progress = useStore((s) => s.setupProgress)
-  const [loggingIn, setLoggingIn] = useState(false)
-
-  const login = async () => {
-    setLoggingIn(true)
-    try {
-      await api.claudeLogin()
-      await refreshClaude()
-    } catch (e) {
-      toast(errorText(e), 'error')
-    } finally {
-      setLoggingIn(false)
-    }
-  }
-
-  const steps = [
-    {
-      id: 'env' as const,
-      icon: <Terminal />,
-      title: 'Manim environment',
-      text: 'Python, manim and voice tools, installed into the app’s own folder. About 750 MB.',
-      state: setup.env,
-      action: () => void installComponent('env'),
-    },
-    {
-      id: 'latex' as const,
-      icon: <Sigma />,
-      title: 'LaTeX for formulas',
-      text: 'Needed for MathTex: TinyTeX with the packages manim uses. About 250 MB.',
-      state: setup.latex,
-      action: () => void installComponent('latex'),
-    },
-  ]
-
-  return (
-    <section className="setup">
-      <div className="setup-head">
-        <span className="eyebrow">First run</span>
-        <h2>Set up this computer for rendering</h2>
-      </div>
-      <ol className="setup-steps">
-        {steps.map((s) => (
-          <li key={s.id} className={`setup-step state-${s.state}`}>
-            <span className="step-icon">{s.state === 'ready' ? <Check /> : s.state === 'error' ? <CircleAlert /> : s.icon}</span>
-            <div className="step-body">
-              <div className="step-title">
-                {s.title} <span className="faint">· {STATE_LABEL[s.state]}</span>
-              </div>
-              <div className="hint">{s.state === 'installing' || s.state === 'error' ? (log[s.id]?.at(-1) ?? s.text) : s.text}</div>
-              {s.state === 'installing' && <ProgressLine value={progress[s.id]} />}
-            </div>
-            {s.state !== 'ready' && s.state !== 'installing' && (
-              <button className="btn" onClick={s.action}>
-                {s.state === 'outdated' ? 'Update' : s.state === 'error' ? 'Try again' : 'Install'}
-              </button>
-            )}
-          </li>
-        ))}
-        <li className={`setup-step state-${claude?.loggedIn ? 'ready' : 'missing'}`}>
-          <span className="step-icon">{claude?.loggedIn ? <Check /> : <Sparkles />}</span>
-          <div className="step-body">
-            <div className="step-title">
-              Claude <span className="faint">· {claude?.loggedIn ? (claude.email ?? claude.subscription ?? 'Signed in') : 'Not signed in'}</span>
-            </div>
-            <div className="hint">
-              {loggingIn
-                ? 'Finish signing in in the browser window that opened.'
-                : 'Studio runs Claude Code with your own Claude account. Sign-in happens in your browser; usage counts against your plan.'}
-            </div>
-          </div>
-          {!claude?.loggedIn && (
-            <button className="btn" disabled={loggingIn} onClick={() => void login()}>
-              {loggingIn ? <span className="spinner" /> : null} Sign in
-            </button>
-          )}
-        </li>
-      </ol>
-    </section>
   )
 }

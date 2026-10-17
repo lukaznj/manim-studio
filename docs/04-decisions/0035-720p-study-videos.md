@@ -21,7 +21,7 @@ Measured on a 24-second lesson with text and a graph, from an empty cache, on 4 
 ## Decision
 
 - **720p is an export size** (1280 × 720), next to 1080p and 1440p in the export dialog.
-- **Exports that name no size** use the study size in Learn and Both (Settings → General → Study videos: 720p, or 1080p), and 1080p in Create. That covers the background exports of exercise sets, follow-ups, series and quick videos. An export from the dialog keeps the size chosen there, and a project's last export size is used again.
+- **Exports that name no size** use the study size in Learn and Both (Settings → Video → Study videos: 720p, or 1080p), and 1080p in Create. That covers the background exports of exercise sets, follow-ups, series and quick videos. An export from the dialog keeps the size chosen there, and a project's last export size is used again.
 - **No 24 fps.** On top of 720p it saves another 12%, and motion gets visibly choppier in the animations these videos are made of (moving dots, transforms). 30 fps stays the lowest.
 
 ## Consequences

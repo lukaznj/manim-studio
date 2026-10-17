@@ -6,6 +6,10 @@ import { migrateVoice } from '../shared/voice'
 import { paths } from './paths'
 
 const defaults = (): Settings => ({
+  uiLanguage: 'en',
+  defaultAspect: '16:9',
+  defaultTheme: 'dark',
+  defaultTone: 'warm',
   appearance: 'system',
   projectsDir: paths.defaultProjectsDir(),
   recentProjects: [],
@@ -63,7 +67,12 @@ export function rememberProject(path: string): void {
 
 // --- secrets: encrypted with the OS keychain via safeStorage, never sent to the renderer ---
 
-const secretFlags = () => ({ hasElevenLabsKey: !!getSecret('elevenlabs'), hasAnthropicKey: !!getSecret('anthropic'), hasOpenAIKey: !!getSecret('openai'), hasGeminiKey: !!getSecret('gemini') })
+const secretFlags = () => ({
+  hasElevenLabsKey: !!getSecret('elevenlabs'),
+  hasAnthropicKey: !!getSecret('anthropic'),
+  hasOpenAIKey: !!getSecret('openai'),
+  hasGeminiKey: !!getSecret('gemini'),
+})
 
 const secretFile = (name: string) => join(app.getPath('userData'), `${name}.secret`)
 

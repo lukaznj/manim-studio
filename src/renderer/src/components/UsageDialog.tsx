@@ -1,3 +1,4 @@
+import { t as uiText } from '../lib/i18n'
 import { Receipt } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { costOf, modelName, usageTotals, type ModelTokens, type UsageEntry } from '../../../shared/usage'
@@ -37,7 +38,7 @@ export function ProjectCost() {
   return (
     <button
       className="usage-chip"
-      title="What this video’s agent turns cost at API prices. Click for where it went."
+      title={uiText('What this video’s agent turns cost at API prices. Click for where it went.')}
       onClick={() => openDialog({ kind: 'usage' })}
     >
       <Receipt /> {dollars(cost)}
@@ -64,26 +65,32 @@ export function UsageDialog() {
   }
 
   return (
-    <Modal open={open} onClose={closeDialog} title="What this video used" icon={<Receipt className="head-icon" />} width={720}>
+    <Modal open={open} onClose={closeDialog} title={uiText('What this video used')} icon={<Receipt className="head-icon" />} width={720}>
       <div className="modal-body usage-dialog">
         {!log.length ? (
-          <p className="muted">No agent turns recorded yet. Every turn from now on is (chat, quick mode and series).</p>
+          <p className="muted">{uiText('No agent turns recorded yet. Every turn from now on is (chat, quick mode and series).')}</p>
         ) : (
           <>
             <p className="muted">
-              {dollars(total)} at API prices over {log.length} turns. On a Claude plan these tokens count against its limits instead of being billed; the
-              proportions show where the usage went. Most of it is usually <strong>cache reads</strong>: on every tool call the agent reads the whole
-              conversation again, pictures of frames and PDF pages included, so long sessions with many renders and looks cost the most.
+              {dollars(total)} {uiText(" at API prices over ")}
+              {log.length}{' '}
+              {uiText(
+                " turns. On a Claude plan these tokens count against its limits instead of being billed; the proportions show where the usage went. Most of it is usually ",
+              )}
+              <strong>{uiText('cache reads')}</strong>
+              {uiText(
+                ': on every tool call the agent reads the whole conversation again, pictures of frames and PDF pages included, so long sessions with many renders and looks cost the most.',
+              )}
             </p>
             <table className="usage-table">
               <thead>
                 <tr>
-                  <th>Model</th>
-                  <th>Input</th>
-                  <th>Cache reads</th>
-                  <th>Cache writes</th>
-                  <th>Output</th>
-                  <th>Cost</th>
+                  <th>{uiText('Model')}</th>
+                  <th>{uiText('Input')}</th>
+                  <th>{uiText('Cache reads')}</th>
+                  <th>{uiText('Cache writes')}</th>
+                  <th>{uiText('Output')}</th>
+                  <th>{uiText('Cost')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -100,15 +107,15 @@ export function UsageDialog() {
               </tbody>
             </table>
 
-            <h3>By step</h3>
+            <h3>{uiText('By step')}</h3>
             <table className="usage-table">
               <thead>
                 <tr>
-                  <th>Step</th>
-                  <th>Turns</th>
-                  <th>What the agent did</th>
-                  <th>Cost</th>
-                  <th>Share</th>
+                  <th>{uiText('Step')}</th>
+                  <th>{uiText('Turns')}</th>
+                  <th>{uiText('What the agent did')}</th>
+                  <th>{uiText('Cost')}</th>
+                  <th>{uiText('Share')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -136,7 +143,7 @@ export function UsageDialog() {
             </table>
 
             <details className="usage-turns">
-              <summary>Every turn</summary>
+              <summary>{uiText('Every turn')}</summary>
               <table className="usage-table">
                 <tbody>
                   {[...log].reverse().map((e, i) => (
@@ -147,7 +154,8 @@ export function UsageDialog() {
                       <td>{e.step}</td>
                       <td className="faint">{Object.keys(e.models).map(modelName).join(', ')}</td>
                       <td className="faint mono">
-                        {tokens(sum(e.models, 'cacheRead') + sum(e.models, 'input') + sum(e.models, 'cacheWrite'))} in · {tokens(sum(e.models, 'output'))} out
+                        {tokens(sum(e.models, 'cacheRead') + sum(e.models, 'input') + sum(e.models, 'cacheWrite'))} {uiText(" in · ")}
+                        {tokens(sum(e.models, 'output'))} {uiText(" out")}
                       </td>
                       <td className="mono">{dollars(costOf(e.models))}</td>
                     </tr>

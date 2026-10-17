@@ -1,3 +1,4 @@
+import { t as uiText } from '../lib/i18n'
 import { Check, NotebookPen, Pencil, Sparkles } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { scriptBody, scriptStatus, withScriptStatus } from '../../../shared/script'
@@ -29,7 +30,8 @@ export function ScriptPane() {
     try {
       await save(withScriptStatus(script, 'approved'))
       if (!useStore.getState().claude?.loggedIn) return toast('Approved. Sign in to your agent in the chat, then ask it to write the video.', 'info')
-      if (await sendChat('I approved the script. Write scene.py from it, then render and check it.', false)) toast('Approved. Claude is writing the video from it.', 'ok')
+      if (await sendChat('I approved the script. Write scene.py from it, then render and check it.', false))
+        toast('Approved. Claude is writing the video from it.', 'ok')
     } catch (e) {
       toast(errorText(e), 'error')
     }
@@ -40,17 +42,19 @@ export function ScriptPane() {
       <div className="script-pane empty">
         <NotebookPen />
         <p>
-          <strong>No script yet</strong>
+          <strong>{uiText('No script yet')}</strong>
           <br />
           <span className="muted">
             {scriptFirst
-              ? 'Describe the video in the chat: Claude plans it here first (the idea, each section’s narration and visuals), and writes the code once you approve.'
-              : 'Script first is off for this project. Turn it on in Settings → Video, or ask Claude for a script.'}
+              ? uiText(
+                  'Describe the video in the chat: Claude plans it here first (the idea, each section’s narration and visuals), and writes the code once you approve.',
+                )
+              : uiText('Script first is off for this project. Turn it on in Settings → Video, or ask Claude for a script.')}
           </span>
         </p>
         {!scriptFirst && (
           <button className="btn" onClick={() => openDialog({ kind: 'settings', tab: 'video' })}>
-            Open Settings → Video
+            {uiText('Open Settings → Video')}
           </button>
         )}
       </div>
@@ -61,13 +65,13 @@ export function ScriptPane() {
     <div className="script-pane">
       <div className="script-bar">
         <span className={`badge ${status === 'approved' ? 'mint' : 'sun'}`}>
-          {status === 'approved' ? <Check /> : <Pencil />} {status === 'approved' ? 'Approved' : 'Draft'}
+          {status === 'approved' ? <Check /> : <Pencil />} {status === 'approved' ? uiText('Approved') : uiText('Draft')}
         </span>
         <span className="grow" />
         {editing ? (
           <>
             <button className="btn small ghost" onClick={() => setEditing(false)}>
-              Cancel
+              {uiText('Cancel')}
             </button>
             <button
               className="btn small"
@@ -78,17 +82,22 @@ export function ScriptPane() {
                 )
               }
             >
-              Save
+              {uiText('Save')}
             </button>
           </>
         ) : (
           <>
             <button className="btn small ghost" onClick={() => setEditing(true)}>
-              <Pencil /> Edit
+              <Pencil /> {uiText(" Edit")}
             </button>
             {status === 'draft' && (
-              <button className="btn small primary" disabled={chatBusy} onClick={() => void approve()} title={chatBusy ? 'Claude is still working' : undefined}>
-                <Sparkles /> Approve and make the video
+              <button
+                className="btn small primary"
+                disabled={chatBusy}
+                onClick={() => void approve()}
+                title={chatBusy ? uiText('Claude is still working') : undefined}
+              >
+                <Sparkles /> {uiText(" Approve and make the video")}
               </button>
             )}
           </>
@@ -117,27 +126,41 @@ function renderScript(md: string): ReactNode[] {
       const quote: string[] = []
       for (; i < lines.length && lines[i].startsWith('>'); i++) quote.push(lines[i].replace(/^>\s?/, ''))
       i--
-      out.push(<blockquote key={i}>{quote.map((q, j) => <p key={j}>{inline(q)}</p>)}</blockquote>)
+      out.push(
+        <blockquote key={i}>
+          {quote.map((q, j) => (
+            <p key={j}>{inline(q)}</p>
+          ))}
+        </blockquote>,
+      )
     } else if (/^\s*[-*] /.test(line)) {
       const items: string[] = []
       for (; i < lines.length && /^\s*[-*] /.test(lines[i]); i++) items.push(lines[i].replace(/^\s*[-*] /, ''))
       i--
-      out.push(<ul key={i}>{items.map((t, j) => <li key={j}>{inline(t)}</li>)}</ul>)
+      out.push(
+        <ul key={i}>
+          {items.map((t, j) => (
+            <li key={j}>{inline(t)}</li>
+          ))}
+        </ul>,
+      )
     } else out.push(<p key={i}>{inline(line)}</p>)
   }
   return out
 }
 
 function inline(text: string): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((part, i) =>
-    part.startsWith('**') && part.endsWith('**') && part.length > 4 ? (
-      <strong key={i}>{part.slice(2, -2)}</strong>
-    ) : part.startsWith('`') && part.endsWith('`') && part.length > 2 ? (
-      <code key={i}>{part.slice(1, -1)}</code>
-    ) : part.startsWith('*') && part.endsWith('*') && part.length > 2 ? (
-      <em key={i}>{part.slice(1, -1)}</em>
-    ) : (
-      part
-    ),
-  )
+  return text
+    .split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g)
+    .map((part, i) =>
+      part.startsWith('**') && part.endsWith('**') && part.length > 4 ? (
+        <strong key={i}>{part.slice(2, -2)}</strong>
+      ) : part.startsWith('`') && part.endsWith('`') && part.length > 2 ? (
+        <code key={i}>{part.slice(1, -1)}</code>
+      ) : part.startsWith('*') && part.endsWith('*') && part.length > 2 ? (
+        <em key={i}>{part.slice(1, -1)}</em>
+      ) : (
+        part
+      ),
+    )
 }

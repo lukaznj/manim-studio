@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { Check, ChevronDown, Pause, Play, Search } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import type { VoiceOption, VoiceSettings } from '../../../shared/types'
@@ -102,7 +103,12 @@ export function VoicePicker(props: { language: string; hasKey: boolean; value?: 
     const on = v.id === props.value?.id
     return (
       <div key={v.id} className={`voice-row ${on ? 'on' : ''}`}>
-        <button className="icon-btn" disabled={!v.preview} onClick={() => void play(v)} aria-label={playing === v.id ? 'Stop the sample' : `Play a sample of ${v.name}`}>
+        <button
+          className="icon-btn"
+          disabled={!v.preview}
+          onClick={() => void play(v)}
+          aria-label={playing === v.id ? uiText('Stop the sample') : format('Play a sample of {0}', [v.name])}
+        >
           {playing === v.id ? <Pause /> : <Play />}
         </button>
         <button
@@ -118,8 +124,8 @@ export function VoicePicker(props: { language: string; hasKey: boolean; value?: 
           {v.description && <span className="hint">{v.description}</span>}
         </button>
         {v.users ? (
-          <span className="voice-users mono faint" title={`Saved by ${v.users.toLocaleString('en')} people`}>
-            {compact.format(v.users)} users
+          <span className="voice-users mono faint" title={format('Saved by {0} people', [v.users.toLocaleString('en')])}>
+            {compact.format(v.users)} {uiText(" users")}
           </span>
         ) : null}
         {on && <Check className="voice-check" />}
@@ -130,23 +136,23 @@ export function VoicePicker(props: { language: string; hasKey: boolean; value?: 
   return (
     <>
       <button className="select voice-picker" popoverTarget={anchor.slice(2)} style={{ anchorName: anchor } as CSSProperties}>
-        <span className={props.value?.id ? '' : 'faint'}>{props.value?.id ? (props.value.name ?? props.value.id) : 'Choose a voice'}</span>
+        <span className={props.value?.id ? '' : 'faint'}>{props.value?.id ? (props.value.name ?? props.value.id) : uiText('Choose a voice')}</span>
         <ChevronDown />
       </button>
       <div ref={panel} id={anchor.slice(2)} popover="auto" className="voice-panel" style={{ positionAnchor: anchor } as CSSProperties}>
         <label className="voice-search">
           <Search />
-          <input ref={input} placeholder="Search voices: name, accent, style…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input ref={input} placeholder={uiText('Search voices: name, accent, style…')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </label>
-        <div className="voice-list" role="listbox" aria-label="ElevenLabs voices">
-          <div className="eyebrow">{q ? 'Voice library' : `Most used in ${languageName.of(props.language)}`}</div>
-          {library === null ? <div className="voice-note hint">Loading…</div> : library.map(row)}
-          {library?.length === 0 && !error && <div className="voice-note hint">No voices match. Try another word.</div>}
+        <div className="voice-list" role="listbox" aria-label={uiText('ElevenLabs voices')}>
+          <div className="eyebrow">{q ? uiText('Voice library') : format('Most used in {0}', [languageName.of(props.language)])}</div>
+          {library === null ? <div className="voice-note hint">{uiText('Loading…')}</div> : library.map(row)}
+          {library?.length === 0 && !error && <div className="voice-note hint">{uiText('No voices match. Try another word.')}</div>}
           {error && <div className="voice-note hint">{error}</div>}
-          {!props.hasKey && !error && <div className="voice-note hint">Save your API key to see the top ten and search the library.</div>}
+          {!props.hasKey && !error && <div className="voice-note hint">{uiText('Save your API key to see the top ten and search the library.')}</div>}
           {own.length > 0 && (
             <>
-              <div className="eyebrow">In your account</div>
+              <div className="eyebrow">{uiText('In your account')}</div>
               {own.map(row)}
             </>
           )}
@@ -167,7 +173,10 @@ export function useVoiceFor(language: string): VoiceSettings | undefined {
   useEffect(() => {
     if (!def || own) return
     let live = true
-    void api.elevenLabsDefaultVoice(language).then((v) => live && v && setPicked({ language, id: v.id, name: v.name }), () => undefined)
+    void api.elevenLabsDefaultVoice(language).then(
+      (v) => live && v && setPicked({ language, id: v.id, name: v.name }),
+      () => undefined,
+    )
     return () => {
       live = false
     }

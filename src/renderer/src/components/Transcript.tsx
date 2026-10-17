@@ -1,3 +1,4 @@
+import { t as uiText, format } from '../lib/i18n'
 import { ChevronDown, ChevronUp, MessageCircleQuestion, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Subtitle } from '../../../shared/types'
@@ -90,8 +91,8 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
           <input
             ref={input}
             className="input"
-            placeholder="Search what’s said"
-            aria-label="Search what’s said in the video"
+            placeholder={uiText('Search what’s said')}
+            aria-label={uiText('Search what’s said in the video')}
             value={query}
             disabled={!lines?.length}
             onChange={(e) => {
@@ -109,7 +110,7 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
             }}
           />
           {query && (
-            <button className="icon-btn" aria-label="Clear the search" onClick={() => setQuery('')}>
+            <button className="icon-btn" aria-label={uiText('Clear the search')} onClick={() => setQuery('')}>
               <X />
             </button>
           )}
@@ -117,12 +118,24 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
         {query.trim() && (
           <div className="lyrics-count">
             <span className={hits.length ? 'faint' : 'error-text'}>
-              {hits.length ? `${Math.min(pick, hits.length - 1) + 1} of ${hits.length}` : 'Not said in this video'}
+              {hits.length ? format('{0} of {1}', [Math.min(pick, hits.length - 1) + 1, hits.length]) : uiText('Not said in this video')}
             </span>
-            <button className="icon-btn" aria-label="Previous match" title="Previous match (Shift+Enter)" disabled={hits.length < 2} onClick={() => step(-1)}>
+            <button
+              className="icon-btn"
+              aria-label={uiText('Previous match')}
+              title={uiText('Previous match (Shift+Enter)')}
+              disabled={hits.length < 2}
+              onClick={() => step(-1)}
+            >
               <ChevronUp />
             </button>
-            <button className="icon-btn" aria-label="Next match" title="Next match (Enter)" disabled={hits.length < 2} onClick={() => step(1)}>
+            <button
+              className="icon-btn"
+              aria-label={uiText('Next match')}
+              title={uiText('Next match (Enter)')}
+              disabled={hits.length < 2}
+              onClick={() => step(1)}
+            >
               <ChevronDown />
             </button>
           </div>
@@ -132,7 +145,7 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
       {lines === null ? (
         <div className="ex-empty faint">…</div>
       ) : !lines.length ? (
-        <div className="ex-empty faint">No narration in this video yet. Its words show up here once it has a voice.</div>
+        <div className="ex-empty faint">{uiText('No narration in this video yet. Its words show up here once it has a voice.')}</div>
       ) : (
         <ol
           className="lyrics"
@@ -143,15 +156,19 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
         >
           {lines.map((l, i) => (
             <li key={i} className={`lyric ${i === current ? 'now' : i < current ? 'past' : ''}`}>
-              <button className="lyric-line" onClick={() => ((scrolledAt.current = 0), seekStudy(l.start, true))} title={`Play from ${clock(l.start)}`}>
+              <button
+                className="lyric-line"
+                onClick={() => ((scrolledAt.current = 0), seekStudy(l.start, true))}
+                title={format('Play from {0}', [clock(l.start)])}
+              >
                 <Marked text={l.text} hits={hits.filter((h) => h.line === i)} chosen={hit?.line === i ? hit : undefined} />
               </button>
               <span className="lyric-side">
                 <span className="mono faint">{clock(l.start)}</span>
                 <button
                   className="icon-btn"
-                  title="Ask about this line in the chat"
-                  aria-label="Ask about this line"
+                  title={uiText('Ask about this line in the chat')}
+                  aria-label={uiText('Ask about this line')}
                   onClick={() =>
                     askInChat(`At ${clock(l.start)} it says: “${l.text.replace(/\s+/g, ' ')}”. I don’t understand this part. Explain it more thoroughly.`)
                   }

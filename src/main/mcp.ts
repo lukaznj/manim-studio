@@ -12,7 +12,7 @@ import { homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { z } from 'zod'
 import { desktopTools, type DesktopToolName } from '../shared/studio-tools'
-import type { ClaudeDesktopStatus, ExportResult, Tone } from '../shared/types'
+import type { ClaudeDesktopStatus, ExportResult, Theme, Tone } from '../shared/types'
 import { languageName, mediaNote } from './claude'
 import { createProject, listProjects, project, readScene, readScript, requireProject, saveScene, saveScript } from './projects'
 import { agentProjects } from './agent-projects'
@@ -23,6 +23,14 @@ import { sourcesNote } from './sources'
 import { scriptBrief, scriptStatus } from '../shared/script'
 import { styleBrief } from '../shared/tone'
 import { seriesBrief } from './series'
+import { checkAndFix } from './quick'
+import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
+import { claudeStatus } from './claude'
+import { setupStatus } from './env'
+import { queueExport } from './exports'
+import { rememberProject } from './settings'
+import { checkElevenLabsKey } from './voice'
+import { videoIntent } from '../shared/video-intent'
 
 export interface DesktopHost {
   /** Shows the window and opens the project in it, the same way a click on Home does. */
@@ -32,10 +40,69 @@ export interface DesktopHost {
   /** The same for script.md: the Script tab updates. */
   scriptWritten(text: string): void
   exportVideo(): Promise<ExportResult>
+  projectsChanged(): void
 }
 
 // Claude Desktop gives up on a tool call after about a minute, so nothing here waits longer.
 const MAX_WAIT_MS = 45_000
+
+// Only media produced by this endpoint is exposed, never an arbitrary caller-supplied path.
+type VideoJob = { result?: ExportResult; error?: string; project: string; activity: string; theme: Theme; agent?: EpisodeAgent }
+const videoJobs = new Map<string, VideoJob>()
+export const desktopVideosBusy = (): boolean => [...videoJobs.values()].some((job) => !job.result && !job.error)
+export function stopDesktopVideos(): void {
+  for (const job of videoJobs.values())
+    if (!job.result && !job.error) {
+      job.error = 'Studio was closed before the video finished.'
+      job.agent?.close()
+    }
+}
+
+async function makeDesktopVideo(job: VideoJob, prompt: string): Promise<void> {
+  const agent = await episodeAgent(job.project, {
+    onTool: (activity) => {
+      job.activity = activity
+    },
+    onUsage: () => undefined,
+  })
+  job.agent = agent
+  const turn = async (text: string, step: string) => {
+    const result = await turnPastLimits(
+      (message) => agent.turn(message, step),
+      text,
+      (note) => {
+        if (note) job.activity = note
+      },
+      () => undefined,
+    )
+    if (!result.ok) throw new Error(result.error ?? 'The video agent stopped.')
+  }
+  try {
+    job.activity = 'Writing the video'
+    await turn(prompt, 'Video from chat')
+    job.activity = 'Checking the render'
+    const warnings = await checkAndFix(
+      job.project,
+      (text) => turn(text, 'Fixing the render'),
+      () => undefined,
+    )
+    job.activity = 'Exporting'
+    const result = await queueExport(job.project, { themes: [job.theme], languages: [], languageVideos: false }).finished
+    job.result = { ...result, warnings: [...warnings, ...result.warnings] }
+    job.activity = 'Done'
+  } finally {
+    agent.close()
+  }
+}
+
+function videoFile(id: string, index: number): string {
+  const result = videoJobs.get(id)?.result
+  const file = result?.files[index]
+  if (!result || !file || !/\.(mp4|vtt|srt|jpg|png)$/i.test(file)) throw new Error('Video resource is not available.')
+  const full = resolve(result.folder, file)
+  if (!full.startsWith(resolve(result.folder) + (process.platform === 'win32' ? '\\' : '/'))) throw new Error('Invalid video resource.')
+  return full
+}
 
 const endpointFile = () => join(app.getPath('userData'), 'mcp-endpoint.json')
 
@@ -59,6 +126,18 @@ export function startDesktopEndpoint(host: DesktopHost): void {
     const reply = (status: number, body?: unknown) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body ?? {}))
     if (req.headers.authorization !== `Bearer ${token}`) return reply(401)
     if (req.method === 'GET' && req.url === '/health') return reply(200, { app: 'Manim Studio', version: app.getVersion() })
+    const resource = req.url?.match(/^\/video\/([a-zA-Z0-9-]+)\/(\d+)$/)
+    if (req.method === 'GET' && resource) {
+      try {
+        const file = videoFile(resource[1], Number(resource[2]))
+        return reply(200, {
+          blob: readFileSync(file).toString('base64'),
+          mimeType: /\.mp4$/i.test(file) ? 'video/mp4' : /\.vtt$/i.test(file) ? 'text/vtt' : /\.srt$/i.test(file) ? 'text/plain' : 'image/jpeg',
+        })
+      } catch (e) {
+        return reply(404, { error: (e as Error).message })
+      }
+    }
     const name = req.url?.match(/^\/tools\/([a-z_]+)$/)?.[1]
     if (req.method !== 'POST' || !name || !(name in desktopTools)) return reply(404)
     try {
@@ -112,6 +191,66 @@ function body(req: IncomingMessage): Promise<string> {
 
 async function run(host: DesktopHost, name: DesktopToolName, args: Record<string, unknown>, req: IncomingMessage): Promise<CallToolResult> {
   switch (name) {
+    case 'create_video': {
+      const settings = getSettings()
+      if (setupStatus().env !== 'ready') throw new Error('Install the video environment in Settings → Environment first.')
+      if (!(await claudeStatus()).loggedIn) throw new Error('Connect an agent in Settings → Accounts first.')
+      if (settings.defaultVoice.provider === 'elevenlabs') {
+        if (!settings.hasElevenLabsKey) throw new Error('Add an ElevenLabs key in Settings → Accounts first.')
+        const key = await checkElevenLabsKey()
+        if (!key.tts || !key.voices) throw new Error(key.problem ?? 'The ElevenLabs key needs Text to Speech and Voices permissions.')
+        if (!settings.defaultVoice.elevenlabs?.voiceId) throw new Error('Choose a voice in Settings → Voice first.')
+      } else if (setupStatus().omnivoice !== 'ready') throw new Error('Install OmniVoice in Settings → Environment first.')
+      const intent = videoIntent(settings.mode, args.intent as 'learn' | 'create' | undefined)
+      const dir = await createProject({
+        name: String(args.title || String(args.prompt).slice(0, 80)),
+        aspect: settings.defaultAspect ?? '16:9',
+        theme: settings.defaultTheme ?? 'dark',
+        tone: settings.defaultTone ?? 'warm',
+        language: settings.defaultVoice.language,
+        voice: settings.defaultVoice,
+        scriptFirst: true,
+      })
+      rememberProject(dir)
+      host.projectsChanged()
+      if (intent === 'create') await host.openInWindow(dir)
+      const id = randomBytes(16).toString('hex')
+      const job: VideoJob = { project: dir, activity: 'Starting', theme: settings.defaultTheme ?? 'dark' }
+      videoJobs.set(id, job)
+      void makeDesktopVideo(job, String(args.prompt))
+        .catch((e) => {
+          job.error = (e as Error).message
+        })
+        .finally(() => host.projectsChanged())
+      return {
+        content: [{ type: 'text', text: `Video started. Poll get_video with job ${id}. Delivery: ${intent}.` }],
+        structuredContent: { job: id, state: 'working', intent },
+      }
+    }
+    case 'get_video': {
+      const id = String(args.job)
+      const job = videoJobs.get(id)
+      if (!job) return textResult('Unknown video job. Jobs are available until Studio restarts.', true)
+      if (job.error) return textResult(`Video failed: ${job.error}`, true)
+      if (!job.result) {
+        return { content: [{ type: 'text', text: job.activity }], structuredContent: { job: id, state: 'working', activity: job.activity } }
+      }
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Video complete and saved in the Studio library.${job.result.warnings.length ? ` Warnings: ${job.result.warnings.join('; ')}` : ''}`,
+          },
+          ...job.result.files.map((file, index) => ({
+            type: 'resource_link' as const,
+            uri: `studio-video://${id}/${index}`,
+            name: basename(file),
+            mimeType: /\.mp4$/i.test(file) ? 'video/mp4' : /\.vtt$/i.test(file) ? 'text/vtt' : /\.srt$/i.test(file) ? 'text/plain' : 'image/jpeg',
+          })),
+        ],
+        structuredContent: { job: id, state: 'done', project: job.project, files: job.result.files, warnings: job.result.warnings },
+      }
+    }
     case 'list_projects': {
       const list = listProjects().filter((p) => !p.missing)
       if (!list.length) return textResult('No projects yet. create_project makes one.')
