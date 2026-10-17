@@ -50,11 +50,12 @@ import { VoicePicker } from './VoicePicker'
 import { useRecorder } from './RecordingBooth'
 import { Modal, ProgressLine, Tabs } from './ui'
 
-type Tab = 'account' | 'accounts' | 'voice' | 'video' | 'env' | 'about'
+type Tab = 'account' | 'accounts' | 'voice' | 'video' | 'env' | 'about' | 'develop'
 
 export function SettingsDialog() {
   const dialog = useStore((s) => s.dialog)
   const open = dialog?.kind === 'settings'
+  const developerMode = useStore((s) => s.settings?.developerMode)
   const [tab, setTab] = useState<Tab>('account')
   useEffect(() => {
     if (dialog?.kind === 'settings') setTab(dialog.tab ?? 'account')
@@ -73,6 +74,7 @@ export function SettingsDialog() {
             { value: 'video', label: 'Video' },
             { value: 'env', label: 'Environment' },
             { value: 'about', label: 'General' },
+            ...(developerMode ? [{ value: 'develop' as const, label: 'Develop' }] : []),
           ]}
         />
       </div>
@@ -83,6 +85,7 @@ export function SettingsDialog() {
         {tab === 'video' && <VideoTab />}
         {tab === 'env' && <EnvTab />}
         {tab === 'about' && <AboutTab />}
+        {tab === 'develop' && <DevelopTab onDisable={() => setTab('about')} />}
       </div>
     </Modal>
   )
@@ -124,7 +127,7 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
       <div className="inline-form">
         {props.saved && (
           <span className="badge mint">
-            <Check /> {uiText(" Key saved")}
+            <Check /> {uiText(' Key saved')}
           </span>
         )}
         <button className="btn small" onClick={() => setReplacing(true)}>
@@ -178,6 +181,8 @@ const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1
 /** Settings → Agent: who writes the scenes, Claude, Codex (ADR 0022) or Antigravity (ADR 0031), and its model. Sign-ins are under Accounts. */
 function AgentTab() {
   const agent = useStore((s) => s.settings!.agent)
+  const settings = useStore((s) => s.settings)!
+  const models = useStore((s) => s.models)
   const signedIn = useStore((s) => !!s.claude?.loggedIn)
   const seriesAgents = useStore((s) => s.settings!.seriesAgents)
   const pick = async (next: Agent) => {
@@ -210,7 +215,7 @@ function AgentTab() {
       ) : (
         <Row title={format('{0} isn’t signed in', [AGENT_NAMES[agent]])} text={uiText('Sign in, or add an API key, under Accounts.')}>
           <button className="btn small primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
-            <KeyRound /> {uiText(" Accounts")}
+            <KeyRound /> {uiText(' Accounts')}
           </button>
         </Row>
       )}
@@ -227,11 +232,39 @@ function AgentTab() {
           items={['1', '2', '3', '4'].map((n) => ({ value: n, label: n }))}
         />
       </Row>
+      {agent === 'codex' && signedIn && (
+        <Row
+          title={uiText('When an OpenAI model is busy')}
+          text={uiText(
+            'For chat and background video turns: retry once, then use this model on the same account. Account limits, sign-in errors and interrupted tool work never trigger a model switch. Episode model comparisons keep their assigned model.',
+          )}
+        >
+          <select
+            className="input"
+            aria-label={uiText('OpenAI fallback model')}
+            value={settings.codexFallbackModel ?? ''}
+            onChange={(e) => void updateSettings({ codexFallbackModel: e.target.value })}
+          >
+            <option value="">{uiText('No automatic fallback')}</option>
+            {models
+              .filter((m) => m.value && m.value !== settings.codexModel)
+              .map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            {settings.codexFallbackModel && !models.some((m) => m.value === settings.codexFallbackModel && m.value !== settings.codexModel) && (
+              <option value={settings.codexFallbackModel}>{settings.codexFallbackModel}</option>
+            )}
+          </select>
+        </Row>
+      )}
     </div>
   )
 }
 
 const AGENT_NAMES: Record<Agent, string> = { claude: 'Claude', codex: 'Codex', antigravity: 'Antigravity' }
+const accountStatus = new Map<string, ClaudeStatus>()
 
 /**
  * Settings → Accounts: every agent's sign-in and API key, whether it's the chosen one or not, so
@@ -253,22 +286,61 @@ function AccountsTab() {
 /** One agent's account: whether it writes the scenes now, and its sign-in, read for that agent. */
 export function AgentAccount({ agent }: { agent: Agent }) {
   const chosen = useStore((s) => s.settings!.agent === agent)
-  const keys = useStore((s) => [s.settings!.hasAnthropicKey, s.settings!.hasOpenAIKey, s.settings!.hasGeminiKey, s.settings!.claudeAuth].join())
+  const keys = useStore((s) =>
+    [
+      s.settings!.hasAnthropicKey,
+      s.settings!.hasOpenAIKey,
+      s.settings!.hasGeminiKey,
+      s.settings!.claudeAuth,
+      s.settings!.codexAuth,
+      s.settings!.antigravityAuth,
+    ].join(),
+  )
   const installs = useStore((s) => `${s.setup?.codex}:${s.setup?.antigravity}`)
-  const [status, setStatus] = useState<ClaudeStatus | null>(null)
+  const cacheKey = `${agent}:${keys}:${installs}`
+  const [loaded, setLoaded] = useState<{ key: string; status: ClaudeStatus } | null>(() => {
+    const status = accountStatus.get(cacheKey)
+    return status ? { key: cacheKey, status } : null
+  })
+  const status = loaded?.key === cacheKey ? loaded.status : (accountStatus.get(cacheKey) ?? null)
+  const accept = (status: ClaudeStatus) => {
+    accountStatus.set(cacheKey, status)
+    setLoaded({ key: cacheKey, status })
+  }
   const refresh = async () => {
-    setStatus(await api.claudeStatus(agent))
+    accept(await api.claudeStatus(agent))
     if (chosen) await refreshClaude()
   }
-  useEffect(() => void api.claudeStatus(agent).then(setStatus), [agent, keys, installs])
+  useEffect(() => {
+    let active = true
+    void api.claudeStatus(agent).then(
+      (status) => active && accept(status),
+      (e) => active && accept({ loggedIn: false, error: errorText(e) }),
+    )
+    return () => {
+      active = false
+    }
+  }, [cacheKey])
   return (
     <section className="account-section">
       <header className="account-head">
         <strong>{AGENT_NAMES[agent]}</strong>
-        {status?.loggedIn ? <span className="badge mint">{uiText(" Ready")}</span> : <span className="badge">{uiText('Not set up')}</span>}
+        {status ? (
+          status.loggedIn ? (
+            <span className="badge mint">{uiText(' Ready')}</span>
+          ) : (
+            <span className="badge">{uiText('Not set up')}</span>
+          )
+        ) : (
+          <span className="badge">{uiText('Checking…')}</span>
+        )}
         <span className="account-head-end">{chosen && <span className="badge">{uiText('Selected in Agent')}</span>}</span>
       </header>
-      {agent === 'codex' ? (
+      {!status ? (
+        <div className="account-loading hint" role="status">
+          <span className="spinner" /> {uiText('Checking account…')}
+        </div>
+      ) : agent === 'codex' ? (
         <CodexAccount status={localize(status)} refresh={refresh} />
       ) : agent === 'antigravity' ? (
         <AntigravityAccount status={localize(status)} refresh={refresh} />
@@ -312,7 +384,7 @@ export function ElevenLabsAccount() {
     <section className="account-section">
       <header className="account-head">
         <strong>{uiText('ElevenLabs')}</strong>
-        {settings.hasElevenLabsKey ? <span className="badge mint">{uiText(" Ready")}</span> : <span className="badge">{uiText('Not set up')}</span>}
+        {settings.hasElevenLabsKey ? <span className="badge mint">{uiText(' Ready')}</span> : <span className="badge">{uiText('Not set up')}</span>}
         <span className="account-head-end hint">{uiText('For narration')}</span>
       </header>
       <Row
@@ -393,11 +465,11 @@ function CodexAccount({ status, refresh }: AccountProps) {
                 await refresh()
               }}
             >
-              <LogOut /> {uiText(" Sign out")}
+              <LogOut /> {uiText(' Sign out')}
             </button>
           ) : (
             <button className="btn primary small" disabled={busy} onClick={() => void login()}>
-              {busy && <span className="spinner" />} {uiText(" Sign in with ChatGPT")}
+              {busy && <span className="spinner" />} {uiText(' Sign in with ChatGPT')}
             </button>
           )}
         </div>
@@ -490,11 +562,11 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
                 await refresh()
               }}
             >
-              <LogOut /> {uiText(" Sign out")}
+              <LogOut /> {uiText(' Sign out')}
             </button>
           ) : (
             <button className="btn primary small" disabled={busy} onClick={() => void login()}>
-              {busy && <span className="spinner" />} {uiText(" Sign in with Google")}
+              {busy && <span className="spinner" />} {uiText(' Sign in with Google')}
             </button>
           )}
         </div>
@@ -620,11 +692,11 @@ function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { cho
                   await refresh()
                 }}
               >
-                <LogOut /> {uiText(" Sign out")}
+                <LogOut /> {uiText(' Sign out')}
               </button>
             ) : (
               <button className="btn primary small" disabled={busy} onClick={() => void login()}>
-                {busy && <span className="spinner" />} {uiText(" Sign in")}
+                {busy && <span className="spinner" />} {uiText(' Sign in')}
               </button>
             )}
           </div>
@@ -723,7 +795,10 @@ function ClaudeDesktopRow() {
   const text = !status?.installed
     ? 'Ask Claude Desktop to make a video from your discussion. Learn works in the background; Create opens the editor. The video is returned as a chat resource and saved in your library. Install the extension to connect.'
     : outdated
-      ? format('Claude Desktop has version {0} of the extension and this app ships {1}. Update it so both have the same tools.', [status.version, status.current])
+      ? format('Claude Desktop has version {0} of the extension and this app ships {1}. Update it so both have the same tools.', [
+          status.version,
+          status.current,
+        ])
       : status.enabled
         ? 'The Manim Studio extension is installed. Ask Claude in the Claude desktop app for a maths video.'
         : 'The extension is installed but turned off. Turn it on in Claude Desktop → Settings → Extensions.'
@@ -735,7 +810,7 @@ function ClaudeDesktopRow() {
         </span>
       ) : (
         <button className="btn small" onClick={() => void api.installClaudeExtension().catch((e) => toast(errorText(e), 'error'))}>
-          <Plug /> {outdated ? uiText('Update in Claude Desktop') : uiText('Add to Claude Desktop')}
+          <Plug /> {outdated ? uiText('Update in Claude Desktop') : uiText('Connect')}
         </button>
       )}
     </Row>
@@ -1199,7 +1274,7 @@ function ReferenceRecorder() {
   return (
     <div className="reference">
       <div className="set-row-title">
-        {uiText("Your voice, for cloning ")}
+        {uiText('Your voice, for cloning ')}
         {has && <span className="badge mint">{uiText('saved')}</span>}
       </div>
       <p className="hint">{uiText('Read this naturally, 5–10 seconds:')}</p>
@@ -1290,7 +1365,7 @@ function GpuEncoding() {
           />
         )}
         <button className="btn small ghost" disabled={checking} onClick={() => void check(true)}>
-          {checking ? <span className="spinner" /> : <RefreshCw />} {uiText(" Check again")}
+          {checking ? <span className="spinner" /> : <RefreshCw />} {uiText(' Check again')}
         </button>
       </div>
     </Row>
@@ -1310,7 +1385,7 @@ function InstallButton({ component, state }: { component: Component; state: Comp
   if (state === 'ready')
     return (
       <span className="badge mint">
-        <Check /> {uiText(" Ready")}
+        <Check /> {uiText(' Ready')}
       </span>
     )
   if (state === 'unsupported') return <span className="badge">{uiText('Not supported on this computer')}</span>
@@ -1420,6 +1495,7 @@ function RenderServers() {
 }
 
 function AboutTab() {
+  const unlock = useRef({ count: 0, at: 0 })
   const app = useStore((s) => s.app)!
   const update = useStore((s) => s.update)
   const settings = useStore((s) => s.settings)!
@@ -1439,7 +1515,12 @@ function AboutTab() {
                 ? update.message
                 : ''
   return (
-    <div className="set-group">
+    <div
+      className="set-group"
+      onClickCapture={(event) => {
+        if (!(event.target as HTMLElement).closest('.version-unlock')) unlock.current.count = 0
+      }}
+    >
       <Row
         title={uiText('How you use Manim Studio')}
         text={
@@ -1526,7 +1607,26 @@ function AboutTab() {
           </button>
         </Row>
       )}
-      <Row title={format('Manim Studio {0}', [app.version])} text={format('{0} · {1} · open source (MIT)', [app.platform, app.arch])}>
+      <Row
+        title={
+          <button
+            className="version-unlock"
+            onClick={() => {
+              if (settings.developerMode) return
+              const now = Date.now()
+              unlock.current.count = now - unlock.current.at < 1600 ? unlock.current.count + 1 : 1
+              unlock.current.at = now
+              if (unlock.current.count === 5) {
+                void updateSettings({ developerMode: true })
+                toast('Developer mode enabled', 'ok')
+              }
+            }}
+          >
+            {format('Manim Studio {0}', [app.version])}
+          </button>
+        }
+        text={format('{0} · {1} · open source (MIT)', [app.platform, app.arch])}
+      >
         <button className="btn small" onClick={() => void api.checkForUpdates()}>
           {uiText('Check for updates')}
         </button>
@@ -1534,7 +1634,7 @@ function AboutTab() {
       {status && <p className="hint">{localize(status)}</p>}
       {update.state === 'available' && (
         <button className="btn primary small" onClick={() => void api.downloadUpdate()}>
-          {uiText("Download ")}
+          {uiText('Download ')}
           {update.version}
         </button>
       )}
@@ -1548,6 +1648,83 @@ function AboutTab() {
           {uiText('Download from GitHub')}
         </button>
       )}
+    </div>
+  )
+}
+
+function DevelopTab({ onDisable }: { onDisable: () => void }) {
+  const enabled = useStore((s) => !!s.settings?.developerEpisodeModels)
+  const settings = useStore((s) => s.settings)!
+  return (
+    <div className="set-group">
+      <Row
+        title={uiText('Episode model comparison')}
+        text={uiText(
+          'In Learn, choose an agent and model for each episode after reviewing a course or mini-series plan. Only connected accounts are offered. Assignments stay with the episodes when reordered and resumed.',
+        )}
+      >
+        <Tabs
+          radio={uiText('Episode model comparison')}
+          value={enabled ? 'on' : 'off'}
+          onChange={(v) => void updateSettings({ developerEpisodeModels: v === 'on' })}
+          items={[
+            { value: 'off', label: 'Off' },
+            { value: 'on', label: 'On' },
+          ]}
+        />
+      </Row>
+      <p className="hint">
+        {uiText(
+          'Each assigned model writes the script, makes the video and fixes its render. Automatic model fallback is disabled for comparisons so the results keep the model you selected.',
+        )}
+      </p>
+      {(
+        [
+          [
+            'developerUsageMetrics',
+            'Usage graphs',
+            'Record per-turn agent tokens, ElevenLabs request billing and account plan windows. Account percentages are shared with other apps; missing provider counters remain unavailable.',
+          ],
+          ['developerTimingMetrics', 'Episode timing', 'Measure scripting, implementation, render checks, fixes and export, with active and wall time.'],
+          [
+            'developerResourceMetrics',
+            'Hardware graphs',
+            'Sample Studio process-tree RAM and CPU, whole-computer CPU, and supported device-wide GPU counters about every five seconds. Unsupported counters are marked unavailable.',
+          ],
+        ] as const
+      ).map(([key, title, text]) => (
+        <Row key={key} title={uiText(title)} text={uiText(text)}>
+          <Tabs
+            radio={uiText(title)}
+            value={settings[key] ? 'on' : 'off'}
+            onChange={(value) => void updateSettings({ [key]: value === 'on' })}
+            items={[
+              { value: 'off', label: 'Off' },
+              { value: 'on', label: 'On' },
+            ]}
+          />
+        </Row>
+      ))}
+      <p className="hint">
+        {uiText(
+          'Measured episodes run one at a time, including export, for clearer attribution. Each episode gets an offline HTML report, and the series gets a combined report. Data stays in the project; measurement adds some overhead.',
+        )}
+      </p>
+      <button
+        className="btn small ghost"
+        onClick={async () => {
+          await updateSettings({
+            developerMode: false,
+            developerEpisodeModels: false,
+            developerUsageMetrics: false,
+            developerTimingMetrics: false,
+            developerResourceMetrics: false,
+          })
+          onDisable()
+        }}
+      >
+        {uiText('Turn off developer mode')}
+      </button>
     </div>
   )
 }
@@ -1578,7 +1755,7 @@ function KeyStatus({ check, fix }: { check: (again: boolean) => Promise<KeyCheck
       <div className="el-permissions">
         {!result && (
           <span className="faint">
-            <span className="spinner" /> {uiText(" Checking the key…")}
+            <span className="spinner" /> {uiText(' Checking the key…')}
           </span>
         )}
         {result?.items.map((i) => (
@@ -1587,7 +1764,7 @@ function KeyStatus({ check, fix }: { check: (again: boolean) => Promise<KeyCheck
           </span>
         ))}
         <button className="link-btn" disabled={busy} onClick={() => void run(true)} title={uiText('Tries the key again (one tiny request)')}>
-          {uiText(" Check again")}
+          {uiText(' Check again')}
         </button>
       </div>
       {result?.problem && (
@@ -1598,8 +1775,8 @@ function KeyStatus({ check, fix }: { check: (again: boolean) => Promise<KeyCheck
       )}
       {result && !result.problem && result.items.some((i) => !i.ok) && (
         <p className="key-error">
-          {uiText("Edit the key at ")}
-          {fix} {uiText(" and allow what’s crossed out, then check again.")}
+          {uiText('Edit the key at ')}
+          {fix} {uiText(' and allow what’s crossed out, then check again.')}
         </p>
       )}
     </div>
@@ -1633,12 +1810,12 @@ function ElevenLabsStatus() {
           </span>
         ))}
         <button className="link-btn" disabled={busy} onClick={() => void run(true)} title={uiText('Tries the key again (speaks one character)')}>
-          {uiText(" Check again")}
+          {uiText(' Check again')}
         </button>
       </div>
       {rejected ? (
         <p className="key-error">
-          {check.problem} {uiText(" Replace it with a key from elevenlabs.io → Developers → API keys.")}
+          {check.problem} {uiText(' Replace it with a key from elevenlabs.io → Developers → API keys.')}
         </p>
       ) : (
         <>
@@ -1652,8 +1829,8 @@ function ElevenLabsStatus() {
         <div className="el-usage" title={format('ElevenLabs {0} plan', [usage.tier])}>
           <ProgressLine value={usage.limit ? usage.used / usage.limit : 0} />
           <span className="hint">
-            {nf.format(usage.used)} {uiText(" of ")}
-            {nf.format(usage.limit)} {uiText(" characters this month")}
+            {nf.format(usage.used)} {uiText(' of ')}
+            {nf.format(usage.limit)} {uiText(' characters this month')}
             {usage.resetsAt ? format(' · resets {0}', [new Date(usage.resetsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })]) : ''}
           </span>
         </div>

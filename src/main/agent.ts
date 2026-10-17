@@ -5,7 +5,7 @@
 // With Codex or Antigravity chosen, the same agent runs on them (otherAgent): their bridge to
 // Studio's tools names the project, so several projects are worked on at once.
 import { randomUUID } from 'node:crypto'
-import type { ChatMessage, ChatPart, Effort } from '../shared/types'
+import type { Agent, ChatMessage, ChatPart, Effort } from '../shared/types'
 import type { UsageEntry } from '../shared/usage'
 import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
 import { antigravitySession } from './antigravity'
@@ -15,7 +15,7 @@ import { agentProjects } from './agent-projects'
 import { fakeAgent, fakeAgents } from './agent-fake'
 import { commitAll } from './git'
 import { readChat, readMeta, updateMetaAt, writeChat } from './projects'
-import { recordTurn } from './usage'
+import { appendUsage, recordTurn } from './usage'
 
 export interface EpisodeAgent {
   /** One turn: sends `text` and waits for Claude to finish. `step` labels its usage ("Script", "Video"…). */
@@ -28,6 +28,9 @@ export interface AgentOptions {
   onUsage: (entry: UsageEntry) => void
   model?: string // the series' own choice; otherwise the chat's (Settings)
   effort?: Effort
+  agent?: Agent
+  allowFallback?: boolean
+  strictModel?: boolean // an experiment supplies its effort explicitly, including no effort
 }
 
 /** Projects a background agent is working on: the chat leaves them alone until it's done. */
@@ -35,12 +38,15 @@ export const agentBusy = new Set<string>()
 
 export async function episodeAgent(dir: string, opts: AgentOptions): Promise<EpisodeAgent> {
   if (fakeAgents()) return fakeAgent(dir, opts) // driving the app in tests
-  if (codexChosen()) return otherAgent(dir, opts, 'codex')
-  if (antigravityChosen()) return otherAgent(dir, opts, 'antigravity')
+  if (opts.agent ? opts.agent === 'codex' : codexChosen()) return otherAgent(dir, opts, 'codex')
+  if (opts.agent ? opts.agent === 'antigravity' : antigravityChosen()) return otherAgent(dir, opts, 'antigravity')
   const { onTool } = opts
   const { query } = await sdk()
   const inbox = new Inbox()
-  const q = query({ prompt: inbox, options: await studioOptions(dir, { autopilot: true, model: opts.model, effort: opts.effort }) })
+  const q = query({
+    prompt: inbox,
+    options: await studioOptions(dir, { autopilot: true, model: opts.model, effort: opts.strictModel && !opts.effort ? null : opts.effort }),
+  })
   agentBusy.add(dir)
   const messages = readChat(dir)
   let reply = null as ChatMessage | null // the turn being answered (set by turn())
@@ -129,29 +135,68 @@ function otherAgent(dir: string, opts: AgentOptions, agent: 'codex' | 'antigravi
   agentProjects.add(dir)
   const messages = readChat(dir)
   let reply: ChatMessage | null = null
+  let step = '',
+    startedAt = 0
+  let tools: Record<string, number> = {}
   const on = {
     part(part: ChatPart) {
       if (!reply) return
       reply.parts.push(part)
-      if (part.kind === 'tool') opts.onTool(part.summary)
+      if (part.kind === 'tool') {
+        opts.onTool(part.summary)
+        tools[part.name] = (tools[part.name] ?? 0) + 1
+      }
     },
     status(id: string, status: 'ok' | 'error') {
       const part = reply?.parts.find((p) => p.kind === 'tool' && p.id === id)
       if (part && part.kind === 'tool') part.status = status
+    },
+    usage(raw: Record<string, number>, model: string) {
+      const cached = raw.cached_input_tokens ?? raw.cache_read_tokens ?? 0
+      const entry: UsageEntry = {
+        at: Date.now(),
+        step,
+        session: agent === 'codex' ? readMeta(dir).codexThreadId : readMeta(dir).antigravityConversationId,
+        provider: agent,
+        providerUsage: raw,
+        costKnown: false,
+        tools: { ...tools },
+        ms: Date.now() - startedAt,
+        models: {
+          [model]: {
+            input: agent === 'codex' ? Math.max(0, (raw.input_tokens ?? 0) - cached) : (raw.input_tokens ?? 0),
+            output: raw.output_tokens ?? 0,
+            cacheRead: cached,
+            cacheWrite: 0,
+            costUSD: 0,
+          },
+        },
+      }
+      appendUsage(dir, entry)
+      opts.onUsage(entry)
     },
   }
   const meta = readMeta(dir)
   const instructions = studioPrompt(dir, agent, true)
   const session =
     agent === 'codex'
-      ? codexSession(dir, instructions, meta.codexThreadId, { ...on, thread: (id) => updateMetaAt(dir, { codexThreadId: id }) })
-      : antigravitySession(dir, instructions, meta.antigravityConversationId, {
-          ...on,
-          conversation: (id) => updateMetaAt(dir, { antigravityConversationId: id }),
-        })
+      ? codexSession(dir, instructions, meta.codexThreadId, { ...on, thread: (id) => updateMetaAt(dir, { codexThreadId: id }) }, opts)
+      : antigravitySession(
+          dir,
+          instructions,
+          meta.antigravityConversationId,
+          {
+            ...on,
+            conversation: (id) => updateMetaAt(dir, { antigravityConversationId: id }),
+          },
+          opts,
+        )
   const name = agent === 'codex' ? 'Codex' : 'Antigravity'
   return {
-    async turn(text) {
+    async turn(text, label) {
+      step = label
+      startedAt = Date.now()
+      tools = {}
       messages.push({ id: randomUUID(), role: 'user', parts: [{ kind: 'text', text }], auto: true, at: Date.now() })
       reply = { id: randomUUID(), role: 'assistant', parts: [], auto: true, at: Date.now() }
       messages.push(reply)

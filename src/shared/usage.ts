@@ -11,6 +11,9 @@ export interface ModelTokens {
 }
 
 export interface UsageEntry {
+  provider?: 'claude' | 'codex' | 'antigravity'
+  providerUsage?: Record<string, number> // original CLI counters; no invented category semantics
+  costKnown?: boolean // false: this provider did not report an API price
   at: number
   step: string // "Script", "Video", "Fixing the render", "Chat", "Planning the series"…
   session?: string

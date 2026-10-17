@@ -4,7 +4,7 @@
 // queues the export. One run at a time; series mode (series.ts) runs these one after another.
 import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
-import type { ChatEvent, ExportOptions, ExportResult, QuickRequest, QuickRun, QuickStep } from '../shared/types'
+import type { Agent, ChatEvent, ExportOptions, ExportResult, QuickRequest, QuickRun, QuickStep } from '../shared/types'
 import { chatAndWait, chatInterrupt, claudeStatus, observeChat, setAutopilot } from './claude'
 import { setupStatus } from './env'
 import { turnPastLimits } from './agent'
@@ -40,10 +40,10 @@ const update = (patch: Partial<QuickRun>) => {
 const reach = (step: QuickStep) => run && STEPS.indexOf(step) > STEPS.indexOf(run.step) && update({ step })
 
 /** Throws, with what to do, when quick mode can't run here: it's busy, or Claude or manim is missing. */
-export async function ensureQuickReady(): Promise<void> {
+export async function ensureQuickReady(agent?: Agent): Promise<void> {
   if (run?.state === 'working') throw new Error('Quick mode is already making a video. Wait for it, or stop it.')
   if (setupStatus().env !== 'ready') throw new Error('The manim environment isn’t installed yet (Settings → Environment).')
-  const claude = await claudeStatus()
+  const claude = await claudeStatus(agent)
   if (!claude.loggedIn && !fakeAgents()) throw new Error('Sign in to your agent first (Settings → Accounts): quick mode needs it to write the video.')
 }
 

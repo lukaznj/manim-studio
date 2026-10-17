@@ -9,9 +9,12 @@ import { basename, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { SCRIPT_FILE, scriptStatus } from '../shared/script'
 import { TONES } from '../shared/tone'
+import { defaultAgentSelection, seriesAgentSelection } from '../shared/agent-selection'
 import type { Effort, EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
 import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
-import { askClaude, claudeStatus, languageName } from './claude'
+import { askClaude, chatModels, claudeStatus, languageName } from './claude'
+import { fakeAgents } from './agent-fake'
+import { beginEpisodeMetrics, episodeMetricsPhase, finishEpisodeMetrics } from './episode-metrics'
 import { cancelExport, queueExport } from './exports'
 import { cancel } from './render'
 import { createProject, readMeta, readScript } from './projects'
@@ -89,10 +92,29 @@ const two = (n: number) => String(n).padStart(2, '0')
 
 /** Creates the series folder and one project per episode; unattended, makes them all in quick mode. */
 export async function startSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>): Promise<void> {
-  if (start.unattended) await ensureQuickReady()
+  if (start.unattended) await ensureQuickReady(start.plan.episodes[0]?.assignment?.agent)
   if (start.unattended && series && series.state !== 'done')
     throw new Error('Another series is still on Home. Let it finish, or stop and dismiss it there, before starting a new one.')
   const { plan } = start
+  const settings = getSettings()
+  const assignments = plan.episodes.flatMap((ep) => (ep.assignment ? [ep.assignment] : []))
+  if (assignments.length) {
+    const learning = settings.mode === 'learn' || (settings.mode === 'both' && settings.homeTab === 'learn')
+    if (!settings.developerMode || !settings.developerEpisodeModels || !learning || !start.unattended)
+      throw new Error('Enable episode model comparison in Settings → Develop and start the series in Learn.')
+    if (assignments.length !== plan.episodes.length) throw new Error('Choose an agent and model for every episode.')
+    for (const agent of new Set(assignments.map((a) => a.agent))) {
+      if (!['claude', 'codex', 'antigravity'].includes(agent)) throw new Error('Unknown episode agent.')
+      if (fakeAgents()) continue
+      if (!(await claudeStatus(agent)).loggedIn) throw new Error(`Connect ${agent} in Settings → Accounts before starting this series.`)
+      const models = await chatModels(agent)
+      for (const assignment of assignments.filter((a) => a.agent === agent)) {
+        const model = models.find((m) => m.value === assignment.model && m.value)
+        if (!model || (assignment.effort && !model.efforts.includes(assignment.effort)))
+          throw new Error(`The selected model or effort is no longer offered by ${agent}. Review the episode assignments.`)
+      }
+    }
+  }
   const root = getSettings().projectsDir
   let folder = join(root, slugify(plan.title))
   for (let i = 2; existsSync(folder); i++) folder = join(root, `${slugify(plan.title)}-${i}`)
@@ -148,6 +170,7 @@ let exportOptions: ExportOptions = { themes: [], languages: [], languageVideos: 
 const agents = new Map<string, EpisodeAgent>() // by episode folder
 const steps = new Map<string, 'script' | 'video'>() // episodes whose agent step is running
 const exporting = new Set<string>()
+const reporting = new Map<string, Promise<void>>()
 let sendSeries: (run: SeriesRun | null) => void = () => {}
 
 const runFile = (folder: string) => join(folder, '.studio', 'series-run.json')
@@ -179,6 +202,12 @@ function save(): void {
 }
 
 const update = (ep: EpisodeRun, patch: Partial<EpisodeRun>) => {
+  if (patch.state) {
+    const phase = (
+      { script: 'Script', scripted: 'Waiting for video', scene: 'Implementation', check: 'Render check', export: 'Export' } as Record<string, string>
+    )[patch.state]
+    if (phase) episodeMetricsPhase(ep.dir, phase)
+  }
   Object.assign(ep, patch)
   save()
 }
@@ -195,6 +224,7 @@ export function pauseSeries(paused: boolean): void {
   if (!series || (paused ? series.state !== 'working' : series.state !== 'paused')) return
   series.state = paused ? 'paused' : 'working'
   if (paused) series.episodes.forEach(halt)
+  if (paused) series.episodes.filter((ep) => ep.state !== 'export').forEach((ep) => episodeMetricsPhase(ep.dir, 'Paused'))
   save()
   if (!paused) void drive()
 }
@@ -203,6 +233,7 @@ export function pauseEpisode(dir: string, paused: boolean): void {
   const ep = series?.episodes.find((e) => e.dir === dir)
   if (!ep) return
   update(ep, { held: paused })
+  if (paused && ep.state !== 'export') episodeMetricsPhase(ep.dir, 'Paused')
   if (paused) halt(ep)
 }
 
@@ -213,6 +244,7 @@ export function stopSeries(): void {
   for (const ep of series.episodes) {
     halt(ep)
     if (ep.exportJob && exporting.has(ep.dir)) cancelExport(ep.exportJob)
+    void finishMetrics(ep, series, 'stopped')
   }
   save()
 }
@@ -220,7 +252,10 @@ export function stopSeries(): void {
 /** Carries on with a stopped run: what didn't finish, including what failed, gets another go. */
 export async function continueSeries(): Promise<void> {
   if (series?.state !== 'stopped') return
-  await ensureQuickReady()
+  for (const agent of new Set(
+    series.episodes.filter((ep) => ep.state !== 'done').map((ep) => seriesAgentSelection(series!, ep, defaultAgentSelection(getSettings())).agent),
+  ))
+    await ensureQuickReady(agent)
   for (const ep of series.episodes) {
     if (ep.state !== 'failed' && ep.state !== 'stopped') continue
     const script = readScript(ep.dir)
@@ -241,15 +276,21 @@ export function dismissSeries(): void {
 }
 
 function startRun(title: string, folder: string, dirs: string[], start: SeriesStart, planningCostUSD?: number): void {
+  const selection = defaultAgentSelection(getSettings())
+  const settings = getSettings()
+  const flags = { usage: !!settings.developerUsageMetrics, timing: !!settings.developerTimingMetrics, resources: !!settings.developerResourceMetrics }
+  const metrics = settings.developerMode && Object.values(flags).some(Boolean) ? flags : undefined
   exportOptions = start.export
   series = {
     title,
     folder,
-    agents: Math.max(1, getSettings().seriesAgents || 3),
-    model: start.model,
-    effort: start.effort,
+    agents: metrics ? 1 : Math.max(1, getSettings().seriesAgents || 3),
+    metrics,
+    agent: selection.agent,
+    model: start.model ?? selection.model,
+    effort: start.effort ?? selection.effort,
     state: 'working',
-    episodes: dirs.map((dir) => ({ dir, title: readMeta(dir).name, state: 'waiting', warnings: [] })),
+    episodes: dirs.map((dir, i) => ({ dir, title: readMeta(dir).name, assignment: start.plan.episodes[i].assignment, state: 'waiting', warnings: [] })),
     planningCostUSD,
   }
   setSettings({ seriesRun: folder })
@@ -261,6 +302,21 @@ function startRun(title: string, folder: string, dirs: string[], start: SeriesSt
 async function drive(): Promise<void> {
   const run = series
   while (run && series === run && run.state === 'working') {
+    if (run.metrics) {
+      const episode = run.episodes.find((ep) => ep.state !== 'done' && ep.state !== 'failed')
+      if (!episode && !steps.size && !exporting.size && !reporting.size) {
+        run.state = 'done'
+        save()
+        return
+      }
+      if (episode && !episode.held && !steps.size && !exporting.size && !reporting.size) {
+        if (episode.state === 'waiting' || episode.state === 'script') launch(episode, 'script')
+        else if (['scripted', 'scene', 'check'].includes(episode.state)) launch(episode, 'video')
+        else if (episode.state === 'export') exportEpisode(episode, run)
+      }
+      await new Promise((r) => setTimeout(r, 500))
+      continue
+    }
     for (const ep of run.episodes) if (ep.state === 'export' && !exporting.has(ep.dir)) exportEpisode(ep, run)
 
     // A paused episode's script waits; the writer goes on with the next one.
@@ -320,14 +376,25 @@ async function episodeVideo(ep: EpisodeRun): Promise<void> {
 
 function exportEpisode(ep: EpisodeRun, run: SeriesRun): void {
   exporting.add(ep.dir)
-  const { job, finished } = queueExport(ep.dir, exportOptions)
-  update(ep, { exportJob: job.id })
-  finished
-    .then(
-      () => update(ep, { state: 'done' }),
-      (e: Error) => run.state === 'working' && update(ep, { state: 'failed', error: e.message }), // stopped: it exports again on Continue
-    )
-    .finally(() => exporting.delete(ep.dir))
+  void (async () => {
+    try {
+      await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, defaultAgentSelection(getSettings())), run.metrics)
+      stopIf(ep)
+      episodeMetricsPhase(ep.dir, 'Export')
+      const { job, finished } = queueExport(ep.dir, exportOptions)
+      update(ep, { exportJob: job.id })
+      await finished
+      await finishMetrics(ep, run, 'done')
+      update(ep, { state: 'done' })
+    } catch (e) {
+      if (run.state === 'working') {
+        await finishMetrics(ep, run, 'failed')
+        update(ep, { state: 'failed', error: (e as Error).message })
+      }
+    } finally {
+      exporting.delete(ep.dir)
+    }
+  })()
 }
 
 function stopIf(ep: EpisodeRun): void {
@@ -346,20 +413,24 @@ async function episodeStep(
 ): Promise<void> {
   const run = series!
   let again = !!ep.tried
-  update(ep, { state, activity: 'Starting', tried: true })
   let agent: EpisodeAgent | null = null
   try {
+    await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, defaultAgentSelection(getSettings())), run.metrics)
+    stopIf(ep)
+    update(ep, { state, activity: 'Starting', tried: true })
     writeEpisodeBible(ep.dir)
     agent = await episodeAgent(ep.dir, {
       onTool: (summary) => update(ep, { activity: summary }),
       onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models) }),
-      model: run.model,
-      effort: run.effort,
+      ...seriesAgentSelection(run, ep, defaultAgentSelection(getSettings())),
+      allowFallback: !ep.assignment,
+      strictModel: !!ep.assignment,
     })
     agents.set(ep.dir, agent)
     stopIf(ep)
     const a = agent
     await work(async (text, step) => {
+      episodeMetricsPhase(ep.dir, step === 'Script' ? 'Script' : step === 'Fixing the render' ? 'Fixing render' : 'Implementation')
       stopIf(ep)
       const ask = again ? `You were interrupted. Carry on where you stopped, with this task:\n\n${text}` : text
       again = false
@@ -374,6 +445,7 @@ async function episodeStep(
     })
     update(ep, { tried: false })
   } catch (e) {
+    if (!halted(ep)) await finishMetrics(ep, run, 'failed')
     update(ep, halted(ep) ? { activity: undefined } : { state: 'failed', error: (e as Error).message, activity: undefined, tried: false })
   } finally {
     if (agent) {
@@ -381,6 +453,26 @@ async function episodeStep(
       agent.close()
     }
   }
+}
+
+function finishMetrics(ep: EpisodeRun, run: SeriesRun, outcome: string): Promise<void> {
+  if (reporting.has(ep.dir)) return reporting.get(ep.dir)!
+  const pending = finishEpisodeMetrics(ep.dir, outcome, { title: run.title, folder: run.folder, dirs: run.episodes.map((e) => e.dir) })
+    .then((result) => {
+      if (result) {
+        ep.report = result.report
+        ep.elapsedMs = result.elapsedMs
+        run.report = result.seriesReport
+        if (series === run) save()
+      }
+    })
+    .catch((error) => {
+      ep.warnings.push(`Developer report: ${(error as Error).message}`)
+      if (series === run) save()
+    })
+    .finally(() => reporting.delete(ep.dir))
+  reporting.set(ep.dir, pending)
+  return pending
 }
 
 /** The name importSources would give a PDF: "Lecture 1.PDF" → lecture-1.pdf. */
