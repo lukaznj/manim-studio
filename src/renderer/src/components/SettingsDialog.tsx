@@ -1,4 +1,4 @@
-import { t as uiText, localize, format } from '../lib/i18n'
+import { t as uiText, localize, format, currentLanguage } from '../lib/i18n'
 import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Plus, RefreshCw, Settings2, Sparkles, Square, Sun, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
@@ -642,12 +642,12 @@ function PlanUsageList({ usage }: { usage: PlanUsage }) {
       <div className="eyebrow">{uiText('Plan usage · shared with claude.ai and Claude Desktop')}</div>
       {usage.windows.map((w) => (
         <div key={w.label} className={`plan-usage-row ${usageLevel(w.percent)}`}>
-          <span>{w.label}</span>
+          <span>{uiText(w.label)}</span>
           <span className="usage-bar">
             <span style={{ width: `${Math.min(100, w.percent)}%` }} />
           </span>
           <span className="mono">{Math.round(w.percent)}%</span>
-          <span className="hint">{w.resetsAt ? format('resets {0}', [resetTime(w.resetsAt)]) : ''}</span>
+          <span className="hint">{w.resetsAt ? format('resets {0}', [resetTime(w.resetsAt, currentLanguage())]) : ''}</span>
         </div>
       ))}
     </div>
@@ -723,7 +723,7 @@ function ClaudeDesktopRow() {
   const text = !status?.installed
     ? 'Ask Claude Desktop to make a video from your discussion. Learn works in the background; Create opens the editor. The video is returned as a chat resource and saved in your library. Install the extension to connect.'
     : outdated
-      ? `Claude Desktop has version ${status.version} of the extension and this app ships ${status.current}. Update it so both have the same tools.`
+      ? format('Claude Desktop has version {0} of the extension and this app ships {1}. Update it so both have the same tools.', [status.version, status.current])
       : status.enabled
         ? 'The Manim Studio extension is installed. Ask Claude in the Claude desktop app for a maths video.'
         : 'The extension is installed but turned off. Turn it on in Claude Desktop → Settings → Extensions.'

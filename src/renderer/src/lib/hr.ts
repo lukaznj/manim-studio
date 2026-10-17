@@ -679,6 +679,14 @@ export const hr: Record<string, string> = {
   'A key from platform.openai.com → API keys.': 'Ključ sa stranice platform.openai.com → API keys.',
   'A key from aistudio.google.com → API keys.': 'Ključ sa stranice aistudio.google.com → API keys.',
   'A key from console.anthropic.com → API keys.': 'Ključ sa stranice console.anthropic.com → API keys.',
+  'Ask Claude Desktop to make a video from your discussion. Learn works in the background; Create opens the editor. The video is returned as a chat resource and saved in your library. Install the extension to connect.':
+    'Zatražite od Claude Desktopa videozapis iz razgovora. Uči radi u pozadini, a Stvaraj otvara uređivač. Videozapis se vraća u razgovor i sprema u knjižnicu. Instalirajte dodatak za povezivanje.',
+  'Claude Desktop has version {0} of the extension and this app ships {1}. Update it so both have the same tools.':
+    'Claude Desktop ima inačicu dodatka {0}, a aplikacija uključuje {1}. Ažurirajte dodatak kako bi alati bili usklađeni.',
+  'The Manim Studio extension is installed. Ask Claude in the Claude desktop app for a maths video.':
+    'Dodatak Manim Studio je instaliran. Zatražite od Claudea u aplikaciji Claude Desktop matematički videozapis.',
+  'The extension is installed but turned off. Turn it on in Claude Desktop → Settings → Extensions.':
+    'Dodatak je instaliran, ali isključen. Uključite ga pod Claude Desktop → Settings → Extensions.',
   'Your own Anthropic API key, billed per use to its Console account.': 'Vaš Anthropic API ključ, uz naplatu po korištenju na Console računu.',
   'Your Claude account. Usage counts against your plan, shared with claude.ai and Claude Desktop.':
     'Vaš Claude račun. Korištenje se uračunava u plan, zajednički za claude.ai i Claude Desktop.',
