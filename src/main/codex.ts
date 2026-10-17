@@ -89,8 +89,11 @@ function run(cmd: string, args: string[]): Promise<string> {
   })
 }
 
-/** An OpenAI API key saved in Settings → Agent is used instead of the account sign-in. */
-const apiKey = () => getSecret('openai')
+/** Settings → Accounts: the ChatGPT sign-in or an OpenAI API key (before the switch existed, a saved key meant the key). */
+export const codexUsesKey = (): boolean => (getSettings().codexAuth ?? (getSecret('openai') ? 'api-key' : 'account')) === 'api-key'
+
+/** The OpenAI key, only while the switch says API key. */
+const apiKey = () => (codexUsesKey() ? getSecret('openai') : '')
 
 /** The CLI's environment: no inherited agent variables, its helpers on the PATH. */
 function codexEnv(): Record<string, string> {
@@ -105,7 +108,7 @@ function codexEnv(): Record<string, string> {
 export async function codexStatus(): Promise<ClaudeStatus> {
   const bin = installed()?.bin
   if (!bin) return { loggedIn: false, method: 'not-installed' }
-  if (apiKey()) return { loggedIn: true, method: 'api-key', subscription: 'API key' }
+  if (codexUsesKey()) return { loggedIn: !!apiKey(), method: 'api-key', subscription: apiKey() ? 'API key' : undefined }
   try {
     const out = await new Promise<string>((resolve) => {
       const child = spawn(bin, ['login', 'status'], { env: codexEnv(), windowsHide: true })
