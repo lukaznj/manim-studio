@@ -1,18 +1,85 @@
 // Croatian interface copy. English source strings are stable catalog keys.
 export const hr: Record<string, string> = {
+  'Your course': 'Vaš tečaj',
+  'Your library': 'Vaša zbirka',
+  '{0} of {1} lessons watched': 'Pogledano {0} od {1} lekcija',
+  'Course progress': 'Napredak tečaja',
+  'Course library': 'Sadržaj tečaja',
+  'Find a lesson': 'Pronađite lekciju',
+  'No matching lessons.': 'Nema odgovarajućih lekcija.',
+  'Practice what you learn': 'Uvježbajte naučeno',
+  'Add exercises to this course. They’ll appear here, with written solutions and videos.':
+    'Dodajte zadatke ovom tečaju. Ovdje će se prikazati s pisanim rješenjima i videozapisima.',
+  'Add lesson': 'Dodaj lekciju',
+  'Video player': 'Videoplayer',
+  'Play video': 'Pokreni video',
+  'Pause video': 'Pauziraj video',
+  'The video could not be loaded. Open its file to check it.': 'Video se nije mogao učitati. Otvorite njegovu datoteku kako biste ga provjerili.',
+  'Show video file': 'Prikaži videodatoteku',
+  'Video position': 'Položaj u videozapisu',
+  'Back 10 seconds': 'Natrag 10 sekundi',
+  'Forward 10 seconds': 'Naprijed 10 sekundi',
+  Unmute: 'Uključi zvuk',
+  Mute: 'Isključi zvuk',
+  'Mute (M)': 'Isključi zvuk (M)',
+  Volume: 'Glasnoća',
+  'Subtitles (C)': 'Titlovi (C)',
+  'Playback speed': 'Brzina reprodukcije',
+  'Exit full screen': 'Izađi iz cijelog zaslona',
+  'Full screen': 'Cijeli zaslon',
+  'Full screen (F)': 'Cijeli zaslon (F)',
+  'Browse chapters': 'Pregledaj poglavlja',
+  'Chapter {0} of {1}': 'Poglavlje {0} od {1}',
+  'Previous chapter': 'Prethodno poglavlje',
+  'Next chapter': 'Sljedeće poglavlje',
+  'Your lesson is being made. You can keep studying while it finishes.': 'Lekcija se izrađuje. Možete nastaviti učiti dok ne bude gotova.',
+  'Create lesson': 'Izradi lekciju',
+  'A new lesson for this course, using the same notation and video settings. It will appear after your existing lessons.':
+    'Nova lekcija ovog tečaja, s istim oznakama i postavkama videozapisa. Prikazat će se nakon postojećih lekcija.',
+  'Lesson title': 'Naslov lekcije',
+  'What would you like to learn?': 'Što želite naučiti?',
+  'Describe the topic, ask a question, or add PDFs below.': 'Opišite temu, postavite pitanje ili dodajte PDF datoteke u nastavku.',
+  'Remove PDF': 'Ukloni PDF',
+  'Ready to watch': 'Spremno za gledanje',
+  Preview: 'Pretpregled',
+  'Lesson {0}': 'Lekcija {0}',
+  'Need a little more clarity?': 'Želite jasnije objašnjenje?',
+  'Ask a question': 'Postavi pitanje',
+  'Go deeper': 'Saznaj više',
+  'A closer look': 'Detaljnije objašnjenje',
+  'A follow-up video is being made. It shows under this episode.': 'Dodatni video se izrađuje. Prikazuje se ispod ove epizode.',
+  'Create follow-up video': 'Izradi dodatni video',
+  'A short video that explains this moment more slowly, with the same notation. You can keep studying while it is made.':
+    'Kratak video koji sporije objašnjava ovaj trenutak, s istim oznakama. Možete nastaviti učiti dok se izrađuje.',
+  'Follow video': 'Prati video',
+  'Ask about this lesson': 'Pitajte o ovoj lekciji',
+  "Add a course's material, one PDF per lecture for example. Your selected agent reads it all and proposes the episodes: usually one per PDF, merged or split where that makes better videos. You review the plan before anything is made.":
+    'Dodajte materijale za tečaj, primjerice jedan PDF po predavanju. Odabrani agent čita sve i predlaže epizode: obično jednu po PDF-u, uz spajanje ili razdvajanje kad to daje bolje videozapise. Plan pregledavate prije početka izrade.',
+  'Optional: named from the material': 'Neobavezno: naziv prema materijalima',
+  'Your selected agent plans the episodes with it, and every episode follows it (series.md keeps it).':
+    'Odabrani agent prema ovome planira epizode, a svaka epizoda slijedi te upute (spremljene u series.md).',
+  'Model · {0}': 'Model · {0}',
+  'Loading models…': 'Učitavanje modela…',
+  'No models were returned. Check the selected agent in Settings → Accounts and retry.':
+    'Nema dostupnih modela. Provjerite odabranog agenta u Postavke → Računi i pokušajte ponovno.',
+  'For planning and every episode of this series; the chat keeps its own. Higher effort can take longer and use more of your plan.':
+    'Za planiranje i svaku epizodu ove serije; razgovor zadržava svoj model. Veći trud može trajati dulje i trošiti više vašeg plana.',
   Develop: 'Razvoj',
   'Usage graphs': 'Grafovi korištenja',
   'Episode timing': 'Trajanje epizode',
   'Hardware graphs': 'Grafovi hardvera',
   'Record per-turn agent tokens, ElevenLabs request billing and account plan windows. Account percentages are shared with other apps; missing provider counters remain unavailable.':
     'Bilježi tokene agenta po koraku, naplatu zahtjeva ElevenLabsa i ograničenja plana računa. Postotci računa zajednički su drugim aplikacijama; nedostajući brojači ostaju nedostupni.',
-  'Measure scripting, implementation, render checks, fixes and export, with active and wall time.': 'Mjeri pisanje scenarija, izradu, provjere prikaza, popravke i izvoz, uz aktivno i ukupno vrijeme.',
+  'Measure scripting, implementation, render checks, fixes and export, with active and wall time.':
+    'Mjeri pisanje scenarija, izradu, provjere prikaza, popravke i izvoz, uz aktivno i ukupno vrijeme.',
   'Sample Studio process-tree RAM and CPU, whole-computer CPU, and supported device-wide GPU counters about every five seconds. Unsupported counters are marked unavailable.':
     'Uzorkuje RAM i CPU stabla procesa Studija, CPU cijelog računala i podržane GPU brojače uređaja približno svakih pet sekundi. Nepodržani brojači označeni su kao nedostupni.',
   'Measured episodes run one at a time, including export, for clearer attribution. Each episode gets an offline HTML report, and the series gets a combined report. Data stays in the project; measurement adds some overhead.':
     'Mjerene epizode rade pojedinačno, uključujući izvoz, radi jasnijeg pripisivanja potrošnje. Svaka dobiva lokalno HTML izvješće, a serijal objedinjeno izvješće. Podaci ostaju u projektu; mjerenje stvara dodatno opterećenje.',
-  'Developer measurements are enabled. Episodes will run one at a time, through export, and produce HTML reports.': 'Razvojna mjerenja su uključena. Epizode će raditi pojedinačno do završetka izvoza i izrađivati HTML izvješća.',
-  'Measuring one episode at a time, from script through export. HTML reports appear as episodes finish.': 'Mjerenje pojedinačnih epizoda od scenarija do izvoza. HTML izvješća pojavljuju se nakon završetka epizoda.',
+  'Developer measurements are enabled. Episodes will run one at a time, through export, and produce HTML reports.':
+    'Razvojna mjerenja su uključena. Epizode će raditi pojedinačno do završetka izvoza i izrađivati HTML izvješća.',
+  'Measuring one episode at a time, from script through export. HTML reports appear as episodes finish.':
+    'Mjerenje pojedinačnih epizoda od scenarija do izvoza. HTML izvješća pojavljuju se nakon završetka epizoda.',
   'Elapsed: {0}': 'Trajanje: {0}',
   'HTML report': 'HTML izvješće',
   'Open series report': 'Otvori izvješće serijala',
@@ -675,10 +742,10 @@ export const hr: Record<string, string> = {
   'For planning and every episode of this series; the chat keeps its own. Opus and higher effort cost much more of your plan.':
     'Za planiranje i sve epizode serijala; razgovor zadržava vlastite postavke. Opus i veća razina razmišljanja troše znatno više plana.',
   'The series bible (series.md): audience, notation, visual vocabulary': 'Plan serijala (series.md): publika, oznake i vizualni stil',
-  'Claude is reading the material and planning': 'Agent čita materijal i planira',
+  'An agent is reading the material and planning': 'Agent čita materijal i planira',
   pages: 'stranica',
   'pages.': 'stranica.',
-  'The episodes appear here as Claude writes them; this usually takes a few minutes.':
+  'The episodes appear here as an agent writes them; this usually takes a few minutes.':
     'Epizode se pojavljuju dok ih agent piše; to obično traje nekoliko minuta.',
   'What these agent turns would cost on the API. On a Claude plan they count against its limits instead; the relative sizes show where the usage went.':
     'Procijenjeni API trošak ovih koraka agenta. Na pretplatničkom planu uračunavaju se u ograničenja; omjeri pokazuju potrošnju.',
@@ -705,8 +772,7 @@ export const hr: Record<string, string> = {
     'Vaš ChatGPT račun, s prijavom u pregledniku. Korištenje se uračunava u vaš plan.',
   'Your own OpenAI API key, billed per use to its platform.openai.com account.':
     'Vaš OpenAI API ključ, uz naplatu po korištenju na računu platform.openai.com.',
-  'Your Google account. Usage counts against your Google AI plan.':
-    'Vaš Google račun. Korištenje se uračunava u vaš Google AI plan.',
+  'Your Google account. Usage counts against your Google AI plan.': 'Vaš Google račun. Korištenje se uračunava u vaš Google AI plan.',
   'Your own Gemini API key, billed per use to its aistudio.google.com account.':
     'Vaš Gemini API ključ, uz naplatu po korištenju na računu aistudio.google.com.',
   'Sign-in opens in your browser.': 'Prijava se otvara u pregledniku.',

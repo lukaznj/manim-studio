@@ -1,10 +1,11 @@
 import { t as uiText, format } from '../lib/i18n'
-import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, RotateCcw, Sparkles } from 'lucide-react'
+import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, MessageCircleQuestion, RotateCcw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { api } from '../lib/api'
 import { canEdit, errorText, selectStudied, toast, useStore } from '../store'
 import { StudyPlayer } from './StudyPlayer'
+import { Modal } from './ui'
 
 // The study screen's lessons (StudyView.tsx): a series' episodes and follow-ups, or a single video
 // (src/main/watch.ts, ADR 0028).
@@ -16,15 +17,34 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
   return (
     <>
       <li>
-        <button className={`ex-row ${e.dir === selected ? 'on' : ''}`} onClick={() => void selectStudied(e.dir)}>
+        <button
+          className={`ex-row ${e.dir === selected ? 'on' : ''}`}
+          aria-current={e.dir === selected ? 'true' : undefined}
+          title={e.title}
+          onClick={() => void selectStudied(e.dir)}
+        >
           <span className="ex-num mono">{e.number}</span>
           <span className="ex-row-body">
             <span className="ex-row-title">{e.title}</span>
             <span className="ex-row-state">
-              {e.watched ? uiText('Watched') : e.video ? uiText('Not watched yet') : uiText('Preview only: export it for the full quality')}
+              {e.state === 'making'
+                ? (e.activity ?? uiText('Making the video'))
+                : e.state === 'failed'
+                  ? uiText('Didn’t finish')
+                  : e.watched
+                    ? uiText('Watched')
+                    : e.video
+                      ? uiText('Ready to watch')
+                      : uiText('Preview')}
             </span>
           </span>
-          {e.watched && <Eye className="ex-state-icon watched" />}
+          {e.state === 'making' ? (
+            <span className="spinner" />
+          ) : e.state === 'failed' ? (
+            <CircleAlert className="ex-state-icon failed" />
+          ) : (
+            e.watched && <Check className="ex-state-icon watched" />
+          )}
         </button>
       </li>
       {e.followUps.map((f) => (
@@ -66,21 +86,26 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
     void api.watchDetail(dir).then(setDetail, () => setDetail(null))
   }, [dir, followUp?.state, episode.video])
   const src = detail?.video ?? detail?.preview
+  const state = followUp?.state ?? episode.state
+  const error = followUp?.error ?? episode.error
 
   return (
     <div className="ex-detail">
       <header className="ex-detail-head">
         <div>
           <span className="eyebrow">
-            {followUp ? format('Follow-up to episode {0}', [episode.number]) : single ? uiText('Video') : format('Episode {0}', [episode.number])}
+            {followUp ? format('Follow-up to episode {0}', [episode.number]) : single ? uiText('Video') : format('Lesson {0}', [episode.number])}
           </span>
           <h1>{followUp ? followUp.request : episode.title}</h1>
         </div>
         <div className="ex-detail-actions">
           <WatchedToggle dir={dir} watched={!!(followUp ? followUp.watched : episode.watched)} />
-          {followUp?.state === 'failed' && (
-            <button className="btn small" onClick={() => void api.retryFollowUp(dir).catch((e) => toast(errorText(e), 'error'))}>
-              <RotateCcw /> {uiText(" Try again")}
+          {state === 'failed' && (
+            <button
+              className="btn small"
+              onClick={() => void (followUp ? api.retryFollowUp(dir) : api.retryCourseLesson(dir)).catch((e) => toast(errorText(e), 'error'))}
+            >
+              <RotateCcw /> {uiText(' Try again')}
             </button>
           )}
           {editing && (
@@ -89,12 +114,12 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
               title={uiText('The code, timeline and voice of this video')}
               onClick={() => useStore.setState({ screen: 'editor' })}
             >
-              <Code2 /> {uiText(" Open in editor")}
+              <Code2 /> {uiText(' Open in editor')}
             </button>
           )}
         </div>
       </header>
-      {followUp?.state === 'failed' && followUp.error && <p className="ex-error">{followUp.error}</p>}
+      {state === 'failed' && error && <p className="ex-error">{error}</p>}
 
       {src ? (
         <>
@@ -110,9 +135,9 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
         </>
       ) : (
         <section className="ex-card ex-player-wait faint">
-          {followUp?.state === 'making' ? (
+          {state === 'making' ? (
             <span>
-              <span className="spinner" /> {followUp.activity ?? uiText('Making the video')}…
+              <span className="spinner" /> {followUp?.activity ?? episode.activity ?? uiText('Making the video')}…
             </span>
           ) : (
             <span>{uiText('Nothing rendered yet.')}</span>
@@ -130,6 +155,7 @@ export function WatchedToggle({ dir, watched }: { dir: string; watched: boolean 
   return (
     <button
       className={`btn small ${watched ? '' : 'ghost'}`}
+      aria-pressed={watched}
       onClick={() => void api.setWatched(dir, !watched)}
       title={watched ? uiText('Mark as not watched') : uiText('Mark as watched')}
     >
@@ -144,54 +170,81 @@ function FollowUpRequest({ dir }: { dir: string }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  if (!open)
-    return (
-      <div className="ex-explain">
-        <button className="btn small" onClick={() => setOpen(true)}>
-          <Sparkles /> {uiText(" Explain this part in a new video")}
-        </button>
-        <span className="faint">{uiText('For a quick question, ask in the chat: it knows where in the video you are.')}</span>
-      </div>
-    )
+  const [moment, setMoment] = useState(0)
   return (
-    <div className="ex-explain open">
-      <label className="label" htmlFor="watch-follow">
-        {uiText("What should a new video explain further, around ")}
-        {clock(at)}?
-      </label>
-      <textarea
-        id="watch-follow"
-        className="textarea"
-        rows={3}
-        autoFocus
-        placeholder={uiText('e.g. I don’t see why the current splits here, and where R₂₃ comes from.')}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
-      <div className="ex-explain-actions">
-        <button className="btn ghost small" onClick={() => setOpen(false)}>
-          {uiText('Cancel')}
-        </button>
-        <button
-          className="btn primary small"
-          disabled={!text.trim() || busy}
-          onClick={async () => {
-            setBusy(true)
-            try {
-              await api.requestFollowUp(dir, at, text)
-              setOpen(false)
-              setText('')
-              toast('A follow-up video is being made. It shows under this episode.', 'ok')
-            } catch (e) {
-              toast(errorText(e), 'error')
-            } finally {
-              setBusy(false)
-            }
-          }}
-        >
-          {busy ? <span className="spinner" /> : <Sparkles />} {uiText(" Make the video")}
-        </button>
+    <>
+      <div className="study-lesson-tools">
+        <span className="hint">{uiText('Need a little more clarity?')}</span>
+        <div>
+          <button className="btn small ghost" onClick={() => useStore.setState({ studyTab: 'chat', chatDraft: '' })}>
+            <MessageCircleQuestion />
+            {uiText('Ask a question')}
+          </button>
+          <button
+            className="btn small"
+            onClick={() => {
+              setMoment(at)
+              setOpen(true)
+            }}
+          >
+            <Sparkles />
+            {uiText('Go deeper')}
+          </button>
+        </div>
       </div>
-    </div>
+      <Modal
+        open={open}
+        onClose={() => !busy && setOpen(false)}
+        title={uiText('A closer look')}
+        icon={<Sparkles className="head-icon" />}
+        width={520}
+        footer={
+          <>
+            <button className="btn ghost" disabled={busy} onClick={() => setOpen(false)}>
+              {uiText('Cancel')}
+            </button>
+            <button
+              className="btn primary"
+              disabled={!text.trim() || busy}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  await api.requestFollowUp(dir, moment, text)
+                  setOpen(false)
+                  setText('')
+                  toast(uiText('A follow-up video is being made. It shows under this episode.'), 'ok')
+                } catch (e) {
+                  toast(errorText(e), 'error')
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              {busy ? <span className="spinner" /> : <Sparkles />}
+              {uiText('Create follow-up video')}
+            </button>
+          </>
+        }
+      >
+        <div className="modal-body quick-form">
+          <p className="hint">
+            {uiText('A short video that explains this moment more slowly, with the same notation. You can keep studying while it is made.')}
+          </p>
+          <label className="label" htmlFor="watch-follow">
+            {uiText('What should a new video explain further, around ')}
+            {clock(moment)}?
+          </label>
+          <textarea
+            id="watch-follow"
+            className="textarea ex-input"
+            rows={4}
+            data-autofocus
+            placeholder={uiText('e.g. I don’t see why the current splits here, and where R₂₃ comes from.')}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </div>
+      </Modal>
+    </>
   )
 }

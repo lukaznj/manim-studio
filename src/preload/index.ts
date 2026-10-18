@@ -76,6 +76,8 @@ const methods = [
   'courseExercises',
   'watchDetail',
   'requestFollowUp',
+  'addCourseLesson',
+  'retryCourseLesson',
   'retryFollowUp',
   'setWatched',
   'renderServers',

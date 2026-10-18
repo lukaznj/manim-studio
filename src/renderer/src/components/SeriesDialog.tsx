@@ -37,6 +37,12 @@ export function SeriesDialog() {
   const [catalogReady, setCatalogReady] = useState(false)
   const [catalogErrors, setCatalogErrors] = useState<string[]>([])
   const settings = useStore((s) => s.settings)
+  const agent = settings?.agent ?? 'claude'
+  const [planningCatalog, setPlanningCatalog] = useState<{ agent: Agent; models: ModelOption[]; error?: string } | null>(null)
+  const [catalogAttempt, setCatalogAttempt] = useState(0)
+  const planningModels = planningCatalog?.agent === agent ? planningCatalog.models : []
+  const planningError = planningCatalog?.agent === agent ? planningCatalog.error : undefined
+  const planningReady = planningModels.length > 0 && !planningError
   const [model, setModel] = useState('')
   const [effort, setEffort] = useState<Effort>('high')
   const [server, setServer] = useState<string | undefined>()
@@ -57,6 +63,29 @@ export function SeriesDialog() {
     setPlan(null)
     setBusy(null)
   }, [open]) // a fresh form each time
+
+  useEffect(() => {
+    if (!open) return
+    let active = true
+    const selection = settings && defaultAgentSelection(settings)
+    setModel(selection?.model ?? '')
+    setEffort(selection?.effort || 'high')
+    setPlanningCatalog(null)
+    void api.chatModels(agent).then(
+      (models) => {
+        if (active)
+          setPlanningCatalog({
+            agent,
+            models,
+            error: models.length ? undefined : uiText('No models were returned. Check the selected agent in Settings → Accounts and retry.'),
+          })
+      },
+      (error) => active && setPlanningCatalog({ agent, models: [], error: errorText(error) }),
+    )
+    return () => {
+      active = false
+    }
+  }, [open, agent, catalogAttempt])
 
   useEffect(() => {
     if (!open || !comparison) return
@@ -126,6 +155,7 @@ export function SeriesDialog() {
   const name = (p: string) => p.split(/[\\/]/).pop() ?? p
 
   const makePlan = async () => {
+    if (!planningReady) return
     setBusy('planning')
     setProgress(null)
     cancelled.current = false
@@ -219,7 +249,12 @@ export function SeriesDialog() {
             <button className="btn ghost" onClick={busy === 'planning' ? cancelPlan : closeDialog}>
               {busy === 'planning' ? uiText('Stop planning') : uiText('Cancel')}
             </button>
-            <button className="btn primary" disabled={!pdfs.length || !!busy || !!voiceIssue} title={voiceIssue ?? undefined} onClick={() => void makePlan()}>
+            <button
+              className="btn primary"
+              disabled={!pdfs.length || !!busy || !!voiceIssue || !planningReady}
+              title={voiceIssue ?? undefined}
+              onClick={() => void makePlan()}
+            >
               {busy === 'planning' ? <span className="spinner" /> : <Library />} {busy === 'planning' ? uiText('Planning…') : uiText('Plan the episodes')}
             </button>
           </>
@@ -232,7 +267,7 @@ export function SeriesDialog() {
         <div className="modal-body quick-form">
           <p className="hint">
             {uiText(
-              "Add a course's material, one PDF per lecture for example. Claude reads it all and proposes the episodes: usually one per PDF, merged or split where that makes better videos. You review the plan before anything is made.",
+              "Add a course's material, one PDF per lecture for example. Your selected agent reads it all and proposes the episodes: usually one per PDF, merged or split where that makes better videos. You review the plan before anything is made.",
             )}
           </p>
           <div className="field">
@@ -241,7 +276,7 @@ export function SeriesDialog() {
               id="series-title"
               className="input"
               data-autofocus
-              placeholder={uiText('Optional: Claude names it from the material')}
+              placeholder={uiText('Optional: named from the material')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -256,7 +291,7 @@ export function SeriesDialog() {
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
             />
-            <span className="hint">{uiText('Claude plans the episodes with it, and every episode follows it (series.md keeps it).')}</span>
+            <span className="hint">{uiText('Your selected agent plans the episodes with it, and every episode follows it (series.md keeps it).')}</span>
           </div>
           <div
             className={`series-pdfs ${dragging ? 'dragging' : ''}`}
@@ -308,17 +343,31 @@ export function SeriesDialog() {
           )}
           {
             <div className="field">
-              <span className="label">{uiText('Model')}</span>
-              <ModelPicker
-                model={model}
-                effort={effort}
-                onChange={(m, e) => {
-                  setModel(m)
-                  if (e) setEffort(e)
-                }}
-              />
+              <span className="label">{format('Model · {0}', [AGENT_LABELS[agent]])}</span>
+              {planningError ? (
+                <div className="hint" role="alert">
+                  {planningError}{' '}
+                  <button className="link-btn" onClick={() => setCatalogAttempt((n) => n + 1)}>
+                    {uiText('Retry')}
+                  </button>
+                </div>
+              ) : !planningReady ? (
+                <span className="hint" role="status">
+                  <span className="spinner" /> {uiText('Loading models…')}
+                </span>
+              ) : (
+                <ModelPicker
+                  model={model}
+                  effort={effort}
+                  models={planningModels}
+                  onChange={(m, e) => {
+                    setModel(m)
+                    if (e) setEffort(e)
+                  }}
+                />
+              )}
               <span className="hint">
-                {uiText('For planning and every episode of this series; the chat keeps its own. Opus and higher effort cost much more of your plan.')}
+                {uiText('For planning and every episode of this series; the chat keeps its own. Higher effort can take longer and use more of your plan.')}
               </span>
             </div>
           }
@@ -483,7 +532,7 @@ function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlan
               ? uiText('Writing the series bible')
               : episodes.length
                 ? format('Planning episode {0}', [episodes.length])
-                : uiText('Claude is reading the material and planning')}
+                : uiText('An agent is reading the material and planning')}
         </strong>
         <span className="mono faint">{clock(progress?.startedAt)}</span>
       </div>
@@ -514,7 +563,7 @@ function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlan
               {pdfs.length} {uiText(' PDFs, ')}
               {pages} {uiText(' pages.')}{' '}
               {!episodes.length
-                ? uiText('The episodes appear here as Claude writes them; this usually takes a few minutes.')
+                ? uiText('The episodes appear here as an agent writes them; this usually takes a few minutes.')
                 : progress.stage === 'bible'
                   ? format('The {0} episodes:', [episodes.length])
                   : format('Episodes so far ({0}):', [episodes.length])}
