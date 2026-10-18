@@ -210,6 +210,9 @@ export interface WatchEpisode {
   video?: string // the exported video, else none (the preview plays meanwhile)
   watched?: boolean
   followUps: FollowUp[]
+  state?: 'making' | 'failed'
+  activity?: string
+  error?: string
 }
 
 export interface WatchSeries {
@@ -905,6 +908,8 @@ export interface StudioApi {
   watchDetail(dir: string): Promise<WatchDetail>
   /** Makes a new video explaining the part of an episode at `at` further, as the viewer asks. */
   requestFollowUp(dir: string, at: number, request: string): Promise<void>
+  addCourseLesson(folder: string, request: { title: string; prompt: string; sources: string[] }): Promise<string>
+  retryCourseLesson(dir: string): Promise<void>
   retryFollowUp(dir: string): Promise<void>
   /** Marks a video (an episode, follow-up or exercise) watched or not; its list updates. */
   setWatched(dir: string, watched: boolean): Promise<void>

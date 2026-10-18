@@ -18,28 +18,30 @@ export function findInTranscript(): void {
   window.dispatchEvent(new Event('studio:find'))
 }
 
-/** After you scroll the transcript yourself, it stops following the video for this long. */
-const HOLD_MS = 3500
-
 /**
  * Everything the video says, as a column of lines that follows it (ADR 0032): the line being said
  * is lit, a click plays from a line, and searching jumps the transcript and the video to each match.
  * `version` changes when the video does (a new render or export), so its words are read again.
  */
-export function Transcript({ dir, version, head }: { dir: string; version: string; head: React.ReactNode }) {
+export function Transcript({ dir, version, head }: { dir: string; version: string; head?: React.ReactNode }) {
   const [lines, setLines] = useState<Subtitle[] | null>(null)
   const [query, setQuery] = useState('')
   const [pick, setPick] = useState(0) // which hit is chosen
   const now = useStore((s) => s.watchTime ?? 0)
   const list = useRef<HTMLOListElement>(null)
-  const scrolledAt = useRef(0)
+  const [following, setFollowing] = useState(true)
   const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    let active = true
+    setLines(null)
     void api.watchDetail(dir).then(
-      (d) => setLines(d.subtitles),
-      () => setLines([]),
+      (d) => active && setLines(d.subtitles),
+      () => active && setLines([]),
     )
+    return () => {
+      active = false
+    }
   }, [dir, version])
 
   const hits = useMemo(() => transcriptHits(lines ?? [], query), [lines, query])
@@ -50,14 +52,14 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
   useEffect(() => {
     if (!hit || !lines) return
     seekStudy(lines[hit.line].start)
-    scrolledAt.current = 0
+    setFollowing(false)
     scrollTo(hit.line)
   }, [hit?.line, hit?.from, query])
 
-  // The lit line stays in the middle, unless you're reading elsewhere.
+  // Keep the active line visible; manual reading pauses following until the user resumes it.
   useEffect(() => {
-    if (current >= 0 && Date.now() - scrolledAt.current > HOLD_MS) scrollTo(current)
-  }, [current])
+    if (current >= 0 && following) scrollTo(current)
+  }, [current, following])
 
   // Cmd/Ctrl+F: the search takes the cursor, now or once the lines are in (the box is off until then).
   useEffect(() => {
@@ -77,14 +79,16 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
     const box = list.current
     if (!el || !box) return
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
-    box.scrollTo({ top: el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2, behavior: reduce ? 'auto' : 'smooth' })
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop
+    const visible = top >= box.scrollTop + 12 && top + el.offsetHeight <= box.scrollTop + box.clientHeight - 12
+    if (!visible) box.scrollTo({ top: Math.max(0, top - box.clientHeight * 0.3), behavior: reduce ? 'auto' : 'smooth' })
   }
 
   const step = (by: number) => hits.length && setPick((p) => (Math.min(p, hits.length - 1) + by + hits.length) % hits.length)
 
   return (
-    <div className="lyrics-pane">
-      <div className="pane-head">{head}</div>
+    <div className={`lyrics-pane ${!head ? 'embedded' : ''}`}>
+      {head && <div className="pane-head">{head}</div>}
       <div className="lyrics-search">
         <label className="ex-search">
           <Search />
@@ -98,6 +102,7 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
             onChange={(e) => {
               setQuery(e.target.value)
               setPick(0)
+              if (!e.target.value) setFollowing(true)
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -106,15 +111,29 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
               } else if (e.key === 'Escape' && query) {
                 e.stopPropagation()
                 setQuery('')
+                setFollowing(true)
               }
             }}
           />
           {query && (
-            <button className="icon-btn" aria-label={uiText('Clear the search')} onClick={() => setQuery('')}>
+            <button
+              className="icon-btn"
+              aria-label={uiText('Clear the search')}
+              onClick={() => {
+                setQuery('')
+                setFollowing(true)
+              }}
+            >
               <X />
             </button>
           )}
         </label>
+        {!following && !query && (
+          <button className="lyrics-follow link-btn" onClick={() => setFollowing(true)}>
+            <ChevronDown />
+            {uiText('Follow video')}
+          </button>
+        )}
         {query.trim() && (
           <div className="lyrics-count">
             <span className={hits.length ? 'faint' : 'error-text'}>
@@ -150,15 +169,18 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
         <ol
           className="lyrics"
           ref={list}
-          onWheel={() => (scrolledAt.current = Date.now())}
-          onTouchMove={() => (scrolledAt.current = Date.now())}
-          onKeyDown={(e) => ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(e.key) && (scrolledAt.current = Date.now())}
+          onWheel={() => setFollowing(false)}
+          onTouchMove={() => setFollowing(false)}
+          onKeyDown={(e) => ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(e.key) && setFollowing(false)}
         >
           {lines.map((l, i) => (
             <li key={i} className={`lyric ${i === current ? 'now' : i < current ? 'past' : ''}`}>
               <button
                 className="lyric-line"
-                onClick={() => ((scrolledAt.current = 0), seekStudy(l.start, true))}
+                onClick={() => {
+                  setFollowing(true)
+                  seekStudy(l.start, true)
+                }}
                 title={format('Play from {0}', [clock(l.start)])}
               >
                 <Marked text={l.text} hits={hits.filter((h) => h.line === i)} chosen={hit?.line === i ? hit : undefined} />

@@ -73,6 +73,7 @@ export function Tabs<T extends string>(props: {
   onChange: (v: T) => void
   items: { value: T; label: ReactNode }[]
   radio?: string
+  label?: string
   disabled?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -97,7 +98,25 @@ export function Tabs<T extends string>(props: {
     return () => observer.disconnect()
   }, [props.value, props.items.length])
   return (
-    <div ref={ref} className="tabs" role={props.radio ? 'radiogroup' : 'tablist'} aria-label={props.radio}>
+    <div
+      ref={ref}
+      className="tabs"
+      role={props.radio ? 'radiogroup' : 'tablist'}
+      aria-label={props.radio ?? props.label}
+      onKeyDown={(e) => {
+        if (props.disabled || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+        e.preventDefault()
+        const selected = props.items.findIndex((it) => it.value === props.value)
+        const index =
+          e.key === 'Home'
+            ? 0
+            : e.key === 'End'
+              ? props.items.length - 1
+              : (selected + (e.key === 'ArrowRight' ? 1 : -1) + props.items.length) % props.items.length
+        props.onChange(props.items[index].value)
+        ref.current?.querySelectorAll('button')[index]?.focus()
+      }}
+    >
       <span
         aria-hidden
         className="tabs-indicator"
@@ -109,6 +128,7 @@ export function Tabs<T extends string>(props: {
           role={props.radio ? 'radio' : 'tab'}
           {...(props.radio ? { 'aria-checked': props.value === it.value } : { 'aria-selected': props.value === it.value })}
           disabled={props.disabled}
+          tabIndex={props.value === it.value ? 0 : -1}
           onClick={() => props.onChange(it.value)}
         >
           {localize(it.label)}

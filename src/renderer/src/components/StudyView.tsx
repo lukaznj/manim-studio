@@ -1,25 +1,33 @@
-import { t as uiText } from '../lib/i18n'
-import { Captions, Plus, Sparkles } from 'lucide-react'
+import { t as uiText, format } from '../lib/i18n'
+import { BookOpen, Captions, ListChecks, Plus, Search, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { addCourseExercises, openDialog, useStore } from '../store'
 import { ChatPane } from './ChatPane'
+import { AddLessonDialog } from './AddLessonDialog'
 import { ExerciseActions, ExerciseEmpty, ExerciseHits, ExerciseMain, ExerciseRows, ExerciseSearch, useExerciseHits } from './ExerciseView'
 import { EpisodeRow, Watched } from './LessonView'
 import { findInTranscript, Transcript } from './Transcript'
+import { Tabs } from './ui'
 
-/**
- * A course to study (ADR 0030): its lessons (a series' episodes with their follow-ups, or one video)
- * and its exercises, in one list, with the selected one in the middle and the chat beside it. A
- * series, an exercise set and a series with its own set all open here.
- */
+/** Video first, with one library section and one assistant panel visible at a time. */
 export function StudyView() {
   const series = useStore((s) => s.watchSeries)
   const set = useStore((s) => s.exerciseSet)
   const path = useStore((s) => s.project?.path)
-  const [query, setQuery] = useState('')
-  const hits = useExerciseHits(query)
   const tab = useStore((s) => s.studyTab)
-  // Cmd/Ctrl+F searches what the video says.
+  const item = set?.items.find((i) => i.dir === path)
+  const [library, setLibrary] = useState<'lessons' | 'exercises'>(series ? 'lessons' : 'exercises')
+  const [query, setQuery] = useState('')
+  const [lessonQuery, setLessonQuery] = useState('')
+  const [adding, setAdding] = useState(false)
+  const hits = useExerciseHits(library === 'exercises' ? query : '')
+  useEffect(() => {
+    setLibrary(item || !series ? 'exercises' : 'lessons')
+  }, [path, series?.folder, set?.folder])
+  useEffect(() => {
+    setQuery('')
+    setLessonQuery('')
+  }, [series?.folder, set?.folder])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
@@ -31,87 +39,178 @@ export function StudyView() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   if (!series && !set) return null
-
-  const single = !!series && series.episodes.length === 1 && series.episodes[0].dir === series.folder // a video on its own
+  const single = !!series && series.episodes.length === 1 && series.episodes[0].dir === series.folder
   const episode = series?.episodes.find((e) => e.dir === path || e.followUps.some((f) => f.dir === path))
   const followUp = episode?.followUps.find((f) => f.dir === path)
-  const item = set?.items.find((i) => i.dir === path)
-  const both = !!series && !!set
   const version = item ? `${item.state}:${item.video ?? ''}` : `${episode?.video ?? ''}:${followUp?.state ?? ''}`
-  const tabs = (
-    <div className="pane-tabs" role="tablist" aria-label={uiText('Transcript or chat')}>
-      <button role="tab" aria-selected={tab === 'transcript'} className="file-tab" onClick={() => useStore.setState({ studyTab: 'transcript' })}>
-        <Captions /> {uiText(" Transcript")}
-      </button>
-      <button role="tab" aria-selected={tab === 'chat'} className="file-tab" onClick={() => useStore.setState({ studyTab: 'chat' })}>
-        <Sparkles className="claude-mark" /> {uiText(" Chat")}
-      </button>
-    </div>
-  )
-
-  const parts = [
-    series &&
-      !single &&
-      `${series.episodes.length === 1 ? '1 episode' : `${series.episodes.length} episodes`}, ${series.episodes.filter((e) => e.watched).length} watched`,
-    single && 'A single video',
-    set &&
-      `${set.items.length === 1 ? '1 exercise' : `${set.items.length} exercises`}${set.items.length ? `, ${set.items.filter((i) => i.state === 'done').length} with a video${series ? '' : `, ${set.items.filter((i) => i.watched).length} watched`}` : ''}`,
-    set?.level,
-  ].filter(Boolean)
+  const watched = series?.episodes.filter((e) => e.watched).length ?? 0
+  const count = series?.episodes.length ?? 0
+  const lessons =
+    series?.episodes.filter((e) => `${e.title} ${e.followUps.map((f) => f.request).join(' ')}`.toLocaleLowerCase().includes(lessonQuery.toLocaleLowerCase())) ??
+    []
 
   return (
-    <div className="ex-view">
+    <div className="ex-view study-view">
       <aside className="ex-side">
         <div className="ex-side-head">
+          <span className="eyebrow">{series && !single ? uiText('Your course') : uiText('Your library')}</span>
           <h2 className="ex-set-title">{series?.title ?? set!.title}</h2>
-          <p className="faint">{parts.join(' · ')}</p>
-          {set && <ExerciseSearch query={query} onQuery={setQuery} />}
+          {series ? (
+            <>
+              <p className="faint">{format('{0} of {1} lessons watched', [watched, count])}</p>
+              <div
+                className="study-course-progress"
+                role="progressbar"
+                aria-label={uiText('Course progress')}
+                aria-valuenow={watched}
+                aria-valuemin={0}
+                aria-valuemax={count || 1}
+              >
+                <span style={{ width: `${count ? (watched / count) * 100 : 0}%` }} />
+              </div>
+            </>
+          ) : (
+            <p className="faint">{format('{0} exercises', [set!.items.length])}</p>
+          )}
+          {series && !single ? (
+            <Tabs
+              label={uiText('Course library')}
+              value={library}
+              onChange={setLibrary}
+              items={[
+                {
+                  value: 'lessons',
+                  label: (
+                    <>
+                      <BookOpen />
+                      {uiText('Lessons')}
+                      <small>{count}</small>
+                    </>
+                  ),
+                },
+                {
+                  value: 'exercises',
+                  label: (
+                    <>
+                      <ListChecks />
+                      {uiText('Exercises')}
+                      <small>{set?.items.length ?? 0}</small>
+                    </>
+                  ),
+                },
+              ]}
+            />
+          ) : (
+            <span className="study-library-label">{series ? uiText('Lessons') : uiText('Exercises')}</span>
+          )}
+          {library === 'exercises' && set && <ExerciseSearch query={query} onQuery={setQuery} />}
+          {library === 'lessons' && count > 5 && (
+            <label className="ex-search">
+              <Search />
+              <input
+                className="input"
+                placeholder={uiText('Find a lesson')}
+                aria-label={uiText('Find a lesson')}
+                value={lessonQuery}
+                onChange={(e) => setLessonQuery(e.target.value)}
+              />
+            </label>
+          )}
         </div>
-        {hits ? (
-          <ExerciseHits hits={hits} query={query} set={set} selected={path} />
-        ) : (
-          <ul className="ex-list">
-            {series && both && <li className="ex-group eyebrow">{uiText('Lessons')}</li>}
-            {series?.episodes.map((e) => (
-              <EpisodeRow key={e.dir} episode={e} selected={path} />
-            ))}
-            {set && both && <li className="ex-group eyebrow">{uiText('Exercises')}</li>}
-            {set && <ExerciseRows set={set} selected={path} />}
-          </ul>
-        )}
-        {(set || (series && !single)) && (
-          <div className="ex-side-foot">
-            <button
-              className={`btn ${set ? 'primary' : ''}`}
-              title={set ? undefined : uiText('Exercises for this course, solved in writing and on video with its notation')}
-              onClick={() => (set ? openDialog({ kind: 'add-exercises' }) : void addCourseExercises())}
-            >
-              <Plus /> {uiText(" Add exercises")}
+        <div className="study-library-content" key={library} role="region" aria-label={library === 'lessons' ? uiText('Lessons') : uiText('Exercises')}>
+          {library === 'lessons' ? (
+            <ul className="ex-list">
+              {lessons.map((e) => (
+                <EpisodeRow key={e.dir} episode={e} selected={path} />
+              ))}
+              {!lessons.length && <li className="ex-none faint">{uiText('No matching lessons.')}</li>}
+            </ul>
+          ) : hits ? (
+            <ExerciseHits hits={hits} query={query} set={set} selected={path} />
+          ) : set ? (
+            <ul className="ex-list">
+              <ExerciseRows set={set} selected={path} />
+            </ul>
+          ) : (
+            <div className="study-library-empty">
+              <ListChecks />
+              <strong>{uiText('Practice what you learn')}</strong>
+              <p>{uiText('Add exercises to this course. They’ll appear here, with written solutions and videos.')}</p>
+            </div>
+          )}
+        </div>
+        <div className="ex-side-foot">
+          {library === 'lessons' && series && !single ? (
+            <button className="btn" onClick={() => setAdding(true)}>
+              <Plus />
+              {uiText('Add lesson')}
             </button>
-            {set && <ExerciseActions set={set} />}
+          ) : library === 'exercises' && (set || (series && !single)) ? (
+            <>
+              <button className="btn" onClick={() => (set ? openDialog({ kind: 'add-exercises' }) : void addCourseExercises())}>
+                <Plus />
+                {uiText('Add exercises')}
+              </button>
+              {set && <ExerciseActions set={set} />}
+            </>
+          ) : null}
+        </div>
+      </aside>
+      <main className="ex-main">
+        <div className="study-content" key={path ?? 'empty'}>
+          {item ? (
+            <ExerciseMain key={item.dir} item={item} />
+          ) : episode && path ? (
+            <Watched key={path} dir={path} episode={episode} followUp={followUp} single={single} />
+          ) : set && !series ? (
+            <ExerciseEmpty set={set} />
+          ) : (
+            <div className="ex-empty faint">{uiText('Choose a lesson or an exercise.')}</div>
+          )}
+        </div>
+      </main>
+      <aside className="ex-chat study-assistant">
+        <div className="study-assistant-head">
+          <Tabs
+            label={uiText('Transcript or chat')}
+            value={tab}
+            onChange={(studyTab) => useStore.setState({ studyTab })}
+            items={[
+              {
+                value: 'transcript',
+                label: (
+                  <>
+                    <Captions />
+                    {uiText('Transcript')}
+                  </>
+                ),
+              },
+              {
+                value: 'chat',
+                label: (
+                  <>
+                    <Sparkles />
+                    {uiText('Chat')}
+                  </>
+                ),
+              },
+            ]}
+          />
+        </div>
+        {!path ? (
+          <div className="ex-empty faint">{uiText('Choose a lesson or an exercise.')}</div>
+        ) : (
+          <div className="study-assistant-body" key={path}>
+            <div className={`study-panel ${tab === 'transcript' ? 'active' : ''}`} inert={tab !== 'transcript'} aria-hidden={tab !== 'transcript'}>
+              <Transcript dir={path} version={version} />
+            </div>
+            <div className={`study-panel ${tab === 'chat' ? 'active' : ''}`} inert={tab !== 'chat'} aria-hidden={tab !== 'chat'}>
+              <ChatPane embedded />
+            </div>
           </div>
         )}
       </aside>
-      <main className="ex-main">
-        {item ? (
-          <ExerciseMain key={item.dir} item={item} />
-        ) : episode && path ? (
-          <Watched key={path} dir={path} episode={episode} followUp={followUp} single={single} />
-        ) : set && !series ? (
-          <ExerciseEmpty set={set} />
-        ) : (
-          <div className="ex-empty faint">{uiText('Choose a lesson or an exercise.')}</div>
-        )}
-      </main>
-      <aside className="ex-chat">
-        {!path ? (
-          <div className="ex-empty faint">{uiText('The chat opens with the first exercise.')}</div>
-        ) : tab === 'transcript' ? (
-          <Transcript key={path} dir={path} version={version} head={tabs} />
-        ) : (
-          <ChatPane head={tabs} />
-        )}
-      </aside>
+      {series && !single && <AddLessonDialog open={adding} onClose={() => setAdding(false)} series={series} />}
     </div>
   )
 }

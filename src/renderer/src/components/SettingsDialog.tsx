@@ -183,7 +183,8 @@ function AgentTab() {
   const agent = useStore((s) => s.settings!.agent)
   const settings = useStore((s) => s.settings)!
   const models = useStore((s) => s.models)
-  const signedIn = useStore((s) => !!s.claude?.loggedIn)
+  const status = useStore((s) => s.claude)
+  const signedIn = !!status?.loggedIn
   const seriesAgents = useStore((s) => s.settings!.seriesAgents)
   const pick = async (next: Agent) => {
     await updateSettings({ agent: next })
@@ -208,7 +209,9 @@ function AgentTab() {
           ]}
         />
       </Row>
-      {signedIn ? (
+      {!status ? (
+        <Row title={uiText('Checking account…')} />
+      ) : signedIn ? (
         <Row title={uiText('Model and effort')} text={uiText('Which model writes the scenes and how much it reasons first. Also under the chat box.')}>
           <ModelControls />
         </Row>
