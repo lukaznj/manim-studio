@@ -1,0 +1,698 @@
+/* A quiet study workspace. Motion follows explicit navigation and respects reduced motion. */
+.study-view {
+  grid-template-columns: 248px minmax(0, 1fr) 350px;
+}
+.study-view .ex-main {
+  background: var(--bg);
+}
+.study-view .ex-side-head {
+  padding: 22px 16px 14px;
+  gap: 12px;
+}
+.study-view .ex-set-title {
+  font-size: 19px;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+.study-view .ex-side-head p {
+  margin: -6px 0 0;
+  font-size: 11.5px;
+}
+.study-view .eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.study-course-progress {
+  height: 3px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--raised-2);
+  margin-bottom: 6px;
+}
+.study-course-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sun);
+  transition: width 0.4s var(--ease-out);
+}
+.study-view .tabs {
+  width: 100%;
+}
+.study-view .tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding-inline: 8px;
+}
+.study-view .tabs svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.study-view .tabs small {
+  font: 10px var(--font-mono);
+  opacity: 0.6;
+}
+.study-library-label {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.study-library-content {
+  min-height: 0;
+  overflow: auto;
+  animation: study-reveal 0.24s var(--ease-out);
+}
+.study-library-content .ex-list {
+  overflow: visible;
+  gap: 5px;
+  padding: 3px 10px 12px;
+}
+.study-view .ex-row {
+  padding: 11px 9px;
+  gap: 10px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.study-view .ex-row.on {
+  box-shadow: inset 2px 0 var(--sun);
+}
+.study-view .ex-row-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
+  font-size: 12.5px;
+}
+.study-view .ex-row-state {
+  margin-top: 3px;
+  font-size: 10.5px;
+}
+.study-view .ex-num {
+  width: 25px;
+  height: 25px;
+  font-size: 10px;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+.study-view .ex-row.follow {
+  margin-left: 12px;
+  width: calc(100% - 12px);
+  padding-block: 8px;
+  border-left: 1px solid var(--line);
+  border-radius: 0 8px 8px 0;
+}
+.study-view .ex-row.follow .ex-row-title {
+  font-size: 11.5px;
+}
+.study-view .ex-side-foot {
+  padding: 12px 16px 16px;
+  background: var(--panel);
+}
+.study-view .ex-side-foot > .btn {
+  width: 100%;
+}
+.study-library-empty {
+  padding: 30px 20px;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+  color: var(--text-2);
+}
+.study-library-empty > svg {
+  color: var(--text-3);
+  width: 28px;
+  height: 28px;
+}
+.study-library-empty strong {
+  font-size: 13px;
+  color: var(--text);
+}
+.study-library-empty p {
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0;
+}
+.study-content {
+  min-height: 100%;
+  animation: study-reveal 0.3s var(--ease-out);
+}
+.study-view .ex-detail {
+  max-width: 1080px;
+  padding: 28px 28px 36px;
+  gap: 22px;
+}
+.study-view .ex-detail-head {
+  align-items: center;
+}
+.study-view .ex-detail-head h1 {
+  font-size: clamp(21px, 1.65vw, 27px);
+  line-height: 1.3;
+  margin-top: 6px;
+  text-wrap: balance;
+}
+.study-view .ex-detail-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 130px;
+}
+.study-view .ex-detail-actions .btn {
+  font-size: 11px;
+  padding-inline: 7px;
+}
+.study-view .ex-detail-actions .btn svg {
+  width: 13px;
+  height: 13px;
+}
+.study-lesson-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 2px;
+}
+.study-lesson-tools > div {
+  display: flex;
+  gap: 6px;
+}
+.study-lesson-tools > .hint {
+  font-size: 11.5px;
+}
+.study-lesson-sources {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+.study-lesson-sources > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.study-lesson-sources > div > svg {
+  width: 15px;
+  height: 15px;
+}
+.study-lesson-sources > div > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Persistent tabs with two independent panels: keep transcript search and chat drafts intact. */
+.study-assistant {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.study-assistant-head {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.study-assistant-body {
+  display: grid;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.study-panel {
+  grid-area: 1 / 1;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(7px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.26s var(--ease-out),
+    visibility 0s 0.2s;
+}
+.study-panel.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition-delay: 0s;
+}
+.study-panel .chat-pane {
+  height: 100%;
+}
+.study-panel .pane-head {
+  min-width: 0;
+  padding: 8px 12px;
+}
+.study-panel .pane-head > .hint {
+  font-size: 10.5px;
+}
+.study-panel .pane-actions {
+  gap: 3px;
+}
+.lyrics-pane.embedded {
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+.study-view .lyrics-search {
+  padding: 12px;
+}
+.study-view .lyrics {
+  position: relative;
+  padding: 10px 12px 30px;
+  gap: 3px;
+  mask-image: none;
+  scroll-padding-block: 12px;
+}
+.study-view .lyric {
+  position: relative;
+  grid-template-columns: 35px minmax(0, 1fr) 24px;
+  gap: 3px;
+  padding: 9px 4px;
+  border-left: 2px solid transparent;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+.study-view .lyric.now {
+  background: var(--sun-soft);
+  border-color: var(--sun-text);
+}
+.study-view .lyric-line {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 0 4px;
+  font: 400 14px/1.7 var(--font-ui);
+  color: var(--text-2);
+  letter-spacing: 0;
+  white-space: normal;
+}
+.study-view .lyric.past .lyric-line {
+  color: var(--text-2);
+  opacity: 1;
+}
+.study-view .lyric.now .lyric-line {
+  color: var(--text);
+}
+.study-view .lyric-side {
+  display: contents;
+}
+.study-view .lyric-side .mono {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  padding-top: 4px;
+  font-size: 9px;
+  opacity: 0.8;
+}
+.study-view .lyric-side .icon-btn {
+  grid-column: 3;
+  grid-row: 1;
+  width: 24px;
+  height: 26px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.study-view .lyric:hover .icon-btn,
+.study-view .lyric.now .icon-btn,
+.study-view .lyric:focus-within .icon-btn {
+  opacity: 1;
+}
+.lyrics-follow {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+.lyrics-follow svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* The video remains a fixed-color canvas; the surrounding controls use the UI theme. */
+.study-player {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 5px 20px rgb(0 0 0 / 0.06);
+}
+.study-player:focus-visible {
+  outline: 2px solid var(--sun);
+  outline-offset: 3px;
+}
+.study-video-stage {
+  position: relative;
+  background: #000;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+.study-video-stage .ex-video {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+  border-radius: 0;
+  cursor: pointer;
+}
+.study-play-overlay {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 50%;
+  background: rgb(9 18 30 / 0.7);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+.study-play-overlay svg {
+  width: 25px;
+  height: 25px;
+  fill: currentColor;
+  margin-left: 3px;
+}
+.study-play-overlay:hover {
+  background: rgb(9 18 30 / 0.9);
+  transform: scale(1.06);
+}
+.study-video-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  background: var(--panel);
+  color: var(--text-2);
+  text-align: center;
+}
+.study-controls {
+  padding: 4px 14px 10px;
+}
+.study-seek {
+  position: relative;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+.study-seek-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--raised-2);
+}
+.study-seek-track > span {
+  display: block;
+  height: 100%;
+  background: var(--sun);
+  border-radius: inherit;
+}
+.study-seek-track i {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 2px;
+  background: var(--panel);
+}
+.study-seek input {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  height: 20px;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+.study-seek input::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.study-seek input::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sun);
+  opacity: 0;
+  box-shadow: 0 0 0 3px var(--sun-soft);
+  transition: opacity 0.18s ease;
+}
+.study-seek:hover input::-webkit-slider-thumb,
+.study-seek input:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+.study-control-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.study-control-row .icon-btn {
+  width: 30px;
+  height: 30px;
+  color: var(--text-2);
+  flex-shrink: 0;
+  transition:
+    color 0.18s,
+    background 0.18s;
+}
+.study-control-row .icon-btn:hover {
+  color: var(--text);
+}
+.study-control-row .study-play {
+  color: var(--text);
+}
+.study-play svg {
+  fill: currentColor;
+}
+.study-control-row .active {
+  color: var(--sun-text);
+  background: var(--sun-soft);
+}
+.study-time {
+  font-size: 10px;
+  color: var(--text);
+  white-space: nowrap;
+  margin-left: 3px;
+}
+.study-time > span {
+  color: var(--text-3);
+}
+.study-control-spacer {
+  flex: 1;
+  min-width: 4px;
+}
+.study-volume {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.study-volume input {
+  accent-color: var(--sun);
+  width: 54px;
+  height: 3px;
+  cursor: pointer;
+}
+.study-rate {
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 11px var(--font-ui);
+  width: 51px;
+  height: 30px;
+  cursor: pointer;
+}
+.study-rate option {
+  background: var(--panel);
+  color: var(--text);
+}
+.study-chapter-bar {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 8px 12px;
+  gap: 6px;
+}
+.study-chapter-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  padding: 3px 2px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+.study-chapter-trigger:hover {
+  color: var(--text);
+}
+.study-chapter-trigger > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.study-chapter-trigger > svg:last-child {
+  width: 13px;
+  height: 13px;
+  margin-left: 2px;
+}
+.study-chapter-trigger > span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.study-chapter-trigger small {
+  font-size: 9px;
+  color: var(--text-3);
+}
+.study-chapter-trigger strong {
+  font-size: 11.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.study-chapter-arrows {
+  display: flex;
+  gap: 2px;
+}
+.study-chapter-list {
+  display: grid;
+  gap: 4px;
+  max-height: min(65vh, 560px);
+  overflow: auto;
+}
+.study-chapter-item {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) 38px 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    color 0.18s;
+}
+.study-chapter-item:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+.study-chapter-item.active {
+  background: var(--sun-soft);
+  color: var(--text);
+}
+.study-chapter-item > .mono,
+.study-chapter-item time {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.study-chapter-item > svg {
+  width: 14px;
+  height: 14px;
+  color: var(--sun-text);
+}
+.study-player:fullscreen {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+}
+.study-player:fullscreen .study-video-stage .ex-video {
+  max-height: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.study-player:fullscreen .study-controls,
+.study-player:fullscreen .study-chapter-bar {
+  padding-inline: 26px;
+}
+@keyframes study-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 1180px) {
+  .study-view .ex-side-head .tabs svg {
+    display: none;
+  }
+  .study-view .ex-side-head .tabs button {
+    gap: 4px;
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+  .study-view {
+    grid-template-columns: 218px minmax(0, 1fr) 300px;
+  }
+  .study-view .ex-detail {
+    padding: 22px 20px 30px;
+  }
+  .study-volume input {
+    display: none;
+  }
+}
+@media (max-width: 1020px) {
+  .study-view .ex-side-head .tabs small {
+    display: none;
+  }
+  .study-view {
+    grid-template-columns: 195px minmax(0, 1fr) 280px;
+  }
+  .study-view .ex-side-head {
+    padding-inline: 12px;
+  }
+  .study-view .ex-detail {
+    padding-inline: 14px;
+  }
+  .study-skip {
+    display: none !important;
+  }
+  .study-control-row {
+    gap: 2px;
+  }
+  .study-controls {
+    padding-inline: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .study-view *,
+  .study-player *,
+  .study-panel {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -18,6 +18,8 @@ A series (ADR 0019, 0028) and an exercise set (ADR 0025) were two things with tw
 
 ## Consequences
 
+Presentation update: [[0041-focused-study-workspace]] replaces the combined list with Lessons/Exercises tabs and adds full lessons to existing courses. The course and exercise storage model is unchanged.
+
 - Moving or copying a series folder takes its exercises with it.
 - Search still covers every exercise set, a course's included.
 - Exercises can't yet be planned with the series (one request for lectures and problems together); they are added once the series exists.

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell, systemPreferences } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell, systemPreferences, type WebContents } from 'electron'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
@@ -43,7 +43,18 @@ import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
 import { videoEncoder } from './encoder'
-import { requestFollowUp, retryFollowUp, setupWatch, setWatched, watchDetail, watchSeries } from './watch'
+import {
+  addCourseLesson,
+  retryCourseLesson,
+  requestFollowUp,
+  retryFollowUp,
+  setupWatch,
+  setWatched,
+  stopWatchVideos,
+  watchDetail,
+  watchSeries,
+  watchVideosBusy,
+} from './watch'
 import { checkAnthropicKey, checkGeminiKey, checkOpenAIKey, keyUsable } from './keys'
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
@@ -208,7 +219,8 @@ function registerIpc(): void {
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
     // Another sign-in method means another Claude Code process: the next message starts it.
-    if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch || 'agent' in patch || 'codexModel' in patch || 'codexEffort' in patch) closeChat()
+    if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch || 'agent' in patch || 'codexModel' in patch || 'codexEffort' in patch)
+      closeChat()
     if (patch.appearance || patch.recentProjects || patch.mode) refreshMenu()
     return settings
   })
@@ -325,7 +337,11 @@ function registerIpc(): void {
   handle('seriesRun', () => seriesRun())
   handle('openEpisodeReport', async (dir: string) => {
     const root = resolve(dir)
-    const report = existsSync(join(root, 'project.json')) ? join(root, '.studio', 'episode-report.html') : existsSync(join(root, 'series.json')) ? join(root, 'developer-report.html') : ''
+    const report = existsSync(join(root, 'project.json'))
+      ? join(root, '.studio', 'episode-report.html')
+      : existsSync(join(root, 'series.json'))
+        ? join(root, 'developer-report.html')
+        : ''
     if (!report || !existsSync(report)) throw new Error('No developer report has been generated here yet.')
     const error = await shell.openPath(report)
     if (error) throw new Error(error)
@@ -360,6 +376,8 @@ function registerIpc(): void {
   handle('courseExercises', (series: string) => ex.courseExercises(series))
   handle('watchDetail', (dir: string) => watchDetail(dir))
   handle('requestFollowUp', (dir: string, at: number, request: string) => requestFollowUp(dir, at, request))
+  handle('addCourseLesson', (folder: string, request: { title: string; prompt: string; sources: string[] }) => addCourseLesson(folder, request))
+  handle('retryCourseLesson', (dir: string) => retryCourseLesson(dir))
   handle('retryFollowUp', (dir: string) => retryFollowUp(dir))
   handle('setWatched', (dir: string, watched: boolean) => setWatched(dir, watched, ex.watchedChanged))
   handle('renderServers', () => listServers())
@@ -437,8 +455,11 @@ async function installClaudeExtension(): Promise<void> {
 /** The export, with its progress shown in the window (the dialog, or Claude Desktop's export). */
 app.whenReady().then(() => {
   app.setAppUserModelId('cc.razem.manimstudio')
-  // The recording booth needs the microphone; nothing else asks for permissions.
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'media'))
+  // The booth needs the microphone; the study player can enter full screen in our own window.
+  const permissionAllowed = (wc: WebContents | null, permission: string) =>
+    permission === 'media' || (!!win && wc?.id === win.webContents.id && (permission === 'fullscreen' || permission === 'automatic-fullscreen'))
+  session.defaultSession.setPermissionCheckHandler(permissionAllowed)
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(permissionAllowed(wc, permission)))
   setupMenu(
     (action, extra) => void showWindow().then(() => send('menu', { action, ...extra })),
     () => void installClaudeExtension().catch((e: Error) => dialog.showErrorBox('Claude Desktop', e.message)),
@@ -493,7 +514,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', (e) => {
   // Exports and a series being made live in memory: quitting would stop them, so ask first.
-  const making = seriesRun()?.state === 'working' || desktopVideosBusy()
+  const making = seriesRun()?.state === 'working' || desktopVideosBusy() || watchVideosBusy()
   if (exportsBusy() || making) {
     const choice = dialog.showMessageBoxSync({
       type: 'warning',
@@ -512,6 +533,7 @@ app.on('before-quit', (e) => {
   resumeAll() // nothing stays stopped behind the app
   stopSeries()
   stopDesktopVideos()
+  stopWatchVideos()
   stopTtsWorker()
   closeChat()
 })

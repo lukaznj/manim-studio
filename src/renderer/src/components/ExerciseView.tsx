@@ -47,8 +47,19 @@ export function useExerciseHits(query: string): ExerciseHit[] | null {
   const [hits, setHits] = useState<ExerciseHit[] | null>(null)
   useEffect(() => {
     if (!query.trim()) return setHits(null)
-    const t = setTimeout(() => void api.searchExercises(query).then(setHits), 180)
-    return () => clearTimeout(t)
+    let active = true
+    const t = setTimeout(
+      () =>
+        void api.searchExercises(query).then(
+          (next) => active && setHits(next),
+          () => active && setHits([]),
+        ),
+      180,
+    )
+    return () => {
+      active = false
+      clearTimeout(t)
+    }
   }, [query])
   return hits
 }
@@ -120,7 +131,7 @@ export function ExerciseActions({ set }: { set: ExerciseSet }) {
           title={done ? undefined : uiText('Once an exercise has its video')}
           onClick={() => openDialog({ kind: 'lecture' })}
         >
-          <Film /> {uiText(" Lecture video")}
+          <Film /> {uiText(' Lecture video')}
         </button>
         {(working || set.paused) && (
           <button className="btn small ghost" onClick={() => void api.pauseExercises(set.folder, !set.paused)}>
@@ -151,7 +162,7 @@ function IntakeRow({ set }: { set: ExerciseSet }) {
         {intake.state === 'reading' ? format('Reading the exercises in {0}…', [what]) : format('Couldn’t read the exercises in {0}: {1}', [what, intake.error])}
         {intake.state === 'failed' && (
           <button className="link-btn" onClick={() => openDialog({ kind: 'add-exercises' })}>
-            {uiText(" Try again")}
+            {uiText(' Try again')}
           </button>
         )}
       </span>
@@ -164,19 +175,19 @@ function LectureNote({ set }: { set: ExerciseSet }) {
   if (l.state === 'making')
     return (
       <p className="ex-lecture faint">
-        <span className="spinner" /> {uiText(" Joining the videos…")}
+        <span className="spinner" /> {uiText(' Joining the videos…')}
       </p>
     )
   if (l.state === 'failed')
     return (
       <p className="ex-lecture error-text">
-        {uiText("The lecture video failed: ")}
+        {uiText('The lecture video failed: ')}
         {l.error}
       </p>
     )
   return (
     <p className="ex-lecture">
-      <Check /> {uiText(" Lecture video ready.")}{' '}
+      <Check /> {uiText(' Lecture video ready.')}{' '}
       <button className="link-btn" onClick={() => void api.reveal(l.file!)}>
         {revealLabel}
       </button>
@@ -224,7 +235,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
       <header className="ex-detail-head">
         <div>
           <span className="eyebrow">
-            {uiText("Exercise ")}
+            {uiText('Exercise ')}
             {item.number}
           </span>
           <h1>{item.title}</h1>
@@ -233,7 +244,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
           {item.video && <WatchedToggle dir={item.dir} watched={!!item.watched} />}
           {item.state === 'failed' && (
             <button className="btn small" onClick={() => void api.retryExercise(item.dir).catch((e) => toast(errorText(e), 'error'))}>
-              <RotateCcw /> {uiText(" Try again")}
+              <RotateCcw /> {uiText(' Try again')}
             </button>
           )}
           {editing && (
@@ -242,7 +253,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
               title={uiText('The code, timeline and voice of this video')}
               onClick={() => useStore.setState({ screen: 'editor' })}
             >
-              <Code2 /> {uiText(" Open in editor")}
+              <Code2 /> {uiText(' Open in editor')}
             </button>
           )}
           <button className="icon-btn" title={revealLabel} aria-label={revealLabel} onClick={() => void api.reveal(item.dir)}>
@@ -302,7 +313,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
                       </button>
                     )}
                     <button className="btn small ghost" onClick={() => ask(`I don’t understand step ${i + 1} (“${step.title}”). Explain it more thoroughly.`)}>
-                      <MessageCircleQuestion /> {uiText(" Ask")}
+                      <MessageCircleQuestion /> {uiText(' Ask')}
                     </button>
                   </div>
                   <Markdown text={step.body} />
@@ -368,7 +379,7 @@ function ExplainBetter({ item }: { item: ExerciseItem }) {
     return (
       <div className="ex-explain">
         <button className="btn small" disabled={working} title={working ? uiText('Once its agent is done') : undefined} onClick={() => setOpen(true)}>
-          <Sparkles /> {uiText(" Explain something better in the video")}
+          <Sparkles /> {uiText(' Explain something better in the video')}
         </button>
         <span className="faint">{uiText('For a quick question, ask in the chat instead: it answers right away.')}</span>
       </div>
@@ -408,7 +419,7 @@ function ExplainBetter({ item }: { item: ExerciseItem }) {
             }
           }}
         >
-          {busy ? <span className="spinner" /> : <Sparkles />} {uiText(" Redo the video")}
+          {busy ? <span className="spinner" /> : <Sparkles />} {uiText(' Redo the video')}
         </button>
       </div>
     </div>
