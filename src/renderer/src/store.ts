@@ -343,20 +343,25 @@ export async function locateProject(path: string): Promise<void> {
 }
 
 let modelsFor = '' // the account the model list belongs to
+let agentRefresh = 0
 
 export async function refreshClaude(): Promise<void> {
-  const claude = await api.claudeStatus()
+  const agent = get().settings?.agent ?? 'claude'
+  const request = ++agentRefresh
+  const current = () => request === agentRefresh && get().settings?.agent === agent
+  const claude = await api.claudeStatus(agent)
+  if (!current()) return
   set({ claude })
   void refreshUsage(true) // gone with an API key or after signing out
   const who = claude.loggedIn ? `${claude.agent}:${claude.method}:${claude.email ?? ''}` : ''
   if (who === modelsFor) return
+  modelsFor = ''
+  set({ models: [] })
   if (!who) {
-    modelsFor = ''
-    set({ models: [] })
     return
   }
-  const models = await api.chatModels().catch(() => null)
-  if (models) {
+  const models = await api.chatModels(agent).catch(() => null)
+  if (current() && models) {
     modelsFor = who
     set({ models })
   }
@@ -446,9 +451,15 @@ export async function refreshSetup(): Promise<void> {
 
 export async function updateSettings(patch: Partial<Settings>): Promise<void> {
   const settings = await api.setSettings(patch)
+  const changedAgent = settings.agent !== get().settings?.agent
+  if (changedAgent) {
+    ++agentRefresh // discard status/catalog requests from the previous provider
+    modelsFor = ''
+  }
   setLanguage(settings.uiLanguage ?? 'en')
-  if (patch.homeTab) withTransition(() => set({ settings }))
-  else set({ settings })
+  const next = { settings, ...(changedAgent ? { models: [], claude: null, usage: null } : {}) }
+  if (patch.homeTab) withTransition(() => set(next))
+  else set(next)
 }
 
 export async function installComponent(c: Component): Promise<void> {

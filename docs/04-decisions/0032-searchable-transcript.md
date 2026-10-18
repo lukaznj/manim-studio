@@ -17,5 +17,7 @@ A learner often remembers a word, not a moment: "where did it say Thévenin?". T
 
 ## Consequences
 
+Presentation update: [[0041-focused-study-workspace]] uses compact timestamped rows, preserves Transcript/Chat panel state and makes manual scrolling pause following until Follow video is selected. Transcript search and video seeking remain unchanged.
+
 - Search covers one video at a time; a whole course's search (the exercise search covers exercises' statements and solutions) could later include what the lessons say.
 - A video without narration shows no transcript.

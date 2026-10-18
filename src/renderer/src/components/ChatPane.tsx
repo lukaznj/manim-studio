@@ -22,7 +22,7 @@ const SUGGESTIONS = [
 ]
 
 /** The chat; `head` replaces its title (the study screen puts its Transcript and Chat tabs there). */
-export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
+export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; embedded?: boolean } = {}) {
   const claude = useStore((s) => s.claude)
   const agent = useStore((s) => s.settings?.agent ?? 'claude')
   const codex = agent === 'codex'
@@ -44,10 +44,14 @@ export function ChatPane({ head }: { head?: React.ReactNode } = {}) {
   return (
     <div className="chat-pane">
       <div className="pane-head">
-        {head ?? (
-          <div className="file-tab">
-            <Sparkles className="claude-mark" /> {agent === 'claude' ? uiText('Claude Agent') : agentName}
-          </div>
+        {embedded ? (
+          <span className="hint">{uiText('Ask about this lesson')}</span>
+        ) : (
+          (head ?? (
+            <div className="file-tab">
+              <Sparkles className="claude-mark" /> {agent === 'claude' ? uiText('Claude Agent') : agentName}
+            </div>
+          ))
         )}
         <div className="pane-actions">
           <ProjectCost />
@@ -198,7 +202,7 @@ function AntigravitySignIn() {
         )}
       </p>
       <button className="btn primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
-        <Sparkles /> {uiText(" Open Settings → Accounts")}
+        <Sparkles /> {uiText(' Open Settings → Accounts')}
       </button>
       <button className="link-btn" onClick={() => void updateSettings({ agent: 'claude' }).then(refreshClaude)}>
         {uiText('Use Claude instead')}
@@ -302,14 +306,14 @@ function Intro() {
   return (
     <div className="chat-intro">
       <p className="muted">
-        {uiText("Describe what the video should show. ")}
-        {name} {uiText(" edits ")}
+        {uiText('Describe what the video should show. ')}
+        {name} {uiText(' edits ')}
         <span className="mono">{uiText('scene.py')}</span>
         {uiText(', renders it and looks at the frames before it says it’s done.')}
       </p>
       <p className="hint">
-        {uiText("Select clips on the timeline so ")}
-        {name} {uiText(" knows which part you mean.")}
+        {uiText('Select clips on the timeline so ')}
+        {name} {uiText(' knows which part you mean.')}
       </p>
     </div>
   )
@@ -522,7 +526,7 @@ function Composer() {
           )}
           {timeline && !exercise && (
             <button className={`attach-toggle ${frame ? 'on' : ''}`} onClick={() => setFrame((f) => !f)} title={uiText('Attach the current preview frame')}>
-              <Camera /> {uiText(" Frame")}
+              <Camera /> {uiText(' Frame')}
             </button>
           )}
         </div>
@@ -645,7 +649,7 @@ export function ModelPicker({
           {effort ? (
             efforts.map((e) => (
               <option key={e} value={e}>
-                {EFFORTS[e]} {uiText(" effort")}
+                {EFFORTS[e]} {uiText(' effort')}
               </option>
             ))
           ) : (
