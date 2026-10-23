@@ -209,7 +209,6 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
         tone: settings.defaultTone ?? 'warm',
         language: settings.defaultVoice.language,
         voice: settings.defaultVoice,
-        scriptFirst: true,
       })
       rememberProject(dir)
       host.projectsChanged()
@@ -338,7 +337,7 @@ function guide(): string {
     `Write all narration and on-screen text in ${language}.`,
     styleBrief(meta),
     seriesBrief(meta),
-    scriptBrief(meta, readScript(path) !== null, { desktop: true }),
+    scriptBrief({ desktop: true }),
     mediaNote(path),
     sourcesNote(path),
     'Change scene.py only through write_scene or edit_scene. After each change call render_preview, then view_frames at the moments you changed.',

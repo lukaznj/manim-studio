@@ -41,7 +41,7 @@ import { askCodex, closeCodex, codexLogin, codexLogout, codexModels, codexStatus
 import { cleanEnv, pythonExe } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
-import { mediaNames, project, readChat, readMeta, readScript, readTimeline, requireProject, updateMeta, writeChat } from './projects'
+import { mediaNames, project, readChat, readMeta, readTimeline, requireProject, updateMeta, writeChat } from './projects'
 import { frameBase64, pauseCommits } from './render'
 import { calculate, getTimeline, readSource, renderPreview, viewFrames, viewSourcePages } from './scene-tools'
 import { getSecret, getSettings } from './settings'
@@ -491,7 +491,9 @@ export async function claudeUsage(includeUnselected = false): Promise<PlanUsage 
     let timer: ReturnType<typeof setTimeout> | undefined
     const answer = await Promise.race([
       usage.call(q, { skipBehaviors: true }) as Promise<UsageAnswer>,
-      new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('Plan usage read timed out')), 8000) }),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('Plan usage read timed out')), 8000)
+      }),
     ]).finally(() => clearTimeout(timer))
     if (!answer.rate_limits_available || !answer.rate_limits) return null
     const windows: UsageWindow[] = []
@@ -732,7 +734,7 @@ export function studioPrompt(dir: string, agent: Agent, autopilot: boolean): str
     'Mark the thumbnail once in scene.py: self.thumbnail("a 2 to 5 word hook") right after the animation that completes the key picture (the core idea fully on screen). The hook is in the narration language and makes someone want to watch; it is not the title. The exported thumbnail puts the hook and the episode number on the left of that frame.',
     seriesBrief(meta),
     exerciseBrief(meta),
-    scriptBrief(meta, readScript(dir) !== null, { auto: autopilot }),
+    scriptBrief({ auto: autopilot }),
     autopilot
       ? 'You are working unattended: the user started this in quick mode and is not watching, so nobody can answer a question. Make every choice yourself, never stop to ask, and finish the whole job: the script, scene.py, a render with no errors and no layout warnings, and a last look at the frames. End with two or three sentences on what the video covers.'
       : '',

@@ -1,21 +1,5 @@
-import { t as uiText, format } from '../lib/i18n'
-import {
-  Captions,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FolderOpen,
-  ListVideo,
-  Maximize,
-  Minimize,
-  Pause,
-  Play,
-  RotateCcw,
-  RotateCw,
-  Volume2,
-  VolumeX,
-} from 'lucide-react'
+import { t as uiText } from '../lib/i18n'
+import { Captions, Check, FolderOpen, ListVideo, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Section } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -57,6 +41,7 @@ export function StudyPlayer(props: {
   onWatched?: () => void
 }) {
   const { src, vtt, video } = props
+  const aspect = useStore((s) => s.project?.meta.aspect ?? '16:9')
   const root = useRef<HTMLElement>(null)
   const [rate, setRate] = useState(1)
   const [now, setNow] = useState(0)
@@ -64,17 +49,19 @@ export function StudyPlayer(props: {
   const [paused, setPaused] = useState(true)
   const [volume, setVolume] = useState(1)
   const [muted, setMuted] = useState(false)
-  const [captions, setCaptions] = useState(!!vtt)
+  const [captions, setCaptions] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
   const [chaptersOpen, setChaptersOpen] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [controlsVisible, setControlsVisible] = useState(true)
+  const toolbar = useRef<HTMLDivElement>(null)
+  const hideTimer = useRef<number | undefined>(undefined)
   const marked = useRef(false)
   const chapters = useMemo(() => props.chapters.filter((c) => c.end > c.start), [props.chapters])
   const chapterIndex = Math.max(
     0,
     chapters.findLastIndex((c) => now >= c.start),
   )
-  const chapter = chapters[chapterIndex]
 
   useEffect(() => {
     const el = video.current
@@ -84,7 +71,7 @@ export function StudyPlayer(props: {
     setDuration(0)
     setPaused(true)
     setFailed(false)
-    setCaptions(!!vtt)
+    setCaptions(true)
     return () => {
       if (props.resume && el) save(src, el.currentTime)
       if (playing === el) {
@@ -94,7 +81,14 @@ export function StudyPlayer(props: {
     }
   }, [src])
   useEffect(() => {
-    const changed = () => setFullscreen(document.fullscreenElement === root.current)
+    let wasFullscreen = false
+    const changed = () => {
+      const active = document.fullscreenElement === root.current
+      setFullscreen(active)
+      // Leave button activation behind: Space and arrows should control playback immediately.
+      if (active || wasFullscreen) root.current?.focus({ preventScroll: true })
+      wasFullscreen = active
+    }
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || document.fullscreenElement !== root.current || root.current?.querySelector('dialog[open]')) return
       event.preventDefault()
@@ -114,6 +108,30 @@ export function StudyPlayer(props: {
     const tracks = video.current?.textTracks
     if (tracks) for (const track of tracks) track.mode = captions ? 'showing' : 'hidden'
   }, [captions, vtt])
+  useEffect(() => {
+    revealControls()
+    // Capture mouse input as well as React's pointer events so the fullscreen toolbar can wake.
+    if (fullscreen) document.addEventListener('mousemove', revealControls, true)
+    return () => {
+      window.clearTimeout(hideTimer.current)
+      document.removeEventListener('mousemove', revealControls, true)
+    }
+  }, [fullscreen, paused, chaptersOpen, failed])
+
+  function revealControls(): void {
+    setControlsVisible(true)
+    window.clearTimeout(hideTimer.current)
+    if (!fullscreen || paused || chaptersOpen || failed) return
+    hideTimer.current = window.setTimeout(() => {
+      const focusedControl = toolbar.current?.contains(document.activeElement)
+      if (toolbar.current?.matches(':hover') || (focusedControl && document.activeElement?.matches(':focus-visible'))) return
+      if (focusedControl) {
+        root.current?.focus({ preventScroll: true })
+        window.clearTimeout(hideTimer.current)
+      }
+      setControlsVisible(false)
+    }, 2200)
+  }
 
   const seek = (t: number, start = false) => {
     const el = video.current
@@ -145,10 +163,14 @@ export function StudyPlayer(props: {
   return (
     <section
       ref={root}
-      className="ex-player study-player"
+      className={`ex-player study-player ${fullscreen && !controlsVisible ? 'controls-hidden' : ''}`}
       tabIndex={0}
       aria-label={uiText('Video player')}
+      onPointerMove={revealControls}
+      onPointerDown={revealControls}
+      onFocusCapture={revealControls}
       onKeyDown={(e) => {
+        revealControls()
         if ((e.target as HTMLElement).closest('button,input,select,textarea,summary') || e.altKey || e.ctrlKey || e.metaKey) return
         if ([' ', 'k', 'ArrowLeft', 'ArrowRight', 'm', 'f', 'c'].includes(e.key)) e.preventDefault()
         if (e.key === ' ' || e.key === 'k') toggle()
@@ -164,6 +186,7 @@ export function StudyPlayer(props: {
           ref={video}
           key={src}
           className="ex-video"
+          style={{ aspectRatio: aspect.replace(':', ' / ') }}
           src={api.mediaUrl(src)}
           preload="metadata"
           playsInline
@@ -230,120 +253,98 @@ export function StudyPlayer(props: {
           </div>
         )}
       </div>
-      <div className="study-controls">
-        <div className="study-seek">
-          <div className="study-seek-track" aria-hidden="true">
-            <span style={{ width: `${duration ? Math.min(100, (now / duration) * 100) : 0}%` }} />
-            {chapters.slice(1).map((c) => (
-              <i key={c.start} style={{ left: `${duration ? (c.start / duration) * 100 : 0}%` }} />
-            ))}
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={duration || 1}
-            step={0.01}
-            value={Math.min(now, duration || 1)}
-            disabled={!duration}
-            aria-label={uiText('Video position')}
-            aria-valuetext={`${clock(now)} / ${clock(duration)}`}
-            onChange={(e) => seek(Number(e.target.value))}
-          />
-        </div>
-        <div className="study-control-row">
-          <button
-            className="icon-btn study-play"
-            aria-label={paused ? uiText('Play video') : uiText('Pause video')}
-            title={uiText('Play / pause (Space)')}
-            onClick={toggle}
-          >
-            {paused ? <Play /> : <Pause />}
-          </button>
-          <button className="icon-btn study-skip" aria-label={uiText('Back 10 seconds')} title={uiText('Back 10 seconds')} onClick={() => seek(now - 10)}>
-            <RotateCcw />
-          </button>
-          <button className="icon-btn study-skip" aria-label={uiText('Forward 10 seconds')} title={uiText('Forward 10 seconds')} onClick={() => seek(now + 10)}>
-            <RotateCw />
-          </button>
-          <span className="study-time mono">
-            {clock(now)} <span>/ {clock(duration)}</span>
-          </span>
-          <div className="study-control-spacer" />
-          <div className="study-volume">
-            <button className="icon-btn" onClick={mute} aria-label={muted ? uiText('Unmute') : uiText('Mute')} title={uiText('Mute (M)')}>
-              {muted || volume === 0 ? <VolumeX /> : <Volume2 />}
-            </button>
+      <div className="study-player-toolbar" ref={toolbar} onPointerEnter={revealControls} onPointerLeave={revealControls}>
+        <div className="study-controls">
+          <div className="study-seek">
+            <div className="study-seek-track" aria-hidden="true">
+              <span style={{ width: `${duration ? Math.min(100, (now / duration) * 100) : 0}%` }} />
+              {chapters.slice(1).map((c) => (
+                <i key={c.start} style={{ left: `${duration ? (c.start / duration) * 100 : 0}%` }} />
+              ))}
+            </div>
             <input
               type="range"
               min={0}
-              max={1}
-              step={0.05}
-              value={muted ? 0 : volume}
-              aria-label={uiText('Volume')}
-              onChange={(e) => changeVolume(Number(e.target.value))}
+              max={duration || 1}
+              step={0.01}
+              value={Math.min(now, duration || 1)}
+              disabled={!duration}
+              aria-label={uiText('Video position')}
+              aria-valuetext={`${clock(now)} / ${clock(duration)}`}
+              onChange={(e) => seek(Number(e.target.value))}
             />
           </div>
-          {vtt && (
+          <div className="study-control-row">
             <button
-              className={`icon-btn ${captions ? 'active' : ''}`}
+              className="icon-btn study-play"
+              aria-label={paused ? uiText('Play video') : uiText('Pause video')}
+              title={uiText('Play / pause (Space)')}
+              onClick={toggle}
+            >
+              {paused ? <Play /> : <Pause />}
+            </button>
+            <button className="icon-btn study-skip" aria-label={uiText('Back 10 seconds')} title={uiText('Back 10 seconds')} onClick={() => seek(now - 10)}>
+              <RotateCcw />
+            </button>
+            <button
+              className="icon-btn study-skip"
+              aria-label={uiText('Forward 10 seconds')}
+              title={uiText('Forward 10 seconds')}
+              onClick={() => seek(now + 10)}
+            >
+              <RotateCw />
+            </button>
+            <span className="study-time mono">
+              {clock(now)} <span>/ {clock(duration)}</span>
+            </span>
+            <div className="study-control-spacer" />
+            <div className="study-volume">
+              <button className="icon-btn" onClick={mute} aria-label={muted ? uiText('Unmute') : uiText('Mute')} title={uiText('Mute (M)')}>
+                {muted || volume === 0 ? <VolumeX /> : <Volume2 />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={muted ? 0 : volume}
+                aria-label={uiText('Volume')}
+                onChange={(e) => changeVolume(Number(e.target.value))}
+              />
+            </div>
+            <button
+              className={`icon-btn ${vtt && captions ? 'active' : ''}`}
+              disabled={!vtt}
               onClick={() => setCaptions((v) => !v)}
               aria-label={uiText('Subtitles')}
-              aria-pressed={captions}
+              aria-pressed={!!vtt && captions}
               title={uiText('Subtitles (C)')}
             >
               <Captions />
             </button>
-          )}
-          <select className="study-rate" value={rate} aria-label={uiText('Playback speed')} onChange={(e) => setRate(Number(e.target.value))}>
-            {RATES.map((r) => (
-              <option key={r} value={r}>
-                {r}×
-              </option>
-            ))}
-          </select>
-          <button
-            className="icon-btn"
-            onClick={expand}
-            aria-label={fullscreen ? uiText('Exit full screen') : uiText('Full screen')}
-            title={uiText('Full screen (F)')}
-          >
-            {fullscreen ? <Minimize /> : <Maximize />}
-          </button>
-          <button className="icon-btn" aria-label={uiText('Show video file')} title={uiText('Show video file')} onClick={() => void api.reveal(src)}>
-            <FolderOpen />
-          </button>
-        </div>
-      </div>
-      {!!chapters.length && (
-        <div className="study-chapter-bar">
-          <button className="study-chapter-trigger" onClick={() => setChaptersOpen(true)} aria-label={uiText('Browse chapters')}>
-            <ListVideo />
-            <span>
-              <small>{format('Chapter {0} of {1}', [chapterIndex + 1, chapters.length])}</small>
-              <strong>{chapter?.name}</strong>
-            </span>
-            <ChevronDown />
-          </button>
-          <div className="study-chapter-arrows">
+            {!!chapters.length && (
+              <button className="icon-btn" onClick={() => setChaptersOpen(true)} aria-label={uiText('Browse chapters')} title={uiText('Chapters')}>
+                <ListVideo />
+              </button>
+            )}
+            <select className="study-rate" value={rate} aria-label={uiText('Playback speed')} onChange={(e) => setRate(Number(e.target.value))}>
+              {RATES.map((r) => (
+                <option key={r} value={r}>
+                  {r}×
+                </option>
+              ))}
+            </select>
             <button
               className="icon-btn"
-              disabled={chapterIndex === 0}
-              aria-label={uiText('Previous chapter')}
-              onClick={() => seek(chapters[chapterIndex - 1].start, true)}
+              onClick={expand}
+              aria-label={fullscreen ? uiText('Exit full screen') : uiText('Full screen')}
+              title={uiText('Full screen (F)')}
             >
-              <ChevronLeft />
-            </button>
-            <button
-              className="icon-btn"
-              disabled={chapterIndex >= chapters.length - 1}
-              aria-label={uiText('Next chapter')}
-              onClick={() => seek(chapters[chapterIndex + 1].start, true)}
-            >
-              <ChevronRight />
+              {fullscreen ? <Minimize /> : <Maximize />}
             </button>
           </div>
         </div>
-      )}
+      </div>
       <Modal open={chaptersOpen} onClose={() => setChaptersOpen(false)} title={uiText('Chapters')} icon={<ListVideo className="head-icon" />} width={520}>
         <div className="modal-body study-chapter-list">
           {chapters.map((c, i) => (

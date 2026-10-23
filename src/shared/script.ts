@@ -1,6 +1,5 @@
 // Script first (ADR 0016): Claude plans the video in script.md, the user approves it, then the code
 // follows it. Shared by the main process (Claude's brief) and the renderer (the Script tab).
-import type { ProjectMeta } from './types'
 
 export const SCRIPT_FILE = 'script.md'
 export type ScriptStatus = 'draft' | 'approved'
@@ -47,19 +46,17 @@ const CRAFT = `What makes a great explainer (think 3Blue1Brown): one central ide
  * script and goes straight on (the user reviews the finished video instead). `desktop`: Claude
  * Desktop, which writes files only through Studio's tools.
  */
-export function scriptBrief(meta: ProjectMeta, hasScript: boolean, opts: { auto?: boolean; desktop?: boolean } = {}): string {
+export function scriptBrief(opts: { auto?: boolean; desktop?: boolean } = {}): string {
   const { auto = false, desktop = false } = opts
-  if (!meta.scriptFirst)
-    return hasScript ? 'The project has a script (script.md). Keep scene.py consistent with it, and update it when you change the narration or the structure.' : ''
   const approval = auto
     ? '2. Review it yourself as a demanding teacher would, improve it, then set its status to approved and go straight on.'
     : `2. Then stop: tell the user the script is ready in the Script tab${desktop ? ' of Manim Studio' : ''}, in two or three sentences, and wait. They approve it there (its status becomes approved${desktop ? '; get_script shows it' : ''}) or ask for changes.`
   return [
-    'Script first is on for this project. Plan the video in words before writing code:',
+    'Always plan the video in words before writing code:',
     `1. Write script.md ${desktop ? 'with write_script' : 'in the project folder'} from the request and the sources. Leave scene.py alone for now.`,
     approval,
     '3. Once it is approved, write scene.py from it: one self.next_section per script section, with the same name; the narration word for word; the visuals as described. Render and check as usual.',
-    '4. Later: a change to the narration or the structure goes into script.md first (and back to the user for approval); a purely visual fix can go straight into the code. If the user asks to skip the script, do as they say.',
+    '4. Later: a change to the narration or the structure goes into script.md first (and back to the user for approval); a purely visual fix can go straight into the code.',
     CRAFT,
     FORMAT,
   ].join('\n')

@@ -52,7 +52,7 @@ export async function startQuick(req: QuickRequest): Promise<{ run: QuickRun; fi
   await ensureQuickReady()
   if (!req.prompt.trim()) throw new Error('Describe the video first.')
   const name = req.name?.trim() || titleFrom(req.prompt)
-  const dir = await createProject({ name, aspect: req.aspect, theme: req.theme, tone: req.tone, scriptFirst: true, language: req.language, voice: req.voice })
+  const dir = await createProject({ name, aspect: req.aspect, theme: req.theme, tone: req.tone, language: req.language, voice: req.voice })
   const finished = makeVideo(dir, name, { prompt: req.prompt, sources: req.sources, export: req.export })
   return { run: quickRun()!, finished }
 }

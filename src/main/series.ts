@@ -130,7 +130,6 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
       aspect: start.aspect,
       theme: start.theme,
       tone: start.tone,
-      scriptFirst: true,
       language: start.language,
       voice: start.voice,
       series,

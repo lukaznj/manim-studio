@@ -24,7 +24,10 @@ export function findInTranscript(): void {
  * `version` changes when the video does (a new render or export), so its words are read again.
  */
 export function Transcript({ dir, version, head }: { dir: string; version: string; head?: React.ReactNode }) {
-  const [lines, setLines] = useState<Subtitle[] | null>(null)
+  const [lines, setLines] = useState<Subtitle[] | null>(() => {
+    const { project, timeline } = useStore.getState()
+    return project?.path === dir ? (timeline?.subtitles ?? null) : null
+  })
   const [query, setQuery] = useState('')
   const [pick, setPick] = useState(0) // which hit is chosen
   const now = useStore((s) => s.watchTime ?? 0)
@@ -34,7 +37,6 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
 
   useEffect(() => {
     let active = true
-    setLines(null)
     void api.watchDetail(dir).then(
       (d) => active && setLines(d.subtitles),
       () => active && setLines([]),

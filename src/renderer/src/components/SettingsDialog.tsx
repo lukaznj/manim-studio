@@ -12,7 +12,6 @@ import type {
   ElevenLabsCheck,
   ElevenLabsUsage,
   KeyCheck,
-  MediaItem,
   PlanUsage,
   ProjectMeta,
   Settings,
@@ -944,14 +943,12 @@ function VideoTab() {
 
 function ProjectVideo() {
   const project = useStore((s) => s.project)
-  const [pictures, setPictures] = useState<MediaItem[]>([])
   const [colours, setColours] = useState<Background>({})
   const timer = useRef<number>(undefined)
 
   useEffect(() => {
     if (!project) return
     setColours(project.meta.background ?? {})
-    void api.listMedia().then((items) => setPictures(items.filter((i) => i.kind === 'image')))
   }, [project?.path])
 
   if (!project) return <p className="hint">{uiText('Open a project to set its theme and background.')}</p>
@@ -986,22 +983,6 @@ function ProjectVideo() {
           ]}
         />
       </Row>
-      <Row
-        title={uiText('Script first')}
-        text={uiText(
-          "Claude plans the video in a script (the idea, each section's narration and visuals) and waits for your approval before writing the code.",
-        )}
-      >
-        <Tabs
-          radio="Script first"
-          value={meta.scriptFirst ? 'on' : 'off'}
-          onChange={(v) => void updateMeta({ scriptFirst: v === 'on' })}
-          items={[
-            { value: 'on', label: 'On' },
-            { value: 'off', label: 'Off' },
-          ]}
-        />
-      </Row>
       <Row title={uiText('Background colour')} text={uiText("Each theme's background, if you want another than its own. Keep text readable.")}>
         <div className="bg-colours">
           {(['dark', 'light'] as Theme[]).map((t) => (
@@ -1021,23 +1002,6 @@ function ProjectVideo() {
             </label>
           ))}
         </div>
-      </Row>
-      <Row
-        title={uiText('Background picture')}
-        text={uiText("A picture from the project's media, covering the frame behind everything. Add pictures in the Media tab.")}
-      >
-        <select
-          className="select"
-          value={background.image ?? ''}
-          onChange={(e) => void save({ background: { ...background, image: e.target.value || undefined } })}
-        >
-          <option value="">{uiText('None')}</option>
-          {pictures.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name}
-            </option>
-          ))}
-        </select>
       </Row>
     </div>
   )
