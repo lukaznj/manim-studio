@@ -1,6 +1,6 @@
 // Run with scripts/drive.mjs and an isolated STUDIO_USER_DATA profile.
 import assert from 'node:assert/strict'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 const data = process.env.STUDIO_USER_DATA
@@ -14,6 +14,9 @@ const command = async (body) => {
 const evaluate = async (fn) => JSON.parse(await command(`eval (${fn.toString()})()`))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 assert.equal(JSON.parse(await command('main app.getPath("userData")')), resolve(data))
+await command(
+  'main (() => {globalThis.projectsFolderCheck={paths:[],fail:false,open:shell.openPath};shell.openPath=async path=>{globalThis.projectsFolderCheck.paths.push(path);return globalThis.projectsFolderCheck.fail ? "Could not open projects folder" : ""};return true})()',
+)
 const name = `Video settings check ${Date.now()}`
 const dir = JSON.parse(
   await command(
@@ -53,6 +56,25 @@ for (const [mode, uiLanguage, appearance] of [
     'Colour controls should still be present',
   )
   await command(`ss video-settings-${mode}-${uiLanguage}`)
+  await command('click .settings-tabs button:nth-of-type(6)')
+  await command(`click-text ${uiLanguage === 'hr' ? 'Otvori mapu' : 'Open folder'}`)
+  await sleep(100)
+  assert.equal(JSON.parse(await command('main globalThis.projectsFolderCheck.paths.at(-1)')), dirname(dir), 'Open the configured directory itself')
+  await command(`ss general-projects-folder-${mode}-${uiLanguage}`)
+  const changedFolder = join(dirname(data), `projects folder ${mode} ${uiLanguage} ${Date.now()}`)
+  await command(`eval window.studio.setSettings({projectsDir:${JSON.stringify(changedFolder)}})`)
+  await command(`click-text ${uiLanguage === 'hr' ? 'Otvori mapu' : 'Open folder'}`)
+  await sleep(100)
+  assert.equal(JSON.parse(await command('main globalThis.projectsFolderCheck.paths.at(-1)')), changedFolder, 'Read the latest configured directory')
+  assert(existsSync(changedFolder), 'Create a missing projects directory before opening it')
+  if (mode === 'create' && uiLanguage === 'en') {
+    await command('main (globalThis.projectsFolderCheck.fail=true)')
+    await command('click-text Open folder')
+    await sleep(100)
+    assert.match(await command('text .toast-stack'), /Could not open projects folder/)
+    await command('main (globalThis.projectsFolderCheck.fail=false)')
+  }
+  await command(`eval window.studio.setSettings({projectsDir:${JSON.stringify(dirname(dir))}})`)
   await command('press Escape')
   await sleep(250)
   if (mode === 'create') {
@@ -66,4 +88,8 @@ for (const [mode, uiLanguage, appearance] of [
 }
 console.log(
   'Passed: script-first is required for new projects even for old callers; legacy projects keep the script workflow and the removed preferences are absent in Learn/Create and English/Croatian.',
+)
+await command('main (shell.openPath=globalThis.projectsFolderCheck.open,true)')
+console.log(
+  'Passed: General opens the current projects directory itself, handles spaces/missing folders, and reports file-manager errors in English/Croatian layouts.',
 )

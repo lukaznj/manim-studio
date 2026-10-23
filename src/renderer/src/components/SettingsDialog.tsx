@@ -1,5 +1,23 @@
 import { t as uiText, localize, format, currentLanguage } from '../lib/i18n'
-import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Plus, RefreshCw, Settings2, Sparkles, Square, Sun, X } from 'lucide-react'
+import {
+  AudioLines,
+  Check,
+  Circle,
+  Cpu,
+  FolderOpen,
+  KeyRound,
+  LogOut,
+  Monitor,
+  Moon,
+  Plug,
+  Plus,
+  RefreshCw,
+  Settings2,
+  Sparkles,
+  Square,
+  Sun,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
   Agent,
@@ -1557,15 +1575,20 @@ function AboutTab() {
         />
       </Row>
       <Row title={uiText('Projects folder')} text={<span className="mono">{settings.projectsDir}</span>}>
-        <button
-          className="btn small"
-          onClick={async () => {
-            const dir = await api.pickFolder()
-            if (dir) void updateSettings({ projectsDir: dir })
-          }}
-        >
-          {uiText('Change')}
-        </button>
+        <div className="pane-actions">
+          <button className="btn small" onClick={() => void api.openProjectsFolder().catch((e) => toast(errorText(e), 'error'))}>
+            <FolderOpen /> {uiText('Open folder')}
+          </button>
+          <button
+            className="btn small"
+            onClick={async () => {
+              const dir = await api.pickFolder()
+              if (dir) void updateSettings({ projectsDir: dir })
+            }}
+          >
+            {uiText('Change')}
+          </button>
+        </div>
       </Row>
       {canEdit({ settings }) && (
         <Row title={uiText('Tutorial')} text={uiText('A short tour of the editor: the code, Claude, the timeline, media, narration and export.')}>

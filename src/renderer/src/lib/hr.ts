@@ -337,6 +337,7 @@ export const hr: Record<string, string> = {
   Download: 'Preuzmi',
   Downloading: 'Preuzimanje',
   'Projects folder': 'Mapa projekata',
+  'Open folder': 'Otvori mapu',
   Change: 'Promijeni',
   Tutorial: 'Vodič',
   'Show the tutorial': 'Prikaži vodič',
