@@ -20,7 +20,7 @@ async function assertFullscreenControls() {
     'Fullscreen toolbar should be one compact row',
   )
   const buttons = await evaluate(() =>
-    [...document.querySelectorAll('.study-control-row button')].map((button) => {
+    [...document.querySelectorAll('.study-control-row > button, .study-volume > button')].map((button) => {
       const rect = button.getBoundingClientRect()
       const toolbar = button.closest('.study-player-toolbar')
       return {

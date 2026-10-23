@@ -2,6 +2,7 @@ import { t as uiText, format } from '../lib/i18n'
 import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, MessageCircleQuestion, RotateCcw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, WatchDetail, WatchEpisode } from '../../../shared/types'
+import { nextStudyEpisode } from '../../../shared/study-playback'
 import { api } from '../lib/api'
 import { canEdit, errorText, selectStudied, toast, useStore } from '../store'
 import { StudyPlayer } from './StudyPlayer'
@@ -80,9 +81,10 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
 /** The selected episode or follow-up: the player, its transcript, and asking for a follow-up. */
 export function Watched({ dir, episode, followUp, single }: { dir: string; episode: WatchEpisode; followUp?: FollowUp; single: boolean }) {
   const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
+  const startPlaying = useStore((s) => s.studyAutoplayPath === dir)
   // openProject already returned this lesson's timeline. Keep the player in place while
   // watchDetail discovers its export/subtitles instead of briefly showing a smaller empty card.
-  const [detail, setDetail] = useState<WatchDetail>(() => {
+  const seed = (): WatchDetail => {
     const { project, timeline } = useStore.getState()
     const current = project?.path === dir ? timeline : null
     return {
@@ -91,12 +93,14 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
       chapters: current?.sections.filter((s) => s.end > s.start) ?? [],
       subtitles: current?.subtitles ?? [],
     }
-  })
+  }
+  const [loaded, setLoaded] = useState<{ dir: string; detail: WatchDetail } | null>(null)
+  const detail = loaded?.dir === dir ? loaded.detail : seed()
   const video = useRef<HTMLVideoElement>(null)
   useEffect(() => {
     let active = true
     void api.watchDetail(dir).then(
-      (next) => active && setDetail(next),
+      (next) => active && setLoaded({ dir, detail: next }),
       () => undefined,
     )
     return () => {
@@ -147,6 +151,22 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
             chapters={detail?.chapters ?? []}
             video={video}
             resume
+            startPlaying={startPlaying}
+            seriesAutoplay={!followUp && !single}
+            onEnded={() => {
+              const current = useStore.getState()
+              if (
+                followUp ||
+                single ||
+                current.project?.path !== dir ||
+                !current.settings?.studyAutoplay ||
+                current.dialog ||
+                document.querySelector('dialog[open]')
+              )
+                return
+              const next = nextStudyEpisode(current.watchSeries?.episodes ?? [], dir)
+              if (next) void selectStudied(next.dir, true)
+            }}
             onWatched={() => !(followUp ? followUp.watched : episode.watched) && void api.setWatched(dir, true)}
           />
           {!detail?.video && <p className="faint ex-preview-note">{uiText('The preview: export the video for the full quality.')}</p>}
@@ -163,7 +183,7 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
         </section>
       )}
 
-      {!followUp && !single && src && <FollowUpRequest dir={dir} />}
+      {!followUp && !single && src && <FollowUpRequest key={dir} dir={dir} />}
     </div>
   )
 }

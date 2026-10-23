@@ -635,6 +635,11 @@ export type Appearance = 'system' | 'light' | 'dark'
 export type AppMode = 'learn' | 'create' | 'both'
 
 export interface Settings {
+  studyAutoplay?: boolean // advance to the next ready course lesson; unset: off
+  studyPlaybackRate?: number // preferred study player speed; unset: 1
+  studyVolume?: number // preferred study player volume, 0–1; unset: 1
+  studyMuted?: boolean // mute independently of the preferred volume; unset: off
+  studyCaptions?: boolean // show subtitles when available; unset: on
   developerMode?: boolean
   developerEpisodeModels?: boolean
   developerUsageMetrics?: boolean
@@ -676,7 +681,7 @@ export interface Settings {
   defaultVoice: VoiceSettings
   renderServers: RenderServer[] // paired render workers (ADR 0021); their tokens are secrets
   gpuEncoding?: 'auto' | 'off' // exports encode on the GPU when one works (ADR 0034); unset: auto
-  studySize?: 720 | 1080 // Learn and Both: the size of videos made to study (exercises, follow-ups, courses); unset: 720 (ADR 0035)
+  studySize?: 720 | 1080 // default export size in every mode; unset: 1080 (ADR 0035)
   sidebarWidth: number
   chatWidth: number
   timelineHeight: number

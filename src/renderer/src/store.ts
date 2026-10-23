@@ -122,6 +122,7 @@ interface State {
   watchSeries: WatchSeries | null // its lessons (a series, or a single video)
   studyTab: 'transcript' | 'chat' // the study screen's right column (ADR 0032)
   watchTime: number | null // where the study player is, for the chat; null without a video
+  studyAutoplayPath: string | null // only an automatic lesson handoff starts playback
   elevenLabsCheck: ElevenLabsCheck | null // the saved key's permissions, once checked this session
   selection: number[] // clip indices
   recordings: string[]
@@ -170,6 +171,7 @@ export const useStore = create<State>(() => ({
   watchSeries: null,
   studyTab: 'transcript',
   watchTime: null,
+  studyAutoplayPath: null,
   elevenLabsCheck: null,
   selection: [],
   recordings: [],
@@ -296,12 +298,11 @@ export async function openWatch(folder: string, dir?: string): Promise<void> {
 }
 
 /** Opens a video of the course as the project (for the chat), staying on the study screen. */
-export async function selectStudied(dir: string): Promise<void> {
+export async function selectStudied(dir: string, autoplay = false): Promise<void> {
   if (get().project?.path === dir) return
   if (get().dirty) await saveScene()
   const opened = await guard(api.openProject(dir))
-  if (opened) applyOpened(opened, 'study')
-  set({ watchTime: null })
+  if (opened) applyOpened(opened, 'study', autoplay)
 }
 
 /** A question about what's being studied: into the chat's box, with the chat shown. */
@@ -522,9 +523,11 @@ async function studyProject(path: string): Promise<void> {
   return openWatch(summary.series?.folder ?? path, path)
 }
 
-function applyOpened(o: OpenProject, screen: State['screen'] = 'editor'): void {
+function applyOpened(o: OpenProject, screen: State['screen'] = 'editor', autoplay = false): void {
   set({
     screen,
+    watchTime: null,
+    studyAutoplayPath: autoplay ? o.path : null,
     project: { path: o.path, meta: o.meta },
     savedSource: o.source,
     // An episode made by hand starts with its request ready in the chat; Claude's brief has the rest.

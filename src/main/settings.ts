@@ -14,7 +14,8 @@ const defaults = (): Settings => ({
   projectsDir: paths.defaultProjectsDir(),
   recentProjects: [],
   claudeAuth: 'account',
-  previewSize: 480,
+  previewSize: 1080,
+  studySize: 1080,
   previewFps: 15,
   tutorialDone: false,
   claudeModel: 'claude-sonnet-5-5', // Sonnet 5.5 at high effort writes scenes well enough, faster and cheaper than Opus
