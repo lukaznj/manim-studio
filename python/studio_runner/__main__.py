@@ -18,7 +18,7 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("render")
     r.add_argument("project", type=Path)
     r.add_argument("--quality", choices=["preview", "final"], default="preview")
-    r.add_argument("--size", type=int, help="short side in pixels (preview: 480 by default)")
+    r.add_argument("--size", type=int, help="short side in pixels (1080 by default)")
     r.add_argument("--fps", type=int)
     r.add_argument("--theme", choices=["dark", "light"], help="instead of the project's (for exporting both)")
     r.add_argument("--out", help="output folder under .studio/ (default: the quality)")

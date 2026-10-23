@@ -153,12 +153,10 @@ await command('click .study-play')
 await command('click button[aria-label="Mute"]')
 assert.equal(await evaluate(() => document.querySelector('video').muted), true)
 await command('click button[aria-label="Unmute"]')
-await evaluate(() => {
-  const rate = document.querySelector('select[aria-label="Playback speed"]')
-  rate.value = '1.5'
-  rate.dispatchEvent(new Event('change', { bubbles: true }))
-  return true
-})
+await command('click button[aria-label="Playback speed"]')
+await sleep(80)
+await command('click .study-speed-menu button:nth-of-type(5)')
+await sleep(120)
 assert.equal(await evaluate(() => document.querySelector('video').playbackRate), 1.5)
 await command('click button[aria-label="Browse chapters"]')
 await sleep(100)

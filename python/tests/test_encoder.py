@@ -44,7 +44,7 @@ class EncoderSwap(unittest.TestCase):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def test_partial_movies_use_the_encoder_in_their_own_folder(self):
-        folder = self.project / ".studio" / "cache" / "partial" / "854x480@15-mpeg4"
+        folder = self.project / ".studio" / "cache" / "partial" / "1920x1080@15-mpeg4"
         pieces = list(folder.glob("*.mp4"))
         self.assertTrue(pieces, f"no partial movies in {folder}")
         with av.open(str(pieces[0])) as c:
