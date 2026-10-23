@@ -40,13 +40,9 @@ function cardArgs(meta: ProjectMeta): string[] {
   return ['--text', meta.name, ...(badge ? ['--badge', badge] : []), ...(kicker ? ['--kicker', kicker] : [])]
 }
 
-/**
- * An export that names no size: videos made to study (Learn and Both, ADR 0035) are 720p unless
- * Settings → General says 1080p; 720p renders about twice as fast. Create's are 1080p, to publish.
- */
+/** Unspecified exports use 1080p in every mode; Settings → Video can override it (ADR 0035). */
 function defaultSize(): ExportSize {
-  const { mode, studySize } = getSettings()
-  return studySize ?? (mode === 'create' || !mode ? 1080 : 720)
+  return getSettings().studySize ?? 1080
 }
 
 /** Exports `project` by rendering a copy of it in `work` (an empty folder the caller removes). */

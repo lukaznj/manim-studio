@@ -853,15 +853,10 @@ function VideoTab() {
   return (
     <div className="set-group">
       {
-        <Row
-          title={uiText('Export quality')}
-          text={uiText(
-            'The size of the videos Studio makes for you to study: exercises, follow-ups and courses. 720p renders about twice as fast and is plenty on a laptop; 1080p is sharper on a big screen.',
-          )}
-        >
+        <Row title={uiText('Export quality')} text={uiText('1080p is the default for all videos. Choose 720p for faster rendering.')}>
           <Tabs
             radio="Study videos"
-            value={String(settings.studySize ?? (settings.mode === 'create' ? 1080 : 720))}
+            value={String(settings.studySize ?? 1080)}
             onChange={(v) => void updateSettings({ studySize: Number(v) as 720 | 1080 })}
             items={[
               { value: '720', label: '720p' },
@@ -917,9 +912,7 @@ function VideoTab() {
         <>
           <Row
             title={uiText('Preview quality')}
-            text={uiText(
-              'The preview while you work: higher is sharper, but renders take longer. Exports have their own size: the one chosen in the export dialog, or Study videos above for videos made to study.',
-            )}
+            text={uiText('1080p by default. Lower resolutions render faster. Export quality is configured separately above.')}
           >
             <div className="stack-controls">
               <Tabs

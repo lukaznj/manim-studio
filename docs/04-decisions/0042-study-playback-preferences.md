@@ -14,7 +14,8 @@ The study player stored rounded positions against export filenames and ignored t
 - Save fractional playback positions per project in this computer's app profile, including exercises and follow-ups. Save periodically and on seeking, pausing, navigation and app closure. Read the old filename-based history when no project history exists. An ended video reopens at its beginning; an interrupted video resumes paused even near its beginning or end. Re-exporting at the same project path retains the position, clamped to the new duration.
 - Add an accessible Autoplay next lesson switch to series players, off by default and remembered in Settings. On completion, advance only to the immediately following exported, ready episode, starting at zero. Stop at an unfinished lesson or the end of the series. Follow-ups and exercises do not advance automatically. Manual selection continues to resume paused.
 - Retain the player's fullscreen container between lessons. Only the video source changes, so continuous playback stays in fullscreen without an intermediate page transition.
-- Remember playback speed across study videos and app restarts. Use a compact button with a native top-layer popover, radio choices, keyboard navigation, outside-click dismissal and an initial Escape that closes the menu before exiting fullscreen. Offer 0.5× through 2×. Keep the toolbar a single row.
+- Remember playback speed, volume, mute and subtitle visibility across all study videos and app restarts, including manual selection, automatic advance, exercises and follow-ups. A video without subtitles does not change the saved subtitle preference. Apply these preferences before automatic playback starts.
+- Use a compact speed button with a native top-layer popover, radio choices, keyboard navigation, outside-click dismissal and an initial Escape that closes the menu before exiting fullscreen. Offer 0.5× through 2×. Keep the toolbar a single row.
 
 ## Consequences
 

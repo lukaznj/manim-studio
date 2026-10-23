@@ -19,7 +19,7 @@ from .events import emit
 
 LONG_UNITS = 8 * 16 / 9  # manim's default frame width, used as the long side
 QUALITY = {
-    "preview": {"long": 854, "short": 480, "fps": 15},
+    "preview": {"long": 1920, "short": 1080, "fps": 15},
     "final": {"long": 1920, "short": 1080, "fps": None},
 }
 

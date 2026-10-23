@@ -1,7 +1,7 @@
 import { t as uiText } from '../lib/i18n'
 import { Captions, Check, FolderOpen, ListVideo, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import type { Section } from '../../../shared/types'
+import type { Section, Settings } from '../../../shared/types'
 import { resumePosition, type StudyProgress } from '../../../shared/study-playback'
 import { api } from '../lib/api'
 import { errorText, toast, updateSettings, useStore } from '../store'
@@ -50,6 +50,10 @@ export function StudyPlayer(props: {
   const autoplay = useStore((s) => s.settings?.studyAutoplay ?? false)
   const preferredRate = useStore((s) => s.settings?.studyPlaybackRate ?? 1)
   const rate = PLAYBACK_RATES.includes(preferredRate) ? preferredRate : 1
+  const preferredVolume = useStore((s) => s.settings?.studyVolume ?? 1)
+  const volume = Number.isFinite(preferredVolume) ? Math.max(0, Math.min(1, preferredVolume)) : 1
+  const muted = useStore((s) => s.settings?.studyMuted ?? false)
+  const captions = useStore((s) => s.settings?.studyCaptions ?? true)
   // Keep the old source's last observed position: detached video elements can reset to zero.
   const session = useMemo(() => ({ key: projectPath, position: 0, duration: 0, completed: false, ready: false, lastSaved: 0 }), [src, projectPath])
   const root = useRef<HTMLElement>(null)
@@ -57,9 +61,6 @@ export function StudyPlayer(props: {
   const [now, setNow] = useState(0)
   const [duration, setDuration] = useState(0)
   const [paused, setPaused] = useState(true)
-  const [volume, setVolume] = useState(1)
-  const [muted, setMuted] = useState(false)
-  const [captions, setCaptions] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
   const [chaptersOpen, setChaptersOpen] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -81,7 +82,6 @@ export function StudyPlayer(props: {
     setDuration(0)
     setPaused(true)
     setFailed(false)
-    setCaptions(true)
     return () => {
       if (props.resume !== false && session.ready) save(session.key, session)
       if (playing === el) {
@@ -128,10 +128,15 @@ export function StudyPlayer(props: {
   useEffect(() => {
     if (video.current) video.current.playbackRate = rate
   }, [rate, src])
+  useLayoutEffect(() => {
+    if (!video.current) return
+    video.current.volume = volume
+    video.current.muted = muted
+  }, [volume, muted, src])
   useEffect(() => {
     const tracks = video.current?.textTracks
     if (tracks) for (const track of tracks) track.mode = captions ? 'showing' : 'hidden'
-  }, [captions, vtt])
+  }, [captions, vtt, src])
   useEffect(() => {
     revealControls()
     // Capture mouse input as well as React's pointer events so the fullscreen toolbar can wake.
@@ -183,6 +188,7 @@ export function StudyPlayer(props: {
     video.current.volume = value
     video.current.muted = value === 0
   }
+  const toggleCaptions = () => void updateSettings({ studyCaptions: !captions })
   const remember = (el: HTMLVideoElement, flush = false) => {
     if (!session.ready) return
     session.position = el.currentTime
@@ -211,7 +217,7 @@ export function StudyPlayer(props: {
         else if (e.key === 'ArrowRight') seek(now + 10)
         else if (e.key === 'm') mute()
         else if (e.key === 'f') expand()
-        else if (e.key === 'c' && vtt) setCaptions((v) => !v)
+        else if (e.key === 'c' && vtt) toggleCaptions()
       }}
     >
       <div className="study-video-stage">
@@ -237,8 +243,12 @@ export function StudyPlayer(props: {
             props.onEnded?.()
           }}
           onVolumeChange={(e) => {
-            setVolume(e.currentTarget.volume)
-            setMuted(e.currentTarget.muted)
+            const el = e.currentTarget
+            const settings = useStore.getState().settings
+            const patch: Partial<Settings> = {}
+            if (el.volume !== (settings?.studyVolume ?? 1)) patch.studyVolume = el.volume
+            if (el.muted !== (settings?.studyMuted ?? false)) patch.studyMuted = el.muted
+            if (Object.keys(patch).length) void updateSettings(patch)
           }}
           onTimeUpdate={(e) => {
             const el = e.currentTarget,
@@ -274,7 +284,7 @@ export function StudyPlayer(props: {
             <track
               kind="subtitles"
               src={api.mediaUrl(vtt)}
-              default
+              default={captions}
               label={uiText('Subtitles')}
               onLoad={() => {
                 const track = video.current?.textTracks[0]
@@ -360,7 +370,7 @@ export function StudyPlayer(props: {
             <button
               className={`icon-btn ${vtt && captions ? 'active' : ''}`}
               disabled={!vtt}
-              onClick={() => setCaptions((v) => !v)}
+              onClick={toggleCaptions}
               aria-label={uiText('Subtitles')}
               aria-pressed={!!vtt && captions}
               title={uiText('Subtitles (C)')}

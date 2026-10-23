@@ -49,7 +49,7 @@ await main(() => {
   return true
 })
 await command(
-  `eval window.studio.setSettings(${JSON.stringify({ mode: 'learn', onboardingDone: true, uiLanguage: 'en', appearance: 'dark', recentProjects: dirs, projectsDir: root, studyAutoplay: false, studyPlaybackRate: 1 })})`,
+  `eval window.studio.setSettings(${JSON.stringify({ mode: 'learn', onboardingDone: true, uiLanguage: 'en', appearance: 'dark', recentProjects: dirs, projectsDir: root, studyAutoplay: false, studyPlaybackRate: 1, studyVolume: 1, studyMuted: false, studyCaptions: true })})`,
 )
 const open = async () => {
   await command('eval location.reload()')
@@ -95,6 +95,47 @@ await command('press Enter')
 await sleep(180)
 assert.equal(await evaluate(() => document.querySelector('video').playbackRate), 1.25)
 assert.equal(await evaluate(() => document.activeElement.classList.contains('study-player')), true, 'Choosing speed returns keyboard control to playback')
+await command('click button[aria-label="Subtitles"]')
+await evaluate(() => {
+  const input = document.querySelector('input[aria-label="Volume"]')
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '0.35')
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  return true
+})
+await sleep(150)
+await command('click button[aria-label="Mute"]')
+await sleep(150)
+const assertPreferences = async (subtitles = false, muted = true) => {
+  const actual = await evaluate(() => {
+    const video = document.querySelector('video')
+    return {
+      rate: video.playbackRate,
+      volume: video.volume,
+      muted: video.muted,
+      captions: video.textTracks[0]?.mode,
+      captionPreference: document.querySelector('button[aria-label="Subtitles"]').getAttribute('aria-pressed'),
+    }
+  })
+  assert.equal(actual.rate, 1.25)
+  assert.equal(actual.volume, 0.35)
+  assert.equal(actual.muted, muted)
+  assert.equal(actual.captions, subtitles ? 'showing' : 'hidden')
+  assert.equal(actual.captionPreference, String(subtitles))
+}
+await lesson(1)
+await assertPreferences()
+await lesson(0)
+await assertPreferences()
+await open()
+await assertPreferences()
+await command('click button[aria-label="Subtitles"]')
+await command('click button[aria-label="Unmute"]')
+await sleep(150)
+await lesson(1)
+await assertPreferences(true, false)
+await lesson(0)
+await assertPreferences(true, false)
+console.log('Playback preferences: subtitles off/on, volume, mute and speed persist across manual selection and restart.')
 await command('click button[aria-label="Playback speed"]')
 await command('ss study-speed-dark')
 await command('press Escape')
@@ -163,6 +204,7 @@ for (const number of [2, 3]) {
     'Autoplay preserves the fullscreen player DOM',
   )
   assert((await evaluate(() => document.querySelector('video').currentTime)) < 2, 'Next lesson starts at beginning')
+  await assertPreferences(true, false)
   await command('click button[aria-label="Pause video"]')
 }
 await seek(8.5)
