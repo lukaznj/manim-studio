@@ -157,7 +157,7 @@ export function StudyView() {
         </div>
       </aside>
       <main className="ex-main">
-        <div className="study-content" key={path ?? 'empty'}>
+        <div className="study-content">
           {item ? (
             <ExerciseMain key={item.dir} item={item} />
           ) : episode && path ? (

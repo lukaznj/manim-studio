@@ -1,5 +1,23 @@
 import { t as uiText, localize, format, currentLanguage } from '../lib/i18n'
-import { AudioLines, Check, Circle, Cpu, KeyRound, LogOut, Monitor, Moon, Plug, Plus, RefreshCw, Settings2, Sparkles, Square, Sun, X } from 'lucide-react'
+import {
+  AudioLines,
+  Check,
+  Circle,
+  Cpu,
+  FolderOpen,
+  KeyRound,
+  LogOut,
+  Monitor,
+  Moon,
+  Plug,
+  Plus,
+  RefreshCw,
+  Settings2,
+  Sparkles,
+  Square,
+  Sun,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
   Agent,
@@ -12,7 +30,6 @@ import type {
   ElevenLabsCheck,
   ElevenLabsUsage,
   KeyCheck,
-  MediaItem,
   PlanUsage,
   ProjectMeta,
   Settings,
@@ -944,14 +961,12 @@ function VideoTab() {
 
 function ProjectVideo() {
   const project = useStore((s) => s.project)
-  const [pictures, setPictures] = useState<MediaItem[]>([])
   const [colours, setColours] = useState<Background>({})
   const timer = useRef<number>(undefined)
 
   useEffect(() => {
     if (!project) return
     setColours(project.meta.background ?? {})
-    void api.listMedia().then((items) => setPictures(items.filter((i) => i.kind === 'image')))
   }, [project?.path])
 
   if (!project) return <p className="hint">{uiText('Open a project to set its theme and background.')}</p>
@@ -986,22 +1001,6 @@ function ProjectVideo() {
           ]}
         />
       </Row>
-      <Row
-        title={uiText('Script first')}
-        text={uiText(
-          "Claude plans the video in a script (the idea, each section's narration and visuals) and waits for your approval before writing the code.",
-        )}
-      >
-        <Tabs
-          radio="Script first"
-          value={meta.scriptFirst ? 'on' : 'off'}
-          onChange={(v) => void updateMeta({ scriptFirst: v === 'on' })}
-          items={[
-            { value: 'on', label: 'On' },
-            { value: 'off', label: 'Off' },
-          ]}
-        />
-      </Row>
       <Row title={uiText('Background colour')} text={uiText("Each theme's background, if you want another than its own. Keep text readable.")}>
         <div className="bg-colours">
           {(['dark', 'light'] as Theme[]).map((t) => (
@@ -1021,23 +1020,6 @@ function ProjectVideo() {
             </label>
           ))}
         </div>
-      </Row>
-      <Row
-        title={uiText('Background picture')}
-        text={uiText("A picture from the project's media, covering the frame behind everything. Add pictures in the Media tab.")}
-      >
-        <select
-          className="select"
-          value={background.image ?? ''}
-          onChange={(e) => void save({ background: { ...background, image: e.target.value || undefined } })}
-        >
-          <option value="">{uiText('None')}</option>
-          {pictures.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name}
-            </option>
-          ))}
-        </select>
       </Row>
     </div>
   )
@@ -1593,15 +1575,20 @@ function AboutTab() {
         />
       </Row>
       <Row title={uiText('Projects folder')} text={<span className="mono">{settings.projectsDir}</span>}>
-        <button
-          className="btn small"
-          onClick={async () => {
-            const dir = await api.pickFolder()
-            if (dir) void updateSettings({ projectsDir: dir })
-          }}
-        >
-          {uiText('Change')}
-        </button>
+        <div className="pane-actions">
+          <button className="btn small" onClick={() => void api.openProjectsFolder().catch((e) => toast(errorText(e), 'error'))}>
+            <FolderOpen /> {uiText('Open folder')}
+          </button>
+          <button
+            className="btn small"
+            onClick={async () => {
+              const dir = await api.pickFolder()
+              if (dir) void updateSettings({ projectsDir: dir })
+            }}
+          >
+            {uiText('Change')}
+          </button>
+        </div>
       </Row>
       {canEdit({ settings }) && (
         <Row title={uiText('Tutorial')} text={uiText('A short tour of the editor: the code, Claude, the timeline, media, narration and export.')}>

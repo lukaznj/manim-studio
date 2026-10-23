@@ -337,6 +337,7 @@ export const hr: Record<string, string> = {
   Download: 'Preuzmi',
   Downloading: 'Preuzimanje',
   'Projects folder': 'Mapa projekata',
+  'Open folder': 'Otvori mapu',
   Change: 'Promijeni',
   Tutorial: 'Vodič',
   'Show the tutorial': 'Prikaži vodič',
@@ -401,6 +402,8 @@ export const hr: Record<string, string> = {
   Approved: 'Odobreno',
   'Approve and make the video': 'Odobri i izradi videozapis',
   'No script yet': 'Još nema scenarija',
+  'Describe the video in the chat: the agent plans it here first and writes the scene once you approve the script.':
+    'Opišite videozapis u razgovoru: agent ovdje prvo izrađuje scenarij, a scenu piše nakon što ga odobrite.',
   'Describe the video in the chat: Claude plans it here first (the idea, each section’s narration and visuals), and writes the code once you approve.':
     'Opišite videozapis u razgovoru: agent ovdje prvo planira ideju, pripovijedanje i vizuale, a nakon vašeg odobrenja piše kod.',
   'Script first is off for this project. Turn it on in Settings → Video, or ask Claude for a script.':

@@ -165,7 +165,6 @@ export async function requestFollowUp(dir: string, at: number, request: string):
     aspect: meta.aspect,
     theme: meta.theme,
     tone: meta.tone,
-    scriptFirst: true,
     language: meta.voice.language,
     voice: meta.voice,
     series: s,
@@ -213,7 +212,6 @@ export async function addCourseLesson(folder: string, request: { title: string; 
       tone: first.tone,
       voice: first.voice,
       language: first.voice.language,
-      scriptFirst: true,
       series: { title: course.plan.title, folder, episode: number, of: number, brief: request.prompt.trim() || title },
       parentDir: folder,
     })

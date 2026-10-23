@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell, systemPreferences, type WebContents } from 'electron'
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import type { Agent, EventChannel, ExerciseInput, ExportOptions, NewExerciseSet, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
@@ -306,6 +306,12 @@ function registerIpc(): void {
     setSettings({ recentProjects: recent })
     refreshMenu()
     return { path: to, found: moved.length - 1 }
+  })
+  handle('openProjectsFolder', async () => {
+    const folder = normalize(getSettings().projectsDir)
+    mkdirSync(folder, { recursive: true })
+    const error = await shell.openPath(folder)
+    if (error) throw new Error(error)
   })
   handle('reveal', (path: string) => shell.showItemInFolder(normalize(path))) // the renderer joins with /
   handle('saveScene', (source: string) => projects.saveScene(source))
