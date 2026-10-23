@@ -16,7 +16,6 @@ export function NewProjectDialog() {
   const aspect: Aspect = settings?.defaultAspect ?? '16:9'
   const theme: Theme = settings?.defaultTheme ?? 'dark'
   const tone: Tone = settings?.defaultTone ?? DEFAULT_TONE
-  const [scriptFirst, setScriptFirst] = useState(true)
   const [voice, setVoice] = useState<VoiceSettings>({
     provider: 'elevenlabs',
     language: 'en',
@@ -41,7 +40,6 @@ export function NewProjectDialog() {
       aspect,
       theme,
       tone,
-      scriptFirst,
       language: voice.language,
       voice,
       parentDir,
@@ -62,7 +60,7 @@ export function NewProjectDialog() {
             {uiText('Cancel')}
           </button>
           <button className="btn primary" disabled={!name.trim() || busy} onClick={() => void submit()}>
-            {busy && <span className="spinner" />} {uiText(" Create project")}
+            {busy && <span className="spinner" />} {uiText(' Create project')}
           </button>
         </>
       }
@@ -96,20 +94,11 @@ export function NewProjectDialog() {
                     if (dir) setParentDir(dir)
                   }}
                 >
-                  <FolderOpen /> {uiText(" Change")}
+                  <FolderOpen /> {uiText(' Change')}
                 </button>
               </div>
             </div>
           </div>
-          <label className="export-check">
-            <input type="checkbox" checked={scriptFirst} onChange={(e) => setScriptFirst(e.target.checked)} />
-            <span>
-              {uiText("Plan a script first ")}
-              <span className="hint">
-                {uiText("Claude writes the plan (the idea, each section's narration and visuals) for you to approve before the code.")}
-              </span>
-            </span>
-          </label>
         </div>
       </div>
     </Modal>

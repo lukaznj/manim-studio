@@ -34,6 +34,7 @@ const methods = [
   'openProject',
   'pickProject',
   'pickFolder',
+  'openProjectsFolder',
   'pickPdfs',
   'closeProject',
   'forgetProject',

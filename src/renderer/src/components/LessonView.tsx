@@ -80,10 +80,28 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
 /** The selected episode or follow-up: the player, its transcript, and asking for a follow-up. */
 export function Watched({ dir, episode, followUp, single }: { dir: string; episode: WatchEpisode; followUp?: FollowUp; single: boolean }) {
   const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
-  const [detail, setDetail] = useState<WatchDetail | null>(null)
+  // openProject already returned this lesson's timeline. Keep the player in place while
+  // watchDetail discovers its export/subtitles instead of briefly showing a smaller empty card.
+  const [detail, setDetail] = useState<WatchDetail>(() => {
+    const { project, timeline } = useStore.getState()
+    const current = project?.path === dir ? timeline : null
+    return {
+      video: followUp ? followUp.video : episode.video,
+      preview: current?.video,
+      chapters: current?.sections.filter((s) => s.end > s.start) ?? [],
+      subtitles: current?.subtitles ?? [],
+    }
+  })
   const video = useRef<HTMLVideoElement>(null)
   useEffect(() => {
-    void api.watchDetail(dir).then(setDetail, () => setDetail(null))
+    let active = true
+    void api.watchDetail(dir).then(
+      (next) => active && setDetail(next),
+      () => undefined,
+    )
+    return () => {
+      active = false
+    }
   }, [dir, followUp?.state, episode.video])
   const src = detail?.video ?? detail?.preview
   const state = followUp?.state ?? episode.state

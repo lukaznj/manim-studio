@@ -3,7 +3,7 @@ import { Check, NotebookPen, Pencil, Sparkles } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { scriptBody, scriptStatus, withScriptStatus } from '../../../shared/script'
 import { api } from '../lib/api'
-import { errorText, openDialog, sendChat, toast, useStore } from '../store'
+import { errorText, sendChat, toast, useStore } from '../store'
 
 /**
  * The video's plan, script.md (ADR 0016): Claude writes it before the code, you read it, change it
@@ -11,7 +11,6 @@ import { errorText, openDialog, sendChat, toast, useStore } from '../store'
  */
 export function ScriptPane() {
   const script = useStore((s) => s.script)
-  const scriptFirst = useStore((s) => !!s.project?.meta.scriptFirst)
   const chatBusy = useStore((s) => s.chatBusy)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -45,18 +44,9 @@ export function ScriptPane() {
           <strong>{uiText('No script yet')}</strong>
           <br />
           <span className="muted">
-            {scriptFirst
-              ? uiText(
-                  'Describe the video in the chat: Claude plans it here first (the idea, each section’s narration and visuals), and writes the code once you approve.',
-                )
-              : uiText('Script first is off for this project. Turn it on in Settings → Video, or ask Claude for a script.')}
+            {uiText('Describe the video in the chat: the agent plans it here first and writes the scene once you approve the script.')}
           </span>
         </p>
-        {!scriptFirst && (
-          <button className="btn" onClick={() => openDialog({ kind: 'settings', tab: 'video' })}>
-            {uiText('Open Settings → Video')}
-          </button>
-        )}
       </div>
     )
 
@@ -88,7 +78,7 @@ export function ScriptPane() {
         ) : (
           <>
             <button className="btn small ghost" onClick={() => setEditing(true)}>
-              <Pencil /> {uiText(" Edit")}
+              <Pencil /> {uiText(' Edit')}
             </button>
             {status === 'draft' && (
               <button
@@ -97,7 +87,7 @@ export function ScriptPane() {
                 onClick={() => void approve()}
                 title={chatBusy ? uiText('Claude is still working') : undefined}
               >
-                <Sparkles /> {uiText(" Approve and make the video")}
+                <Sparkles /> {uiText(' Approve and make the video')}
               </button>
             )}
           </>

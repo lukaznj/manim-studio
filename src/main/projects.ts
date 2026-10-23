@@ -112,7 +112,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
     theme: input.theme,
     tone: input.tone ?? getSettings().defaultTone ?? DEFAULT_TONE,
     background: getSettings().defaultBackground,
-    scriptFirst: input.scriptFirst ?? true,
+    scriptFirst: true,
     series: input.series,
     exercise: input.exercise,
     captionBand: true,

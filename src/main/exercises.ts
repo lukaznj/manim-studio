@@ -222,7 +222,10 @@ async function ensureReady(): Promise<void> {
 function checkInput(input: ExerciseInput): void {
   if (!input.text.trim() && !input.files.length) throw new Error('Add at least one exercise: type it, paste a picture or add a file.')
   const odd = input.files.filter((f) => !IMAGE.test(f) && !PDF.test(f))
-  if (odd.length) throw new Error(`Only pictures (PNG, JPEG, GIF, WebP) and PDFs can be added; ${odd.map((f) => basename(f)).join(', ')} can’t. Take a screenshot of it instead.`)
+  if (odd.length)
+    throw new Error(
+      `Only pictures (PNG, JPEG, GIF, WebP) and PDFs can be added; ${odd.map((f) => basename(f)).join(', ')} can’t. Take a screenshot of it instead.`,
+    )
 }
 
 export async function createExerciseSet(req: NewExerciseSet): Promise<string> {
@@ -313,7 +316,6 @@ async function addOne(set: ExerciseSet, ex: IntakeExercise, files: string[]): Pr
     aspect: f.aspect,
     theme: f.theme,
     tone: f.tone,
-    scriptFirst: true,
     language: f.language,
     voice: f.voice,
     exercise: { set: set.folder, title: set.title, number },
@@ -400,7 +402,11 @@ export function exerciseDetail(dir: string): ExerciseDetail {
   const { it } = itemOf(dir)
   const problem = (readText(join(dir, PROBLEM_FILE)) ?? '').replace(/^# .*\r?\n+/, '')
   const media = join(dir, 'media')
-  const pictures = existsSync(media) ? readdirSync(media).filter((n) => IMAGE.test(n)).map((n) => join(media, n)) : []
+  const pictures = existsSync(media)
+    ? readdirSync(media)
+        .filter((n) => IMAGE.test(n))
+        .map((n) => join(media, n))
+    : []
   const timeline = readTimeline(dir)
   return { item: structuredClone(it), problem, pictures, solution: readSolution(dir), preview: timeline?.video, chapters: timeline?.sections ?? [] }
 }
@@ -423,7 +429,17 @@ export function searchExercises(query: string): ExerciseHit[] {
       const solution = solutionText ? parseSolution(solutionText) : null
       const title = readMeta(dir).name
       const score = searchScore(query, { title, topic: solution?.topic, tags: solution?.tags ?? [], problem, solution: solutionText })
-      if (score) hits.push({ set: folder, setTitle: f.title, dir, number: i + 1, title, topic: solution?.topic, snippet: snippet(query, problem.replace(/^# .*\n/, '')), score })
+      if (score)
+        hits.push({
+          set: folder,
+          setTitle: f.title,
+          dir,
+          number: i + 1,
+          title,
+          topic: solution?.topic,
+          snippet: snippet(query, problem.replace(/^# .*\n/, '')),
+          score,
+        })
     })
   }
   return hits
@@ -495,7 +511,12 @@ async function drive(set: ExerciseSet): Promise<void> {
 }
 
 /** One agent session on an exercise: `work` gets its turns, past usage limits. A failure marks it. */
-async function agentStep(set: ExerciseSet, it: ExerciseItem, state: 'solving' | 'video', work: (turn: (text: string, step: string) => Promise<void>) => Promise<void>): Promise<void> {
+async function agentStep(
+  set: ExerciseSet,
+  it: ExerciseItem,
+  state: 'solving' | 'video',
+  work: (turn: (text: string, step: string) => Promise<void>) => Promise<void>,
+): Promise<void> {
   const before = it.state
   const stopIf = () => {
     if (halted(set, it)) throw new Error('Stopped')
@@ -518,7 +539,8 @@ async function agentStep(set: ExerciseSet, it: ExerciseItem, state: 'solving' | 
       if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
     })
   } catch (e) {
-    if (halted(set, it)) update(set, it, { state: before, activity: undefined }) // paused or removed: it carries on later
+    if (halted(set, it))
+      update(set, it, { state: before, activity: undefined }) // paused or removed: it carries on later
     else {
       writeSaved(it.dir, { failed: (e as Error).message })
       update(set, it, { state: 'failed', error: (e as Error).message, activity: undefined })
@@ -593,7 +615,8 @@ function picture(file: string): { mediaType: string; data: string } {
   const img = nativeImage.createFromBuffer(bytes)
   const { width, height } = img.getSize()
   if (bytes.length < 1_500_000 && Math.max(width, height) <= 2000) return { mediaType: `image/${ext}`, data: bytes.toString('base64') }
-  const scaled = width >= height ? img.resize({ width: Math.min(width, 2000), quality: 'best' }) : img.resize({ height: Math.min(height, 2000), quality: 'best' })
+  const scaled =
+    width >= height ? img.resize({ width: Math.min(width, 2000), quality: 'best' }) : img.resize({ height: Math.min(height, 2000), quality: 'best' })
   return { mediaType: 'image/jpeg', data: scaled.toJPEG(85).toString('base64') }
 }
 
@@ -602,7 +625,10 @@ async function readExercises(f: SetFile, input: ExerciseInput): Promise<{ exerci
   if (fakeAgents()) {
     // Driving the app in tests: typed exercises split as written, one per file.
     const typed = splitTyped(input.text).map((statement, i) => ({ title: statement.split(/[.!?\n]/)[0].slice(0, 50) || `Exercise ${i + 1}`, statement }))
-    return { exercises: [...typed, ...names.map((file) => ({ title: basename(file, extname(file)), statement: 'The exercise is in the picture.', file }))], title: 'Practice set' }
+    return {
+      exercises: [...typed, ...names.map((file) => ({ title: basename(file, extname(file)), statement: 'The exercise is in the picture.', file }))],
+      title: 'Practice set',
+    }
   }
   const images: { name: string; mediaType: string; data: string }[] = []
   const material: string[] = []
@@ -621,7 +647,9 @@ async function readExercises(f: SetFile, input: ExerciseInput): Promise<{ exerci
       // Little text per page: a scan. Its pages go along as pictures.
       if (text.replace(/=== Page \d+ ===/g, '').trim().length < 80 * info.pages) {
         const pages = Array.from({ length: Math.min(info.pages, MAX_PAGES) }, (_, k) => k + 1)
-        const { paths } = await (await runRunner<{ paths: string[] }>('default', ['pdf-pages', file, join(out, 'pages'), '--pages', pages.join(','), '--width', '1100'])).done
+        const { paths } = await (
+          await runRunner<{ paths: string[] }>('default', ['pdf-pages', file, join(out, 'pages'), '--pages', pages.join(','), '--width', '1100'])
+        ).done
         paths.forEach((p, k) => images.push({ name: `${name}, page ${k + 1}`, mediaType: 'image/png', data: readFileSync(p).toString('base64') }))
       }
     }
@@ -638,7 +666,9 @@ async function readExercises(f: SetFile, input: ExerciseInput): Promise<{ exerci
     ]
       .filter(Boolean)
       .join('\n')
-    const answer = await askClaude('You read maths and physics exercises out of text, photos and scans, exactly as written.', prompt, 'read the exercises', { images })
+    const answer = await askClaude('You read maths and physics exercises out of text, photos and scans, exactly as written.', prompt, 'read the exercises', {
+      images,
+    })
     return { exercises: parseIntake(answer, names), title: intakeSetTitle(answer) }
   } finally {
     rmSync(work, { recursive: true, force: true })
@@ -685,7 +715,9 @@ function solvePrompt(dir: string): string {
   const from = readSaved(dir).from
   return [
     'Solve the exercise in problem.md.',
-    from ? `The original is ${from.file}${from.pages ? `, pages ${from.pages}` : ''}: look at it to check that problem.md says the same (numbers, figure, sub-questions).` : '',
+    from
+      ? `The original is ${from.file}${from.pages ? `, pages ${from.pages}` : ''}: look at it to check that problem.md says the same (numbers, figure, sub-questions).`
+      : '',
     `Write solution.md: a worked solution a student can follow, in the project's language. ${SOLUTION_FORMAT}`,
     'Before writing a result down, check it with the calculate tool: recompute it, substitute the answer back, or compare numerically. If the statement is ambiguous or seems wrong, say so in the opening sentences and solve the most likely intended version.',
     'Only the written solution for now: don’t write script.md or scene.py yet.',
