@@ -833,6 +833,8 @@ export interface StudioApi {
   pickProject(): Promise<string | null>
   /** A folder from the system dialog, or null if cancelled. */
   pickFolder(title?: string, defaultPath?: string): Promise<string | null>
+  /** Opens the configured projects directory in the system file manager. */
+  openProjectsFolder(): Promise<void>
   /** PDFs from the system dialog; empty if cancelled. */
   pickPdfs(): Promise<string[]>
   closeProject(): Promise<void>
