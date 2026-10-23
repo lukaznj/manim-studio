@@ -45,3 +45,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI model discovery and opt-in OpenAI capacity fallback for conversational video turns | accepted |
 | [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
 | [[0041-focused-study-workspace]] | Focused study page, separate lesson/exercise tabs, compact video controls and adding lessons to existing courses | accepted |
+| [[0042-study-playback-preferences]] | Per-project resume, optional continuous series playback preserving fullscreen, and a remembered speed menu | accepted |

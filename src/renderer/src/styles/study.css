@@ -512,17 +512,123 @@
   cursor: pointer;
 }
 .study-rate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-2);
   font: 11px var(--font-ui);
-  width: 51px;
+  min-width: 52px;
   height: 30px;
   cursor: pointer;
 }
-.study-rate option {
+.study-rate svg {
+  width: 12px;
+  height: 12px;
+}
+.study-rate:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+.study-speed-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: 184px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
   background: var(--panel);
   color: var(--text);
+  box-shadow: 0 10px 36px #0004;
+  font: 12px var(--font-ui);
+}
+.study-speed-menu:popover-open {
+  animation: study-speed-in 0.14s ease-out;
+}
+@keyframes study-speed-in {
+  from {
+    transform: translateY(4px);
+  }
+}
+.study-speed-heading {
+  display: block;
+  padding: 8px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+.study-speed-menu button {
+  display: grid;
+  grid-template-columns: 40px 1fr 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.study-speed-menu button:hover,
+.study-speed-menu button:focus-visible {
+  background: var(--raised);
+  color: var(--text);
+}
+.study-speed-menu button[aria-checked='true'] {
+  background: var(--sun-soft);
+  color: var(--sun-text);
+}
+.study-speed-menu button:focus-visible {
+  outline: 2px solid var(--sun);
+  outline-offset: -2px;
+}
+.study-speed-menu svg {
+  width: 14px;
+  height: 14px;
+}
+.study-autoplay {
+  width: 34px;
+  height: 20px;
+  padding: 2px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--text-3);
+  color: var(--panel);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.study-autoplay.active {
+  background: var(--sun);
+  color: var(--bg);
+}
+.study-autoplay > span {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  background: var(--panel);
+  color: var(--text-2);
+  border-radius: 50%;
+  transition: transform 0.18s;
+}
+.study-autoplay.active > span {
+  transform: translateX(14px);
+  color: var(--sun-text);
+}
+.study-autoplay svg {
+  width: 10px;
+  height: 10px;
+  fill: currentColor;
 }
 .study-chapter-list {
   display: grid;
