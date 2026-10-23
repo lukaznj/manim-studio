@@ -1,5 +1,8 @@
 // Croatian interface copy. English source strings are stable catalog keys.
 export const hr: Record<string, string> = {
+  '1080p by default. Lower resolutions render faster. Export quality is configured separately above.':
+    'Zadano je 1080p. Niže razlučivosti renderiraju se brže. Kvaliteta izvoza postavlja se zasebno iznad.',
+  '1080p is the default for all videos. Choose 720p for faster rendering.': '1080p je zadano za sve videozapise. Odaberite 720p za brže renderiranje.',
   'Autoplay next lesson': 'Automatski reproduciraj sljedeću lekciju',
   Normal: 'Normalno',
   'Your course': 'Vaš tečaj',

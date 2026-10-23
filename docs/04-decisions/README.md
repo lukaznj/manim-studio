@@ -38,11 +38,11 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0032-searchable-transcript]] | The study screen's transcript follows the video line by line; searching what's said moves the video to each match | accepted |
 | [[0033-every-agent-in-the-background]] | Codex and Antigravity run the background agents too (the bridge names its project); Settings → Accounts shows every agent's sign-in and key | accepted |
 | [[0034-gpu-video-encoding]] | Exports encode on the GPU (VideoToolbox, NVENC, Media Foundation for AMD) when one works, in a cache of their own, with the CPU as the fallback | accepted |
-| [[0035-720p-study-videos]] | Videos made to study (Learn and Both) export at 720p by default, about 2.3× faster; 720p is in the export dialog; no 24 fps | accepted |
+| [[0035-720p-study-videos]] | Previews and exports default to 1080p in all modes; lower resolutions remain explicit choices; no 24 fps exports | accepted |
 | [[0036-settings-onboarding-and-languages]] | Guided onboarding, English/Croatian UI, shared Voice/Video defaults, colour-only background choices and plus-button libraries | accepted |
 | [[0037-desktop-conversation-videos]] | Desktop chat video jobs, mode-aware delivery and shared Claude/Codex/ChatGPT local bridge | accepted |
 | [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
 | [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI model discovery and opt-in OpenAI capacity fallback for conversational video turns | accepted |
 | [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
 | [[0041-focused-study-workspace]] | Focused study page, separate lesson/exercise tabs, compact video controls and adding lessons to existing courses | accepted |
-| [[0042-study-playback-preferences]] | Per-project resume, optional continuous series playback preserving fullscreen, and a remembered speed menu | accepted |
+| [[0042-study-playback-preferences]] | Per-project resume, optional continuous series playback preserving fullscreen, and remembered speed, subtitles and volume | accepted |

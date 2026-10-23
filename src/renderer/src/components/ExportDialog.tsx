@@ -62,7 +62,7 @@ export function ExportDialog() {
         languages: [],
         languageVideos: false,
         ...meta.export,
-        size: meta.export?.size ?? settings?.studySize ?? (settings?.mode === 'create' ? 1080 : 720),
+        size: meta.export?.size ?? settings?.studySize ?? 1080,
         fps: meta.export?.fps ?? (meta.fps === 60 ? 60 : 30),
       })
   }, [open])

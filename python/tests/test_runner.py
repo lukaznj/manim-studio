@@ -38,7 +38,7 @@ class RenderTimeline(unittest.TestCase):
 
     def test_video_written(self):
         self.assertTrue(Path(self.result["video"]).exists())
-        self.assertEqual((self.result["width"], self.result["height"]), (854, 480))
+        self.assertEqual((self.result["width"], self.result["height"]), (1920, 1080))
 
     def test_sections(self):
         self.assertEqual([s["name"] for s in self.result["sections"]], ["Intro", "Mistakes"])
