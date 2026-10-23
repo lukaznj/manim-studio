@@ -1,5 +1,7 @@
 // Croatian interface copy. English source strings are stable catalog keys.
 export const hr: Record<string, string> = {
+  'Autoplay next lesson': 'Automatski reproduciraj sljedeću lekciju',
+  Normal: 'Normalno',
   'Your course': 'Vaš tečaj',
   'Your library': 'Vaša zbirka',
   '{0} of {1} lessons watched': 'Pogledano {0} od {1} lekcija',

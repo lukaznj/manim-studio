@@ -635,6 +635,8 @@ export type Appearance = 'system' | 'light' | 'dark'
 export type AppMode = 'learn' | 'create' | 'both'
 
 export interface Settings {
+  studyAutoplay?: boolean // advance to the next ready course lesson; unset: off
+  studyPlaybackRate?: number // preferred study player speed; unset: 1
   developerMode?: boolean
   developerEpisodeModels?: boolean
   developerUsageMetrics?: boolean

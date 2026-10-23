@@ -161,7 +161,7 @@ export function StudyView() {
           {item ? (
             <ExerciseMain key={item.dir} item={item} />
           ) : episode && path ? (
-            <Watched key={path} dir={path} episode={episode} followUp={followUp} single={single} />
+            <Watched dir={path} episode={episode} followUp={followUp} single={single} />
           ) : set && !series ? (
             <ExerciseEmpty set={set} />
           ) : (

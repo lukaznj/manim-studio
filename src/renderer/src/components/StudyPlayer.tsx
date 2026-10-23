@@ -1,23 +1,24 @@
 import { t as uiText } from '../lib/i18n'
 import { Captions, Check, FolderOpen, ListVideo, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Section } from '../../../shared/types'
+import { resumePosition, type StudyProgress } from '../../../shared/study-playback'
 import { api } from '../lib/api'
-import { errorText, toast, useStore } from '../store'
+import { errorText, toast, updateSettings, useStore } from '../store'
 import { Modal } from './ui'
+import { PlaybackSpeed, PLAYBACK_RATES } from './PlaybackSpeed'
 
-const RATES = [0.75, 1, 1.25, 1.5, 2]
 const clock = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`
-function saved(key: string): number {
+function saved(key: string, src: string, duration: number): number {
   try {
-    return Number(localStorage.getItem(`watch:${key}`)) || 0
+    return resumePosition(localStorage.getItem(`watch:project:${key}`) ?? localStorage.getItem(`watch:${src}`), duration)
   } catch {
     return 0
   }
 }
-function save(key: string, t: number): void {
+function save(key: string, progress: StudyProgress): void {
   try {
-    localStorage.setItem(`watch:${key}`, String(Math.round(t)))
+    localStorage.setItem(`watch:project:${key}`, JSON.stringify({ position: progress.position, duration: progress.duration, completed: progress.completed }))
   } catch {
     /* resume is optional */
   }
@@ -38,12 +39,21 @@ export function StudyPlayer(props: {
   chapters: Section[]
   video: RefObject<HTMLVideoElement | null>
   resume?: boolean
+  startPlaying?: boolean
+  seriesAutoplay?: boolean
+  onEnded?: () => void
   onWatched?: () => void
 }) {
   const { src, vtt, video } = props
   const aspect = useStore((s) => s.project?.meta.aspect ?? '16:9')
+  const projectPath = useStore((s) => s.project?.path ?? src)
+  const autoplay = useStore((s) => s.settings?.studyAutoplay ?? false)
+  const preferredRate = useStore((s) => s.settings?.studyPlaybackRate ?? 1)
+  const rate = PLAYBACK_RATES.includes(preferredRate) ? preferredRate : 1
+  // Keep the old source's last observed position: detached video elements can reset to zero.
+  const session = useMemo(() => ({ key: projectPath, position: 0, duration: 0, completed: false, ready: false, lastSaved: 0 }), [src, projectPath])
   const root = useRef<HTMLElement>(null)
-  const [rate, setRate] = useState(1)
+  const [speedOpen, setSpeedOpen] = useState(false)
   const [now, setNow] = useState(0)
   const [duration, setDuration] = useState(0)
   const [paused, setPaused] = useState(true)
@@ -63,7 +73,7 @@ export function StudyPlayer(props: {
     chapters.findLastIndex((c) => now >= c.start),
   )
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = video.current
     playing = el
     marked.current = false
@@ -73,13 +83,27 @@ export function StudyPlayer(props: {
     setFailed(false)
     setCaptions(true)
     return () => {
-      if (props.resume && el) save(src, el.currentTime)
+      if (props.resume !== false && session.ready) save(session.key, session)
       if (playing === el) {
         playing = null
         useStore.setState({ watchTime: null })
       }
     }
-  }, [src])
+  }, [session])
+  useEffect(() => {
+    const flush = () => {
+      if (props.resume !== false && session.ready) save(session.key, session)
+    }
+    window.addEventListener('pagehide', flush)
+    window.addEventListener('beforeunload', flush)
+    document.addEventListener('visibilitychange', flush)
+    return () => {
+      flush()
+      window.removeEventListener('pagehide', flush)
+      window.removeEventListener('beforeunload', flush)
+      document.removeEventListener('visibilitychange', flush)
+    }
+  }, [session, props.resume])
   useEffect(() => {
     let wasFullscreen = false
     const changed = () => {
@@ -90,7 +114,7 @@ export function StudyPlayer(props: {
       wasFullscreen = active
     }
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || document.fullscreenElement !== root.current || root.current?.querySelector('dialog[open]')) return
+      if (event.key !== 'Escape' || document.fullscreenElement !== root.current || root.current?.querySelector('dialog[open], :popover-open')) return
       event.preventDefault()
       void document.exitFullscreen().catch(() => undefined)
     }
@@ -116,12 +140,12 @@ export function StudyPlayer(props: {
       window.clearTimeout(hideTimer.current)
       document.removeEventListener('mousemove', revealControls, true)
     }
-  }, [fullscreen, paused, chaptersOpen, failed])
+  }, [fullscreen, paused, chaptersOpen, speedOpen, failed])
 
   function revealControls(): void {
     setControlsVisible(true)
     window.clearTimeout(hideTimer.current)
-    if (!fullscreen || paused || chaptersOpen || failed) return
+    if (!fullscreen || paused || chaptersOpen || speedOpen || failed) return
     hideTimer.current = window.setTimeout(() => {
       const focusedControl = toolbar.current?.contains(document.activeElement)
       if (toolbar.current?.matches(':hover') || (focusedControl && document.activeElement?.matches(':focus-visible'))) return
@@ -158,6 +182,15 @@ export function StudyPlayer(props: {
     if (!video.current) return
     video.current.volume = value
     video.current.muted = value === 0
+  }
+  const remember = (el: HTMLVideoElement, flush = false) => {
+    if (!session.ready) return
+    session.position = el.currentTime
+    session.completed = el.ended
+    if (props.resume !== false && (flush || performance.now() - session.lastSaved > 1000)) {
+      save(session.key, session)
+      session.lastSaved = performance.now()
+    }
   }
 
   return (
@@ -196,7 +229,12 @@ export function StudyPlayer(props: {
           onPlay={() => setPaused(false)}
           onPause={(e) => {
             setPaused(true)
-            if (props.resume) save(src, e.currentTarget.currentTime)
+            remember(e.currentTarget, true)
+          }}
+          onSeeked={(e) => remember(e.currentTarget, true)}
+          onEnded={(e) => {
+            remember(e.currentTarget, true)
+            props.onEnded?.()
           }}
           onVolumeChange={(e) => {
             setVolume(e.currentTarget.volume)
@@ -207,7 +245,7 @@ export function StudyPlayer(props: {
               t = el.currentTime
             setNow(t)
             useStore.setState({ watchTime: t })
-            if (props.resume && Math.round(t) % 5 === 0) save(src, t)
+            remember(el)
             if (!marked.current && el.duration && t >= el.duration * 0.9) {
               marked.current = true
               props.onWatched?.()
@@ -219,10 +257,17 @@ export function StudyPlayer(props: {
             el.playbackRate = rate
             el.volume = volume
             el.muted = muted
-            const at = props.resume ? saved(src) : 0
-            if (at > 3 && at < el.duration - 5) el.currentTime = at
+            const at = !props.startPlaying && props.resume !== false ? saved(projectPath, src, el.duration) : 0
+            el.currentTime = at
+            session.duration = Number.isFinite(el.duration) ? el.duration : 0
+            session.position = at
+            session.ready = true
             setNow(el.currentTime)
             useStore.setState({ watchTime: el.currentTime })
+            if (props.startPlaying) {
+              useStore.setState({ studyAutoplayPath: null })
+              void el.play().catch((e) => toast(errorText(e), 'error'))
+            }
           }}
         >
           {vtt && (
@@ -327,13 +372,21 @@ export function StudyPlayer(props: {
                 <ListVideo />
               </button>
             )}
-            <select className="study-rate" value={rate} aria-label={uiText('Playback speed')} onChange={(e) => setRate(Number(e.target.value))}>
-              {RATES.map((r) => (
-                <option key={r} value={r}>
-                  {r}×
-                </option>
-              ))}
-            </select>
+            {props.seriesAutoplay && (
+              <button
+                className={`study-autoplay ${autoplay ? 'active' : ''}`}
+                role="switch"
+                aria-checked={autoplay}
+                aria-label={uiText('Autoplay next lesson')}
+                title={uiText('Autoplay next lesson')}
+                onClick={() => void updateSettings({ studyAutoplay: !autoplay })}
+              >
+                <span>
+                  <Play />
+                </span>
+              </button>
+            )}
+            <PlaybackSpeed rate={rate} onChange={(studyPlaybackRate) => void updateSettings({ studyPlaybackRate })} onOpen={setSpeedOpen} />
             <button
               className="icon-btn"
               onClick={expand}
