@@ -15,14 +15,14 @@ Today Claude goes straight from a request to `scene.py`. That works for short vi
   - the one idea the viewer should leave with, who the video is for and what it assumes they know;
   - sections, each with its goal, the final narration, what's on screen and how it moves, and an estimated length;
   - references to the source PDFs (page numbers) where the material comes from.
-- **Script mode** is a project setting. When it's on, Claude writes or revises `script.md` first and asks for approval, and only then writes `scene.py` to follow it. The narration in the code is the script's wording.
+- **Scripting is always part of generation.** The agent writes or revises `script.md` first and asks for approval, and only then writes `scene.py` to follow it. The narration in the code is the script's wording. There is no switch in Settings or New project to bypass this step; legacy `scriptFirst: false` metadata does not disable it.
 - **The app shows the script** in a Script tab next to `scene.py` (`ScriptPane.tsx`): readable, editable, with Approve, which marks it approved and tells Claude to write the video from it. The tab opens by itself when Claude writes the script. Claude Desktop reads and writes it through `get_script` and `write_script`.
-- **The brief** (`src/shared/script.ts`) gives Claude the format, the rules and what makes a great explainer. New projects have script mode on; Settings → Video turns it off.
+- **The brief** (`src/shared/script.ts`) gives every agent the format, the rules and what makes a great explainer. The Script tab is always available, including in older projects.
 - **Series** add `series.md`, the series bible: what each episode covers and assumes, the notation, and the recurring visual vocabulary (colours and shapes that always mean the same thing). Each episode's script reads it, which is how a video refers back to an earlier one.
 - Quick mode and series mode use script mode, with approval either by the user or automatic.
 
 ## Consequences
 
-- One more step before the first render, so it's off by default for small edits and on by default for new videos made from sources.
+- Planning precedes the first render for every new video. Purely visual fixes can still go straight into the existing scene without rewriting an unchanged script.
 - The script is plain Markdown in the project's git history, so it can be reviewed, diffed and reverted like the code.
 - Script sections and rendered sections should be the same thing, matched by name, so the timeline can show which part of the script a clip belongs to.

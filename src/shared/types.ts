@@ -40,7 +40,7 @@ export interface ProjectMeta {
   exercise?: ExerciseRef // an exercise in an exercise set (ADR 0025)
   extra?: { of: string; at: number; request: string } // a follow-up video to an episode (its folder name), asked for while watching (ADR 0028)
   captionBand?: boolean // keeps text out of the bottom band, where viewers' subtitles go (ADR 0027); projects made since 0.6
-  scriptFirst?: boolean // Claude plans script.md and gets it approved before writing scene.py (ADR 0016)
+  scriptFirst?: boolean // Legacy metadata. Scripting is always part of generation (ADR 0016).
   claudeSessionId?: string
   codexThreadId?: string // the project's Codex conversation, resumed after a restart
   antigravityConversationId?: string // the project's Antigravity conversation, resumed the same way
@@ -313,7 +313,6 @@ export interface NewProjectInput {
   /** The project's voice; unset takes Settings → Voice's default (with `language`). */
   voice?: VoiceSettings
   tone?: Tone
-  scriptFirst?: boolean
   series?: SeriesRef
   exercise?: ExerciseRef
   parentDir?: string

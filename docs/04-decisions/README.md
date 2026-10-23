@@ -19,7 +19,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0013-export-versions-and-languages]] | Export light and dark versions, and dubbed audio tracks plus subtitles per language | accepted |
 | [[0014-pdf-sources]] | PDFs are sources in the project, read by Claude through Studio tools and shown with pdf_page() | accepted |
 | [[0015-tone-and-pacing]] | Tone per project (professional, warm, playful); pacing by clarity, no target length | accepted |
-| [[0016-script-first]] | Claude writes script.md and gets it approved before writing scene.py; series share a series.md | accepted |
+| [[0016-script-first]] | Every agent plans in script.md before scene.py; scripting is always enabled and series share a series.md | accepted |
 | [[0017-background-export-queue]] | Exports run in a background queue, one at a time, each on a copy of its project | accepted |
 | [[0018-quick-mode]] | Quick mode: Claude makes the video on autopilot, Studio checks the render and exports it | accepted |
 | [[0019-series-mode]] | Series mode: Claude plans episodes and a series bible from a course's PDFs; episodes refer back through series.md | accepted |
@@ -39,9 +39,9 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0033-every-agent-in-the-background]] | Codex and Antigravity run the background agents too (the bridge names its project); Settings → Accounts shows every agent's sign-in and key | accepted |
 | [[0034-gpu-video-encoding]] | Exports encode on the GPU (VideoToolbox, NVENC, Media Foundation for AMD) when one works, in a cache of their own, with the CPU as the fallback | accepted |
 | [[0035-720p-study-videos]] | Videos made to study (Learn and Both) export at 720p by default, about 2.3× faster; 720p is in the export dialog; no 24 fps | accepted |
-| [[0036-settings-onboarding-and-languages]] | Guided onboarding, English/Croatian UI, shared Voice/Video defaults and plus-button libraries | accepted |
+| [[0036-settings-onboarding-and-languages]] | Guided onboarding, English/Croatian UI, shared Voice/Video defaults, colour-only background choices and plus-button libraries | accepted |
 | [[0037-desktop-conversation-videos]] | Desktop chat video jobs, mode-aware delivery and shared Claude/Codex/ChatGPT local bridge | accepted |
 | [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
 | [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI model discovery and opt-in OpenAI capacity fallback for conversational video turns | accepted |
 | [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
-| [[0041-focused-study-workspace]] | Focused study page, separate lesson/exercise tabs, custom video controls and adding lessons to existing courses | accepted |
+| [[0041-focused-study-workspace]] | Focused study page, separate lesson/exercise tabs, compact video controls and adding lessons to existing courses | accepted |
