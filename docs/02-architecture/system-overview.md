@@ -54,6 +54,7 @@
 | `<project>/media/` | Your pictures and videos ([[../04-decisions/0012-own-media-in-scenes\|ADR 0012]]) | pictures yes, videos no |
 | `<project>/sources/` | PDFs the video is made from, indexed into `.studio/sources/` ([[../04-decisions/0014-pdf-sources\|ADR 0014]]) | no |
 | `<project>/.studio/` | Renders, `timeline.json`, frames, chat log, thumbnail | no |
+| render cache (`~/Library/Caches/Manim Studio`, `%LOCALAPPDATA%\Manim Studio\Render cache`, `~/.cache/manim-studio`) | manim's partial movies and typeset text per project, rebuilt when missing, 20 GB at most ([[../04-decisions/0043-projects-folder-and-render-cache\|ADR 0043]]) | no |
 | `<project>/exports/<name>/` | Videos per theme, audio tracks and subtitles per language, thumbnails ([[../04-decisions/0013-export-versions-and-languages\|ADR 0013]]) | no |
 | `<set>/exercises.json`, `<set>/NN-<slug>/problem.md`, `solution.md` | An exercise set: its exercises in order, each a project with its statement and worked solution ([[../04-decisions/0025-exercise-sets\|ADR 0025]]) | the projects are their own repos |
 | `<series>/exercises/` | A course's own exercise set, each exercise with the series bible as `course.md` ([[../04-decisions/0030-courses\|ADR 0030]]) | the projects are their own repos |

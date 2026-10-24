@@ -158,7 +158,12 @@ function load(folder: string): ExerciseSet {
 function setFolders(): string[] {
   const { exerciseSets = [], projectsDir } = getSettings()
   const found = new Set(exerciseSets.filter((f) => existsSync(setFile(f))))
-  if (existsSync(projectsDir)) for (const name of readdirSync(projectsDir)) if (existsSync(setFile(join(projectsDir, name)))) found.add(join(projectsDir, name))
+  if (existsSync(projectsDir))
+    for (const name of readdirSync(projectsDir)) {
+      if (existsSync(setFile(join(projectsDir, name)))) found.add(join(projectsDir, name))
+      // A course's own set (ADR 0030): found too, so a folder brought back after a reinstall has its exercises.
+      else if (existsSync(setFile(join(projectsDir, name, 'exercises')))) found.add(join(projectsDir, name, 'exercises'))
+    }
   return [...found]
 }
 

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { AppMode } from '../../../shared/types'
 import { api } from '../lib/api'
-import { errorText, installComponent, switchMode, updateSettings, useStore } from '../store'
+import { errorText, installComponent, refreshProjects, switchMode, updateSettings, useStore } from '../store'
+import { ProjectsFolderStep } from './ProjectsFolderStep'
 import { AgentAccount, ElevenLabsAccount, VoiceForm, voiceProblem } from './SettingsDialog'
 import { Modal, Tabs } from './ui'
 
@@ -13,6 +14,7 @@ export function ModeChoice() {
   const [mode, setMode] = useState<AppMode>('learn')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [folder, setFolder] = useState<string | null>(null)
   const open = !!settings && !settings.mode
   if (!settings) return null
   const hr = settings.uiLanguage === 'hr'
@@ -20,6 +22,7 @@ export function ModeChoice() {
   const titles = [
     say('Welcome to Manim Studio', 'Dobro došli u Manim Studio'),
     say('What will you do?', 'Što želite raditi?'),
+    say('Where should your projects go?', 'Gdje spremati projekte?'),
     say('Choose your agent', 'Odaberite agenta'),
     say('Connect your account', 'Povežite račun'),
     say('Choose your voice', 'Odaberite glas'),
@@ -32,7 +35,11 @@ export function ModeChoice() {
     setError('')
     setBusy(true)
     try {
-      if (step === 3) {
+      if (step === 2 && folder) {
+        useStore.setState({ settings: await api.useProjectsFolder(folder) })
+        await refreshProjects()
+      }
+      if (step === 4) {
         const status = await api.claudeStatus(settings.agent)
         if (!status.loggedIn)
           throw new Error(
@@ -42,7 +49,7 @@ export function ModeChoice() {
             ),
           )
       }
-      if (step === 4) {
+      if (step === 5) {
         const problem = voiceProblem(settings.defaultVoice, settings.hasElevenLabsKey, setup?.omnivoice)
         if (problem) throw new Error(problem)
         await finish()
@@ -74,19 +81,19 @@ export function ModeChoice() {
               {say('Back', 'Natrag')}
             </button>
           )}
-          {step >= 3 && (
-            <button className="btn ghost" disabled={busy} onClick={() => (step === 4 ? void finish() : setStep(step + 1))}>
+          {step >= 4 && (
+            <button className="btn ghost" disabled={busy} onClick={() => (step === 5 ? void finish() : setStep(step + 1))}>
               {say('Set up later', 'Postavi kasnije')}
             </button>
           )}
           <button className="btn primary" disabled={busy} onClick={() => void next()}>
-            {busy ? say('Checking…', 'Provjera…') : step === 4 ? say('Get started', 'Započni') : say('Continue', 'Nastavi')}
+            {busy ? say('Checking…', 'Provjera…') : step === 5 ? say('Get started', 'Započni') : say('Continue', 'Nastavi')}
           </button>
         </>
       }
     >
       <div className="modal-body set-group">
-        <div className="onboarding-progress" aria-label={`${step + 1} / 5`}>
+        <div className="onboarding-progress" aria-label={`${step + 1} / ${titles.length}`}>
           {titles.map((title, i) => (
             <span key={i} className={i <= step ? 'on' : ''} title={title} />
           ))}
@@ -152,7 +159,8 @@ export function ModeChoice() {
             ))}
           </div>
         )}
-        {step === 2 && (
+        {step === 2 && <ProjectsFolderStep say={say} value={folder} onChange={setFolder} />}
+        {step === 3 && (
           <>
             <p>
               {say(
@@ -178,7 +186,7 @@ export function ModeChoice() {
             </p>
           </>
         )}
-        {step === 3 && (
+        {step === 4 && (
           <>
             <p>
               {say(
@@ -189,7 +197,7 @@ export function ModeChoice() {
             <AgentAccount agent={settings.agent} />
           </>
         )}
-        {step === 4 && (
+        {step === 5 && (
           <>
             <p>
               {say(
