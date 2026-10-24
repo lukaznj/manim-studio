@@ -24,6 +24,7 @@ import { renderRemote } from './remote'
 import { runRunner } from './runner'
 import { getSettings } from './settings'
 import { voiceEnv } from './voice'
+import { projectCache, pruneRenderCache } from './render-cache'
 
 type Progress = (e: { stage: string; percent?: number }) => void
 
@@ -69,6 +70,7 @@ export async function exportVideo(
   const last = readTimeline(project)
   const duration = last?.duration
   const animations = last?.clips.length ?? 0 // one per play() and wait(), as manim counts them
+  const cache = projectCache(project) // the original's render cache (ADR 0043): unchanged animations aren't drawn again
   const files: string[] = []
   const warnings: string[] = []
   const videos: string[] = []
@@ -127,7 +129,7 @@ export async function exportVideo(
           snap,
           meta,
           { theme, size, fps, encoder },
-          join(project, '.studio', 'cache'),
+          cache,
           animations,
           (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }),
           signal,
@@ -139,7 +141,7 @@ export async function exportVideo(
             meta,
             { theme, out: `final-${theme}`, size, fps, encoder: on },
             {
-              cacheDir: join(project, '.studio', 'cache'),
+              cacheDir: cache,
               signal,
               tag,
               onProgress: (t) =>
@@ -205,6 +207,11 @@ export async function exportVideo(
     }
   } finally {
     keepNarration(snap, project)
+    try {
+      pruneRenderCache([project])
+    } catch {
+      // the cache is only a cache
+    }
   }
   return { folder, files, warnings }
 }
