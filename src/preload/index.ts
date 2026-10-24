@@ -81,7 +81,7 @@ const methods = [
   'retryCourseLesson',
   'retryFollowUp',
   'setWatched',
-  'renderServers',
+  'renderServers', 'projectsFolders', 'inspectFolder', 'useProjectsFolder', 'renderCacheInfo', 'clearRenderCache',
   'videoEncoder',
   'addServer',
   'removeServer',

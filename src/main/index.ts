@@ -43,6 +43,8 @@ import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
 import { videoEncoder } from './encoder'
+import { inspectFolder, projectsFolders, useProjectsFolder } from './folders'
+import { clearRenderCache, pruneRenderCache, renderCacheInfo } from './render-cache'
 import {
   addCourseLesson,
   retryCourseLesson,
@@ -387,6 +389,11 @@ function registerIpc(): void {
   handle('retryFollowUp', (dir: string) => retryFollowUp(dir))
   handle('setWatched', (dir: string, watched: boolean) => setWatched(dir, watched, ex.watchedChanged))
   handle('renderServers', () => listServers())
+  handle('projectsFolders', () => projectsFolders())
+  handle('inspectFolder', (dir: string) => inspectFolder(dir))
+  handle('useProjectsFolder', (dir: string) => useProjectsFolder(dir))
+  handle('renderCacheInfo', () => renderCacheInfo())
+  handle('clearRenderCache', () => clearRenderCache())
   handle('videoEncoder', (again?: boolean) => videoEncoder(again))
   handle('addServer', (code: string) => addServer(code))
   handle('removeServer', (id: string) => removeServer(id))
@@ -504,6 +511,14 @@ app.whenReady().then(() => {
     pythonJobs: [...runningJobs].map(([pid, job]) => ({ pid, what: job.what, since: job.since, lastLog: job.log().split('\n').slice(-15) })),
   }))
   createWindow()
+  // The render cache stays under its limit (ADR 0043); the open project's is kept.
+  setTimeout(() => {
+    try {
+      pruneRenderCache([projects.project()?.path].filter((p): p is string => !!p))
+    } catch {
+      // the cache is only a cache
+    }
+  }, 30_000)
 
   // A fresh install or an app update that changed pixi.toml: bring the env up to date quietly.
   const status = setupStatus()

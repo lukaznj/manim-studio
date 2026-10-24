@@ -3,6 +3,7 @@ import {
   AudioLines,
   Check,
   Circle,
+  Cloud,
   Cpu,
   FolderOpen,
   KeyRound,
@@ -16,6 +17,7 @@ import {
   Sparkles,
   Square,
   Sun,
+  Trash2,
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -52,6 +54,7 @@ import {
   installComponent,
   openDialog,
   refreshClaude,
+  refreshProjects,
   refreshUsage,
   renderNow,
   startTour,
@@ -945,6 +948,7 @@ function VideoTab() {
             </label>
           </Row>
           <GpuEncoding />
+          <RenderCache />
           <RenderServers />
         </>
       )}
@@ -1304,6 +1308,91 @@ function EnvTab() {
   )
 }
 
+/** The projects folder, and whether a cloud drive syncs it (ADR 0043): allowed, never the default. */
+function ProjectsFolderRow() {
+  const dir = useStore((s) => s.settings!.projectsDir)
+  const [cloud, setCloud] = useState<string | null>(null)
+  useEffect(
+    () =>
+      void api.inspectFolder(dir).then(
+        (i) => setCloud(i.cloud),
+        () => setCloud(null),
+      ),
+    [dir],
+  )
+  return (
+    <Row
+      title={uiText('Projects folder')}
+      text={
+        <>
+          <span className="mono">{dir}</span>
+          {cloud && (
+            <span className="folder-synced">
+              <Cloud />{' '}
+              {format('{0} syncs this folder, so projects are backed up but use your cloud storage. The render cache stays on this computer.', [cloud])}
+            </span>
+          )}
+        </>
+      }
+    >
+      <div className="pane-actions">
+        <button className="btn small" onClick={() => void api.openProjectsFolder().catch((e) => toast(errorText(e), 'error'))}>
+          <FolderOpen /> {uiText('Open folder')}
+        </button>
+        <button
+          className="btn small"
+          onClick={async () => {
+            const picked = await api.pickFolder()
+            if (!picked) return
+            useStore.setState({ settings: await api.useProjectsFolder(picked) })
+            await refreshProjects() // a returning user's folder: Home lists what's in it
+          }}
+        >
+          {uiText('Change')}
+        </button>
+      </div>
+    </Row>
+  )
+}
+
+const gigabytes = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`)
+
+/** The render cache (ADR 0043): rebuilt when needed, kept out of the projects folder, limited in size. */
+function RenderCache() {
+  const [info, setInfo] = useState<{ path: string; bytes: number } | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => void api.renderCacheInfo().then(setInfo), [])
+  return (
+    <Row
+      title={uiText('Render cache')}
+      text={
+        <>
+          {format('Finished animations, kept so renders don’t draw them again: {0}, up to 20 GB. Kept on this computer only, outside the projects folder.', [
+            info ? gigabytes(info.bytes) : '…',
+          ])}{' '}
+          {info && <span className="mono">{info.path}</span>}
+        </>
+      }
+    >
+      <button
+        className="btn small"
+        disabled={busy || !info?.bytes}
+        onClick={async () => {
+          setBusy(true)
+          try {
+            await api.clearRenderCache()
+            setInfo(await api.renderCacheInfo())
+          } finally {
+            setBusy(false)
+          }
+        }}
+      >
+        {busy ? <span className="spinner" /> : <Trash2 />} {uiText('Clear')}
+      </button>
+    </Row>
+  )
+}
+
 /** Exports encode on the GPU when one works here (ADR 0034): which one, and a way to turn it off. */
 function GpuEncoding() {
   const mode = useStore((s) => s.settings!.gpuEncoding ?? 'auto')
@@ -1567,22 +1656,7 @@ function AboutTab() {
           ]}
         />
       </Row>
-      <Row title={uiText('Projects folder')} text={<span className="mono">{settings.projectsDir}</span>}>
-        <div className="pane-actions">
-          <button className="btn small" onClick={() => void api.openProjectsFolder().catch((e) => toast(errorText(e), 'error'))}>
-            <FolderOpen /> {uiText('Open folder')}
-          </button>
-          <button
-            className="btn small"
-            onClick={async () => {
-              const dir = await api.pickFolder()
-              if (dir) void updateSettings({ projectsDir: dir })
-            }}
-          >
-            {uiText('Change')}
-          </button>
-        </div>
-      </Row>
+      <ProjectsFolderRow />
       {canEdit({ settings }) && (
         <Row title={uiText('Tutorial')} text={uiText('A short tour of the editor: the code, Claude, the timeline, media, narration and export.')}>
           <button className="btn small" disabled={!project} title={project ? undefined : uiText('Open a project first')} onClick={startTour}>

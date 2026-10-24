@@ -45,6 +45,8 @@ export function getSettings(): Settings {
     let stored: Partial<Settings> = {}
     try {
       stored = JSON.parse(readFileSync(paths.settingsFile(), 'utf8'))
+      // Installs from before 0.11 keep the projects folder they had (Documents), set or not (ADR 0043).
+      stored.projectsDir ??= process.env.STUDIO_PROJECTS_DIR ?? paths.legacyProjectsDir()
     } catch {
       // first run, or a corrupt file: fall back to defaults
     }

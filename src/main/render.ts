@@ -12,6 +12,7 @@ import { project, readMeta, readTimeline, requireProject } from './projects'
 import { killJob, pauseTag, runRunner } from './runner'
 import { getSettings } from './settings'
 import { voiceEnv } from './voice'
+import { projectCache } from './render-cache'
 
 export type RenderOutcome = { timeline: Timeline } | { error: RenderError } | { cancelled: true }
 
@@ -82,7 +83,7 @@ export function render(quality: Quality, variant: RenderVariant = {}, dir = requ
               ...(variant.fps ? ['--fps', String(variant.fps)] : []),
             ]
       const job = await runRunner<{ result: Timeline }>('default', ['render', dir, '--quality', quality, ...options], {
-        extraEnv: await voiceEnv(meta, dir),
+        extraEnv: { ...(await voiceEnv(meta, dir)), STUDIO_CACHE_DIR: projectCache(dir) },
         tag: quality === 'preview' && open ? 'preview' : undefined,
         onEvent: (e) => {
           if (e.type === 'progress') send({ id, quality, type: 'progress', clips: Number(e.clips), t: Number(e.t) })

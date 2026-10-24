@@ -2046,3 +2046,50 @@
 .episode-models .model-controls {
   flex-wrap: wrap;
 }
+
+/* Onboarding: where projects go (ProjectsFolderStep.tsx, ADR 0043). */
+.folder-choices {
+  display: grid;
+  gap: 10px;
+}
+.folder-card {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  min-width: 0;
+}
+.folder-card-head {
+  justify-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.folder-card-head svg {
+  width: 18px;
+  height: 18px;
+  color: var(--sun-text);
+}
+.folder-card-head .folder-card-check {
+  margin-left: auto;
+}
+.folder-card-path {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.folder-card-found {
+  font-size: 13px;
+  color: var(--mint);
+}
+.folder-synced {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+}
+.folder-synced svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  color: var(--sun-text);
+}
