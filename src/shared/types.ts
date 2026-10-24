@@ -369,6 +369,20 @@ export interface VideoEncoderInfo {
   error?: string // the check itself failed
 }
 
+/** A folder projects could live in (folders.ts, ADR 0043). */
+export interface FolderInfo {
+  path: string
+  cloud: string | null // "iCloud Drive", "OneDrive", "Dropbox"…: it's synced
+  exists: boolean
+  found: { videos: number; courses: number; exerciseSets: number } | null // Manim Studio projects already in it
+}
+
+export interface ProjectsFolders {
+  local: FolderInfo // ~/Manim Studio: not synced
+  documents: FolderInfo // Documents/Manim Studio: the default before 0.11, often synced
+  current: string
+}
+
 export interface Subtitle {
   start: number
   end: number
@@ -920,6 +934,14 @@ export interface StudioApi {
   /** Marks a video (an episode, follow-up or exercise) watched or not; its list updates. */
   setWatched(dir: string, watched: boolean): Promise<void>
   renderServers(): Promise<RenderServer[]>
+  /** Where projects can go (ADR 0043): a local folder, Documents and whether a cloud drive syncs it, the one in use. */
+  projectsFolders(): Promise<ProjectsFolders>
+  /** What a folder holds (a returning user's projects) and whether it's synced. */
+  inspectFolder(dir: string): Promise<FolderInfo>
+  useProjectsFolder(dir: string): Promise<Settings>
+  /** The render cache's size and place (ADR 0043); clearing it makes renders draw everything again. */
+  renderCacheInfo(): Promise<{ path: string; bytes: number }>
+  clearRenderCache(): Promise<void>
   /** The GPU video encoder exports use on this computer, if any; `again` tests it anew. */
   videoEncoder(again?: boolean): Promise<VideoEncoderInfo>
   /** Pairs with a render worker from the code it printed; checks that it answers first. */

@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 // Where things live in dev (repo checkout) vs. a packaged app (Contents/Resources).
@@ -13,7 +14,21 @@ export const paths = {
   env: () => join(app.getPath('userData'), 'python-env'),
   tinytex: () => join(app.getPath('userData'), 'tinytex'),
   settingsFile: () => join(app.getPath('userData'), 'settings.json'),
-  defaultProjectsDir: () => process.env.STUDIO_PROJECTS_DIR ?? join(app.getPath('documents'), 'Manim Studio'),
+  /** New installs: a folder in the home folder, which iCloud and OneDrive don't sync (ADR 0043). */
+  defaultProjectsDir: () => process.env.STUDIO_PROJECTS_DIR ?? join(homedir(), 'Manim Studio'),
+  /** Where projects went before 0.11: Documents, which iCloud and OneDrive often sync. */
+  legacyProjectsDir: () => join(app.getPath('documents'), 'Manim Studio'),
+  /**
+   * The render cache (manim's partial movies, typeset text and formulas), one folder per project.
+   * Big and rebuilt when needed, so it lives where nothing syncs or backs it up: ~/Library/Caches
+   * on macOS, %LOCALAPPDATA% on Windows (not the roaming profile), XDG_CACHE_HOME on Linux.
+   */
+  renderCache(): string {
+    if (process.env.STUDIO_USER_DATA) return join(process.env.STUDIO_USER_DATA, 'render-cache') // the test driver's own folder
+    if (process.platform === 'darwin') return join(homedir(), 'Library', 'Caches', 'Manim Studio')
+    if (process.platform === 'win32') return join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'Manim Studio', 'Render cache')
+    return join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'manim-studio')
+  },
 
   /** Bundled pixi (extraResources bin/; in dev, resources/bin/ from `npm run fetch-pixi`).
    *  Never one from PATH: an older pixi can't read our lock file. */

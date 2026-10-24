@@ -15,7 +15,7 @@ Render time is now worth working on: it's the slowest part of making a long vide
 
 There's no GPU anywhere in this. The caches:
 
-- **Partial movies** in `.studio/cache/partial/<width>x<height>@<fps>/`, shared by every render of the project (previews, exports of its copies, slices of a parallel export). An animation with the same hash as before is reused, not drawn again.
+- **Partial movies** in the project's folder of the local render cache ([[../04-decisions/0043-projects-folder-and-render-cache|ADR 0043]]), `partial/<width>x<height>@<fps>/`, shared by every render of the project (previews, exports of its copies, slices of a parallel export). An animation with the same hash as before is reused, not drawn again.
 - **LaTeX** (`MathTex` → latex → dvisvgm → SVG), once per formula.
 - **Text** (Pango → SVG), once per string and style.
 - **Narration**, once per sentence and voice (`voice/tts/`).

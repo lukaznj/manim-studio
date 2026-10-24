@@ -1,5 +1,10 @@
 // Croatian interface copy. English source strings are stable catalog keys.
 export const hr: Record<string, string> = {
+  '{0} syncs this folder, so projects are backed up but use your cloud storage. The render cache stays on this computer.':
+    '{0} sinkronizira ovu mapu: projekti su sigurnosno kopirani, ali troše prostor u oblaku. Predmemorija renderiranja ostaje na ovom računalu.',
+  'Render cache': 'Predmemorija renderiranja',
+  'Finished animations, kept so renders don’t draw them again: {0}, up to 20 GB. Kept on this computer only, outside the projects folder.':
+    'Gotove animacije, čuvaju se da ih renderiranje ne crta ponovno: {0}, najviše 20 GB. Samo na ovom računalu, izvan mape projekata.',
   '1080p by default. Lower resolutions render faster. Export quality is configured separately above.':
     'Zadano je 1080p. Niže razlučivosti renderiraju se brže. Kvaliteta izvoza postavlja se zasebno iznad.',
   '1080p is the default for all videos. Choose 720p for faster rendering.': '1080p je zadano za sve videozapise. Odaberite 720p za brže renderiranje.',

@@ -46,3 +46,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
 | [[0041-focused-study-workspace]] | Focused study page, separate lesson/exercise tabs, compact video controls and adding lessons to existing courses | accepted |
 | [[0042-study-playback-preferences]] | Per-project resume, optional continuous series playback preserving fullscreen, and remembered speed, subtitles and volume | accepted |
+| [[0043-projects-folder-and-render-cache]] | Render cache in a local, unsynced cache folder (20 GB, LRU); new installs keep projects out of iCloud/OneDrive; onboarding asks where projects go and finds a returning user's folder | accepted |
