@@ -758,7 +758,7 @@
   height: 56px;
   border-radius: 999px;
   background: var(--mint);
-  color: var(--panel);
+  color: #fff; /* on the green circle in both themes */
   animation: onb-pop 0.5s var(--ease-spring);
 }
 .onb-success-mark svg {
@@ -771,7 +771,7 @@
   font: 700 18px var(--font-display);
   overflow-wrap: anywhere;
 }
-.onb-success span {
+.onb-success div > span {
   font-size: 15px;
   color: var(--text-2);
 }
