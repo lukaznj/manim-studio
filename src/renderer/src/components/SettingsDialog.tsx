@@ -66,6 +66,7 @@ import {
 } from '../store'
 import { ModelControls, ModelPicker, usageLevel } from './ChatPane'
 import { seriesSelection } from '../../../shared/agent-selection'
+import { playSound } from '../lib/sounds'
 import { RevoiceButton, useOutdatedVoice, voiceLabel } from './Revoice'
 import { VoicePicker } from './VoicePicker'
 import { useRecorder } from './RecordingBooth'
@@ -1685,6 +1686,35 @@ function AboutTab() {
             },
           ]}
         />
+      </Row>
+      <Row
+        title={uiText('Sounds')}
+        text={uiText('A short cue when something finishes while you look elsewhere: a render, an export, an episode, a series. Silent while a video plays.')}
+      >
+        <div className="sound-controls">
+          <Tabs
+            radio="Sounds"
+            value={settings.sounds === false ? 'off' : 'on'}
+            onChange={(v) => void updateSettings({ sounds: v === 'on' })}
+            items={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+          />
+          <input
+            type="range"
+            className="sound-volume"
+            min={5}
+            max={100}
+            step={5}
+            disabled={settings.sounds === false}
+            aria-label={uiText('Sound volume')}
+            value={settings.soundVolume ?? 50}
+            onChange={(e) => void updateSettings({ soundVolume: Number(e.target.value) })}
+            onPointerUp={() => void playSound('episode', true)}
+            onKeyUp={() => void playSound('episode', true)}
+          />
+        </div>
       </Row>
       <ProjectsFolderRow />
       {canEdit({ settings }) && (

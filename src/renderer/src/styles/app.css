@@ -2069,3 +2069,14 @@
   height: 30px;
   font-weight: 600;
 }
+
+/* Settings → General: sounds on/off and their volume. */
+.sound-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sound-volume {
+  width: 120px;
+  accent-color: var(--sun);
+}

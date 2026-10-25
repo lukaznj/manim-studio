@@ -690,6 +690,8 @@ export interface Settings {
   seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
   seriesModels?: Partial<Record<Agent, Partial<Record<SeriesRole, { model: string; effort: Effort }>>>> // per agent; unset: the defaults in shared/agent-selection.ts (ADR 0045)
   autoRender: boolean
+  sounds?: boolean // app sounds (ADR 0046); unset: on
+  soundVolume?: number // 0–100, 0.3 dB a step; unset: 50 (−15 dB)
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
   hasOpenAIKey: boolean

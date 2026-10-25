@@ -1115,4 +1115,8 @@ export const hr: Record<string, string> = {
     'Jednom pročita materijal i isplanira sve epizode i bibliju serijala. Jači model bolje planira.',
   'Writes each episode’s script and video, and fixes them. It runs many times, so a faster model saves time and plan limits.':
     'Piše scenarij i video svake epizode i ispravlja ih. Pokreće se mnogo puta, pa brži model štedi vrijeme i ograničenja pretplate.',
+  Sounds: 'Zvukovi',
+  'A short cue when something finishes while you look elsewhere: a render, an export, an episode, a series. Silent while a video plays.':
+    'Kratak zvuk kad nešto završi dok gledaš drugdje: renderiranje, izvoz, epizoda, serijal. Utihne dok se video reproducira.',
+  'Sound volume': 'Glasnoća zvukova',
 }
