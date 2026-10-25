@@ -1597,7 +1597,6 @@ function AboutTab() {
   const app = useStore((s) => s.app)!
   const update = useStore((s) => s.update)
   const settings = useStore((s) => s.settings)!
-  const project = useStore((s) => s.project)
   const status =
     update.state === 'checking'
       ? 'Checking…'
@@ -1717,13 +1716,26 @@ function AboutTab() {
         </div>
       </Row>
       <ProjectsFolderRow />
-      {canEdit({ settings }) && (
-        <Row title={uiText('Tutorial')} text={uiText('A short tour of the editor: the code, Claude, the timeline, media, narration and export.')}>
-          <button className="btn small" disabled={!project} title={project ? undefined : uiText('Open a project first')} onClick={startTour}>
-            {uiText('Show the tutorial')}
-          </button>
-        </Row>
-      )}
+      <Row
+        title={uiText('Guided tours')}
+        text={
+          canEdit({ settings })
+            ? uiText(
+                'Short tours of the library, the study page and the editor. This one starts on the screen you’re on; the others show again when you open them.',
+              )
+            : uiText('Short tours of the library and the study page. This one starts on the screen you’re on; the other shows again when you open it.')
+        }
+      >
+        <button
+          className="btn small"
+          onClick={() => {
+            void updateSettings({ toursSeen: [], tutorialDone: !canEdit({ settings }) })
+            startTour()
+          }}
+        >
+          {uiText('Show the tours again')}
+        </button>
+      </Row>
       <Row
         title={
           <button

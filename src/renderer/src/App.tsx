@@ -72,7 +72,7 @@ export function App() {
       <NewExerciseSetDialog />
       <AddExercisesDialog />
       <LectureDialog />
-      {screen === 'editor' && !quickHere && !learn && <Tour />}
+      <Tour />
       <div className="toast-stack" aria-live="polite" popover="manual" ref={toastLayer}>
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>
