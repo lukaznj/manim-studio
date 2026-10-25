@@ -28,6 +28,7 @@ Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017
     - a blind human rating of the finished video
   - Claude Code's session transcript records the model and effort of every turn, so each run can be audited afterwards.
   - Output: a results note in this vault, then an ADR if it changes the default.
+- **App sounds.** Short cues synthesized in code with the Web Audio API (no audio files): render finished, export ready, episode and series done, right and wrong answers, setup finished, an agent needing you, and errors. Quiet by default, with a switch and volume in Settings → General, and silent while a video plays. A preview is being reviewed before any go in.
 - **Bookmark editing on the timeline.** Drag a bookmark diamond onto another word in the narration. The voice track already shows the diamonds.
 - **Cut-and-reorder sections.** Drag a section on the section lane to move its block of code (an AST move of the code between `next_section` calls).
 - **Signed builds.** A notarized macOS build, which can update itself, and a signed Windows installer ([[../06-operations/releasing|releasing]]).
@@ -38,7 +39,11 @@ Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017
 
 - Intel Mac builds: a second macOS job, see [[../06-operations/releasing|releasing]].
 - Several scene files per project, with helper modules opened as editor tabs.
-- Music and sound effects: an audio lane backed by `self.add_sound()`.
+- **Sound effects and music in the videos.**
+  - The agent places short cues where the animation calls for them: a soft whoosh as a formula transforms, a tick as a point lands, a chime on the result. They play through manim's `self.add_sound()`, so they're part of the render and are timed to its animations.
+  - Cues come from code-synthesized sounds (like the app's own) or a library whose licence fits an MIT project, and each video keeps them sparse.
+  - The timeline gets an audio lane for them; narration stays on top (cues duck under speech), and the export mix includes them.
+  - This touches the timeline contract (`render.py` and `src/shared/types.ts`) and the voice pipeline's mix, so it needs its own ADR.
 - Translated subtitles and narration, for one video in several languages.
 - **Faster renders: the rendering engine needs work.** A 10-minute video took about 30 minutes to export on a CPU. Exports encode on the GPU now (ADR 0034). Next: profile a long export, then more parallel slices for long videos and a warm render worker for previews; drawing on the GPU (manim's OpenGL renderer) is a larger, separate project, worth it if profiling shows drawing dominates. Render servers already let a faster machine do the work. Today, cached 480p renders take 2–10 s ([[../02-architecture/render-performance|render performance]]).
 
