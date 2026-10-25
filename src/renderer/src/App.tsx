@@ -5,7 +5,7 @@ import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
 import { AddExercisesDialog, LectureDialog, NewExerciseSetDialog } from './components/ExerciseDialogs'
 import { StudyView } from './components/StudyView'
-import { ModeChoice } from './components/ModeChoice'
+import { Onboarding, SetupGate, requiredReady } from './components/Onboarding'
 import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
 import { QuickDialog } from './components/QuickDialog'
@@ -22,6 +22,9 @@ export function App() {
   useStore((s) => s.settings?.uiLanguage)
   const screen = useStore((s) => s.screen)
   const ready = useStore((s) => !!s.app)
+  // First launch is its own screen until a mode is chosen; after it, nothing opens until the engine is in.
+  const onboarding = useStore((s) => !!s.settings && !s.settings.mode)
+  const installing = useStore((s) => !!s.settings?.mode && !!s.setup && !requiredReady(s.setup))
   const toasts = useStore((s) => s.toasts)
   // Quick mode shows its progress instead of the editor, until you ask for the editor.
   const quickHere = useStore((s) => !!s.quick && s.quick.project === s.project?.path && !s.quickEditor)
@@ -35,7 +38,13 @@ export function App() {
     <div className={`app ${window.studio ? '' : 'no-bridge'}`}>
       <TitleBar />
       <main className="app-main">
-        {ready && (screen === 'home' ? <Home /> : screen === 'study' ? <StudyView /> : quickHere ? <QuickView /> : editorBarred ? null : <Editor />)}
+        {onboarding ? (
+          <Onboarding />
+        ) : installing ? (
+          <SetupGate />
+        ) : (
+          ready && (screen === 'home' ? <Home /> : screen === 'study' ? <StudyView /> : quickHere ? <QuickView /> : editorBarred ? null : <Editor />)
+        )}
       </main>
       <NewProjectDialog />
       <SettingsDialog />
@@ -47,7 +56,6 @@ export function App() {
       <NewExerciseSetDialog />
       <AddExercisesDialog />
       <LectureDialog />
-      <ModeChoice />
       {screen === 'editor' && !quickHere && !learn && <Tour />}
       <div className="toast-stack" aria-live="polite">
         {toasts.map((t) => (
