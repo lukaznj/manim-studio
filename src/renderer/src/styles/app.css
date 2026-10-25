@@ -2057,3 +2057,15 @@
   margin-top: 2px;
   color: var(--sun-text);
 }
+
+/* Series dialog: the way in without PDFs (SeriesDialog.tsx). */
+.series-no-pdfs {
+  justify-self: start;
+  font-size: 13.5px;
+}
+/* Renaming a series in its Home folder view. */
+.series-rename {
+  width: min(360px, 100%);
+  height: 30px;
+  font-weight: 600;
+}

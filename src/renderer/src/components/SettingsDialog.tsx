@@ -64,7 +64,8 @@ import {
   updateSettings,
   useStore,
 } from '../store'
-import { ModelControls, usageLevel } from './ChatPane'
+import { ModelControls, ModelPicker, usageLevel } from './ChatPane'
+import { seriesSelection } from '../../../shared/agent-selection'
 import { RevoiceButton, useOutdatedVoice, voiceLabel } from './Revoice'
 import { VoicePicker } from './VoicePicker'
 import { useRecorder } from './RecordingBooth'
@@ -242,6 +243,35 @@ function AgentTab() {
           </button>
         </Row>
       )}
+      {signedIn &&
+        (['plan', 'make'] as const).map((role) => {
+          const chosen = seriesSelection(settings, role)
+          return (
+            <Row
+              key={role}
+              title={role === 'plan' ? uiText('Series: planning') : uiText('Series: making the episodes')}
+              text={
+                role === 'plan'
+                  ? uiText('Reads the material once and plans every episode and the series bible. A stronger model plans better.')
+                  : uiText('Writes each episode’s script and video, and fixes them. It runs many times, so a faster model saves time and plan limits.')
+              }
+            >
+              <ModelPicker
+                model={chosen.model}
+                effort={chosen.effort ?? 'high'}
+                models={models}
+                onChange={(model, effort) =>
+                  void updateSettings({
+                    seriesModels: {
+                      ...settings.seriesModels,
+                      [agent]: { ...settings.seriesModels?.[agent], [role]: { model, effort: effort ?? chosen.effort ?? 'high' } },
+                    },
+                  })
+                }
+              />
+            </Row>
+          )
+        })}
       <Row
         title={uiText('Agents at once')}
         text={uiText(
@@ -1675,7 +1705,7 @@ function AboutTab() {
               unlock.current.at = now
               if (unlock.current.count === 5) {
                 void updateSettings({ developerMode: true })
-                toast('Developer mode enabled', 'ok')
+                toast(uiText('Developer mode enabled'), 'ok')
               }
             }}
           >

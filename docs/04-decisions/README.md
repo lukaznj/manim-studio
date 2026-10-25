@@ -48,3 +48,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0042-study-playback-preferences]] | Per-project resume, optional continuous series playback preserving fullscreen, and remembered speed, subtitles and volume | accepted |
 | [[0043-projects-folder-and-render-cache]] | Render cache in a local, unsynced cache folder (20 GB, LRU); new installs keep projects out of iCloud/OneDrive; onboarding asks where projects go and finds a returning user's folder | accepted |
 | [[0044-full-window-onboarding]] | Full-window first launch that explains the app, installs the engine and LaTeX in the background from the mode choice, and waits for them before the app opens | accepted |
+| [[0045-series-planner-and-maker]] | Series plan with a strong model and make with a faster one (Settings → Agent; Opus 5.5 → Sonnet 5.5 by default); series without PDFs from a learning goal; titles named by the planner and renamed on Home | accepted |
