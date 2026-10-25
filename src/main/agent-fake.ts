@@ -1,5 +1,5 @@
 // A stand-in for Claude in a series' background agents, for driving the app in tests without a
-// signed-in agent (STUDIO_FAKE_AGENT=1; "limit" also hits one usage limit). It writes a real script
+// signed-in agent (STUDIO_FAKE_AGENT=1; "limit" also hits one usage limit, STUDIO_FAKE_LIMIT_MS long). It writes a real script
 // and scene and renders them through the same per-project path a real agent's tools use.
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -62,7 +62,7 @@ export function fakeAgent(dir: string, { onTool, onUsage, model }: AgentOptions)
       }
       if (process.env.STUDIO_FAKE_AGENT === 'limit' && n === 2 && !limitedOnce) {
         limitedOnce = true
-        return { ok: false, error: 'limit', limitedUntil: Date.now() + 5_000 }
+        return { ok: false, error: 'limit', limitedUntil: Date.now() + Number(process.env.STUDIO_FAKE_LIMIT_MS ?? 5_000) }
       }
       onTool('Writing scene.py')
       writeFileSync(

@@ -5,16 +5,17 @@
 // With Codex or Antigravity chosen, the same agent runs on them (otherAgent): their bridge to
 // Studio's tools names the project, so several projects are worked on at once.
 import { randomUUID } from 'node:crypto'
-import type { Agent, ChatMessage, ChatPart, Effort } from '../shared/types'
+import type { Agent, AgentRoute, ChatMessage, ChatPart, ClaudeAuth, Effort } from '../shared/types'
 import type { UsageEntry } from '../shared/usage'
 import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
-import { antigravitySession } from './antigravity'
-import { antigravityChosen, codexChosen, Inbox, sdk, studioOptions, studioPrompt, summarize, type TurnResult } from './claude'
-import { codexSession } from './codex'
+import { antigravitySession, antigravityUsesKey } from './antigravity'
+import { antigravityChosen, claudeStatus, codexChosen, Inbox, sdk, studioOptions, studioPrompt, summarize, type TurnResult } from './claude'
+import { codexSession, codexUsesKey } from './codex'
 import { agentProjects } from './agent-projects'
 import { fakeAgent, fakeAgents } from './agent-fake'
 import { commitAll } from './git'
 import { readChat, readMeta, updateMetaAt, writeChat } from './projects'
+import { getSecret, getSettings } from './settings'
 import { appendUsage, recordTurn } from './usage'
 
 export interface EpisodeAgent {
@@ -29,6 +30,7 @@ export interface AgentOptions {
   model?: string // the series' own choice; otherwise the chat's (Settings)
   effort?: Effort
   agent?: Agent
+  auth?: ClaudeAuth // the account or the saved key, for this agent only (ADR 0048); otherwise Settings
   allowFallback?: boolean
   strictModel?: boolean // an experiment supplies its effort explicitly, including no effort
 }
@@ -45,7 +47,12 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
   const inbox = new Inbox()
   const q = query({
     prompt: inbox,
-    options: await studioOptions(dir, { autopilot: true, model: opts.model, effort: opts.strictModel && !opts.effort ? null : opts.effort }),
+    options: await studioOptions(dir, {
+      autopilot: true,
+      model: opts.model,
+      effort: opts.strictModel && !opts.effort ? null : opts.effort,
+      auth: opts.auth,
+    }),
   })
   agentBusy.add(dir)
   const messages = readChat(dir)
@@ -206,7 +213,8 @@ function otherAgent(dir: string, opts: AgentOptions, agent: 'codex' | 'antigravi
       if (!r.ok && r.error) messages.push({ id: randomUUID(), role: 'error', parts: [{ kind: 'text', text: r.error }], auto: true, at: Date.now() })
       writeChat(messages, dir)
       await commitAll(dir, `${name}: ${text.split('\n')[0].slice(0, 72)}`, agent === 'codex' ? 'codex' : 'antigravity').catch(() => null)
-      return { ok: r.ok, error: r.error }
+      // Their CLIs end a turn at the plan's limit with an error; it waits like Claude's (reset time unknown).
+      return { ok: r.ok, error: r.error, limitedUntil: !r.ok && LIMITED.test(r.error ?? '') ? 0 : undefined }
     },
     close() {
       session.close()
@@ -216,27 +224,64 @@ function otherAgent(dir: string, opts: AgentOptions, agent: 'codex' | 'antigravi
   }
 }
 
+const LIMITED = /usage limit|rate limit|quota|too many requests|limit (?:was |has been )?reached/i
+
 /**
- * Runs a turn, and when a usage limit ends it, waits for the reset and tells Claude to carry on.
- * `waiting` shows what it's waiting for (undefined once it goes on); `check` throws to stop.
+ * Runs a turn, and when a usage limit ends it, waits for the reset and tells the agent to carry on.
+ * `waiting` shows what it's waiting for and until when (undefined once it goes on); `check` throws to
+ * stop. `moved` says the user chose another agent meanwhile (ADR 0048): the wait ends with `switched`,
+ * and the caller carries on with that agent.
  */
 export async function turnPastLimits(
   turn: (text: string) => Promise<TurnResult>,
   text: string,
-  waiting: (note: string | undefined) => void,
+  waiting: (note: string | undefined, until?: number) => void,
   check: () => void,
+  moved: () => boolean = () => false,
 ): Promise<TurnResult> {
   let result = await turn(text)
   while (!result.ok && result.limitedUntil !== undefined) {
     check()
     const until = result.limitedUntil || Date.now() + 30 * 60_000 // reset time unknown: try again in half an hour
-    waiting(`${limitText({ until })} Waiting, then it carries on by itself.`)
+    waiting(`${limitText({ until })} Waiting, then it carries on by itself.`, until)
     while (Date.now() < until + 60_000) {
       check()
-      await new Promise((r) => setTimeout(r, 5_000))
+      if (moved()) {
+        waiting(undefined)
+        return { ok: false, switched: true }
+      }
+      await new Promise((r) => setTimeout(r, 2_000))
     }
     waiting(undefined)
     result = await turn('Your usage limit has reset. Carry on where you stopped, with the task above.')
   }
   return result
 }
+
+/** Who can take over when a plan's limit is reached: each signed-in agent, and a saved Claude or OpenAI key. */
+export async function agentRoutes(): Promise<AgentRoute[]> {
+  if (fakeAgents())
+    return [
+      { agent: 'claude', auth: 'account' },
+      { agent: 'codex', auth: 'account' },
+      { agent: 'claude', auth: 'api-key' },
+    ]
+  const configured = { claude: configuredAuth('claude'), codex: configuredAuth('codex'), antigravity: configuredAuth('antigravity') }
+  const routes: AgentRoute[] = []
+  for (const agent of ['claude', 'codex', 'antigravity'] as const) {
+    if ((await claudeStatus(agent).catch(() => null))?.loggedIn) routes.push({ agent, auth: configured[agent] })
+    // Antigravity keeps its sign-in in its own settings files, so only the method Settings chose.
+    const key = agent === 'claude' ? 'anthropic' : agent === 'codex' ? 'openai' : null
+    if (key && configured[agent] === 'account' && getSecret(key)) routes.push({ agent, auth: 'api-key' })
+  }
+  return routes
+}
+
+/** How Settings → Accounts signs this agent in. */
+export function configuredAuth(agent: Agent): ClaudeAuth {
+  if (agent === 'codex') return codexUsesKey() ? 'api-key' : 'account'
+  if (agent === 'antigravity') return antigravityUsesKey() ? 'api-key' : 'account'
+  return getSettings().claudeAuth ?? 'account'
+}
+
+export const sameRoute = (a: AgentRoute, b: AgentRoute): boolean => a.agent === b.agent && a.auth === b.auth

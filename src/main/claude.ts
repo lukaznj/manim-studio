@@ -24,6 +24,7 @@ import type {
   ModelOption,
   PlanUsage,
   UsageWindow,
+  ClaudeAuth,
 } from '../shared/types'
 import { agentBusy } from './agent'
 import {
@@ -70,8 +71,9 @@ export const antigravityChosen = () => getSettings().agent === 'antigravity'
 export const claudeNotChosen = () => codexChosen() || antigravityChosen()
 
 /** cleanEnv() strips inherited ANTHROPIC_* variables; the key saved in Settings goes back only when it's the chosen method. */
-const claudeEnv = (): NodeJS.ProcessEnv => {
-  const apiKey = usingApiKey() ? getSecret('anthropic') : ''
+const claudeEnv = (auth?: ClaudeAuth): NodeJS.ProcessEnv => {
+  // `auth`: a series that carries on past the account's limit with the key (ADR 0048); otherwise Settings.
+  const apiKey = (auth ? auth === 'api-key' : usingApiKey()) ? getSecret('anthropic') : ''
   return { ...cleanEnv(), CLAUDE_AGENT_SDK_CLIENT_APP: `manim-studio/${app.getVersion()}`, ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}) }
 }
 
@@ -224,7 +226,7 @@ export function setAutopilot(on: boolean): void {
 }
 
 let turnDone: ((r: TurnResult) => void) | null = null
-export type TurnResult = { ok: boolean; error?: string; limitedUntil?: number }
+export type TurnResult = { ok: boolean; error?: string; limitedUntil?: number; switched?: boolean }
 
 /** The plan's usage limit while Claude refuses for it (claude.ai sign-in only; API keys have none). */
 let limit: Limit | null = null
@@ -564,7 +566,7 @@ const metaOf = (dir: string) => (project()?.path === dir ? project()!.meta : rea
  * file permissions (writes only inside it) and the brief. The chat and a series' background agents
  * (agent.ts) share it. `resume` continues the project's conversation when this machine has it.
  */
-export async function studioOptions(dir: string, opts: { autopilot: boolean; model?: string; effort?: Effort | null }): Promise<Options> {
+export async function studioOptions(dir: string, opts: { autopilot: boolean; model?: string; effort?: Effort | null; auth?: ClaudeAuth }): Promise<Options> {
   const { createSdkMcpServer, tool, getSessionInfo } = await sdk()
   const meta = metaOf(dir)
   // A project synced from another machine carries a session id this machine doesn't have.
@@ -590,7 +592,7 @@ export async function studioOptions(dir: string, opts: { autopilot: boolean; mod
   const readRoots = [dir, paths.python(), join(paths.env(), '.pixi', 'envs', 'default')]
   return {
     cwd: dir,
-    env: claudeEnv(),
+    env: claudeEnv(opts.auth),
     pathToClaudeCodeExecutable: paths.claude(),
     model: opts.model || getSettings().claudeModel || 'claude-sonnet-5-5',
     ...(opts.effort === null ? {} : { effort: opts.effort || getSettings().claudeEffort || 'high' }),

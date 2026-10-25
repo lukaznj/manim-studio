@@ -46,6 +46,7 @@ import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { encodeWav } from '../lib/audio'
 import { resetTime } from '../lib/time'
+import { AntigravityConsent } from './AntigravityConsent'
 import {
   canEdit,
   studying,
@@ -556,23 +557,29 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
   const [busy, setBusy] = useState(false)
   const [url, setUrl] = useState<string | null>(null)
   const [code, setCode] = useState('')
+  const [needsConsent, setNeedsConsent] = useState(false)
   const installed = setup?.antigravity === 'ready'
   const auth = settings.antigravityAuth ?? (settings.hasGeminiKey ? 'api-key' : 'account') // as antigravity.ts reads it
-  useEffect(() => api.on('claude-login', (e) => e.url && setUrl(e.url)), [])
+  useEffect(() => api.on('claude-login', (e) => {
+    if (e.url) setUrl(e.url)
+    if (e.needsConsent) setNeedsConsent(true)
+  }), [])
 
   const login = async () => {
     setBusy(true)
     setUrl(null)
     setCode('')
+    setNeedsConsent(false)
     try {
       const st = await api.claudeLogin('antigravity')
       await refresh()
       if (!st.loggedIn) toast('The Google sign-in wasn’t completed.', 'error')
     } catch (e) {
-      toast(errorText(e), 'error')
+      toast(uiText(errorText(e)), 'error')
     } finally {
       setBusy(false)
       setUrl(null)
+      setNeedsConsent(false)
     }
   }
 
@@ -625,7 +632,8 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
           )}
         </div>
       )}
-      {busy && !status?.loggedIn && (
+      {busy && needsConsent && <AntigravityConsent onContinue={() => setNeedsConsent(false)} />}
+      {busy && !needsConsent && !status?.loggedIn && (
         <div className="code-entry">
           {url ? (
             <>

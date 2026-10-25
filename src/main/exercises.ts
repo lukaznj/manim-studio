@@ -31,6 +31,7 @@ import {
 } from '../shared/exercise'
 import { DEFAULT_TONE } from '../shared/tone'
 import type {
+  AgentRoute,
   Aspect,
   ExerciseDetail,
   ExerciseHit,
@@ -43,7 +44,7 @@ import type {
   Tone,
   VoiceSettings,
 } from '../shared/types'
-import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
+import { configuredAuth, episodeAgent, sameRoute, turnPastLimits, type EpisodeAgent } from './agent'
 import { fakeAgents } from './agent-fake'
 import { askClaude, claudeStatus, languageName } from './claude'
 import { setupStatus } from './env'
@@ -481,6 +482,14 @@ export async function makeLecture(folder: string, dirs: string[]): Promise<void>
 
 // --- the agents' work ---------------------------------------------------------------------------
 
+/** The set's agents carry on with another agent or sign-in; exercises waiting on a usage limit start again at once (ADR 0048). */
+export function switchExercisesAgent(folder: string, to: AgentRoute): void {
+  const set = sets.get(folder)
+  if (!set) throw new Error('That exercise set isn’t open.')
+  set.route = to
+  changed(set)
+}
+
 const halted = (set: ExerciseSet, it: ExerciseItem) => !!set.paused || !set.items.includes(it)
 
 /** Stops an exercise's agent and render; its state stays, so it carries on from there later. */
@@ -528,20 +537,44 @@ async function agentStep(
   }
   update(set, it, { state, activity: 'Starting', error: undefined })
   let agent: EpisodeAgent | null = null
+  // The set's agent: Settings', or the one it switched to at a usage limit (ADR 0048).
+  const route = (): AgentRoute => set.route ?? { agent: getSettings().agent, auth: configuredAuth(getSettings().agent) }
+  const open = async () => {
+    const opened = route()
+    const a = await episodeAgent(it.dir, {
+      onTool: (summary) => update(set, it, { activity: summary }),
+      onUsage: () => undefined,
+      ...(set.route ? opened : {}),
+    })
+    agents.set(it.dir, a)
+    return { a, opened }
+  }
   try {
-    agent = await episodeAgent(it.dir, { onTool: (summary) => update(set, it, { activity: summary }), onUsage: () => undefined })
-    agents.set(it.dir, agent)
-    const a = agent
+    let current = await open()
+    agent = current.a
     await work(async (text, step) => {
       stopIf()
-      const result = await turnPastLimits(
-        (t) => a.turn(t, step),
-        text,
-        (note) => update(set, it, { activity: note }),
-        stopIf,
-      )
-      stopIf()
-      if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
+      let ask = text
+      for (;;) {
+        const { a, opened } = current
+        const result = await turnPastLimits(
+          (t) => a.turn(t, step),
+          ask,
+          (note, until) => update(set, it, { activity: note, limitedUntil: until }),
+          stopIf,
+          () => !sameRoute(route(), opened),
+        )
+        stopIf()
+        if (result.switched) {
+          a.close()
+          current = await open()
+          agent = current.a
+          ask = `Another agent was working on this and was interrupted. Carry on where it stopped, with this task:\n\n${text}`
+          continue
+        }
+        if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
+        return
+      }
     })
   } catch (e) {
     if (halted(set, it))

@@ -15,7 +15,7 @@ import { pipeline } from 'node:stream/promises'
 import { app } from 'electron'
 import type { Thread, ThreadEvent, ThreadItem } from '@openai/codex-sdk'
 import { sceneTools } from '../shared/studio-tools'
-import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, SetupEvent } from '../shared/types'
+import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, SetupEvent, ClaudeAuth } from '../shared/types'
 import { recoverModelCapacity, type CapacityResult } from '../shared/codex-recovery'
 import { listCodexModels, readCodexRateLimits } from './codex-models'
 import { cleanEnv } from './env'
@@ -102,7 +102,7 @@ function run(cmd: string, args: string[]): Promise<string> {
 export const codexUsesKey = (): boolean => (getSettings().codexAuth ?? (getSecret('openai') ? 'api-key' : 'account')) === 'api-key'
 
 /** The OpenAI key, only while the switch says API key. */
-const apiKey = () => (codexUsesKey() ? getSecret('openai') : '')
+const apiKey = (auth?: ClaudeAuth) => ((auth ? auth === 'api-key' : codexUsesKey()) ? getSecret('openai') : '')
 
 /** The CLI's environment: no inherited agent variables, its helpers on the PATH. */
 function codexEnv(): Record<string, string> {
@@ -190,6 +190,7 @@ export async function codexModels(): Promise<ModelOption[]> {
 }
 
 export interface CodexOptions {
+  auth?: ClaudeAuth // a series carrying on with the key past the account's limit (ADR 0048); otherwise Settings
   model?: string
   effort?: Effort
   allowFallback?: boolean
@@ -216,7 +217,7 @@ type Sdk = typeof import('@openai/codex-sdk')
 let sdkPromise: Promise<Sdk> | null = null
 const sdk = () => (sdkPromise ??= import('@openai/codex-sdk'))
 
-async function client(dir: string, instructions: string, withTools = true) {
+async function client(dir: string, instructions: string, withTools = true, auth?: ClaudeAuth) {
   const { Codex } = await sdk()
   const bin = installed()?.bin
   if (!bin) throw new Error('Install Codex first (Settings → Accounts).')
@@ -225,7 +226,7 @@ async function client(dir: string, instructions: string, withTools = true) {
   if (process.env.STUDIO_USER_DATA) bridgeEnv.STUDIO_USER_DATA = process.env.STUDIO_USER_DATA
   return new Codex({
     codexPathOverride: bin,
-    apiKey: apiKey() || undefined,
+    apiKey: apiKey(auth) || undefined,
     env: codexEnv(),
     config: {
       developer_instructions: instructions,
@@ -302,7 +303,7 @@ export async function codexTurn(
 
 /** The project's thread, resumed from `threadId` when there is one, sandboxed to the project. */
 async function openThread(dir: string, instructions: string, threadId: string | undefined, selection: CodexOptions = {}, withTools = true): Promise<Thread> {
-  const codex = await client(dir, instructions, withTools)
+  const codex = await client(dir, instructions, withTools, selection.auth)
   const { codexModel, codexEffort } = getSettings()
   const model = selection.model ?? codexModel
   const offered = knownModels.find((m) => m.value === model)?.efforts

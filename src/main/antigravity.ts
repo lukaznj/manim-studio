@@ -277,12 +277,40 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
   mkdirSync(agyHome(), { recursive: true })
   await ensureKeychain()
   const job = await runRunner('default', ['agy-login', bin, agyHome()], {
-    onEvent: (e) => e.type === 'url' && onEvent({ line: String(e.line), url: String(e.url), needsCode: true }),
+    onEvent: (e) => {
+      if (e.type === 'url') onEvent({ line: String(e.line), url: String(e.url), needsCode: true })
+      if (e.type === 'consent') onEvent({ needsConsent: true })
+    },
   })
   loginChild = job.child
-  await job.done.catch(() => undefined)
-  loginChild = null
-  onEvent({ done: true })
+  // On macOS the CLI saves the sign-in in Keychain, so the Python helper never sees a
+  // token file. Check existence through the same status path as Settings, never its contents.
+  let signedIn = false
+  let checking = false
+  const timer = setInterval(async () => {
+    if (checking || loginChild !== job.child) return
+    checking = true
+    try {
+      const status = await antigravityStatus()
+      if (status.loggedIn && loginChild === job.child) {
+        signedIn = true
+        killLogin()
+      }
+    } catch {
+      // The helper still reports startup errors and its own timeout.
+    } finally {
+      checking = false
+    }
+  }, 1500)
+  try {
+    await job.done
+  } catch (e) {
+    if (!signedIn) throw e
+  } finally {
+    clearInterval(timer)
+    if (loginChild === job.child) loginChild = null
+    onEvent({ done: true })
+  }
   return antigravityStatus()
 }
 
@@ -322,6 +350,12 @@ async function windowsLogin(bin: string, onEvent: (e: ClaudeLoginEvent) => void)
 /** The code the browser showed, typed into the CLI's sign-in. */
 export function antigravityLoginCode(code: string): void {
   loginChild?.stdin?.write(code.trim() + '\n')
+}
+
+/** The user's explicit choice on the CLI's first-run terms and optional interaction sharing. */
+export function antigravityLoginConsent(shareData: boolean): void {
+  if (typeof shareData !== 'boolean') throw new Error('Choose whether to share Antigravity interactions with Google.')
+  loginChild?.stdin?.write(JSON.stringify({ type: 'consent', shareData }) + '\n')
 }
 
 /** Forgets the Google sign-in (the CLI's /logout does the same to its own token file). */
