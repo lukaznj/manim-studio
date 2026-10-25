@@ -1174,4 +1174,6 @@ export const hr: Record<string, string> = {
   'scene.py is manim code: Claude writes it, or you do. Every save renders a new preview.':
     'scene.py je manim kod: piše ga Claude ili ti. Svako spremanje renderira novi pregled.',
   'Open a project to see the tutorial: it walks through the editor.': 'Otvori projekt da vidiš vodič: prolazi kroz uređivač.',
+  '{0} is connected': '{0} je povezan',
+  'PDFs,': 'PDF-ova,',
 }
