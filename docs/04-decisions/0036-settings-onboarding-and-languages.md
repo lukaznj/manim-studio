@@ -11,7 +11,7 @@ Accounts and Voice both exposed credentials, General mixed app and video prefere
 
 ## Decision
 
-- First launch guides the user through interface language, Learn/Create/Both, agent, sign-in or API key, and narration. Explain subscription versus API billing and ElevenLabs versus local OmniVoice. ElevenLabs is recommended for natural speech and exact timings. Users can explicitly postpone account or voice setup.
+- First launch (revised by [[0044-full-window-onboarding]]) guides the user through interface language, Learn/Create/Both, agent, sign-in or API key, and narration. Explain subscription versus API billing and ElevenLabs versus local OmniVoice. ElevenLabs is recommended for natural speech and exact timings. Users can explicitly postpone account or voice setup.
 - Ship English and Croatian UI. English remains the source language for code, comments, docs, catalog keys, and project instructions. Add more of the most popular languages later. Onboarding language seeds narration language; later General language changes leave narration alone. Never translate user content, scene source, mathematical narration or attached material through the UI catalog.
 - General owns app language, mode, appearance and folders, with version and update controls last. Show the releases-page fallback only after update failure.
 - Agent selects the agent and model. Accounts owns every provider credential and desktop-assistant connection. Keys are entered in a focused modal and retain existing OS-encrypted storage and validation. Choosing ElevenLabs without a key directs users to Accounts before it can be used.
