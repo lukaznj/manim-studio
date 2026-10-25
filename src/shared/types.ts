@@ -678,6 +678,7 @@ export interface Settings {
   previewSize: 480 | 720 | 1080 // short side of the preview render, in pixels
   previewFps: 15 | 24 | 30
   tutorialDone: boolean // the first-run tour of the editor was finished or skipped
+  toursSeen?: ('home' | 'study')[] // the app's guided tours already shown (ADR 0047)
   claudeModel: string // '' = Claude Code's default for the account
   claudeEffort: Effort | '' // '' (older settings) reads as 'medium'
   agent: Agent // who writes the scenes (ADR 0022)
@@ -690,6 +691,8 @@ export interface Settings {
   seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
   seriesModels?: Partial<Record<Agent, Partial<Record<SeriesRole, { model: string; effort: Effort }>>>> // per agent; unset: the defaults in shared/agent-selection.ts (ADR 0045)
   autoRender: boolean
+  sounds?: boolean // app sounds (ADR 0046); unset: on
+  soundVolume?: number // 0–100, 0.3 dB a step; unset: 50 (−15 dB)
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
   hasOpenAIKey: boolean

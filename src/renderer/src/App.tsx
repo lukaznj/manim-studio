@@ -16,6 +16,7 @@ import { TitleBar } from './components/TitleBar'
 import { UsageDialog } from './components/UsageDialog'
 import { Tour } from './components/Tour'
 import { canEdit, leaveEditor, useStore } from './store'
+import { startSoundCues } from './lib/sounds'
 
 export function App() {
   // Language updates rerender the complete interface without remounting open dialogs or editors.
@@ -33,6 +34,7 @@ export function App() {
   useEffect(() => {
     if (editorBarred) void leaveEditor()
   }, [editorBarred])
+  useEffect(() => startSoundCues(), [])
   // Dialogs sit in the top layer, above any z-index; showing the toasts again puts them above the newest one.
   const toastLayer = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -70,7 +72,7 @@ export function App() {
       <NewExerciseSetDialog />
       <AddExercisesDialog />
       <LectureDialog />
-      {screen === 'editor' && !quickHere && !learn && <Tour />}
+      <Tour />
       <div className="toast-stack" aria-live="polite" popover="manual" ref={toastLayer}>
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>

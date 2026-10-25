@@ -66,6 +66,7 @@ import {
 } from '../store'
 import { ModelControls, ModelPicker, usageLevel } from './ChatPane'
 import { seriesSelection } from '../../../shared/agent-selection'
+import { playSound } from '../lib/sounds'
 import { RevoiceButton, useOutdatedVoice, voiceLabel } from './Revoice'
 import { VoicePicker } from './VoicePicker'
 import { useRecorder } from './RecordingBooth'
@@ -1596,7 +1597,6 @@ function AboutTab() {
   const app = useStore((s) => s.app)!
   const update = useStore((s) => s.update)
   const settings = useStore((s) => s.settings)!
-  const project = useStore((s) => s.project)
   const status =
     update.state === 'checking'
       ? 'Checking…'
@@ -1686,14 +1686,56 @@ function AboutTab() {
           ]}
         />
       </Row>
+      <Row
+        title={uiText('Sounds')}
+        text={uiText('A short cue when something finishes while you look elsewhere: a render, an export, an episode, a series. Silent while a video plays.')}
+      >
+        <div className="sound-controls">
+          <Tabs
+            radio="Sounds"
+            value={settings.sounds === false ? 'off' : 'on'}
+            onChange={(v) => void updateSettings({ sounds: v === 'on' })}
+            items={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+          />
+          <input
+            type="range"
+            className="sound-volume"
+            min={5}
+            max={100}
+            step={5}
+            disabled={settings.sounds === false}
+            aria-label={uiText('Sound volume')}
+            value={settings.soundVolume ?? 50}
+            onChange={(e) => void updateSettings({ soundVolume: Number(e.target.value) })}
+            onPointerUp={() => void playSound('episode', true)}
+            onKeyUp={() => void playSound('episode', true)}
+          />
+        </div>
+      </Row>
       <ProjectsFolderRow />
-      {canEdit({ settings }) && (
-        <Row title={uiText('Tutorial')} text={uiText('A short tour of the editor: the code, Claude, the timeline, media, narration and export.')}>
-          <button className="btn small" disabled={!project} title={project ? undefined : uiText('Open a project first')} onClick={startTour}>
-            {uiText('Show the tutorial')}
-          </button>
-        </Row>
-      )}
+      <Row
+        title={uiText('Guided tours')}
+        text={
+          canEdit({ settings })
+            ? uiText(
+                'Short tours of the library, the study page and the editor. This one starts on the screen you’re on; the others show again when you open them.',
+              )
+            : uiText('Short tours of the library and the study page. This one starts on the screen you’re on; the other shows again when you open it.')
+        }
+      >
+        <button
+          className="btn small"
+          onClick={() => {
+            void updateSettings({ toursSeen: [], tutorialDone: !canEdit({ settings }) })
+            startTour()
+          }}
+        >
+          {uiText('Show the tours again')}
+        </button>
+      </Row>
       <Row
         title={
           <button

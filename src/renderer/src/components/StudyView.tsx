@@ -1,7 +1,7 @@
 import { t as uiText, format } from '../lib/i18n'
 import { BookOpen, Captions, ListChecks, Plus, Search, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { addCourseExercises, openDialog, useStore } from '../store'
+import { addCourseExercises, offerTour, openDialog, useStore } from '../store'
 import { ChatPane } from './ChatPane'
 import { AddLessonDialog } from './AddLessonDialog'
 import { ExerciseActions, ExerciseEmpty, ExerciseHits, ExerciseMain, ExerciseRows, ExerciseSearch, useExerciseHits } from './ExerciseView'
@@ -28,6 +28,7 @@ export function StudyView() {
     setQuery('')
     setLessonQuery('')
   }, [series?.folder, set?.folder])
+  useEffect(() => offerTour('study'), [])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
@@ -51,7 +52,7 @@ export function StudyView() {
 
   return (
     <div className="ex-view study-view">
-      <aside className="ex-side">
+      <aside className="ex-side" data-tour="study-library">
         <div className="ex-side-head">
           <span className="eyebrow">{series && !single ? uiText('Your course') : uiText('Your library')}</span>
           <h2 className="ex-set-title">{series?.title ?? set!.title}</h2>
@@ -156,7 +157,7 @@ export function StudyView() {
           ) : null}
         </div>
       </aside>
-      <main className="ex-main">
+      <main className="ex-main" data-tour="study-video">
         <div className="study-content">
           {item ? (
             <ExerciseMain key={item.dir} item={item} />
@@ -169,7 +170,7 @@ export function StudyView() {
           )}
         </div>
       </main>
-      <aside className="ex-chat study-assistant">
+      <aside className="ex-chat study-assistant" data-tour="study-assistant">
         <div className="study-assistant-head">
           <Tabs
             label={uiText('Transcript or chat')}

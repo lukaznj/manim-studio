@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { ago, timecode } from '../lib/time'
 import {
+  offerTour,
   studying,
   locateProject,
   openDialog,
@@ -33,6 +34,7 @@ export function Home() {
   const claude = useStore((s) => s.claude)
   const signedOut = !!claude && !claude.loggedIn
 
+  useEffect(() => offerTour('home'), [])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n' && !studying()) {
@@ -55,17 +57,19 @@ export function Home() {
         <header className="home-head">
           <div>
             {both ? (
-              <Tabs
-                value={editing ? 'create' : 'learn'}
-                onChange={(tab) => {
-                  useStore.setState({ homeSeries: null })
-                  void updateSettings({ homeTab: tab })
-                }}
-                items={[
-                  { value: 'create', label: 'Create' },
-                  { value: 'learn', label: 'Learn' },
-                ]}
-              />
+              <div data-tour="home-tabs">
+                <Tabs
+                  value={editing ? 'create' : 'learn'}
+                  onChange={(tab) => {
+                    useStore.setState({ homeSeries: null })
+                    void updateSettings({ homeTab: tab })
+                  }}
+                  items={[
+                    { value: 'create', label: 'Create' },
+                    { value: 'learn', label: 'Learn' },
+                  ]}
+                />
+              </div>
             ) : (
               <h1>{editing ? uiText('Projects') : uiText('Library')}</h1>
             )}
@@ -76,7 +80,7 @@ export function Home() {
             </p>
           </div>
           <div className="home-actions">
-            <button className="btn primary" aria-label={uiText('Add video, course or exercises')} onClick={() => setAdding(true)}>
+            <button className="btn primary" data-tour="home-add" aria-label={uiText('Add video, course or exercises')} onClick={() => setAdding(true)}>
               <Plus />
             </button>
           </div>
@@ -85,7 +89,7 @@ export function Home() {
         <SeriesPanel />
 
         {projects.length === 0 && !sets.length ? (
-          <div className="library-empty">
+          <div className="library-empty" data-tour="home-library">
             <button className="library-add" aria-label={uiText('Add your first video, course or exercises')} onClick={() => setAdding(true)}>
               <Plus />
             </button>
@@ -111,14 +115,14 @@ export function Home() {
                 <FolderOpen /> {revealLabel}
               </button>
             </nav>
-            <section className="project-grid">
+            <section className="project-grid" data-tour="home-library">
               {inSeries.map((p, i) => (
                 <ProjectCard key={p.path} project={p} index={i} />
               ))}
             </section>
           </>
         ) : (
-          <section className="project-grid">
+          <section className="project-grid" data-tour="home-library">
             {sets.map((set, i) => (
               <ExerciseSetCard key={set.folder} set={set} index={i} />
             ))}

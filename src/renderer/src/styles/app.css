@@ -1442,6 +1442,9 @@
     height 0.35s var(--ease-out);
   pointer-events: none;
 }
+.tour-spot.none {
+  box-shadow: 0 0 0 100vmax light-dark(rgb(15 23 42 / 0.45), rgb(2 6 14 / 0.66));
+}
 .tour-card {
   position: fixed;
   display: grid;
@@ -2068,4 +2071,15 @@
   width: min(360px, 100%);
   height: 30px;
   font-weight: 600;
+}
+
+/* Settings → General: sounds on/off and their volume. */
+.sound-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sound-volume {
+  width: 120px;
+  accent-color: var(--sun);
 }
