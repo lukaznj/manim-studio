@@ -85,7 +85,7 @@ export type Dialog =
   | { kind: 'lecture' }
   | null
 
-interface State {
+export interface State {
   screen: 'home' | 'editor' | 'study'
   app: AppInfo | null
   settings: Settings | null

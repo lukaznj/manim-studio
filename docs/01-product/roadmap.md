@@ -28,7 +28,7 @@ Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017
     - a blind human rating of the finished video
   - Claude Code's session transcript records the model and effort of every turn, so each run can be audited afterwards.
   - Output: a results note in this vault, then an ADR if it changes the default.
-- **App sounds.** Short cues synthesized in code with the Web Audio API (no audio files): render finished, export ready, episode and series done, right and wrong answers, setup finished, an agent needing you, and errors. Quiet by default, with a switch and volume in Settings → General, and silent while a video plays. A preview is being reviewed before any go in.
+- **Answer checking in Learn** (is my answer right?), which would use the app sounds’ right and not-quite cues ([[../04-decisions/0046-app-sounds|ADR 0046]]).
 - **Bookmark editing on the timeline.** Drag a bookmark diamond onto another word in the narration. The voice track already shows the diamonds.
 - **Cut-and-reorder sections.** Drag a section on the section lane to move its block of code (an AST move of the code between `next_section` calls).
 - **Signed builds.** A notarized macOS build, which can update itself, and a signed Windows installer ([[../06-operations/releasing|releasing]]).
