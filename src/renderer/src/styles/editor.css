@@ -1067,6 +1067,20 @@ body.resizing-y .code-host {
   gap: 8px;
   width: 100%;
 }
+.antigravity-consent {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+.antigravity-consent p {
+  margin: 0;
+}
+.antigravity-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 
 .composer {
   padding: 8px 12px 12px;

@@ -2083,3 +2083,33 @@
   width: 120px;
   accent-color: var(--sun);
 }
+
+/* A run waiting on a plan's usage limit, and who can carry on now (LimitSwitch.tsx, ADR 0048). */
+.limit-switch {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--sun-soft);
+}
+.limit-switch > svg {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--sun-text);
+}
+.limit-switch-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.limit-switch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ex-side .limit-switch {
+  margin: 8px 12px;
+}

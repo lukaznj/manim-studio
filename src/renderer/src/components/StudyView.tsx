@@ -8,6 +8,8 @@ import { ExerciseActions, ExerciseEmpty, ExerciseHits, ExerciseMain, ExerciseRow
 import { EpisodeRow, Watched } from './LessonView'
 import { findInTranscript, Transcript } from './Transcript'
 import { Tabs } from './ui'
+import { configuredAuth, LimitSwitch } from './LimitSwitch'
+import { api } from '../lib/api'
 
 /** Video first, with one library section and one assistant panel visible at a time. */
 export function StudyView() {
@@ -21,6 +23,7 @@ export function StudyView() {
   const [lessonQuery, setLessonQuery] = useState('')
   const [adding, setAdding] = useState(false)
   const hits = useExerciseHits(library === 'exercises' ? query : '')
+  const settings = useStore((s) => s.settings)
   useEffect(() => {
     setLibrary(item || !series ? 'exercises' : 'lessons')
   }, [path, series?.folder, set?.folder])
@@ -140,6 +143,20 @@ export function StudyView() {
             </div>
           )}
         </div>
+        {set &&
+          !set.paused &&
+          (() => {
+            const waiting = set.items.filter((i) => i.limitedUntil)
+            if (!waiting.length) return null
+            const agent = set.route?.agent ?? settings?.agent ?? 'claude'
+            return (
+              <LimitSwitch
+                until={Math.min(...waiting.map((i) => i.limitedUntil!))}
+                current={set.route ?? { agent, auth: configuredAuth(settings, agent) }}
+                onSwitch={(to) => api.switchExercisesAgent(set.folder, to)}
+              />
+            )
+          })()}
         <div className="ex-side-foot">
           {library === 'lessons' && series && !single ? (
             <button className="btn" onClick={() => setAdding(true)}>

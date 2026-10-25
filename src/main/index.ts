@@ -2,7 +2,18 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, sh
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
-import type { Agent, EventChannel, ExerciseInput, ExportOptions, NewExerciseSet, ProjectMeta, Quality, QuickRequest, SeriesStart } from '../shared/types'
+import type {
+  Agent,
+  AgentRoute,
+  EventChannel,
+  ExerciseInput,
+  ExportOptions,
+  NewExerciseSet,
+  ProjectMeta,
+  Quality,
+  QuickRequest,
+  SeriesStart,
+} from '../shared/types'
 import {
   applyChatSettings,
   chatInterrupt,
@@ -20,6 +31,7 @@ import {
   projectUsage,
 } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
+import { antigravityLoginConsent } from './antigravity'
 import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, pauseExport, queueExport } from './exports'
 import { importMedia, listMedia, removeMedia } from './media'
 import { importSources, listSources, removeSource, sourcePages } from './sources'
@@ -34,6 +46,7 @@ import {
   pauseSeries,
   planSeries,
   renameSeries,
+  switchSeriesAgent,
   seriesRun,
   setupSeries,
   startSeries,
@@ -43,6 +56,7 @@ import {
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
+import { agentRoutes } from './agent'
 import { videoEncoder } from './encoder'
 import { inspectFolder, projectsFolders, useProjectsFolder } from './folders'
 import { clearRenderCache, pruneRenderCache, renderCacheInfo } from './render-cache'
@@ -256,6 +270,7 @@ function registerIpc(): void {
   handle('claudeUsage', () => claudeUsage())
   handle('claudeLogin', (agent?: Agent) => claudeLogin((e) => send('claude-login', e), agent))
   handle('claudeLoginCode', (code: string, agent?: Agent) => claudeLoginCode(code, agent))
+  handle('antigravityLoginConsent', (shareData: boolean) => antigravityLoginConsent(shareData))
   handle('claudeLogout', (agent?: Agent) => claudeLogout(agent))
 
   handle('listProjects', () => projects.listProjects())
@@ -343,6 +358,9 @@ function registerIpc(): void {
   })
   handle('cancelSeriesPlan', () => planning?.abort())
   handle('renameSeries', (folder: string, title: string) => renameSeries(folder, title))
+  handle('agentRoutes', () => agentRoutes())
+  handle('switchSeriesAgent', (route: AgentRoute) => switchSeriesAgent(route))
+  handle('switchExercisesAgent', (folder: string, route: AgentRoute) => ex.switchExercisesAgent(folder, route))
   handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
   handle('seriesRun', () => seriesRun())
   handle('openEpisodeReport', async (dir: string) => {

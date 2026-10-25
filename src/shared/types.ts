@@ -137,6 +137,7 @@ export interface ExerciseItem {
   title: string
   state: ExerciseState
   activity?: string // what its agent is doing right now
+  limitedUntil?: number // waiting for the plan's usage limit to reset, until then (ms); another agent can take over
   error?: string
   warnings: string[]
   topic?: string // from solution.md
@@ -154,6 +155,7 @@ export interface ExerciseSet {
   /** Reading new exercises out of what the user gave (files: how many pictures and PDFs). */
   intake?: { state: 'reading' | 'failed'; files: number; error?: string }
   paused?: boolean // its agents are stopped until it's resumed
+  route?: AgentRoute // the agent it switched to at a usage limit (ADR 0048); unset: Settings
   items: ExerciseItem[]
   lecture?: { state: 'making' | 'done' | 'failed'; file?: string; error?: string }
   /** The series this set is the exercises of (<series>/exercises/, ADR 0030); none for a set on its own. */
@@ -253,6 +255,7 @@ export interface EpisodeRun {
   // waiting → script (its turn in the first pass) → scripted → scene → check → export → done
   state: 'waiting' | 'script' | 'scripted' | 'scene' | 'check' | 'export' | 'done' | 'failed' | 'stopped'
   activity?: string // what its agent is doing right now
+  limitedUntil?: number // waiting for the plan's usage limit to reset, until then (ms); another agent can take over
   exportJob?: string
   error?: string
   warnings: string[]
@@ -274,6 +277,7 @@ export interface SeriesRun {
   report?: string // combined developer report
   model?: string // the series' own model and effort; otherwise the chat's
   effort?: Effort
+  auth?: ClaudeAuth // how its agent signs in; another agent or the key can take over at a limit (ADR 0048)
   // paused: its agents stop until resumed; stopped: also its exports, and it carries on with Continue,
   // even after a restart (the app keeps the run in the series folder)
   state: 'working' | 'paused' | 'stopped' | 'done'
@@ -480,6 +484,12 @@ export interface AgentSelection {
 /** How Studio's Claude authenticates: the Claude Code account sign-in, or the user's own API key. */
 export type ClaudeAuth = 'account' | 'api-key'
 
+/** An agent and how it signs in: what a series or exercise set can carry on with past a usage limit (ADR 0048). */
+export interface AgentRoute {
+  agent: Agent
+  auth: ClaudeAuth
+}
+
 /** One plan limit window, e.g. the 5-hour or the weekly limit. */
 export interface UsageWindow {
   label: string
@@ -639,6 +649,7 @@ export interface ClaudeLoginEvent {
   line?: string
   url?: string
   needsCode?: boolean
+  needsConsent?: boolean // Antigravity's first-run terms and optional interaction sharing
   done?: boolean
 }
 
@@ -849,6 +860,7 @@ export interface StudioApi {
   claudeUsage(): Promise<PlanUsage | null>
   claudeLogin(agent?: Agent): Promise<ClaudeStatus>
   claudeLoginCode(code: string, agent?: Agent): Promise<void>
+  antigravityLoginConsent(shareData: boolean): Promise<void>
   claudeLogout(agent?: Agent): Promise<ClaudeStatus>
 
   listProjects(): Promise<ProjectSummary[]>
@@ -883,6 +895,12 @@ export interface StudioApi {
   planSeries(request: { pdfs: string[]; topic?: string; instructions?: string; language: string; tone: Tone }): Promise<SeriesPlan>
   /** Stops series planning (reading the PDFs or the agent's answer). */
   cancelSeriesPlan(): Promise<void>
+  /** Who can take over past a usage limit: each signed-in agent, and a saved Claude or OpenAI key (ADR 0048). */
+  agentRoutes(): Promise<AgentRoute[]>
+  /** The running series carries on with this agent; episodes waiting on a limit start again at once. */
+  switchSeriesAgent(route: AgentRoute): Promise<void>
+  /** The same for an exercise set's agents. */
+  switchExercisesAgent(folder: string, route: AgentRoute): Promise<void>
   /** Renames a series on Home (its episodes' project.json and series.json); folders keep their names. */
   renameSeries(folder: string, title: string): Promise<void>
   /** Creates the series' projects; unattended, makes them one after another in quick mode. */
