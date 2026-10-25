@@ -51,3 +51,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0045-series-planner-and-maker]] | Series plan with a strong model and make with a faster one (Settings → Agent; Opus 5.5 → Sonnet 5.5 by default); series without PDFs from a learning goal; titles named by the planner and renamed on Home | accepted |
 | [[0046-app-sounds]] | Short UI cues synthesized with the Web Audio API, played from state transitions (renders you waited for, exports, episodes, series, setup, limits, failures); on/off and volume in Settings → General | accepted |
 | [[0047-guided-tours]] | Guided tours for Home and the study page (and the editor) from one component; each shows once on first visit, replayable from Settings → General | accepted |
+| [[0048-switch-agent-at-usage-limit]] | While a series or exercise set waits on a usage limit, carry on now with another signed-in agent or a saved API key; Codex and Antigravity limits wait like Claude’s | accepted |

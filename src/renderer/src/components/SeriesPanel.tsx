@@ -6,6 +6,7 @@ import { modelName } from '../../../shared/usage'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { errorText, openProject, refreshProjects, toast, useStore } from '../store'
+import { configuredAuth, LimitSwitch } from './LimitSwitch'
 
 const LABEL: Record<EpisodeRun['state'], string> = {
   waiting: 'Waiting for its script',
@@ -25,6 +26,7 @@ const dollars = (n: number) => `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`
 export function SeriesPanel() {
   const run = useStore((s) => s.series)
   const exports = useStore((s) => s.exports)
+  const settings = useStore((s) => s.settings)
   const count = run?.episodes.filter((e) => e.state === 'done').length
   useEffect(() => void refreshProjects(), [run?.folder, count]) // new episodes, fresh thumbnails
   if (!run) return null
@@ -66,6 +68,20 @@ export function SeriesPanel() {
           {run.planningCostUSD ? format(' (planning {0})', [dollars(run.planningCostUSD)]) : ''}
         </p>
       </div>
+      {working &&
+        (() => {
+          // The plan's limit holds back the episodes on this series' own agent; another can take over.
+          const waiting = run.episodes.filter((e) => e.limitedUntil && !e.assignment)
+          if (!waiting.length) return null
+          const agent = run.agent ?? settings?.agent ?? 'claude'
+          return (
+            <LimitSwitch
+              until={Math.min(...waiting.map((e) => e.limitedUntil!))}
+              current={{ agent, auth: run.auth ?? configuredAuth(settings, agent) }}
+              onSwitch={(to) => api.switchSeriesAgent(to)}
+            />
+          )
+        })()}
       <ol className="quick-steps series-run">
         {run.episodes.map((ep, i) => {
           const job = exports.find((j) => j.id === ep.exportJob)
