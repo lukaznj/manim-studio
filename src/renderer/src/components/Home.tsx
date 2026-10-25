@@ -28,9 +28,8 @@ export function Home() {
   const sets = useMemo(() => allSets.filter((x) => !x.course), [allSets]) // a course's own set shows in its series' card
   const editing = useStore((s) => !studying(s)) // Learn: a library to watch, no editor (ADR 0029); Both has a tab for each
   const both = useStore((s) => s.settings?.mode === 'both')
-  const setup = useStore((s) => s.setup)
   const claude = useStore((s) => s.claude)
-  const needsSetup = !!setup && (setup.env !== 'ready' || setup.latex !== 'ready' || (claude && !claude.loggedIn))
+  const signedOut = !!claude && !claude.loggedIn
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -138,15 +137,15 @@ export function Home() {
         )}
         <Modal open={adding} onClose={() => setAdding(false)} title={uiText('What would you like to make?')} width={560}>
           <div className="modal-body creation-choices">
-            {needsSetup && (
+            {signedOut && (
               <button
                 className="btn ghost"
                 onClick={() => {
                   setAdding(false)
-                  openDialog({ kind: 'settings', tab: claude?.loggedIn ? 'env' : 'accounts' })
+                  openDialog({ kind: 'settings', tab: 'accounts' })
                 }}
               >
-                {uiText('Complete setup')}
+                {uiText('Connect your AI agent to make videos')}
               </button>
             )}
             {[

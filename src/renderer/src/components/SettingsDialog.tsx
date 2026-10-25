@@ -1841,7 +1841,7 @@ function KeyStatus({ check, fix }: { check: (again: boolean) => Promise<KeyCheck
 }
 
 /** The saved ElevenLabs key's permissions, tried for real, and this month's characters. */
-function ElevenLabsStatus() {
+export function ElevenLabsStatus() {
   const check = useStore((s) => s.elevenLabsCheck)
   const [usage, setUsage] = useState<ElevenLabsUsage | null>(null)
   const [busy, setBusy] = useState(false)
