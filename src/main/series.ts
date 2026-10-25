@@ -3,21 +3,21 @@
 // one project per episode in a series folder, and either makes them all in quick mode, one after
 // another, or opens the first to make by hand. Each episode carries a copy of the bible, series.md,
 // listing what the earlier episodes covered, so a video can refer back to them (ADR 0019).
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { SCRIPT_FILE, scriptStatus } from '../shared/script'
 import { TONES } from '../shared/tone'
-import { defaultAgentSelection, seriesAgentSelection } from '../shared/agent-selection'
-import type { Effort, EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
+import { seriesAgentSelection, seriesSelection } from '../shared/agent-selection'
+import type { EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
 import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
 import { askClaude, chatModels, claudeStatus, languageName } from './claude'
 import { fakeAgents } from './agent-fake'
 import { beginEpisodeMetrics, episodeMetricsPhase, finishEpisodeMetrics } from './episode-metrics'
 import { cancelExport, queueExport } from './exports'
 import { cancel } from './render'
-import { createProject, readMeta, readScript } from './projects'
+import { createProject, readMeta, readScript, updateMetaAt } from './projects'
 import { parsePlan, titlesSoFar } from '../shared/series-plan'
 import { checkAndFix, ensureQuickReady } from './quick'
 import { runRunner } from './runner'
@@ -32,11 +32,12 @@ const MAX_TEXT = 40_000
 /** Reads the PDFs and asks Claude for episodes and a bible. */
 /** Reads the PDFs and asks the agent for episodes and a bible, reporting each step as it goes. */
 export async function planSeries(
-  req: { pdfs: string[]; title?: string; instructions?: string; language: string; tone: Tone; model?: string; effort?: Effort },
+  req: { pdfs: string[]; topic?: string; instructions?: string; language: string; tone: Tone },
   report: (p: SeriesPlanProgress) => void = () => {},
   signal?: AbortSignal,
 ): Promise<SeriesPlan> {
-  if (!req.pdfs.length) throw new Error('Add the PDFs the series is made from.')
+  const topic = req.topic?.trim()
+  if (!req.pdfs.length && !topic) throw new Error('Add the PDFs the series is made from, or say what you want to learn.')
   if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Accounts): it reads the PDFs and plans the episodes.')
   const work = join(tmpdir(), 'manim-studio-series', randomUUID())
   try {
@@ -54,9 +55,17 @@ export async function planSeries(
     }
     const tone = TONES.find((t) => t.value === req.tone) ?? TONES[1]
     const prompt = [
-      `Plan an educational video series from this course material, in ${languageName(req.language)}.${req.title ? ` The series is called "${req.title}".` : ''}`,
-      `Its tone: ${tone.brief}`,
-      'Episodes: usually one per file, in the given order. Split a file that holds several big ideas into several episodes; merge files too thin for a video of their own. Each episode has one central idea and fits a focused video (typically 3 to 10 minutes). Name the pages each episode uses.',
+      ...(req.pdfs.length
+        ? [
+            `Plan an educational video series from this course material, in ${languageName(req.language)}.`,
+            `Its tone: ${tone.brief}`,
+            'Episodes: usually one per file, in the given order. Split a file that holds several big ideas into several episodes; merge files too thin for a video of their own. Each episode has one central idea and fits a focused video (typically 3 to 10 minutes). Name the pages each episode uses.',
+          ]
+        : [
+            `Plan an educational video series, in ${languageName(req.language)}, that teaches what the user asks for here:\n---\n${topic}\n---`,
+            `Its tone: ${tone.brief}`,
+            'There is no course material: choose the curriculum yourself, in a sensible teaching order, starting from what the request implies the viewer already knows. Each episode has one central idea and fits a focused video (typically 3 to 10 minutes). Leave "sources" empty.',
+          ]),
       ...(req.instructions?.trim()
         ? [
             `The user's own instructions for this series come before the guidance here: the episodes' depth and length, and what the bible says about the audience and the approach, follow them.\n---\n${req.instructions.trim()}\n---`,
@@ -70,17 +79,17 @@ export async function planSeries(
     ].join('\n')
     report({ ...progress, stage: 'planning' })
     let usage: UsageEntry | undefined
+    const planner = seriesSelection(getSettings(), 'plan')
     const answer = await askClaude('You plan educational maths and engineering video series. You answer with JSON only.', prompt, 'plan the series', {
       signal,
-      model: req.model,
-      effort: req.effort,
+      model: planner.model,
+      effort: planner.effort,
       onUsage: (e) => (usage = { ...e, step: 'Planning the series' }),
       onText: (soFar) => report({ ...progress, stage: /"bible"\s*:/.test(soFar) ? 'bible' : 'planning', episodes: titlesSoFar(soFar) }),
     })
     const plan = parsePlan(
       answer,
       req.pdfs.map((p) => basename(p)),
-      req.title,
     )
     return { ...plan, instructions: req.instructions?.trim() || undefined, usage }
   } finally {
@@ -89,6 +98,28 @@ export async function planSeries(
 }
 
 const two = (n: number) => String(n).padStart(2, '0')
+
+/** Renames a series everywhere it's shown: each episode's project.json, series.json and a run on Home. Folders keep their names. */
+export function renameSeries(folder: string, title: string): void {
+  const name = title.trim()
+  if (!name) throw new Error('Give the series a title.')
+  for (const entry of readdirSync(folder)) {
+    const dir = join(folder, entry)
+    if (!existsSync(join(dir, 'project.json'))) continue
+    const meta = readMeta(dir)
+    if (meta.series) updateMetaAt(dir, { series: { ...meta.series, title: name } })
+  }
+  const file = join(folder, 'series.json')
+  if (existsSync(file)) {
+    const saved = JSON.parse(readFileSync(file, 'utf8'))
+    saved.plan.title = name
+    writeFileSync(file, JSON.stringify(saved, null, 2))
+  }
+  if (series?.folder === folder) {
+    series.title = name
+    save()
+  }
+}
 
 /** Creates the series folder and one project per episode; unattended, makes them all in quick mode. */
 export async function startSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>): Promise<void> {
@@ -252,7 +283,7 @@ export function stopSeries(): void {
 export async function continueSeries(): Promise<void> {
   if (series?.state !== 'stopped') return
   for (const agent of new Set(
-    series.episodes.filter((ep) => ep.state !== 'done').map((ep) => seriesAgentSelection(series!, ep, defaultAgentSelection(getSettings())).agent),
+    series.episodes.filter((ep) => ep.state !== 'done').map((ep) => seriesAgentSelection(series!, ep, seriesSelection(getSettings(), 'make')).agent),
   ))
     await ensureQuickReady(agent)
   for (const ep of series.episodes) {
@@ -275,7 +306,7 @@ export function dismissSeries(): void {
 }
 
 function startRun(title: string, folder: string, dirs: string[], start: SeriesStart, planningCostUSD?: number): void {
-  const selection = defaultAgentSelection(getSettings())
+  const selection = seriesSelection(getSettings(), 'make')
   const settings = getSettings()
   const flags = { usage: !!settings.developerUsageMetrics, timing: !!settings.developerTimingMetrics, resources: !!settings.developerResourceMetrics }
   const metrics = settings.developerMode && Object.values(flags).some(Boolean) ? flags : undefined
@@ -286,8 +317,8 @@ function startRun(title: string, folder: string, dirs: string[], start: SeriesSt
     agents: metrics ? 1 : Math.max(1, getSettings().seriesAgents || 3),
     metrics,
     agent: selection.agent,
-    model: start.model ?? selection.model,
-    effort: start.effort ?? selection.effort,
+    model: selection.model,
+    effort: selection.effort,
     state: 'working',
     episodes: dirs.map((dir, i) => ({ dir, title: readMeta(dir).name, assignment: start.plan.episodes[i].assignment, state: 'waiting', warnings: [] })),
     planningCostUSD,
@@ -377,7 +408,7 @@ function exportEpisode(ep: EpisodeRun, run: SeriesRun): void {
   exporting.add(ep.dir)
   void (async () => {
     try {
-      await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, defaultAgentSelection(getSettings())), run.metrics)
+      await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
       stopIf(ep)
       episodeMetricsPhase(ep.dir, 'Export')
       const { job, finished } = queueExport(ep.dir, exportOptions)
@@ -414,14 +445,14 @@ async function episodeStep(
   let again = !!ep.tried
   let agent: EpisodeAgent | null = null
   try {
-    await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, defaultAgentSelection(getSettings())), run.metrics)
+    await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
     stopIf(ep)
     update(ep, { state, activity: 'Starting', tried: true })
     writeEpisodeBible(ep.dir)
     agent = await episodeAgent(ep.dir, {
       onTool: (summary) => update(ep, { activity: summary }),
       onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models) }),
-      ...seriesAgentSelection(run, ep, defaultAgentSelection(getSettings())),
+      ...seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')),
       allowFallback: !ep.assignment,
       strictModel: !!ep.assignment,
     })

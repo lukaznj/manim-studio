@@ -51,6 +51,7 @@ const methods = [
   'stopQuick',
   'planSeries',
   'cancelSeriesPlan',
+  'renameSeries',
   'startSeries',
   'seriesRun',
   'openEpisodeReport',

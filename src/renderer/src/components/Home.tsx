@@ -1,6 +1,6 @@
 import { t as uiText, localize, format } from '../lib/i18n'
-import { ChevronLeft, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Trash2, Zap } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Pencil, Play, Plus, Trash2, Zap } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ExerciseSet, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
@@ -14,6 +14,8 @@ import {
   openWatch,
   pickAndOpenProject,
   refreshProjects,
+  errorText,
+  toast,
   updateSettings,
   useStore,
 } from '../store'
@@ -93,17 +95,17 @@ export function Home() {
           <>
             <nav className="home-crumbs">
               <button className="link-btn" onClick={() => useStore.setState({ homeSeries: null })}>
-                <ChevronLeft /> {uiText(" Projects")}
+                <ChevronLeft /> {uiText(' Projects')}
               </button>
               <span className="faint">/</span>
-              <strong>{inSeries[0].series!.title}</strong>
+              <SeriesTitle folder={inSeries[0].series!.folder} title={inSeries[0].series!.title} />
               <span className="faint">{inSeries.length === 1 ? uiText('1 episode') : format('{0} episodes', [inSeries.length])}</span>
               <button
                 className="btn small"
                 onClick={() => void openWatch(inSeries[0].series!.folder)}
                 title={uiText('Study the series: the videos, a transcript and a chat that knows where you are')}
               >
-                <Play /> {uiText(" Watch")}
+                <Play /> {uiText(' Watch')}
               </button>
               <button className="btn small ghost" onClick={() => void api.reveal(inSeries[0].series!.folder)}>
                 <FolderOpen /> {revealLabel}
@@ -182,7 +184,7 @@ export function Home() {
                   void pickAndOpenProject()
                 }}
               >
-                <FolderOpen /> {uiText(" Open folder…")}
+                <FolderOpen /> {uiText(' Open folder…')}
               </button>
             )}
           </div>
@@ -234,7 +236,7 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
         <div className="project-name">{set.title}</div>
         <div className="project-sub">
           <span className="badge sun">
-            <GraduationCap /> {uiText(" Exercises")}
+            <GraduationCap /> {uiText(' Exercises')}
           </span>
           <span className="faint">{working ? uiText('Solving…') : format('{0} of {1} with a video', [done, set.items.length])}</span>
         </div>
@@ -266,7 +268,7 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
         <div className="project-name">{first.series!.title}</div>
         <div className="project-sub">
           <span className="badge sun">
-            <Library /> {uiText(" Series")}
+            <Library /> {uiText(' Series')}
           </span>
           <span className="faint">{episodes.length === 1 ? uiText('1 episode') : format('{0} episodes', [episodes.length])}</span>
           {exercises ? (
@@ -306,7 +308,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
               <span className="badge">{p.aspect}</span>
               {p.series && (
                 <span className="badge sun">
-                  {uiText("Episode ")}
+                  {uiText('Episode ')}
                   {p.series.episode}
                 </span>
               )}
@@ -318,7 +320,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
       {p.missing ? (
         <div className="missing-actions" onClick={(e) => e.stopPropagation()}>
           <button className="btn small" onClick={() => void locateProject(p.path)}>
-            <FolderSearch /> {uiText(" Locate…")}
+            <FolderSearch /> {uiText(' Locate…')}
           </button>
           <button
             className="btn small ghost"
@@ -328,7 +330,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
               void refreshProjects()
             }}
           >
-            <Trash2 /> {uiText(" Remove")}
+            <Trash2 /> {uiText(' Remove')}
           </button>
         </div>
       ) : (
@@ -346,7 +348,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
           {menu && (
             <div className="menu" onMouseLeave={() => setMenu(false)} onClick={(e) => e.stopPropagation()}>
               <button onClick={() => void api.reveal(p.path)}>
-                <FolderOpen /> {uiText(" Show in folder")}
+                <FolderOpen /> {uiText(' Show in folder')}
               </button>
               <button
                 onClick={async () => {
@@ -354,12 +356,64 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
                   void refreshProjects()
                 }}
               >
-                <Trash2 /> {uiText(" Remove from list")}
+                <Trash2 /> {uiText(' Remove from list')}
               </button>
             </div>
           )}
         </>
       )}
     </article>
+  )
+}
+
+/** A series' title in its folder view; the pencil turns it into a field (Enter saves, Escape cancels). */
+function SeriesTitle({ folder, title }: { folder: string; title: string }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const cancelled = useRef(false) // Escape: the field's blur mustn't save
+  const save = async () => {
+    const name = draft?.trim()
+    setDraft(null)
+    if (cancelled.current || !name || name === title) return
+    try {
+      await api.renameSeries(folder, name)
+      await refreshProjects()
+    } catch (e) {
+      toast(errorText(e), 'error')
+    }
+  }
+  if (draft === null)
+    return (
+      <>
+        <strong>{title}</strong>
+        <button
+          className="icon-btn"
+          onClick={() => {
+            cancelled.current = false
+            setDraft(title)
+          }}
+          aria-label={uiText('Rename series')}
+          title={uiText('Rename series')}
+        >
+          <Pencil />
+        </button>
+      </>
+    )
+  return (
+    <input
+      className="input series-rename"
+      autoFocus
+      aria-label={uiText('Series title')}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onBlur={() => void save()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') {
+          cancelled.current = true
+          setDraft(null)
+        }
+      }}
+    />
   )
 }

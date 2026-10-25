@@ -33,6 +33,7 @@ import {
   pauseEpisode,
   pauseSeries,
   planSeries,
+  renameSeries,
   seriesRun,
   setupSeries,
   startSeries,
@@ -341,6 +342,7 @@ function registerIpc(): void {
     }
   })
   handle('cancelSeriesPlan', () => planning?.abort())
+  handle('renameSeries', (folder: string, title: string) => renameSeries(folder, title))
   handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
   handle('seriesRun', () => seriesRun())
   handle('openEpisodeReport', async (dir: string) => {
