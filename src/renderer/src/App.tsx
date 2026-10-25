@@ -1,5 +1,5 @@
 import { CircleAlert, CircleCheck, Info } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { BoothDialog } from './components/RecordingBooth'
 import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
@@ -33,6 +33,14 @@ export function App() {
   useEffect(() => {
     if (editorBarred) void leaveEditor()
   }, [editorBarred])
+  // Dialogs sit in the top layer, above any z-index; showing the toasts again puts them above the newest one.
+  const toastLayer = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = toastLayer.current
+    if (!el?.showPopover) return
+    if (el.matches(':popover-open')) el.hidePopover()
+    if (toasts.length) el.showPopover()
+  }, [toasts])
   // What the mode needs installs by itself: after onboarding, and when Settings switches Learn to Create.
   const mode = useStore((s) => s.settings?.mode)
   const setupLoaded = useStore((s) => !!s.setup)
@@ -63,7 +71,7 @@ export function App() {
       <AddExercisesDialog />
       <LectureDialog />
       {screen === 'editor' && !quickHere && !learn && <Tour />}
-      <div className="toast-stack" aria-live="polite">
+      <div className="toast-stack" aria-live="polite" popover="manual" ref={toastLayer}>
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>
             {t.kind === 'error' ? <CircleAlert /> : t.kind === 'ok' ? <CircleCheck /> : <Info />}

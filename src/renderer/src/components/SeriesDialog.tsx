@@ -1,9 +1,9 @@
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowDown, ArrowUp, Check, Circle, FileText, Library, Plus, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowRight, Check, Circle, FileText, Library, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_TONE } from '../../../shared/tone'
-import type { Agent, AgentSelection, Aspect, Effort, ModelOption, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
-import { defaultAgentSelection } from '../../../shared/agent-selection'
+import type { Agent, AgentSelection, Aspect, ModelOption, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
+import { seriesSelection } from '../../../shared/agent-selection'
 import { api } from '../lib/api'
 import { studying, closeDialog, errorText, toast, useStore } from '../store'
 import { ModelPicker } from './ChatPane'
@@ -23,7 +23,9 @@ export function SeriesDialog() {
   const omnivoice = useStore((s) => s.setup?.omnivoice)
   const agents = useStore((s) => s.settings?.seriesAgents || 3)
   const [pdfs, setPdfs] = useState<string[]>([])
-  const [title, setTitle] = useState('')
+  const [step, setStep] = useState<'material' | 'details'>('material')
+  const [noPdfs, setNoPdfs] = useState(false)
+  const [topic, setTopic] = useState('') // what to learn, when there are no PDFs
   const [instructions, setInstructions] = useState('')
   const aspect: Aspect = defaults?.defaultAspect ?? '16:9'
   const theme: Theme = defaults?.defaultTheme ?? 'dark'
@@ -37,14 +39,6 @@ export function SeriesDialog() {
   const [catalogReady, setCatalogReady] = useState(false)
   const [catalogErrors, setCatalogErrors] = useState<string[]>([])
   const settings = useStore((s) => s.settings)
-  const agent = settings?.agent ?? 'claude'
-  const [planningCatalog, setPlanningCatalog] = useState<{ agent: Agent; models: ModelOption[]; error?: string } | null>(null)
-  const [catalogAttempt, setCatalogAttempt] = useState(0)
-  const planningModels = planningCatalog?.agent === agent ? planningCatalog.models : []
-  const planningError = planningCatalog?.agent === agent ? planningCatalog.error : undefined
-  const planningReady = planningModels.length > 0 && !planningError
-  const [model, setModel] = useState('')
-  const [effort, setEffort] = useState<Effort>('high')
   const [server, setServer] = useState<string | undefined>()
   const [plan, setPlan] = useState<SeriesPlan | null>(null)
   const [busy, setBusy] = useState<'planning' | 'starting' | null>(null)
@@ -55,37 +49,13 @@ export function SeriesDialog() {
   useEffect(() => {
     if (!open) return
     setPdfs([])
-    setTitle('')
+    setStep('material')
+    setNoPdfs(false)
+    setTopic('')
     setInstructions('')
-    const selection = settings && defaultAgentSelection(settings)
-    setModel(selection?.model ?? '')
-    setEffort(selection?.effort || 'high')
     setPlan(null)
     setBusy(null)
   }, [open]) // a fresh form each time
-
-  useEffect(() => {
-    if (!open) return
-    let active = true
-    const selection = settings && defaultAgentSelection(settings)
-    setModel(selection?.model ?? '')
-    setEffort(selection?.effort || 'high')
-    setPlanningCatalog(null)
-    void api.chatModels(agent).then(
-      (models) => {
-        if (active)
-          setPlanningCatalog({
-            agent,
-            models,
-            error: models.length ? undefined : uiText('No models were returned. Check the selected agent in Settings → Accounts and retry.'),
-          })
-      },
-      (error) => active && setPlanningCatalog({ agent, models: [], error: errorText(error) }),
-    )
-    return () => {
-      active = false
-    }
-  }, [open, agent, catalogAttempt])
 
   useEffect(() => {
     if (!open || !comparison) return
@@ -117,8 +87,8 @@ export function SeriesDialog() {
     if (ep.assignment) return ep.assignment
     const entry = catalog.find((c) => c.agent === settings?.agent) ?? catalog[0]
     if (!entry) return undefined
-    const preferred = settings && defaultAgentSelection({ ...settings, agent: entry.agent })
-    const chosen = entry.models.find((m) => m.value === (entry.agent === settings?.agent ? model : preferred?.model)) ?? entry.models[0]
+    const preferred = settings && seriesSelection(settings, 'make', entry.agent)
+    const chosen = entry.models.find((m) => m.value === preferred?.model) ?? entry.models[0]
     const effort = preferred?.effort ?? 'high'
     return {
       agent: entry.agent,
@@ -155,7 +125,6 @@ export function SeriesDialog() {
   const name = (p: string) => p.split(/[\\/]/).pop() ?? p
 
   const makePlan = async () => {
-    if (!planningReady) return
     setBusy('planning')
     setProgress(null)
     cancelled.current = false
@@ -163,13 +132,11 @@ export function SeriesDialog() {
     try {
       setPlan(
         await api.planSeries({
-          pdfs,
-          title: title.trim() || undefined,
+          pdfs: noPdfs ? [] : pdfs,
+          topic: noPdfs ? topic.trim() : undefined,
           instructions: instructions.trim() || undefined,
           language,
           tone,
-          model: model || undefined,
-          effort,
         }),
       )
     } catch (e) {
@@ -189,14 +156,12 @@ export function SeriesDialog() {
     setBusy('starting')
     try {
       await api.startSeries({
-        model: model || undefined,
-        effort,
         plan: {
           ...plan,
           instructions: instructions.trim() || undefined,
           episodes: plan.episodes.map((ep) => ({ ...ep, assignment: comparison ? selectionFor(ep) : undefined })),
         },
-        pdfs,
+        pdfs: noPdfs ? [] : pdfs,
         aspect,
         theme,
         tone,
@@ -246,53 +211,46 @@ export function SeriesDialog() {
           </>
         ) : (
           <>
-            <button className="btn ghost" onClick={busy === 'planning' ? cancelPlan : closeDialog}>
-              {busy === 'planning' ? uiText('Stop planning') : uiText('Cancel')}
-            </button>
-            <button
-              className="btn primary"
-              disabled={!pdfs.length || !!busy || !!voiceIssue || !planningReady}
-              title={voiceIssue ?? undefined}
-              onClick={() => void makePlan()}
-            >
-              {busy === 'planning' ? <span className="spinner" /> : <Library />} {busy === 'planning' ? uiText('Planning…') : uiText('Plan the episodes')}
-            </button>
+            {busy === 'planning' ? (
+              <button className="btn ghost" onClick={cancelPlan}>
+                {uiText('Stop planning')}
+              </button>
+            ) : step === 'details' ? (
+              <button className="btn ghost" onClick={() => setStep('material')}>
+                {uiText('Back')}
+              </button>
+            ) : (
+              <button className="btn ghost" onClick={closeDialog}>
+                {uiText('Cancel')}
+              </button>
+            )}
+            {step === 'material' ? (
+              <button className="btn primary" disabled={!pdfs.length} onClick={() => setStep('details')}>
+                {uiText('Continue')} <ArrowRight />
+              </button>
+            ) : (
+              <button
+                className="btn primary"
+                disabled={!!busy || !!voiceIssue || (noPdfs && !topic.trim())}
+                title={voiceIssue ?? undefined}
+                onClick={() => void makePlan()}
+              >
+                {busy === 'planning' ? <span className="spinner" /> : <Library />} {busy === 'planning' ? uiText('Planning…') : uiText('Plan the episodes')}
+              </button>
+            )}
           </>
         )
       }
     >
       {busy === 'planning' ? (
-        <PlanProgress pdfs={pdfs.map(name)} progress={progress} />
-      ) : !plan ? (
+        <PlanProgress pdfs={noPdfs ? [] : pdfs.map(name)} progress={progress} />
+      ) : !plan && step === 'material' ? (
         <div className="modal-body quick-form">
           <p className="hint">
             {uiText(
               "Add a course's material, one PDF per lecture for example. Your selected agent reads it all and proposes the episodes: usually one per PDF, merged or split where that makes better videos. You review the plan before anything is made.",
             )}
           </p>
-          <div className="field">
-            <label htmlFor="series-title">{uiText('Series title')}</label>
-            <input
-              id="series-title"
-              className="input"
-              data-autofocus
-              placeholder={uiText('Optional: named from the material')}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="series-instructions">{uiText('How to make it')}</label>
-            <textarea
-              id="series-instructions"
-              className="textarea series-instructions"
-              rows={3}
-              placeholder={uiText("Optional. For example: I'm revising this before a new subject, so keep it intuitive and don't go deep into the formulas.")}
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-            />
-            <span className="hint">{uiText('Your selected agent plans the episodes with it, and every episode follows it (series.md keeps it).')}</span>
-          </div>
           <div
             className={`series-pdfs ${dragging ? 'dragging' : ''}`}
             onDragOver={(e) => {
@@ -323,13 +281,57 @@ export function SeriesDialog() {
               </div>
             ))}
             <div className="series-add">
-              <button className="btn small" onClick={() => void api.pickPdfs().then(add)}>
+              <button className="btn small" data-autofocus onClick={() => void api.pickPdfs().then(add)}>
                 <Plus /> {uiText(' Add PDFs')}
               </button>
               <span className="hint">
                 {pdfs.length ? uiText('In course order: drag more in, or reorder with the arrows.') : uiText('or drop them here, in course order.')}
               </span>
             </div>
+          </div>
+          {!pdfs.length && (
+            <button
+              className="link-btn series-no-pdfs"
+              onClick={() => {
+                setNoPdfs(true)
+                setStep('details')
+              }}
+            >
+              {uiText('I have no PDFs: tell the agent what you want to learn')}
+            </button>
+          )}
+        </div>
+      ) : !plan ? (
+        <div className="modal-body quick-form">
+          {noPdfs ? (
+            <div className="field">
+              <label htmlFor="series-topic">{uiText('What do you want to learn?')}</label>
+              <textarea
+                id="series-topic"
+                className="textarea series-instructions"
+                rows={4}
+                autoFocus
+                placeholder={uiText('For example: linear algebra from scratch, vectors to eigenvalues, for a first-year engineering student.')}
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+              />
+              <span className="hint">{uiText('The agent chooses the episodes and their order from this, without course material.')}</span>
+            </div>
+          ) : (
+            <p className="hint">{format('Planned from {0} PDFs.', [pdfs.length])}</p>
+          )}
+          <div className="field">
+            <label htmlFor="series-instructions">{uiText('How to make it')}</label>
+            <textarea
+              id="series-instructions"
+              className="textarea series-instructions"
+              rows={3}
+              autoFocus={!noPdfs}
+              placeholder={uiText("Optional. For example: I'm revising this before a new subject, so keep it intuitive and don't go deep into the formulas.")}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+            />
+            <span className="hint">{uiText('Your selected agent plans the episodes with it, and every episode follows it (series.md keeps it).')}</span>
           </div>
           {voiceIssue && (
             <div className="quick-warning">
@@ -341,36 +343,7 @@ export function SeriesDialog() {
               {uiText('Developer measurements are enabled. Episodes will run one at a time, through export, and produce HTML reports.')}
             </p>
           )}
-          {
-            <div className="field">
-              <span className="label">{format('Model · {0}', [AGENT_LABELS[agent]])}</span>
-              {planningError ? (
-                <div className="hint" role="alert">
-                  {planningError}{' '}
-                  <button className="link-btn" onClick={() => setCatalogAttempt((n) => n + 1)}>
-                    {uiText('Retry')}
-                  </button>
-                </div>
-              ) : !planningReady ? (
-                <span className="hint" role="status">
-                  <span className="spinner" /> {uiText('Loading models…')}
-                </span>
-              ) : (
-                <ModelPicker
-                  model={model}
-                  effort={effort}
-                  models={planningModels}
-                  onChange={(m, e) => {
-                    setModel(m)
-                    if (e) setEffort(e)
-                  }}
-                />
-              )}
-              <span className="hint">
-                {uiText('For planning and every episode of this series; the chat keeps its own. Higher effort can take longer and use more of your plan.')}
-              </span>
-            </div>
-          }
+          <p className="hint">{uiText('The models that plan and make the series are set in Settings → Agent.')}</p>
           {unattended && <ExportOn value={server} onChange={setServer} />}
           {editing && (
             <label className="export-check">
@@ -519,7 +492,7 @@ function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlan
     const s = Math.max(0, Math.round((now - since) / 1000))
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   }
-  const reading = !progress || progress.stage === 'reading'
+  const reading = pdfs.length > 0 && (!progress || progress.stage === 'reading')
   const pages = progress?.read.reduce((n, r) => n + r.pages, 0) ?? 0
   const episodes = progress?.episodes ?? []
   return (
@@ -528,11 +501,13 @@ function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlan
         <strong>
           {reading
             ? format('Reading PDF {0} of {1}', [progress?.index ?? 1, pdfs.length])
-            : progress.stage === 'bible'
+            : progress?.stage === 'bible'
               ? uiText('Writing the series bible')
               : episodes.length
                 ? format('Planning episode {0}', [episodes.length])
-                : uiText('An agent is reading the material and planning')}
+                : pdfs.length
+                  ? uiText('An agent is reading the material and planning')
+                  : uiText('An agent is planning the series')}
         </strong>
         <span className="mono faint">{clock(progress?.startedAt)}</span>
       </div>
@@ -559,12 +534,16 @@ function PlanProgress({ pdfs, progress }: { pdfs: string[]; progress: SeriesPlan
         <>
           <div className="series-progress-head">
             <span className="muted">
-              {uiText('Read ')}
-              {pdfs.length} {uiText(' PDFs, ')}
-              {pages} {uiText(' pages.')}{' '}
+              {pdfs.length > 0 && (
+                <>
+                  {uiText('Read ')}
+                  {pdfs.length} {uiText(' PDFs, ')}
+                  {pages} {uiText(' pages.')}{' '}
+                </>
+              )}
               {!episodes.length
                 ? uiText('The episodes appear here as an agent writes them; this usually takes a few minutes.')
-                : progress.stage === 'bible'
+                : progress?.stage === 'bible'
                   ? format('The {0} episodes:', [episodes.length])
                   : format('Episodes so far ({0}):', [episodes.length])}
             </span>

@@ -501,12 +501,18 @@ dialog.modal::backdrop {
 
 .toast-stack {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  inset: auto 18px 18px auto;
   z-index: 100;
   display: grid;
   gap: 8px;
   pointer-events: none;
+  /* A manual popover (App.tsx), so it sits in the top layer above open dialogs; undo the popover defaults. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  overflow: visible;
 }
 .toast {
   pointer-events: auto;

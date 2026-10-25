@@ -235,7 +235,7 @@ export interface WatchDetail {
 /** What series planning is doing, step by step (src/main/series.ts planSeries). */
 export interface SeriesPlanProgress {
   stage: 'reading' | 'planning' | 'bible'
-  total: number // PDFs
+  total: number // PDFs (0 when planned from a topic)
   file?: string // the PDF being read
   index?: number // 1-based
   read: { file: string; pages: number }[] // PDFs read so far
@@ -300,8 +300,6 @@ export interface SeriesStart {
   voice?: VoiceSettings
   export: ExportOptions
   unattended: boolean // make every episode now in quick mode; else open the first to make by hand
-  model?: string // for the series' agents; otherwise the chat's (Settings)
-  effort?: Effort
 }
 
 export interface NewProjectInput {
@@ -469,6 +467,9 @@ export interface ClaudeStatus {
 
 /** The agent that writes the scenes: Claude (the Agent SDK), Codex (OpenAI's CLI) or Antigravity (Google's CLI, ADR 0031). */
 export type Agent = 'claude' | 'codex' | 'antigravity'
+
+/** A series' two jobs: planning the episodes, and making them (scripts, videos, fixes). */
+export type SeriesRole = 'plan' | 'make'
 
 export interface AgentSelection {
   agent: Agent
@@ -687,6 +688,7 @@ export interface Settings {
   exerciseSets?: string[] // exercise set folders (Home lists them; search looks in them)
   seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed
   seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
+  seriesModels?: Partial<Record<Agent, Partial<Record<SeriesRole, { model: string; effort: Effort }>>>> // per agent; unset: the defaults in shared/agent-selection.ts (ADR 0045)
   autoRender: boolean
   hasElevenLabsKey: boolean
   hasAnthropicKey: boolean
@@ -874,17 +876,12 @@ export interface StudioApi {
   quickRun(): Promise<QuickRun | null>
   stopQuick(): Promise<void>
   /** Reads the PDFs and asks Claude for a series plan (a minute or two). */
-  planSeries(request: {
-    pdfs: string[]
-    title?: string
-    instructions?: string
-    language: string
-    tone: Tone
-    model?: string
-    effort?: Effort
-  }): Promise<SeriesPlan>
+  /** Plans a series from PDFs, or from `topic` (what the user wants to learn) when there are none. */
+  planSeries(request: { pdfs: string[]; topic?: string; instructions?: string; language: string; tone: Tone }): Promise<SeriesPlan>
   /** Stops series planning (reading the PDFs or the agent's answer). */
   cancelSeriesPlan(): Promise<void>
+  /** Renames a series on Home (its episodes' project.json and series.json); folders keep their names. */
+  renameSeries(folder: string, title: string): Promise<void>
   /** Creates the series' projects; unattended, makes them one after another in quick mode. */
   startSeries(start: SeriesStart): Promise<void>
   /** The series being made unattended, or the last one until it's dismissed. */
