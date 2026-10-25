@@ -613,9 +613,11 @@ export function ModelPicker({
   const activeModels = useStore((s) => s.models)
   const models = offeredModels ?? activeModels
   const list: ModelOption[] = models.length ? [...models] : [{ value: '', label: 'Default model', description: '', efforts: [] }]
-  // A model picked under another account still shows, so the picker never claims the wrong one.
-  if (!list.some((m) => m.value === model)) list.push({ value: model, label: modelName(model), description: '', efforts: [] })
-  const current = list.find((m) => m.value === model)!
+  // A saved full id ("claude-sonnet-5-5") is the listed alias of the same name ("sonnet"): same model, same efforts.
+  const listed = list.find((m) => m.value === model) ?? list.find((m) => m.value && m.label === modelName(model))
+  // A model picked under another account still shows, so the picker never claims the wrong one; its saved effort stays.
+  if (!listed) list.push({ value: model, label: modelName(model), description: '', efforts: models.length ? [savedEffort] : [] })
+  const current = listed ?? list.at(-1)!
   const effortFor = (efforts: Effort[]): Effort | null =>
     efforts.includes(savedEffort) ? savedEffort : efforts.includes('medium') ? 'medium' : (efforts[0] ?? null)
   // Until the account's models load, show the saved level rather than "no effort setting".
@@ -629,7 +631,7 @@ export function ModelPicker({
     <div className="model-controls">
       <label className="chip-select" title={current.description || uiText('Model')}>
         <Sparkles />
-        <select aria-label={uiText('Model')} value={model} onChange={(e) => pickModel(e.target.value)}>
+        <select aria-label={uiText('Model')} value={current.value} onChange={(e) => pickModel(e.target.value)}>
           {list.map((m) => (
             <option key={m.value} value={m.value} title={m.description}>
               {m.label}

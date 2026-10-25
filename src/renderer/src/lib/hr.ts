@@ -65,7 +65,6 @@ export const hr: Record<string, string> = {
   'Ask about this lesson': 'Pitajte o ovoj lekciji',
   "Add a course's material, one PDF per lecture for example. Your selected agent reads it all and proposes the episodes: usually one per PDF, merged or split where that makes better videos. You review the plan before anything is made.":
     'Dodajte materijale za tečaj, primjerice jedan PDF po predavanju. Odabrani agent čita sve i predlaže epizode: obično jednu po PDF-u, uz spajanje ili razdvajanje kad to daje bolje videozapise. Plan pregledavate prije početka izrade.',
-  'Optional: named from the material': 'Neobavezno: naziv prema materijalima',
   'Your selected agent plans the episodes with it, and every episode follows it (series.md keeps it).':
     'Odabrani agent prema ovome planira epizode, a svaka epizoda slijedi te upute (spremljene u series.md).',
   'Model · {0}': 'Model · {0}',
@@ -999,8 +998,7 @@ export const hr: Record<string, string> = {
   'Make videos to publish, with the code, a timeline, your own narration and exports.':
     'Izrađuj videozapise za objavu, s kodom, vremenskom crtom, vlastitom naracijom i izvozom.',
   'Study and make': 'Uči i izrađuj',
-  'Your library gets a Learn tab and a Create tab, and you switch between them.':
-    'Knjižnica dobiva kartice Uči i Stvaraj, a ti se prebacuješ između njih.',
+  'Your library gets a Learn tab and a Create tab, and you switch between them.': 'Knjižnica dobiva kartice Uči i Stvaraj, a ti se prebacuješ između njih.',
   'Your way of working': 'Tvoj način rada',
   'How will you use Manim Studio?': 'Kako ćeš koristiti Manim Studio?',
   'Not sure? Start with Learn. You can switch any time in Settings → General.':
@@ -1101,4 +1099,20 @@ export const hr: Record<string, string> = {
     'Videozapisima treba agent da ih napiše i glas da ih ispriča. Postavi ih sada ili kasnije u Postavkama.',
   'Set up': 'Postavi',
   'Last step': 'Zadnji korak',
+  'I have no PDFs: tell the agent what you want to learn': 'Nemam PDF-ove: reci agentu što želiš naučiti',
+  'What do you want to learn?': 'Što želiš naučiti?',
+  'For example: linear algebra from scratch, vectors to eigenvalues, for a first-year engineering student.':
+    'Na primjer: linearna algebra od nule, od vektora do svojstvenih vrijednosti, za studenta prve godine tehnike.',
+  'The agent chooses the episodes and their order from this, without course material.':
+    'Agent prema ovome odabire epizode i njihov redoslijed, bez materijala s predavanja.',
+  'Planned from {0} PDFs.': 'Planira se iz {0} PDF-ova.',
+  'The models that plan and make the series are set in Settings → Agent.': 'Modeli koji planiraju i izrađuju serijal postavljaju se u Postavke → Agent.',
+  'An agent is planning the series': 'Agent planira serijal',
+  'Rename series': 'Preimenuj serijal',
+  'Series: planning': 'Serijal: planiranje',
+  'Series: making the episodes': 'Serijal: izrada epizoda',
+  'Reads the material once and plans every episode and the series bible. A stronger model plans better.':
+    'Jednom pročita materijal i isplanira sve epizode i bibliju serijala. Jači model bolje planira.',
+  'Writes each episode’s script and video, and fixes them. It runs many times, so a faster model saves time and plan limits.':
+    'Piše scenarij i video svake epizode i ispravlja ih. Pokreće se mnogo puta, pa brži model štedi vrijeme i ograničenja pretplate.',
 }
