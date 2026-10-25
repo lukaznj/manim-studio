@@ -211,7 +211,7 @@ function FollowUpRequest({ dir }: { dir: string }) {
   const [moment, setMoment] = useState(0)
   return (
     <>
-      <div className="study-lesson-tools">
+      <div className="study-lesson-tools" data-tour="study-clarity">
         <span className="hint">{uiText('Need a little more clarity?')}</span>
         <div>
           <button className="btn small ghost" onClick={() => useStore.setState({ studyTab: 'chat', chatDraft: '' })}>

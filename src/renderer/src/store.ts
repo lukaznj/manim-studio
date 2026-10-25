@@ -1,4 +1,4 @@
-import { setLanguage } from './lib/i18n'
+import { setLanguage, t as uiText } from './lib/i18n'
 import { create } from 'zustand'
 import type {
   AppInfo,
@@ -85,7 +85,7 @@ export type Dialog =
   | { kind: 'lecture' }
   | null
 
-interface State {
+export interface State {
   screen: 'home' | 'editor' | 'study'
   app: AppInfo | null
   settings: Settings | null
@@ -97,7 +97,7 @@ interface State {
   usage: PlanUsage | null // the Claude plan's limits, when signed in with an account
   historyOpen: boolean
   chatDraft: string | null // text put into the chat box from elsewhere (the Media and Sources panels)
-  tour: boolean // the editor tutorial is showing
+  tour: TourId | null // the guided tour showing (Tour.tsx)
   leftTab: 'code' | 'script' | 'media' | 'sources'
   chatSource: SourceRef | null // a PDF (or some of its pages) attached to the next chat message
   projects: ProjectSummary[]
@@ -148,7 +148,7 @@ export const useStore = create<State>(() => ({
   usage: null,
   historyOpen: false,
   chatDraft: null,
-  tour: false,
+  tour: null,
   leftTab: 'code',
   chatSource: null,
   projects: [],
@@ -378,16 +378,37 @@ export async function refreshUsage(force = false): Promise<void> {
   set({ usage: await api.claudeUsage().catch(() => null) })
 }
 
-/** The editor tutorial (Tour.tsx): shown once on the first project, again from Help or Settings → General. */
-export function startTour(): void {
-  if (!get().project) return toast('Open a project to see the tutorial: it walks through the editor.', 'info')
+/** The guided tours (Tour.tsx, ADR 0047): Home and the study page, and the editor. */
+export type TourId = 'home' | 'study' | 'editor'
+
+/** Shows a tour now: the given one, or the one for the screen you're on (Help, Settings → General). */
+export function startTour(id?: TourId): void {
+  const { screen, project, quick, quickEditor } = get()
+  const tour = id ?? (screen === 'home' ? 'home' : screen === 'study' ? 'study' : 'editor')
+  if (tour === 'editor' && (!project || (quick && !quickEditor)))
+    return toast(uiText('Open a project to see the tutorial: it walks through the editor.'), 'info')
   closeDialog()
-  set({ tour: true })
+  set({ tour })
 }
 
 export function endTour(): void {
-  set({ tour: false })
-  if (!get().settings?.tutorialDone) void updateSettings({ tutorialDone: true })
+  const tour = get().tour
+  set({ tour: null })
+  const settings = get().settings
+  if (!settings || !tour) return
+  if (tour === 'editor') {
+    if (!settings.tutorialDone) void updateSettings({ tutorialDone: true })
+  } else if (!settings.toursSeen?.includes(tour)) void updateSettings({ toursSeen: [...(settings.toursSeen ?? []), tour] })
+}
+
+/** A tour shows by itself the first time its screen opens, once the screen has laid itself out. */
+export function offerTour(tour: 'home' | 'study'): void {
+  const seen = () => !get().settings?.mode || !!get().settings?.toursSeen?.includes(tour)
+  if (seen()) return
+  setTimeout(() => {
+    const { screen, dialog, tour: showing } = get()
+    if (!seen() && !dialog && !showing && screen === tour) set({ tour })
+  }, 900)
 }
 
 /** Open a project folder chosen in the system dialog. */
@@ -557,7 +578,7 @@ export async function createProject(input: Parameters<typeof api.createProject>[
 
 /** The first project opened shows the tutorial, once the editor has laid itself out. */
 function firstRunTour(): void {
-  if (get().settings?.tutorialDone === false) setTimeout(() => get().project && !get().dialog && set({ tour: true }), 700)
+  if (get().settings?.tutorialDone === false) setTimeout(() => get().project && !get().dialog && !get().tour && set({ tour: 'editor' }), 700)
 }
 
 export async function closeProject(): Promise<void> {

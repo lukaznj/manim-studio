@@ -299,7 +299,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
             </div>
           )}
           {detail.solution.intro && <Markdown text={detail.solution.intro} />}
-          <ol className="ex-steps">
+          <ol className="ex-steps" data-tour="study-steps">
             {detail.solution.steps.map((step, i) => {
               const chapter = chapterFor(step.title, i)
               return (

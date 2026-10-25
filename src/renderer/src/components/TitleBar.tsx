@@ -102,7 +102,7 @@ export function TitleBar() {
         )}
         {/* On macOS, Settings… is ⌘, in the menu bar (src/main/menu.ts), the standard place. */}
         {platform !== 'darwin' && (
-          <button className="icon-btn" onClick={() => openDialog({ kind: 'settings' })} title={uiText('Settings')}>
+          <button className="icon-btn" data-tour="settings" onClick={() => openDialog({ kind: 'settings' })} title={uiText('Settings')}>
             <Settings />
           </button>
         )}
@@ -118,7 +118,7 @@ function QuickPill() {
   if (!show) return null
   return (
     <button className="exports-pill busy" onClick={() => useStore.setState({ quickEditor: false })}>
-      <span className="spinner" /> {uiText(" Quick mode · Show progress")}
+      <span className="spinner" /> {uiText(' Quick mode · Show progress')}
     </button>
   )
 }
@@ -133,21 +133,21 @@ function UpdatePill() {
   if (update.state === 'available')
     return (
       <button className="update-pill" onClick={() => void api.downloadUpdate()} title={update.notes}>
-        <ArrowDownToLine /> {uiText(" Update to ")}
+        <ArrowDownToLine /> {uiText(' Update to ')}
         {update.version}
       </button>
     )
   if (update.state === 'downloading')
     return (
       <span className="update-pill busy">
-        <Ring value={update.percent / 100} size={15} /> {uiText(" Downloading ")}
+        <Ring value={update.percent / 100} size={15} /> {uiText(' Downloading ')}
         {Math.round(update.percent)}%
       </span>
     )
   if (update.state === 'ready')
     return (
       <button className="update-pill ready" onClick={() => void api.installUpdate()}>
-        <RefreshCw /> {uiText(" Restart to update to ")}
+        <RefreshCw /> {uiText(' Restart to update to ')}
         {update.version}
       </button>
     )
@@ -159,7 +159,7 @@ function UpdatePill() {
         onContextMenu={() => setDismissed(true)}
         title={update.message}
       >
-        <ArrowDownToLine /> {uiText(" Download the update manually")}
+        <ArrowDownToLine /> {uiText(' Download the update manually')}
       </button>
     )
   return null
