@@ -5,7 +5,7 @@ import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
 import { AddExercisesDialog, LectureDialog, NewExerciseSetDialog } from './components/ExerciseDialogs'
 import { StudyView } from './components/StudyView'
-import { Onboarding, SetupGate, requiredReady } from './components/Onboarding'
+import { Onboarding, SetupGate, requiredReady, startInstalls } from './components/Onboarding'
 import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
 import { QuickDialog } from './components/QuickDialog'
@@ -33,6 +33,12 @@ export function App() {
   useEffect(() => {
     if (editorBarred) void leaveEditor()
   }, [editorBarred])
+  // What the mode needs installs by itself: after onboarding, and when Settings switches Learn to Create.
+  const mode = useStore((s) => s.settings?.mode)
+  const setupLoaded = useStore((s) => !!s.setup)
+  useEffect(() => {
+    if (mode && setupLoaded) startInstalls(mode)
+  }, [mode, setupLoaded])
 
   return (
     <div className={`app ${window.studio ? '' : 'no-bridge'}`}>
