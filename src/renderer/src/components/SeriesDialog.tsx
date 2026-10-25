@@ -134,7 +134,7 @@ export function SeriesDialog() {
         await api.planSeries({
           pdfs: noPdfs ? [] : pdfs,
           topic: noPdfs ? topic.trim() : undefined,
-          instructions: instructions.trim() || undefined,
+          instructions: noPdfs ? undefined : instructions.trim() || undefined,
           language,
           tone,
         }),
@@ -158,7 +158,7 @@ export function SeriesDialog() {
       await api.startSeries({
         plan: {
           ...plan,
-          instructions: instructions.trim() || undefined,
+          instructions: (noPdfs ? topic : instructions).trim() || undefined,
           episodes: plan.episodes.map((ep) => ({ ...ep, assignment: comparison ? selectionFor(ep) : undefined })),
         },
         pdfs: noPdfs ? [] : pdfs,
@@ -305,34 +305,37 @@ export function SeriesDialog() {
         <div className="modal-body quick-form">
           {noPdfs ? (
             <div className="field">
-              <label htmlFor="series-topic">{uiText('What do you want to learn?')}</label>
+              <label htmlFor="series-topic">{uiText('What do you want to learn, and how?')}</label>
               <textarea
                 id="series-topic"
                 className="textarea series-instructions"
                 rows={4}
                 autoFocus
-                placeholder={uiText('For example: linear algebra from scratch, vectors to eigenvalues, for a first-year engineering student.')}
+                placeholder={uiText(
+                  'For example: linear algebra from scratch, vectors to eigenvalues, for a first-year engineering student. Keep it intuitive and light on formulas.',
+                )}
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
               />
-              <span className="hint">{uiText('The agent chooses the episodes and their order from this, without course material.')}</span>
+              <span className="hint">
+                {uiText('The agent plans the episodes and their order from this, and every episode follows it (series.md keeps it).')}
+              </span>
             </div>
           ) : (
-            <p className="hint">{format('Planned from {0} PDFs.', [pdfs.length])}</p>
+            <div className="field">
+              <label htmlFor="series-instructions">{uiText('How to make it')}</label>
+              <textarea
+                id="series-instructions"
+                className="textarea series-instructions"
+                rows={3}
+                autoFocus
+                placeholder={uiText("Optional. For example: I'm revising this before a new subject, so keep it intuitive and don't go deep into the formulas.")}
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+              />
+              <span className="hint">{uiText('Your selected agent plans the episodes with it, and every episode follows it (series.md keeps it).')}</span>
+            </div>
           )}
-          <div className="field">
-            <label htmlFor="series-instructions">{uiText('How to make it')}</label>
-            <textarea
-              id="series-instructions"
-              className="textarea series-instructions"
-              rows={3}
-              autoFocus={!noPdfs}
-              placeholder={uiText("Optional. For example: I'm revising this before a new subject, so keep it intuitive and don't go deep into the formulas.")}
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-            />
-            <span className="hint">{uiText('Your selected agent plans the episodes with it, and every episode follows it (series.md keeps it).')}</span>
-          </div>
           {voiceIssue && (
             <div className="quick-warning">
               {voiceIssue} {uiText(' The episodes are made without you, so the voice has to be ready first.')}
@@ -343,7 +346,6 @@ export function SeriesDialog() {
               {uiText('Developer measurements are enabled. Episodes will run one at a time, through export, and produce HTML reports.')}
             </p>
           )}
-          <p className="hint">{uiText('The models that plan and make the series are set in Settings → Agent.')}</p>
           {unattended && <ExportOn value={server} onChange={setServer} />}
           {editing && (
             <label className="export-check">
