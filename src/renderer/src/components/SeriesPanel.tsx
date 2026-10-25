@@ -46,7 +46,7 @@ export function SeriesPanel() {
             : `The scripts are written; the videos are being made, ${run.agents} at a time. Each is exported as soon as it passes the check.`
 
   return (
-    <section className="setup series-panel" aria-live="polite">
+    <section className="setup series-panel" aria-live="polite" data-tour="home-progress">
       <div className="setup-head">
         <span className="eyebrow">{working ? uiText('Making a series') : run.state === 'paused' ? uiText('Series paused') : uiText('Series')}</span>
         <h2>{run.title}</h2>

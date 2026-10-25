@@ -678,6 +678,7 @@ export interface Settings {
   previewSize: 480 | 720 | 1080 // short side of the preview render, in pixels
   previewFps: 15 | 24 | 30
   tutorialDone: boolean // the first-run tour of the editor was finished or skipped
+  toursSeen?: ('home' | 'study')[] // the app's guided tours already shown (ADR 0047)
   claudeModel: string // '' = Claude Code's default for the account
   claudeEffort: Effort | '' // '' (older settings) reads as 'medium'
   agent: Agent // who writes the scenes (ADR 0022)

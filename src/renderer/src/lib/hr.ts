@@ -1119,4 +1119,59 @@ export const hr: Record<string, string> = {
   'A short cue when something finishes while you look elsewhere: a render, an export, an episode, a series. Silent while a video plays.':
     'Kratak zvuk kad nešto završi dok gledaš drugdje: renderiranje, izvoz, epizoda, serijal. Utihne dok se video reproducira.',
   'Sound volume': 'Glasnoća zvukova',
+  'Start a video': 'Započni video',
+  'A quick video from one sentence, a series from your material or a learning goal, a set of exercises, or an empty project to write yourself.':
+    'Brzi video iz jedne rečenice, serijal iz tvojih materijala ili cilja učenja, zbirka zadataka ili prazan projekt koji pišeš sam.',
+  'Add something to learn': 'Dodaj nešto za učenje',
+  'A quick video on any topic, a course from your lecture PDFs or just from what you want to learn, or exercises with worked solutions and a video each.':
+    'Brzi video o bilo kojoj temi, tečaj iz PDF-ova s predavanja ili samo iz onoga što želiš naučiti, ili zadaci s riješenim postupkom i videom za svaki.',
+  'Learn and Create': 'Uči i Stvaraj',
+  'Your library has two sides: Learn, to watch and ask about videos, and Create, to make and edit them. Switch here.':
+    'Knjižnica ima dvije strane: Uči, za gledanje videozapisa i pitanja o njima, i Stvaraj, za izradu i uređivanje. Prebacuj se ovdje.',
+  'What’s being made': 'Što se izrađuje',
+  'While a series is made, each episode’s progress shows here. Pause it, stop it, or carry on later, even after quitting the app.':
+    'Dok se serijal izrađuje, ovdje se vidi napredak svake epizode. Pauziraj, zaustavi ili nastavi kasnije, i nakon zatvaranja aplikacije.',
+  'Courses being made': 'Tečajevi u izradi',
+  'While a course is made, each lesson’s progress shows here, and lessons open as soon as they’re ready.':
+    'Dok se tečaj izrađuje, ovdje se vidi napredak svake lekcije, a lekcije se otvaraju čim su spremne.',
+  'Every project is a card. A series opens as a folder of episodes; rename it with the pencil next to its title.':
+    'Svaki projekt je kartica. Serijal se otvara kao mapa epizoda; preimenuj ga olovkom pokraj naslova.',
+  'Every course, exercise set and video lands here. A course opens as a folder of lessons; rename it with the pencil next to its title.':
+    'Ovdje se nalaze svi tečajevi, zbirke zadataka i videozapisi. Tečaj se otvara kao mapa lekcija; preimenuj ga olovkom pokraj naslova.',
+  'Your agent and its models, the narration voice, sounds and these tours: ⌘, on a Mac, or the gear up here on Windows and Linux.':
+    'Agent i njegovi modeli, glas naracije, zvukovi i ovi vodiči: ⌘, na Macu ili zupčanik ovdje gore na Windowsu i Linuxu.',
+  'The lessons in order, with what you’ve watched. Exercises holds the practice set. Add lessons or exercises at the bottom.':
+    'Lekcije redom, s onim što si pogledao. Pod Zadaci je zbirka za vježbu. Lekcije i zadatke dodaješ na dnu.',
+  'Play, pause, subtitles and speed are on the video. It remembers where you stopped, and can play the next lesson on its own.':
+    'Reprodukcija, pauza, titlovi i brzina su na videu. Pamti gdje si stao i može sam pustiti sljedeću lekciju.',
+  'Stuck on a moment?': 'Zapelo ti je na nekom trenutku?',
+  'Pause there and ask a question, or have a short follow-up video made that explains just that part more slowly. It appears under the lesson.':
+    'Zaustavi ondje i postavi pitanje, ili zatraži kratak dodatni video koji sporije objašnjava baš taj dio. Pojavit će se ispod lekcije.',
+  'Worked solutions': 'Riješeni postupci',
+  'Each step plays its part of the video, and Ask sends that step to the chat. Explain something better redoes the video where it was unclear.':
+    'Svaki korak pušta svoj dio videa, a Pitaj šalje taj korak u razgovor. Bolje objašnjenje ponovno izrađuje video ondje gdje nije bilo jasno.',
+  'Transcript and chat': 'Transkript i razgovor',
+  'The transcript is every spoken sentence: click one to jump there, and search it with Ctrl+F (⌘F on a Mac). The chat answers questions about the lesson and knows where you paused.':
+    'Transkript je svaka izgovorena rečenica: klikni jednu da skočiš onamo, a pretražuješ ga s Ctrl+F (⌘F na Macu). Razgovor odgovara na pitanja o lekciji i zna gdje si zastao.',
+  'Describe what the video should show. Claude edits the scene, renders it, and looks at the frames before it answers.':
+    'Opiši što video treba prikazati. Claude uređuje scenu, renderira je i pregledava sličice prije nego odgovori.',
+  'The latest render plays here. Space plays and pauses, R renders again.':
+    'Ovdje se reproducira posljednji render. Razmaknica pokreće i zaustavlja, R ponovno renderira.',
+  'Every clip is a line of scene.py: click one to jump to it, drag its edge to retime it. Select clips, and Claude knows which part you mean.':
+    'Svaki isječak je redak u scene.py: klikni ga da skočiš onamo, povuci rub da promijeniš trajanje. Odaberi isječke i Claude zna na koji dio misliš.',
+  'Choose a voice in Settings → Voice, or record your own here. The animations stretch to fit the speech.':
+    'Odaberi glas u Postavke → Glas ili ovdje snimi svoj. Animacije se rastežu prema govoru.',
+  'A 1080p video with subtitles, light and dark versions, and other languages as audio tracks for YouTube.':
+    'Video u 1080p s titlovima, svijetla i tamna inačica te drugi jezici kao audiozapisi za YouTube.',
+  'Got it': 'Razumijem',
+  'Start studying': 'Počni učiti',
+  'Guided tours': 'Vodiči',
+  'Short tours of the library, the study page and the editor. This one starts on the screen you’re on; the others show again when you open them.':
+    'Kratki obilasci knjižnice, stranice za učenje i uređivača. Ovaj kreće na zaslonu na kojem jesi; ostali se ponovno prikazuju kad ih otvoriš.',
+  'Short tours of the library and the study page. This one starts on the screen you’re on; the other shows again when you open it.':
+    'Kratki obilasci knjižnice i stranice za učenje. Ovaj kreće na zaslonu na kojem jesi; drugi se ponovno prikazuje kad ga otvoriš.',
+  'Show the tours again': 'Ponovno prikaži vodiče',
+  'scene.py is manim code: Claude writes it, or you do. Every save renders a new preview.':
+    'scene.py je manim kod: piše ga Claude ili ti. Svako spremanje renderira novi pregled.',
+  'Open a project to see the tutorial: it walks through the editor.': 'Otvori projekt da vidiš vodič: prolazi kroz uređivač.',
 }
