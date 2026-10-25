@@ -1111,13 +1111,6 @@ export const hr: Record<string, string> = {
   'Set up': 'Postavi',
   'Last step': 'Zadnji korak',
   'I have no PDFs: tell the agent what you want to learn': 'Nemam PDF-ove: reci agentu što želiš naučiti',
-  'What do you want to learn?': 'Što želiš naučiti?',
-  'For example: linear algebra from scratch, vectors to eigenvalues, for a first-year engineering student.':
-    'Na primjer: linearna algebra od nule, od vektora do svojstvenih vrijednosti, za studenta prve godine tehnike.',
-  'The agent chooses the episodes and their order from this, without course material.':
-    'Agent prema ovome odabire epizode i njihov redoslijed, bez materijala s predavanja.',
-  'Planned from {0} PDFs.': 'Planira se iz {0} PDF-ova.',
-  'The models that plan and make the series are set in Settings → Agent.': 'Modeli koji planiraju i izrađuju serijal postavljaju se u Postavke → Agent.',
   'An agent is planning the series': 'Agent planira serijal',
   'Rename series': 'Preimenuj serijal',
   'Series: planning': 'Serijal: planiranje',
@@ -1197,4 +1190,11 @@ export const hr: Record<string, string> = {
   'To carry on now, sign in to another agent or add an API key in Settings → Accounts.':
     'Za nastavak odmah prijavi se u drugog agenta ili dodaj API ključ u Postavke → Računi.',
   'An API key is billed per use by its provider, separately from any plan.': 'API ključ pružatelj naplaćuje po korištenju, odvojeno od pretplate.',
+  '{0} is connected': '{0} je povezan',
+  'PDFs,': 'PDF-ova,',
+  'What do you want to learn, and how?': 'Što želiš naučiti i kako?',
+  'For example: linear algebra from scratch, vectors to eigenvalues, for a first-year engineering student. Keep it intuitive and light on formulas.':
+    'Na primjer: linearna algebra od nule, od vektora do svojstvenih vrijednosti, za studenta prve godine tehnike. Neka bude intuitivno, bez previše formula.',
+  'The agent plans the episodes and their order from this, and every episode follows it (series.md keeps it).':
+    'Agent prema ovome planira epizode i njihov redoslijed, a svaka epizoda to slijedi (spremljeno u series.md).',
 }
