@@ -467,8 +467,6 @@ function InstallPage({ mode }: { mode: AppMode }) {
  * the app was quit during it, or an update needs a newer engine. Nothing works without them.
  */
 export function SetupGate() {
-  const mode = useStore((s) => s.settings?.mode ?? 'learn')
-  useEffect(() => startInstalls(mode), [])
   return (
     <div className="onb onb-gate">
       <aside className="onb-stage" aria-hidden>
