@@ -1162,28 +1162,6 @@
   color: var(--text-2);
   margin-bottom: 4px;
 }
-.mode-cards {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 12px;
-}
-.mode-card {
-  align-content: start;
-  padding: 18px;
-  gap: 6px;
-  cursor: pointer;
-}
-.mode-card:hover {
-  border-color: var(--sun);
-}
-.mode-card svg {
-  width: 24px;
-  height: 24px;
-  color: var(--sun-text);
-}
-.mode-card strong {
-  font-family: var(--font-display);
-  font-size: 18px;
-}
 .provider-card.on {
   border-color: var(--sun);
   background: linear-gradient(180deg, rgb(255 209 102 / 0.07), transparent), var(--bg);
@@ -1984,20 +1962,6 @@
 }
 .creation-choice .hint {
   grid-column: 2;
-}
-.onboarding-progress {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-.onboarding-progress span {
-  flex: 1;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--line);
-}
-.onboarding-progress span.on {
-  background: var(--sun);
 }
 @media (prefers-reduced-motion: reduce) {
   .library-add {
