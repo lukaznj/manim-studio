@@ -23,6 +23,7 @@ import { format, t } from '../lib/i18n'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { errorText, installComponent, openDialog, refreshClaude, refreshProjects, switchMode, updateSettings, useStore } from '../store'
 import { ProjectsFolderStep } from './ProjectsFolderStep'
+import { AntigravityConsent } from './AntigravityConsent'
 import { ElevenLabsStatus } from './SettingsDialog'
 import { ProgressLine } from './ui'
 import { VoicePicker } from './VoicePicker'
@@ -607,6 +608,7 @@ function ConnectPage({ agent }: { agent: Agent }) {
   const [waiting, setWaiting] = useState(false)
   const [url, setUrl] = useState<string | null>(null)
   const [needsCode, setNeedsCode] = useState(false)
+  const [needsConsent, setNeedsConsent] = useState(false)
   const [code, setCode] = useState('')
   const [useKey, setUseKey] = useState(settings[AUTH_SETTING[agent]] === 'api-key')
   const [problem, setProblem] = useState('')
@@ -619,6 +621,7 @@ function ConnectPage({ agent }: { agent: Agent }) {
     return api.on('claude-login', (e) => {
       if (e.url) setUrl(e.url)
       if (e.needsCode) setNeedsCode(true)
+      if (e.needsConsent) setNeedsConsent(true)
     })
   }, [agent])
   useEffect(() => {
@@ -630,6 +633,7 @@ function ConnectPage({ agent }: { agent: Agent }) {
     setProblem('')
     setUrl(null)
     setNeedsCode(false)
+    setNeedsConsent(false)
     setWaiting(true)
     try {
       await updateSettings({ [AUTH_SETTING[agent]]: 'account' })
@@ -638,9 +642,10 @@ function ConnectPage({ agent }: { agent: Agent }) {
       await refreshClaude()
       if (!st.loggedIn) setProblem(t('The sign-in wasn’t completed. Try again, or use an API key instead.'))
     } catch (e) {
-      setProblem(errorText(e))
+      setProblem(t(errorText(e)))
     } finally {
       setWaiting(false)
+      setNeedsConsent(false)
     }
   }
   const saveKey = async (key: string) => {
@@ -679,7 +684,8 @@ function ConnectPage({ agent }: { agent: Agent }) {
                 {waiting ? <span className="spinner" /> : <Sparkles />}{' '}
                 {format('Sign in with {0}', [agent === 'codex' ? 'ChatGPT' : agent === 'antigravity' ? 'Google' : 'Claude'])}
               </button>
-              {waiting && (
+              {waiting && needsConsent && <AntigravityConsent onContinue={() => setNeedsConsent(false)} />}
+              {waiting && !needsConsent && (
                 <div className="onb-signin-wait">
                   <p>
                     {agent === 'antigravity' && windows

@@ -10,8 +10,19 @@ import { randomUUID } from 'node:crypto'
 import { SCRIPT_FILE, scriptStatus } from '../shared/script'
 import { TONES } from '../shared/tone'
 import { seriesAgentSelection, seriesSelection } from '../shared/agent-selection'
-import type { EpisodeRun, ExportOptions, ProjectMeta, SeriesPlan, SeriesPlanProgress, SeriesRef, SeriesRun, SeriesStart, Tone } from '../shared/types'
-import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
+import type {
+  AgentRoute,
+  EpisodeRun,
+  ExportOptions,
+  ProjectMeta,
+  SeriesPlan,
+  SeriesPlanProgress,
+  SeriesRef,
+  SeriesRun,
+  SeriesStart,
+  Tone,
+} from '../shared/types'
+import { configuredAuth, episodeAgent, sameRoute, turnPastLimits, type EpisodeAgent } from './agent'
 import { askClaude, chatModels, claudeStatus, languageName } from './claude'
 import { fakeAgents } from './agent-fake'
 import { beginEpisodeMetrics, episodeMetricsPhase, finishEpisodeMetrics } from './episode-metrics'
@@ -98,6 +109,18 @@ export async function planSeries(
 }
 
 const two = (n: number) => String(n).padStart(2, '0')
+
+/**
+ * The running series carries on with another agent or sign-in (ADR 0048): new steps use it, and
+ * episodes waiting on a usage limit start again with it at once. Episodes with a fixed assignment
+ * (a developer comparison) keep theirs.
+ */
+export function switchSeriesAgent(to: AgentRoute): void {
+  if (!series || series.state === 'done') throw new Error('No series is being made.')
+  const maker = seriesSelection(getSettings(), 'make', to.agent)
+  Object.assign(series, { agent: to.agent, auth: to.auth, model: maker.model, effort: maker.effort })
+  save()
+}
 
 /** Renames a series everywhere it's shown: each episode's project.json, series.json and a run on Home. Folders keep their names. */
 export function renameSeries(folder: string, title: string): void {
@@ -215,7 +238,7 @@ export function setupSeries(send: typeof sendSeries): void {
     series = saved.run
     exportOptions = saved.exportOptions
     if (series.state === 'working' || series.state === 'paused') series.state = 'stopped' // the app quit while making it
-    for (const ep of series.episodes) ep.activity = undefined
+    for (const ep of series.episodes) Object.assign(ep, { activity: undefined, limitedUntil: undefined })
   } catch {
     // an unreadable run: Home just doesn't show it
   }
@@ -319,6 +342,7 @@ function startRun(title: string, folder: string, dirs: string[], start: SeriesSt
     agent: selection.agent,
     model: selection.model,
     effort: selection.effort,
+    auth: configuredAuth(selection.agent),
     state: 'working',
     episodes: dirs.map((dir, i) => ({ dir, title: readMeta(dir).name, assignment: start.plan.episodes[i].assignment, state: 'waiting', warnings: [] })),
     planningCostUSD,
@@ -444,34 +468,58 @@ async function episodeStep(
   const run = series!
   let again = !!ep.tried
   let agent: EpisodeAgent | null = null
+  // The agent and sign-in this episode runs on: the series' (switchable at a limit), or its fixed assignment.
+  const route = (): AgentRoute => {
+    const selection = seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make'))
+    return { agent: selection.agent, auth: ep.assignment ? configuredAuth(selection.agent) : (run.auth ?? configuredAuth(selection.agent)) }
+  }
+  const open = async () => {
+    const opened = route()
+    const a = await episodeAgent(ep.dir, {
+      onTool: (summary) => update(ep, { activity: summary }),
+      onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models) }),
+      ...seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')),
+      auth: opened.auth,
+      allowFallback: !ep.assignment,
+      strictModel: !!ep.assignment,
+    })
+    agents.set(ep.dir, a)
+    return { a, opened }
+  }
   try {
     await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
     stopIf(ep)
     update(ep, { state, activity: 'Starting', tried: true })
     writeEpisodeBible(ep.dir)
-    agent = await episodeAgent(ep.dir, {
-      onTool: (summary) => update(ep, { activity: summary }),
-      onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models) }),
-      ...seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')),
-      allowFallback: !ep.assignment,
-      strictModel: !!ep.assignment,
-    })
-    agents.set(ep.dir, agent)
+    let current = await open()
+    agent = current.a
     stopIf(ep)
-    const a = agent
     await work(async (text, step) => {
       episodeMetricsPhase(ep.dir, step === 'Script' ? 'Script' : step === 'Fixing the render' ? 'Fixing render' : 'Implementation')
       stopIf(ep)
-      const ask = again ? `You were interrupted. Carry on where you stopped, with this task:\n\n${text}` : text
+      let ask = again ? `You were interrupted. Carry on where you stopped, with this task:\n\n${text}` : text
       again = false
-      const result = await turnPastLimits(
-        (t) => a.turn(t, step),
-        ask,
-        (note) => update(ep, { activity: note }),
-        () => stopIf(ep),
-      )
-      stopIf(ep)
-      if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
+      for (;;) {
+        const { a, opened } = current
+        const result = await turnPastLimits(
+          (t) => a.turn(t, step),
+          ask,
+          (note, until) => update(ep, { activity: note, limitedUntil: until }),
+          () => stopIf(ep),
+          () => !sameRoute(route(), opened),
+        )
+        stopIf(ep)
+        if (result.switched) {
+          // Another agent takes over (ADR 0048): it reads where things stand from the project's files.
+          a.close()
+          current = await open()
+          agent = current.a
+          ask = `Another agent was working on this and was interrupted. Carry on where it stopped, with this task:\n\n${text}`
+          continue
+        }
+        if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
+        return
+      }
     })
     update(ep, { tried: false })
   } catch (e) {

@@ -1,5 +1,16 @@
 // Croatian interface copy. English source strings are stable catalog keys.
 export const hr: Record<string, string> = {
+  'Before Google sign-in, Antigravity needs its first-time setup. By continuing, you agree to Google’s terms.':
+    'Prije prijave putem Googlea Antigravity treba početno postavljanje. Nastavkom prihvaćate Googleove uvjete.',
+  'Google terms': 'Googleovi uvjeti',
+  'Google privacy policy': 'Googleova pravila privatnosti',
+  'Allow Google to collect and use your interactions to improve Antigravity?':
+    'Dopuštate li Googleu prikupljanje i korištenje vaših interakcija za poboljšanje Antigravityja?',
+  'Continue without sharing': 'Nastavi bez dijeljenja',
+  'Continue and share interactions': 'Nastavi i dijeli interakcije',
+  'Antigravity couldn’t start Google sign-in. Try again, or restart Studio.':
+    'Antigravity nije uspio pokrenuti prijavu putem Googlea. Pokušajte ponovno ili ponovno pokrenite Studio.',
+  'The Antigravity sign-in didn’t finish. Try again.': 'Prijava u Antigravity nije dovršena. Pokušajte ponovno.',
   '{0} syncs this folder, so projects are backed up but use your cloud storage. The render cache stays on this computer.':
     '{0} sinkronizira ovu mapu: projekti su sigurnosno kopirani, ali troše prostor u oblaku. Predmemorija renderiranja ostaje na ovom računalu.',
   'Render cache': 'Predmemorija renderiranja',
@@ -1167,6 +1178,18 @@ export const hr: Record<string, string> = {
   'scene.py is manim code: Claude writes it, or you do. Every save renders a new preview.':
     'scene.py je manim kod: piše ga Claude ili ti. Svako spremanje renderira novi pregled.',
   'Open a project to see the tutorial: it walks through the editor.': 'Otvori projekt da vidiš vodič: prolazi kroz uređivač.',
+  'Claude (API key)': 'Claude (API ključ)',
+  'Codex (ChatGPT)': 'Codex (ChatGPT)',
+  'Codex (OpenAI API key)': 'Codex (OpenAI API ključ)',
+  'Antigravity (Google)': 'Antigravity (Google)',
+  'Antigravity (Gemini key)': 'Antigravity (Gemini ključ)',
+  'Carrying on with {0}.': 'Nastavlja se s: {0}.',
+  '{0} reached its usage limit': '{0}: dosegnuto ograničenje korištenja',
+  'It carries on by itself at {0}.': 'Nastavlja sam u {0}.',
+  'Or carry on now with another agent:': 'Ili nastavi odmah s drugim agentom:',
+  'To carry on now, sign in to another agent or add an API key in Settings → Accounts.':
+    'Za nastavak odmah prijavi se u drugog agenta ili dodaj API ključ u Postavke → Računi.',
+  'An API key is billed per use by its provider, separately from any plan.': 'API ključ pružatelj naplaćuje po korištenju, odvojeno od pretplate.',
   '{0} is connected': '{0} je povezan',
   'PDFs,': 'PDF-ova,',
   'What do you want to learn, and how?': 'Što želiš naučiti i kako?',
