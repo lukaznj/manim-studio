@@ -16,8 +16,7 @@ import { cancelExport, queueExport } from './exports'
 import { cancel } from './render'
 import { createProject, readMeta, readTimeline, updateMetaAt } from './projects'
 import { checkAndFix } from './quick'
-import { writeEpisodeBible } from './series'
-import { titleFrom } from './title'
+import { seriesRunFor, writeEpisodeBible } from './series'
 import { getSettings, setSettings } from './settings'
 import { slugify } from './slug'
 import { isWatched, writeWatched } from './watched'
@@ -91,6 +90,7 @@ export function watchSeries(folder: string): WatchSeries {
   }
   if (!existsSync(file)) throw new Error('That folder isn’t a series any more (its series.json is gone).')
   const { plan, episodes } = JSON.parse(readFileSync(file, 'utf8')) as { plan: { title: string }; episodes: string[] }
+  const production = seriesRunFor(folder) ?? undefined
   const extras = join(folder, 'extras')
   const follow = existsSync(extras) ? readdirSync(extras).filter((n) => existsSync(join(extras, n, 'project.json'))) : []
   const list: WatchEpisode[] = episodes
@@ -98,6 +98,7 @@ export function watchSeries(folder: string): WatchSeries {
     .map((name, i) => {
       const dir = join(folder, name)
       const run = running.get(dir)
+      const producing = production?.episodes.find((ep) => ep.dir === dir)
       const video = exported(dir)
       let lesson: { failed?: string } | undefined
       if (existsSync(lessonFile(dir))) {
@@ -111,8 +112,8 @@ export function watchSeries(folder: string): WatchSeries {
         dir,
         number: readMeta(dir).series?.episode ?? i + 1,
         title: readMeta(dir).name,
-        video,
-        state: run ? 'making' : lesson && !video ? 'failed' : undefined,
+        video: producing && producing.state !== 'done' ? undefined : video,
+        state: producing?.state === 'failed' ? 'failed' : producing && producing.state !== 'done' ? 'making' : run ? 'making' : lesson && !video ? 'failed' : undefined,
         activity: run?.activity,
         error: !run && lesson && !video ? (lesson.failed ?? 'It was interrupted. Try again.') : undefined,
         watched: isWatched(dir),
@@ -123,7 +124,7 @@ export function watchSeries(folder: string): WatchSeries {
       }
     })
   const exercises = join(folder, 'exercises')
-  return { folder, title: plan.title, episodes: list, exercises: existsSync(join(exercises, 'exercises.json')) ? exercises : undefined }
+  return { folder, title: plan.title, episodes: list, production, exercises: existsSync(join(exercises, 'exercises.json')) ? exercises : undefined }
 }
 
 /** Marks a video watched or not; the screen showing its list hears about it. */
@@ -152,8 +153,9 @@ async function ensureReady(): Promise<void> {
   if (!fakeAgents() && !(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Accounts): it makes the video.')
 }
 
-export async function requestFollowUp(dir: string, at: number, request: string): Promise<void> {
+export async function requestFollowUp(dir: string, at: number, request: string, details: { title: string; frame?: string; signal?: AbortSignal }): Promise<string> {
   await ensureReady()
+  if (details.signal?.aborted) throw new Error('Stopped')
   if (!request.trim()) throw new Error('Say what the new video should explain.')
   const meta = readMeta(dir)
   const s = meta.series
@@ -161,7 +163,7 @@ export async function requestFollowUp(dir: string, at: number, request: string):
   const extras = join(s.folder, 'extras')
   mkdirSync(extras, { recursive: true })
   const made = await createProject({
-    name: `#${s.episode} follow-up: ${titleFrom(request)}`,
+    name: details.title,
     aspect: meta.aspect,
     theme: meta.theme,
     tone: meta.tone,
@@ -174,8 +176,10 @@ export async function requestFollowUp(dir: string, at: number, request: string):
   for (let i = 2; existsSync(extra); i++) extra = `${join(extras, `${String(s.episode).padStart(2, '0')}-${basename(made)}`)}-${i}`
   renameSync(made, extra)
   updateMetaAt(extra, { extra: { of: basename(dir), at, request: request.trim() } })
+  if (details.frame) writeFileSync(join(extra, 'selected-frame.png'), Buffer.from(details.frame, 'base64'))
   if (existsSync(join(dir, SCRIPT_FILE))) copyFileSync(join(dir, SCRIPT_FILE), join(extra, 'episode-script.md'))
   void make(extra, meta, at, request.trim())
+  return extra
 }
 
 export async function retryFollowUp(dir: string): Promise<void> {
@@ -303,6 +307,7 @@ async function make(dir: string, episode: ProjectMeta, at: number, request: stri
         : [
             `A viewer watching episode ${s.episode} of the series "${s.title}" ("${episode.name}") asked for a follow-up video. They stopped ${momentNote(readTimeline(join(s.folder, readMeta(dir).extra!.of)), at)}.`,
             `They wrote: "${request}"`,
+            existsSync(join(dir, 'selected-frame.png')) ? 'Read selected-frame.png: this is the frame or area the viewer attached. Focus on this concept. The project name is the refined topic title; keep the script title concise and informative.' : '',
             'Make a short follow-up video, typically 2 to 4 minutes, that explains that part more thoroughly: recall in a sentence or two what they saw, then go slower, with the intermediate steps, why it works, and another example where it helps. Don’t repeat the rest of the episode.',
             'episode-script.md is the episode’s script, for what it showed and how; series.md is the series bible: use the same notation and visual vocabulary.',
             'Write script.md (approve it yourself), then scene.py, render it and look at the frames.',

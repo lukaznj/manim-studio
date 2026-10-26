@@ -49,7 +49,7 @@ export function QuickView() {
             return (
               <li key={step} className={state}>
                 {state === 'done' ? <Check /> : state === 'now' ? <span className="spinner" /> : <Circle />}
-                <span>{label}</span>
+                <span>{uiText(step === 'export' && state === 'now' && job?.phase === 'rendering' ? 'Rendering' : step === 'export' && state === 'now' && job?.phase === 'assembling' ? 'Assembling' : label)}</span>
                 {step === 'export' && state === 'now' && job?.percent !== undefined && <span className="mono faint">{Math.round(job.percent * 100)}%</span>}
               </li>
             )

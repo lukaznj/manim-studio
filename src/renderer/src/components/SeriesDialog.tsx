@@ -5,7 +5,7 @@ import { DEFAULT_TONE } from '../../../shared/tone'
 import type { Agent, AgentSelection, Aspect, ModelOption, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
 import { seriesSelection } from '../../../shared/agent-selection'
 import { api } from '../lib/api'
-import { studying, closeDialog, errorText, toast, useStore } from '../store'
+import { studying, closeDialog, errorText, openWatch, refreshProjects, toast, useStore } from '../store'
 import { ModelPicker } from './ChatPane'
 import { ExportOn } from './ExportDialog'
 import { voiceProblem } from './SettingsDialog'
@@ -45,6 +45,7 @@ export function SeriesDialog() {
   const [dragging, setDragging] = useState(false)
   const [progress, setProgress] = useState<SeriesPlanProgress | null>(null)
   const cancelled = useRef(false)
+  const [draftReady, setDraftReady] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -55,6 +56,21 @@ export function SeriesDialog() {
     setInstructions('')
     setPlan(null)
     setBusy(null)
+    setDraftReady(false)
+    let active = true
+    void api.seriesDraft().then((draft) => {
+      if (!active) return
+      if (draft) {
+        setPdfs(draft.request.pdfs)
+        setNoPdfs(!draft.request.pdfs.length && !!draft.request.topic)
+        setTopic(draft.request.topic ?? '')
+        setInstructions(draft.request.instructions ?? '')
+        setPlan(draft.plan ?? null)
+        setStep(draft.request.pdfs.length || draft.request.topic ? 'details' : 'material')
+      }
+      setDraftReady(true)
+    }).catch((error) => { if (active) { toast(errorText(error), 'error'); setDraftReady(true) } })
+    return () => { active = false }
   }, [open]) // a fresh form each time
 
   useEffect(() => {
@@ -111,6 +127,11 @@ export function SeriesDialog() {
       }))
 
   const language = voice.language
+  useEffect(() => {
+    if (!open || !draftReady || busy) return
+    const request = { pdfs: noPdfs ? [] : pdfs, topic: noPdfs ? topic : undefined, instructions, language, tone }
+    void api.saveSeriesDraft(pdfs.length || topic.trim() || plan ? { request, plan: plan ?? undefined } : null).catch((error) => toast(errorText(error), 'error'))
+  }, [open, draftReady, busy, pdfs, noPdfs, topic, instructions, language, tone, plan])
   // Checked before planning, so a series never gets made without a voice.
   const elevenLabsCheck = useStore((s) => s.elevenLabsCheck)
   const voiceIssue = voiceProblem(voice, hasKey, omnivoice, elevenLabsCheck)
@@ -171,6 +192,11 @@ export function SeriesDialog() {
         unattended: unattended || !editing,
       })
       closeDialog()
+      if (unattended || !editing) {
+        await refreshProjects()
+        const run = await api.seriesRun()
+        if (run) await openWatch(run.folder)
+      }
       toast(
         unattended
           ? `Making ${plan.episodes.length} episodes. Home shows how each one is going.`
@@ -189,7 +215,7 @@ export function SeriesDialog() {
   return (
     <Modal
       open={open}
-      onClose={() => (busy === 'planning' ? cancelPlan() : closeDialog())}
+      onClose={() => { if (busy === 'starting') return; if (busy === 'planning') cancelPlan(); else closeDialog() }}
       title={plan ? uiText('The series plan') : uiText('New series')}
       icon={<Library className="head-icon" />}
       width={760}

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { seriesAgentSelection } from './agent-selection.ts'
-import type { AgentSelection, EpisodeRun } from './types.ts'
+import { seriesAgentSelection, seriesSelection, switchSeriesSelection } from './agent-selection.ts'
+import type { AgentSelection, EpisodeRun, SeriesRun } from './types.ts'
 
 test('episode assignments survive reorder and serialization, independently of current Settings', () => {
   const assignments: AgentSelection[] = [
@@ -23,13 +23,46 @@ test('a normal series keeps its captured provider and model after Settings chang
   })
 })
 
-test('series default to a planner and a maker per agent, at high effort, until Settings say otherwise', async () => {
-  const { seriesSelection } = await import('./agent-selection.ts')
-  assert.deepEqual(seriesSelection({ agent: 'claude' }, 'plan'), { agent: 'claude', model: 'opus', effort: 'high' })
-  assert.deepEqual(seriesSelection({ agent: 'claude' }, 'make'), { agent: 'claude', model: 'sonnet', effort: 'high' })
-  assert.equal(seriesSelection({ agent: 'codex' }, 'plan').model, 'gpt-6-astra')
-  assert.equal(seriesSelection({ agent: 'antigravity' }, 'make').model, '') // Gemini 4 Argon
-  const saved = { agent: 'claude' as const, seriesModels: { claude: { make: { model: 'haiku', effort: 'medium' as const } } } }
-  assert.deepEqual(seriesSelection(saved, 'make'), { agent: 'claude', model: 'haiku', effort: 'medium' })
+const creation = {
+  agent: 'claude' as const, claudeModel: 'haiku', claudeEffort: 'low' as const,
+  codexModel: 'sol', codexEffort: 'medium' as const, antigravityModel: '', antigravityEffort: 'medium' as const,
+}
+
+test('episodes inherit the creation model and effort while planning stays independent', () => {
+  assert.deepEqual(seriesSelection(creation, 'plan'), { agent: 'claude', model: 'opus', effort: 'high' })
+  assert.deepEqual(seriesSelection(creation, 'make'), { agent: 'claude', model: 'haiku', effort: 'low' })
+  assert.deepEqual(seriesSelection(creation, 'make', 'codex'), { agent: 'codex', model: 'sol', effort: 'medium' })
+  assert.equal(seriesSelection(creation, 'plan', 'codex').model, 'gpt-6-astra')
+  assert.equal(seriesSelection(creation, 'make', 'antigravity').effort, 'medium')
+})
+
+test('saved episode overrides remain explicit until removed; removing one restores inheritance', () => {
+  const saved = { ...creation, seriesModels: { claude: { make: { model: 'sonnet', effort: 'medium' as const } } } }
+  assert.deepEqual(seriesSelection(saved, 'make'), { agent: 'claude', model: 'sonnet', effort: 'medium' })
   assert.equal(seriesSelection(saved, 'plan').model, 'opus')
+  assert.deepEqual(seriesSelection({ ...saved, seriesModels: { claude: { make: undefined } } }, 'make'), { agent: 'claude', model: 'haiku', effort: 'low' })
+})
+
+test('explicit takeover reroutes waiting comparison episodes and persists the chosen sign-in without rewriting completed work', () => {
+  const original: AgentSelection = { agent: 'claude', model: 'sonnet', effort: 'high' }
+  const run: SeriesRun = {
+    title: 'Comparison', folder: '/test', agents: 1, state: 'working', agent: 'claude',
+    episodes: ['done', 'export', 'scene', 'waiting'].map((state, i) => ({
+      dir: String(i), title: String(i), state: state as EpisodeRun['state'], assignment: { ...original }, warnings: [],
+      ...(state === 'scene' ? { limitedUntil: Date.now() + 60000 } : {}),
+    })),
+  }
+  const maker: AgentSelection = { agent: 'codex', model: 'gpt-6.1-sol', effort: 'high' }
+  switchSeriesSelection(run, { agent: 'codex', auth: 'api-key' }, maker)
+  const restored = JSON.parse(JSON.stringify(run)) as SeriesRun
+  for (const ep of restored.episodes.slice(0, 2)) assert.deepEqual(ep.assignment, original)
+  for (const ep of restored.episodes.slice(2)) {
+    assert.deepEqual(seriesAgentSelection(restored, ep, original), maker)
+    assert.equal(ep.assignmentAuth, 'api-key')
+  }
+  assert.equal(restored.auth, 'api-key')
+  assert.equal(restored.agent, 'codex')
+  // Same-provider account → API key takeovers must also release the waiting turn.
+  switchSeriesSelection(run, { agent: 'codex', auth: 'account' }, maker)
+  assert.equal(run.episodes[2].assignmentAuth, 'account')
 })

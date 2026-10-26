@@ -34,12 +34,13 @@ export function Markdown({ text }: { text: string }) {
       )
       continue
     }
-    if (line.trim().startsWith('$$')) {
+    if (line.trim().startsWith('$$') || line.trim().startsWith('\\[')) {
       // Display maths, on one line or several: up to the line that ends with $$.
+      const closing = line.trim().startsWith('$$') ? '$$' : '\\]'
       const tex: string[] = [line.trim().slice(2)]
-      while (!tex[tex.length - 1].trimEnd().endsWith('$$') && i + 1 < lines.length) tex.push(lines[++i])
+      while (!tex[tex.length - 1].trimEnd().endsWith(closing) && i + 1 < lines.length) tex.push(lines[++i])
       i++
-      blocks.push(math(tex.join('\n').trimEnd().replace(/\$\$$/, ''), true, blocks.length))
+      blocks.push(math(tex.join('\n').trimEnd().replace(/(?:\$\$|\\\])$/, ''), true, blocks.length))
       continue
     }
     if (LIST.test(line)) {
@@ -70,7 +71,7 @@ export function Markdown({ text }: { text: string }) {
       continue
     }
     const para: string[] = []
-    while (i < lines.length && lines[i].trim() && !lines[i].startsWith('```') && !lines[i].trim().startsWith('$$') && !LIST.test(lines[i]))
+    while (i < lines.length && lines[i].trim() && !lines[i].startsWith('```') && !lines[i].trim().startsWith('$$') && !lines[i].trim().startsWith('\\[') && !LIST.test(lines[i]))
       para.push(lines[i++])
     blocks.push(<p key={blocks.length}>{inline(para.join(' '))}</p>)
   }
@@ -78,7 +79,9 @@ export function Markdown({ text }: { text: string }) {
 }
 
 export function inline(text: string): ReactNode[] {
-  return text.split(/(\$\$[^$]+\$\$|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*)/g).map((seg, k) => {
+  return text.split(/(\\\([^\n]+?\\\)|\\\[[^\n]+?\\\]|\$\$[^$]+\$\$|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*)/g).map((seg, k) => {
+    if (seg.startsWith('\\(') && seg.endsWith('\\)')) return math(seg.slice(2, -2), false, k)
+    if (seg.startsWith('\\[') && seg.endsWith('\\]')) return math(seg.slice(2, -2), true, k)
     if (seg.startsWith('$$') && seg.endsWith('$$') && seg.length > 4) return math(seg.slice(2, -2), true, k)
     if (seg.startsWith('$') && seg.endsWith('$') && seg.length > 2) return math(seg.slice(1, -1), false, k)
     if (seg.startsWith('`') && seg.endsWith('`')) return <code key={k}>{seg.slice(1, -1)}</code>

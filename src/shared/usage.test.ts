@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { modelName, usageDelta, usageTotals } from './usage.ts'
+import { apiEstimateOf, modelName, usageDelta, usageTotals, type UsageEntry } from './usage.ts'
 
 const t = (input: number, output: number, costUSD: number) => ({ input, output, cacheRead: 0, cacheWrite: 0, costUSD })
+
+test('subscription, legacy, mixed and unpriced usage never becomes an API bill', () => {
+  const key: UsageEntry = { at: 0, step: 'Chat', auth: 'api-key', models: { s: t(10, 2, 0.5) }, tools: {}, ms: 0 }
+  assert.equal(apiEstimateOf([key, key]), 1)
+  assert.equal(apiEstimateOf([{ ...key, auth: 'account' }]), null)
+  assert.equal(apiEstimateOf([{ ...key, auth: undefined }]), null)
+  assert.equal(apiEstimateOf([key, { ...key, auth: 'account' }]), null)
+  assert.equal(apiEstimateOf([{ ...key, costKnown: false }]), null)
+  assert.equal(apiEstimateOf([]), null)
+})
 
 test('a turn is the running total minus the session’s previous one', () => {
   assert.deepEqual(usageDelta({ s: t(100, 10, 1) }, { s: t(250, 30, 2.5), h: t(5, 1, 0.01) }), { s: t(150, 20, 1.5), h: t(5, 1, 0.01) })

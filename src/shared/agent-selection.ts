@@ -1,7 +1,9 @@
-import type { Agent, AgentSelection, EpisodeRun, SeriesRole, SeriesRun, Settings } from './types'
+import type { Agent, AgentRoute, AgentSelection, EpisodeRun, SeriesRole, SeriesRun, Settings } from './types'
+import { CODEX_PLANNER } from './codex-selection.ts'
 
-export function defaultAgentSelection(settings: Settings): AgentSelection {
-  const agent = settings.agent
+type ModelSettings = Pick<Settings, 'agent' | 'claudeModel' | 'claudeEffort' | 'codexModel' | 'codexEffort' | 'antigravityModel' | 'antigravityEffort'>
+
+export function defaultAgentSelection(settings: ModelSettings, agent: Agent = settings.agent): AgentSelection {
   return {
     agent,
     model: agent === 'claude' ? settings.claudeModel : agent === 'codex' ? settings.codexModel : settings.antigravityModel,
@@ -20,14 +22,27 @@ export function seriesAgentSelection(
   return ep.assignment ?? { agent: run.agent ?? defaults.agent, model: run.model ?? defaults.model, effort: run.effort ?? defaults.effort }
 }
 
-/** What a series uses unless Settings → Agent says otherwise: a strong planner, a faster maker. */
-export const SERIES_MODELS: Record<Agent, Record<SeriesRole, string>> = {
-  claude: { plan: 'opus', make: 'sonnet' }, // Opus 5.5 plans, Sonnet 5.5 makes
-  codex: { plan: 'gpt-6-astra', make: 'gpt-6-astra' },
-  antigravity: { plan: '', make: '' }, // Gemini 4 Argon
+/** Planning has its own default; episode creation inherits the normal creation model. */
+export const SERIES_PLANNERS: Record<Agent, string> = {
+  claude: 'opus',
+  codex: CODEX_PLANNER,
+  antigravity: '', // Gemini 4 Argon
 }
 
-export function seriesSelection(settings: Pick<Settings, 'agent' | 'seriesModels'>, role: SeriesRole, agent: Agent = settings.agent): AgentSelection {
+export function seriesSelection(settings: ModelSettings & Pick<Settings, 'seriesModels'>, role: SeriesRole, agent: Agent = settings.agent): AgentSelection {
   const saved = settings.seriesModels?.[agent]?.[role]
-  return { agent, model: saved?.model ?? SERIES_MODELS[agent][role], effort: saved?.effort ?? 'high' }
+  if (saved) return { agent, model: saved.model, effort: saved.effort }
+  return role === 'make' ? defaultAgentSelection(settings, agent) : { agent, model: SERIES_PLANNERS[agent], effort: 'high' }
+}
+
+/** An explicit takeover also replaces unfinished comparison assignments, but never completed history. */
+export function switchSeriesSelection(run: SeriesRun, to: AgentRoute, maker: AgentSelection): void {
+  Object.assign(run, maker, { auth: to.auth })
+  for (const episode of run.episodes) {
+    if (episode.state === 'done' || episode.state === 'export') continue
+    if (episode.assignment) {
+      episode.assignment = { ...maker }
+      episode.assignmentAuth = to.auth
+    }
+  }
 }

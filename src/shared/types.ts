@@ -3,6 +3,7 @@
 
 import type { UsageEntry } from './usage'
 import type { DeveloperMetricsOptions } from './episode-metrics'
+import type { UiLanguage } from './ui-languages'
 
 export type Aspect = '16:9' | '9:16'
 export type Theme = 'dark' | 'light'
@@ -221,6 +222,7 @@ export interface WatchSeries {
   folder: string
   title: string
   episodes: WatchEpisode[]
+  production?: SeriesRun // persisted production history, including when a different series is active
   /** The course's exercise set (<series>/exercises/), once exercises were added to it (ADR 0030). */
   exercises?: string
 }
@@ -250,10 +252,12 @@ export interface EpisodeRun {
   dir: string
   title: string
   assignment?: AgentSelection
+  assignmentAuth?: ClaudeAuth // explicit takeover of a comparison episode; otherwise its configured sign-in
   report?: string // standalone developer HTML report
   elapsedMs?: number
   // waiting → script (its turn in the first pass) → scripted → scene → check → export → done
   state: 'waiting' | 'script' | 'scripted' | 'scene' | 'check' | 'export' | 'done' | 'failed' | 'stopped'
+  failedAt?: 'script' | 'scene' | 'check' | 'export' // resume the failed phase without discarding earlier work
   activity?: string // what its agent is doing right now
   limitedUntil?: number // waiting for the plan's usage limit to reset, until then (ms); another agent can take over
   exportJob?: string
@@ -292,6 +296,11 @@ export interface SeriesPlan {
   episodes: SeriesEpisode[]
   usage?: UsageEntry // what planning used (src/shared/usage.ts)
   instructions?: string // the user's own, for the whole series ("keep it intuitive, skip the derivations")
+}
+
+export interface SeriesDraft {
+  request: { pdfs: string[]; topic?: string; instructions?: string; language: string; tone: Tone }
+  plan?: SeriesPlan
 }
 
 export interface SeriesStart {
@@ -497,8 +506,9 @@ export interface UsageWindow {
   resetsAt: string | null // ISO time
 }
 
-/** Claude plan usage (claude.ai limits, shared with Claude Desktop and claude.ai). */
+/** Provider-reported account-wide plan usage, shared with other apps. */
 export interface PlanUsage {
+  agent?: Agent
   windows: UsageWindow[]
   checkedAt: number
 }
@@ -580,6 +590,7 @@ export interface ExportJob {
   options: ExportOptions
   state: 'waiting' | 'running' | 'done' | 'failed' | 'cancelled'
   stage?: string // what it's doing now, e.g. "Rendering the dark version"
+  phase?: 'rendering' | 'assembling' // distinguishes the two local-render progress passes
   percent?: number // 0–1 for the current stage, when known
   paused?: boolean
   result?: ExportResult
@@ -647,6 +658,7 @@ export type MenuAction =
 
 export interface ClaudeLoginEvent {
   line?: string
+  diagnostic?: string // redacted Antigravity startup/terminal details, retained after failure
   url?: string
   needsCode?: boolean
   needsConsent?: boolean // Antigravity's first-run terms and optional interaction sharing
@@ -661,6 +673,7 @@ export type Appearance = 'system' | 'light' | 'dark'
 export type AppMode = 'learn' | 'create' | 'both'
 
 export interface Settings {
+  studyModels?: Partial<Record<Agent, { model: string; effort: Effort }>> // tutor chat and notes, independent of video creation
   studyAutoplay?: boolean // advance to the next ready course lesson; unset: off
   studyPlaybackRate?: number // preferred study player speed; unset: 1
   studyVolume?: number // preferred study player volume, 0–1; unset: 1
@@ -672,7 +685,7 @@ export interface Settings {
   developerTimingMetrics?: boolean
   developerResourceMetrics?: boolean
   codexFallbackModel?: string // opt-in, same-account fallback for capacity failures only
-  uiLanguage?: 'en' | 'hr'
+  uiLanguage?: UiLanguage
   onboardingDone?: boolean
   defaultAspect?: Aspect
   defaultTheme?: Theme
@@ -686,21 +699,21 @@ export interface Settings {
   claudeAuth: ClaudeAuth
   codexAuth?: ClaudeAuth // ChatGPT sign-in or an OpenAI key (Settings → Accounts); unset: the key if one is saved
   antigravityAuth?: ClaudeAuth // Google sign-in or a Gemini key; unset: the key if one is saved
-  previewSize: 480 | 720 | 1080 // short side of the preview render, in pixels
+  previewSize: 480 | ExportSize // short side of the preview render, in pixels
   previewFps: 15 | 24 | 30
   tutorialDone: boolean // the first-run tour of the editor was finished or skipped
   toursSeen?: ('home' | 'study')[] // the app's guided tours already shown (ADR 0047)
   claudeModel: string // '' = Claude Code's default for the account
   claudeEffort: Effort | '' // '' (older settings) reads as 'medium'
   agent: Agent // who writes the scenes (ADR 0022)
-  codexModel: string // '' = Codex's default for the account
+  codexModel: string // GPT-6.1 Sol by default; GPT-6 Astra is the other supported choice
   codexEffort: Effort | ''
   antigravityModel: string // '' = Gemini 4 Argon
   antigravityEffort: Effort | ''
   exerciseSets?: string[] // exercise set folders (Home lists them; search looks in them)
   seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed
   seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
-  seriesModels?: Partial<Record<Agent, Partial<Record<SeriesRole, { model: string; effort: Effort }>>>> // per agent; unset: the defaults in shared/agent-selection.ts (ADR 0045)
+  seriesModels?: Partial<Record<Agent, Partial<Record<SeriesRole, { model: string; effort: Effort }>>>> // per agent; unset make inherits the creation model, plan uses SERIES_PLANNERS (ADR 0045)
   autoRender: boolean
   sounds?: boolean // app sounds (ADR 0046); unset: on
   soundVolume?: number // 0–100, 0.3 dB a step; unset: 50 (−15 dB)
@@ -711,7 +724,7 @@ export interface Settings {
   defaultVoice: VoiceSettings
   renderServers: RenderServer[] // paired render workers (ADR 0021); their tokens are secrets
   gpuEncoding?: 'auto' | 'off' // exports encode on the GPU when one works (ADR 0034); unset: auto
-  studySize?: 720 | 1080 // default export size in every mode; unset: 1080 (ADR 0035)
+  studySize?: ExportSize // default export size in every mode; unset: 1080 (ADR 0035)
   sidebarWidth: number
   chatWidth: number
   timelineHeight: number
@@ -732,6 +745,24 @@ export interface ChatRequest {
   frameAt?: number
   watchingAt?: number // the moment of the finished video the viewer asks about (Watch and exercise screens)
   source?: SourceRef
+  study?: boolean
+  studyAction?: 'video' | 'exercises'
+  frameRegion?: FrameRegion
+  frameImage?: string // PNG data URL captured from the actual paused video, validated in main
+  confirmVideo?: string // id of the assistant's saved offer; retains its request and moment
+}
+
+/** Normalized coordinates in the actual video frame, excluding letterboxing. */
+export interface FrameRegion { x: number; y: number; width: number; height: number }
+
+export interface StudyVideoOffer {
+  request: string
+  at: number
+  title: string
+  region?: FrameRegion
+  frame?: string // validated PNG retained with an offer so Create anyway survives reopening
+  state: 'offered' | 'created'
+  dir?: string
 }
 
 export type ChatPart = { kind: 'text'; text: string } | { kind: 'tool'; id: string; name: string; summary: string; status: 'running' | 'ok' | 'error' }
@@ -743,6 +774,9 @@ export interface ChatMessage {
   context?: ChatContext
   frame?: string // data URL thumbnail sent with the message
   source?: SourceRef
+  videoOffer?: StudyVideoOffer
+  studyAction?: 'video' | 'exercises'
+  exerciseFolder?: string
   auto?: boolean // a background agent's turn (series, exercises), not the user's conversation
   at: number
 }
@@ -809,7 +843,13 @@ export interface VoiceOption {
   users?: number // how many people saved it (ElevenLabs' library)
 }
 
+export interface AgentLimitEvent {
+  agent: Agent
+  until: number // reset time in milliseconds, or 0 when the provider does not report it
+}
+
 export type EventChannel =
+  | 'usage-limit'
   | 'projects-changed'
   | 'render'
   | 'setup'
@@ -858,6 +898,7 @@ export interface StudioApi {
   claudeStatus(agent?: Agent): Promise<ClaudeStatus>
   /** Plan limits used, or null with an API key or when Claude Code can't tell. */
   claudeUsage(): Promise<PlanUsage | null>
+  agentPlanUsage(agent?: Agent, auth?: ClaudeAuth): Promise<PlanUsage | null>
   claudeLogin(agent?: Agent): Promise<ClaudeStatus>
   claudeLoginCode(code: string, agent?: Agent): Promise<void>
   antigravityLoginConsent(shareData: boolean): Promise<void>
@@ -893,6 +934,8 @@ export interface StudioApi {
   /** Reads the PDFs and asks Claude for a series plan (a minute or two). */
   /** Plans a series from PDFs, or from `topic` (what the user wants to learn) when there are none. */
   planSeries(request: { pdfs: string[]; topic?: string; instructions?: string; language: string; tone: Tone }): Promise<SeriesPlan>
+  seriesDraft(): Promise<SeriesDraft | null>
+  saveSeriesDraft(draft: SeriesDraft | null): Promise<void>
   /** Stops series planning (reading the PDFs or the agent's answer). */
   cancelSeriesPlan(): Promise<void>
   /** Who can take over past a usage limit: each signed-in agent, and a saved Claude or OpenAI key (ADR 0048). */
@@ -909,7 +952,8 @@ export interface StudioApi {
   seriesRun(): Promise<SeriesRun | null>
   /** Stops the agents and exports; Continue (continueSeries) carries on later, even after a restart. */
   stopSeries(): Promise<void>
-  continueSeries(): Promise<void>
+  continueSeries(folder?: string): Promise<void>
+  retrySeriesEpisode(dir: string): Promise<void>
   /** Pauses or resumes the whole series (its agents), or one episode. */
   pauseSeries(paused: boolean): Promise<void>
   pauseEpisode(dir: string, paused: boolean): Promise<void>
@@ -944,8 +988,10 @@ export interface StudioApi {
   /** The series' own exercise set, made on first use: returns its folder (ADR 0030). */
   courseExercises(series: string): Promise<string>
   watchDetail(dir: string): Promise<WatchDetail>
-  /** Makes a new video explaining the part of an episode at `at` further, as the viewer asks. */
-  requestFollowUp(dir: string, at: number, request: string): Promise<void>
+  /** Per-video notes and a reviewed, read-only AI revision. */
+  studyNotes(dir: string): Promise<string>
+  saveStudyNotes(dir: string, text: string): Promise<void>
+  refineStudyNotes(dir: string, text: string): Promise<string>
   addCourseLesson(folder: string, request: { title: string; prompt: string; sources: string[] }): Promise<string>
   retryCourseLesson(dir: string): Promise<void>
   retryFollowUp(dir: string): Promise<void>
@@ -1023,6 +1069,7 @@ export interface StudioApi {
   on(channel: 'setup', cb: (e: SetupEvent) => void): () => void
   on(channel: 'claude-login', cb: (e: ClaudeLoginEvent) => void): () => void
   on(channel: 'chat', cb: (e: ChatEvent) => void): () => void
+  on(channel: 'usage-limit', cb: (e: AgentLimitEvent) => void): () => void
   /** `agent`: Claude Desktop wrote it and renders through its own tool. */
   on(channel: 'file-changed', cb: (e: { source: string; external: boolean; agent?: boolean }) => void): () => void
   /** Claude Desktop asked for this project (see src/main/mcp.ts). */

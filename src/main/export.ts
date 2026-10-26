@@ -25,8 +25,9 @@ import { runRunner } from './runner'
 import { getSettings } from './settings'
 import { voiceEnv } from './voice'
 import { projectCache, pruneRenderCache } from './render-cache'
+import { sliceProgress } from './export-progress'
 
-type Progress = (e: { stage: string; percent?: number }) => void
+type Progress = (e: { stage: string; percent?: number; phase?: 'rendering' | 'assembling' }) => void
 
 /** What an export needs from a project: everything but its history, caches and earlier exports. */
 export function snapshotProject(project: string, to: string): void {
@@ -131,7 +132,7 @@ export async function exportVideo(
           { theme, size, fps, encoder },
           cache,
           animations,
-          (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p }),
+          (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p, phase: 'rendering' }),
           signal,
           tag,
         )
@@ -145,10 +146,10 @@ export async function exportVideo(
               signal,
               tag,
               onProgress: (t) =>
-                progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, percent: duration ? Math.min(t / duration, 1) : undefined }),
+                progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, phase: parts > 1 ? 'assembling' : 'rendering', percent: duration ? Math.min(t / duration, 1) : undefined }),
             },
           )
-        progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage })
+        progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, phase: parts > 1 ? 'assembling' : 'rendering' })
         try {
           await final(encoder)
         } catch (e) {
@@ -158,7 +159,7 @@ export async function exportVideo(
             `The GPU’s video encoder (${encoder}) failed with ${why}, so this video was encoded on the CPU. Settings → Environment can turn GPU encoding off.`,
           )
           encoder = undefined
-          progress({ stage: `${stage} on the CPU` })
+          progress({ stage: `${stage} on the CPU`, phase: 'rendering' })
           await final(undefined)
         }
         progress({ stage: 'Saving the video' })
@@ -238,7 +239,7 @@ async function renderSlices(
   const slices = sliceCount(animations, availableParallelism(), totalmem())
   if (slices < 2) return 1
   const size = Math.ceil(animations / slices)
-  let done = 0
+  const update = sliceProgress(animations, slices, (percent) => progress(percent, slices))
   progress(0, slices)
   const results = await Promise.allSettled(
     Array.from({ length: slices }, async (_, i) => {
@@ -249,8 +250,8 @@ async function renderSlices(
         snap,
         meta,
         { ...variant, out: `slice-${i}`, from: i * size, upto: i === slices - 1 ? undefined : (i + 1) * size - 1 },
-        { cacheDir: join(own, 'cache'), partialDir: join(own, 'partial'), signal, offlineVoice: true, tag },
-      ).finally(() => progress(++done / slices, slices))
+        { cacheDir: join(own, 'cache'), partialDir: join(own, 'partial'), signal, offlineVoice: true, tag, onProgress: (_t, clips) => update(i, clips) },
+      )
       return { pieces: join(own, 'partial'), shared: join(cacheDir, 'partial', partialFolder(timeline.width, timeline.height, timeline.fps, variant.encoder)) }
     }),
   )

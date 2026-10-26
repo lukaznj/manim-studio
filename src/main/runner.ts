@@ -16,6 +16,18 @@ export const runningJobs = new Map<number, { what: string; since: string; log: (
 // --- pausing: a render's processes stopped and continued as a group ('preview', or an export's id) ---
 
 const paused = new Set<string>()
+const children = new Map<ChildProcess, Promise<unknown>>()
+const starting = new Set<Promise<ChildProcess>>()
+let stopping = false
+
+/** Cancel and reap every Python job, including a child whose environment was still starting. */
+export async function stopRunners(): Promise<void> {
+  stopping = true
+  resumeAll()
+  for (const child of children.keys()) killJob(child)
+  await Promise.allSettled([...starting])
+  while (children.size) await Promise.allSettled([...children.values()])
+}
 
 /** Pauses or resumes every process of a render, and those it starts while paused. */
 export function pauseTag(tag: string, on: boolean): void {
@@ -37,7 +49,7 @@ export function resumeAll(): void {
  */
 function suspend(pid: number, on: boolean): void {
   try {
-    if (process.platform !== 'win32') return void process.kill(pid, on ? 'SIGSTOP' : 'SIGCONT')
+    if (process.platform !== 'win32') return void process.kill(-pid, on ? 'SIGSTOP' : 'SIGCONT')
     const fn = on ? 'NtSuspendProcess' : 'NtResumeProcess'
     const script = `Add-Type -Name P -Namespace S -MemberDefinition '[DllImport("ntdll.dll")] public static extern int ${fn}(IntPtr h);'; [S.P]::${fn}((Get-Process -Id ${pid}).Handle)`
     spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, stdio: 'ignore' })
@@ -49,7 +61,18 @@ function suspend(pid: number, on: boolean): void {
 /** Stops a render's process, paused or not (a stopped process ignores SIGTERM until continued). */
 export function killJob(child: ChildProcess): void {
   if (child.pid && process.platform !== 'win32') suspend(child.pid, false)
-  child.kill()
+  const terminate = (force: boolean) => {
+    if (!child.pid || child.exitCode !== null || child.signalCode !== null) return
+    try {
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
+      } else process.kill(-child.pid, force ? 'SIGKILL' : 'SIGTERM')
+    } catch { child.kill(force ? 'SIGKILL' : 'SIGTERM') }
+  }
+  terminate(false)
+  const timer = setTimeout(() => terminate(true), 5000)
+  timer.unref()
+  child.once('close', () => clearTimeout(timer))
 }
 
 export interface RunnerJob<T> {
@@ -63,7 +86,11 @@ export async function runRunner<T = RunnerEvent>(
   args: string[],
   opts: { extraEnv?: Record<string, string>; onEvent?: (e: RunnerEvent) => void; cwd?: string; signal?: AbortSignal; tag?: string } = {},
 ): Promise<RunnerJob<T>> {
-  const child = await spawnPython(env, args, opts.extraEnv, opts.cwd)
+  if (stopping) throw Object.assign(new Error('cancelled'), { cancelled: true })
+  const spawn = spawnPython(env, args, opts.extraEnv, opts.cwd)
+  starting.add(spawn)
+  let child: ChildProcess
+  try { child = await spawn } finally { starting.delete(spawn) }
   const log: string[] = []
   let final: RunnerEvent | null = null
   let pending = ''
@@ -98,6 +125,7 @@ export async function runRunner<T = RunnerEvent>(
   const done = new Promise<T>((resolve, reject) => {
     child.on('error', reject)
     child.on('close', (code, signal) => {
+      if (pending) onStdout(Buffer.from('\n')) // retain a final event/log line without a trailing newline
       if (pid) runningJobs.delete(pid)
       const event = final as RunnerEvent | null
       if (event?.type === 'done') resolve(event as T)
@@ -106,6 +134,9 @@ export async function runRunner<T = RunnerEvent>(
       else reject(Object.assign(new Error(`Python exited with code ${code}`), { log: log.join('\n') }))
     })
   })
+  children.set(child, done)
+  void done.finally(() => children.delete(child)).catch(() => undefined)
+  if (stopping) stop()
   return { child, done, log: () => log.join('\n') }
 }
 

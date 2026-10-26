@@ -118,6 +118,7 @@ export async function spawnPython(name: EnvName, args: string[], extra: Record<s
     env: await pythonEnv(name, extra),
     cwd: cwd ?? paths.python(),
     windowsHide: true,
+    detached: process.platform !== 'win32', // one group for the runner and its manim/ffmpeg children
   })
 }
 

@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell, systemPreferences, type WebContents } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerMonitor, powerSaveBlocker, protocol, session, shell, systemPreferences, type WebContents } from 'electron'
+import { onAgentLimit } from './agent-limit-notifications'
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
@@ -32,7 +33,9 @@ import {
 } from './claude'
 import { install, onSetupEvent, setupStatus } from './env'
 import { antigravityLoginConsent } from './antigravity'
-import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, pauseExport, queueExport } from './exports'
+import { agentPlanUsage, clearPlanUsage } from './plan-usage'
+import { studyNotes, saveStudyNotes, refineStudyNotes } from './study-assistant'
+import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, pauseExport, queueExport, stopExports } from './exports'
 import { importMedia, listMedia, removeMedia } from './media'
 import { importSources, listSources, removeSource, sourcePages } from './sources'
 import { history, restore } from './git'
@@ -41,6 +44,7 @@ import { watchMemory } from './memory'
 import { quickRun, setupQuick, startQuick, stopQuick } from './quick'
 import {
   continueSeries,
+  retrySeriesEpisode,
   dismissSeries,
   pauseEpisode,
   pauseSeries,
@@ -49,6 +53,7 @@ import {
   switchSeriesAgent,
   seriesRun,
   setupSeries,
+  settleSeries,
   startSeries,
   stopSeries,
   writeEpisodeBible,
@@ -63,7 +68,6 @@ import { clearRenderCache, pruneRenderCache, renderCacheInfo } from './render-ca
 import {
   addCourseLesson,
   retryCourseLesson,
-  requestFollowUp,
   retryFollowUp,
   setupWatch,
   setWatched,
@@ -77,7 +81,10 @@ import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
 import { cancel, frame, onRenderEvent, render } from './render'
-import { pauseTag, resumeAll, runningJobs } from './runner'
+import { pauseTag, runningJobs, stopRunners } from './runner'
+import { criticalWork, QuitCoordinator, settleCriticalWork, shutdownRequested } from './work-lifecycle'
+import { saveSeriesDraft, seriesDraft } from './series-draft'
+import { translateUi } from '../shared/i18n'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
 import {
@@ -143,6 +150,23 @@ function createWindow(): void {
     if (!backgroundLaunch) win?.show()
   })
   win.on('closed', () => (win = null))
+  win.on('close', (event) => {
+    // Closing a window on macOS keeps background production alive. Other platforms quit.
+    if (quit.ready) return
+    if (process.platform === 'darwin' && (productionBusy() || criticalWork())) {
+      event.preventDefault()
+      win?.hide()
+    } else if (process.platform !== 'darwin' && (productionBusy() || criticalWork())) {
+      event.preventDefault()
+      void quit.request()
+    }
+  })
+  win.on('query-session-end', (event) => {
+    if (!quit.ready) {
+      event.preventDefault()
+      void quit.request(true)
+    }
+  })
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
@@ -236,9 +260,10 @@ function registerIpc(): void {
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
     // Another sign-in method means another Claude Code process: the next message starts it.
+    if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch) clearPlanUsage()
     if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch || 'agent' in patch || 'codexModel' in patch || 'codexEffort' in patch)
       closeChat()
-    if (patch.appearance || patch.recentProjects || patch.mode) refreshMenu()
+    if (patch.appearance || patch.recentProjects || patch.mode || patch.uiLanguage) refreshMenu()
     return settings
   })
   handle('setElevenLabsKey', async (key: string) => {
@@ -268,10 +293,18 @@ function registerIpc(): void {
 
   handle('claudeStatus', (agent?: Agent) => claudeStatus(agent))
   handle('claudeUsage', () => claudeUsage())
-  handle('claudeLogin', (agent?: Agent) => claudeLogin((e) => send('claude-login', e), agent))
+  handle('agentPlanUsage', (agent?: Agent, auth?: import('../shared/types').ClaudeAuth) => agentPlanUsage(agent, auth))
+  handle('claudeLogin', async (agent?: Agent) => {
+    clearPlanUsage()
+    try { return await claudeLogin((e) => send('claude-login', e), agent) }
+    finally { clearPlanUsage() }
+  })
   handle('claudeLoginCode', (code: string, agent?: Agent) => claudeLoginCode(code, agent))
   handle('antigravityLoginConsent', (shareData: boolean) => antigravityLoginConsent(shareData))
-  handle('claudeLogout', (agent?: Agent) => claudeLogout(agent))
+  handle('claudeLogout', async (agent?: Agent) => {
+    try { return await claudeLogout(agent) }
+    finally { clearPlanUsage() }
+  })
 
   handle('listProjects', () => projects.listProjects())
   handle('createProject', (input: Parameters<typeof projects.createProject>[0]) => projects.createProject(input))
@@ -346,16 +379,25 @@ function registerIpc(): void {
   handle('startQuick', async (req: QuickRequest) => (await startQuick(req)).run)
   handle('quickRun', () => quickRun())
   handle('stopQuick', () => stopQuick())
-  let planning: AbortController | null = null
   handle('planSeries', async (req: Parameters<typeof planSeries>[0]) => {
+    if (shutdownRequested()) throw new Error('The app is closing. Try again after reopening it.')
     planning?.abort()
-    planning = new AbortController()
+    const controller = new AbortController()
+    planning = controller
+    saveSeriesDraft({ request: req })
+    const pending = planSeries(req, (p) => send('series-plan', p), controller.signal)
+    planningTasks.add(pending)
     try {
-      return await planSeries(req, (p) => send('series-plan', p), planning.signal)
+      const plan = await pending
+      if (!controller.signal.aborted && planning === controller) saveSeriesDraft({ request: req, plan })
+      return plan
     } finally {
-      planning = null
+      planningTasks.delete(pending)
+      if (planning === controller) planning = null
     }
   })
+  handle('seriesDraft', () => seriesDraft())
+  handle('saveSeriesDraft', (draft: Parameters<typeof saveSeriesDraft>[0]) => saveSeriesDraft(draft))
   handle('cancelSeriesPlan', () => planning?.abort())
   handle('renameSeries', (folder: string, title: string) => renameSeries(folder, title))
   handle('agentRoutes', () => agentRoutes())
@@ -376,7 +418,8 @@ function registerIpc(): void {
   })
   handle('stopSeries', () => stopSeries())
   handle('dismissSeries', () => dismissSeries())
-  handle('continueSeries', () => continueSeries())
+  handle('continueSeries', (folder?: string) => continueSeries(folder))
+  handle('retrySeriesEpisode', (dir: string) => retrySeriesEpisode(dir))
   handle('pauseSeries', (paused: boolean) => pauseSeries(paused))
   handle('pauseEpisode', (dir: string, paused: boolean) => pauseEpisode(dir, paused))
   handle('projectUsage', () => projectUsage())
@@ -403,7 +446,9 @@ function registerIpc(): void {
   handle('watchSeries', (folder: string) => watchSeries(folder))
   handle('courseExercises', (series: string) => ex.courseExercises(series))
   handle('watchDetail', (dir: string) => watchDetail(dir))
-  handle('requestFollowUp', (dir: string, at: number, request: string) => requestFollowUp(dir, at, request))
+  handle('studyNotes', (dir: string) => studyNotes(dir))
+  handle('saveStudyNotes', (dir: string, text: string) => saveStudyNotes(dir, text))
+  handle('refineStudyNotes', (dir: string, text: string) => refineStudyNotes(dir, text))
   handle('addCourseLesson', (folder: string, request: { title: string; prompt: string; sources: string[] }) => addCourseLesson(folder, request))
   handle('retryCourseLesson', (dir: string) => retryCourseLesson(dir))
   handle('retryFollowUp', (dir: string) => retryFollowUp(dir))
@@ -474,7 +519,7 @@ function registerIpc(): void {
 
   handle('checkForUpdates', () => checkForUpdates())
   handle('downloadUpdate', () => downloadUpdate())
-  handle('installUpdate', () => installUpdate())
+  handle('installUpdate', () => { installOnExit = true; void quit.request() })
   handle('openExternal', (url: string) => (/^https:\/\//.test(url) ? shell.openExternal(url) : undefined))
   handle('askMicrophone', async () => (process.platform === 'darwin' ? systemPreferences.askForMediaAccess('microphone') : true))
 }
@@ -486,7 +531,7 @@ async function installClaudeExtension(): Promise<void> {
 }
 
 /** The export, with its progress shown in the window (the dialog, or Claude Desktop's export). */
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   app.setAppUserModelId('cc.razem.manimstudio')
   // The booth needs the microphone; the study player can enter full screen in our own window.
   const permissionAllowed = (wc: WebContents | null, permission: string) =>
@@ -508,12 +553,19 @@ app.whenReady().then(() => {
   onRenderEvent((e) => send('render', e))
   onExportsChanged((jobs) => send('exports', jobs))
   setupQuick({ send: (run) => send('quick', run), openInWindow })
-  setupSeries((run) => send('series', run))
+  await setupSeries((run) => send('series', run)).catch((error: Error) => {
+    dialog.showErrorBox('Manim Studio', `Couldn’t recover the series: ${error.message}`)
+  })
   ex.setupExercises((set) => send('exercises', set))
   setupWatch((series) => send('watch', series))
   onSetupEvent((e) => send('setup', e))
   onWorkerLog((e) => send('setup', e))
   onChatEvent((e) => send('chat', e))
+  onAgentLimit((e) => {
+    if (!win || win.isDestroyed()) return false
+    send('usage-limit', e)
+    return true
+  }, () => { void showWindow() })
   projects.onSceneChangedOnDisk((source) => send('file-changed', { source, external: true }))
   projects.onScriptChangedOnDisk((text) => send('script', { text }))
   setupUpdater((e) => send('update', e))
@@ -531,6 +583,21 @@ app.whenReady().then(() => {
     pythonJobs: [...runningJobs].map(([pid, job]) => ({ pid, what: job.what, since: job.since, lastLog: job.log().split('\n').slice(-15) })),
   }))
   createWindow()
+  // Keep production running while the display sleeps; never prevent display sleep or a lid close.
+  let powerBlock: number | null = null
+  const updatePower = () => {
+    const run = seriesRun()
+    const active = criticalWork() || !!planning || exportJobs().some((job) => ['waiting', 'running'].includes(job.state) && !job.paused)
+      || (run?.state === 'working' && run.episodes.some((ep) => !ep.held && !ep.limitedUntil && ['script', 'scene', 'check'].includes(ep.state)))
+    if (active && powerBlock === null) powerBlock = powerSaveBlocker.start('prevent-app-suspension')
+    else if (!active && powerBlock !== null) { powerSaveBlocker.stop(powerBlock); powerBlock = null }
+  }
+  const powerTimer = setInterval(updatePower, 1000)
+  powerTimer.unref()
+  powerMonitor.on('shutdown', (event?: { preventDefault(): void }) => {
+    event?.preventDefault()
+    void quit.request(true)
+  })
   // The render cache stays under its limit (ADR 0043); the open project's is kept.
   setTimeout(() => {
     try {
@@ -544,37 +611,60 @@ app.whenReady().then(() => {
   const status = setupStatus()
   if (status.env === 'outdated') void install('env').catch(() => undefined)
 
-  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
+  app.on('activate', () => { void showWindow() })
 })
 
 app.on('window-all-closed', () => {
-  stopTtsWorker()
-  closeChat()
+  if (!productionBusy() && !criticalWork()) { stopTtsWorker(); closeChat() }
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', (e) => {
-  // Exports and a series being made live in memory: quitting would stop them, so ask first.
-  const making = seriesRun()?.state === 'working' || desktopVideosBusy() || watchVideosBusy()
-  if (exportsBusy() || making) {
-    const choice = dialog.showMessageBoxSync({
+let planning: AbortController | null = null
+const planningTasks = new Set<Promise<unknown>>()
+let installOnExit = false
+
+function productionBusy(): boolean {
+  const run = seriesRun()
+  return !!planning || (run?.state === 'working' || run?.state === 'paused') || exportsBusy()
+    || desktopVideosBusy() || watchVideosBusy() || quickRun()?.state === 'working'
+}
+
+const quit = new QuitCoordinator({
+  settle: settleCriticalWork,
+  busy: productionBusy,
+  confirm: async () => {
+    const text = (key: string) => translateUi(getSettings().uiLanguage ?? 'en', key)
+    const result = await dialog.showMessageBox({
       type: 'warning',
-      message: making ? 'Videos are still being made' : 'Exports are still running',
-      detail: making ? 'Quitting stops its agents and exports. The episodes keep what was made so far.' : 'Quitting stops them and drops the ones waiting.',
-      buttons: [making ? 'Keep making it' : 'Keep exporting', 'Quit anyway'],
+      message: text('Videos are still being made'),
+      detail: text('Quitting stops its agents and exports. The episodes keep what was made so far.'),
+      buttons: [text('Keep making it'), text('Quit anyway')],
       defaultId: 0,
       cancelId: 0,
     })
-    if (choice === 0) {
-      e.preventDefault()
-      void showWindow()
-      return
-    }
-  }
-  resumeAll() // nothing stays stopped behind the app
-  stopSeries()
-  stopDesktopVideos()
-  stopWatchVideos()
-  stopTtsWorker()
-  closeChat()
+    if (result.response === 0) void showWindow()
+    return result.response === 1
+  },
+  prepare: async () => {
+    planning?.abort()
+    stopSeries()
+    stopQuick()
+    stopDesktopVideos()
+    stopWatchVideos()
+    closeChat()
+    // Cancellation finishes before exit: narration is copied back and agent chats/checkpoints flush.
+    await Promise.all([stopExports(), stopRunners(), settleSeries(), Promise.allSettled([...planningTasks])])
+    stopTtsWorker()
+  },
+  exit: () => { if (installOnExit) installUpdate(); else app.quit() },
+  failed: (error) => {
+    console.error('[shutdown]', error)
+    dialog.showErrorBox('Manim Studio', `Couldn’t save before closing: ${(error as Error).message}`)
+  },
+})
+
+app.on('before-quit', (e) => {
+  if (quit.ready) return
+  e.preventDefault()
+  void quit.request()
 })

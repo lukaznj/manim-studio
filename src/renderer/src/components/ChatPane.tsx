@@ -1,25 +1,18 @@
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Download, FileText, Film, Gauge, Loader, RotateCcw, Sparkles, Square, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Clock3, Download, FileText, Film, Gauge, ListChecks, Loader, Plus, RotateCcw, ScanLine, Settings2, Sparkles, Square, Video, X } from 'lucide-react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { pageRanges } from '../../../shared/pages'
 import type { ChatMessage, ChatPart, Effort, ModelOption, PlanUsage, SourceRef } from '../../../shared/types'
 import { modelName } from '../../../shared/usage'
 import { api } from '../lib/api'
-import { ProjectCost } from './UsageDialog'
+import { ProjectUsage } from './UsageDialog'
 import { resetTime } from '../lib/time'
-import { errorText, installComponent, openDialog, refreshClaude, selectClips, sendChat, toast, updateSettings, useStore } from '../store'
+import { errorText, installComponent, openDialog, prepareStudyAction, refreshClaude, refreshUsage, selectClips, selectStudied, sendChat, toast, updateSettings, useStore, watchAdditionalVideo } from '../store'
 import { addSources, attachSource } from './SourcesPane'
 import { Markdown } from './Markdown'
 
 /** "notes.pdf · p. 3–5" */
 const sourceLabel = (s: SourceRef) => (s.pages?.length ? `${s.name} · p. ${pageRanges(s.pages)}` : s.name)
-
-const SUGGESTIONS = [
-  'Make an intro: a title, a short preview of the topic, and narration.',
-  'Explain step by step how to solve a quadratic equation.',
-  'Check the whole video: overlaps, pacing, legibility.',
-  'Slow down the selected part and add a pause after the result.',
-]
 
 /** The chat; `head` replaces its title (the study screen puts its Transcript and Chat tabs there). */
 export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; embedded?: boolean } = {}) {
@@ -30,11 +23,15 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
   const all = useStore((s) => s.chat)
   // On the exercises screen the chat is the student's: the agents' own turns stay out of it.
   const exercise = useStore((s) => s.screen === 'study') // studying a finished video
-  const watching = useStore((s) => s.screen === 'study' && !s.project?.meta.exercise)
   const chat = useMemo(() => (exercise ? all.filter((m) => !m.auto) : all), [all, exercise])
   const busy = useStore((s) => s.chatBusy)
   const streaming = useStore((s) => s.streaming)
   const list = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    void refreshUsage()
+    const timer = setInterval(() => void refreshUsage(), 60_000)
+    return () => clearInterval(timer)
+  }, [agent, claude?.loggedIn])
 
   useEffect(() => {
     const el = list.current
@@ -42,10 +39,10 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
   }, [chat, streaming])
 
   return (
-    <div className="chat-pane">
+    <div className={`chat-pane ${exercise ? 'study-chat' : ''}`}>
       <div className="pane-head">
         {embedded ? (
-          <span className="hint">{uiText('Ask about this lesson')}</span>
+          <span className="study-chat-provider"><Sparkles />{agentName}</span>
         ) : (
           (head ?? (
             <div className="file-tab">
@@ -54,14 +51,14 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
           ))
         )}
         <div className="pane-actions">
-          <ProjectCost />
+          {!exercise && <ProjectUsage />}
           <UsageMeter />
           <button
             className="icon-btn"
             title={uiText('New conversation')}
             disabled={busy || chat.length === 0}
             onClick={() => {
-              if (confirm(`Start a new conversation? ${agentName} forgets the context of this project’s current one.`)) void api.chatReset()
+              if (confirm(uiText('Start a new conversation? The assistant will forget this conversation.'))) void api.chatReset()
             }}
           >
             <RotateCcw />
@@ -80,7 +77,7 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
       ) : (
         <>
           <div className="chat-list" ref={list}>
-            {chat.length === 0 && (watching ? <WatchIntro /> : exercise ? <ExerciseIntro /> : <Intro />)}
+            {chat.length === 0 && (exercise ? <StudyIntro /> : <Intro />)}
             {chat.map((m) => (
               <Message key={m.id} message={m} streaming={streaming[m.id]} busy={busy} />
             ))}
@@ -94,19 +91,19 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
 
 /** How much of the Claude plan is used: the tightest limit here, every limit in the tooltip and in Settings. */
 export const usageLines = (usage: PlanUsage) =>
-  usage.windows.map((w) => `${w.label}: ${Math.round(w.percent)}% used${w.resetsAt ? `, resets ${resetTime(w.resetsAt)}` : ''}`)
+  usage.windows.map((w) => `${w.label.split(' · ').map(uiText).join(' · ')}: ${format('{0}% used', [Math.round(w.percent)])}${w.resetsAt ? `, ${format('resets {0}', [resetTime(w.resetsAt)])}` : ''}`)
 
 export const usageLevel = (percent: number) => (percent >= 90 ? 'hot' : percent >= 70 ? 'warm' : '')
 
 function UsageMeter() {
   const usage = useStore((s) => s.usage)
-  if (!usage) return null
+  if (!usage?.windows.length) return null
   const top = usage.windows.reduce((a, b) => (b.percent > a.percent ? b : a))
   return (
     <button
       className={`usage-chip ${usageLevel(top.percent)}`}
-      title={format('Your Claude plan (shared with claude.ai and Claude Desktop)\n{0}', [usageLines(usage).join('\n')])}
-      aria-label={format('Claude plan: {0}% of the {1} used', [Math.round(top.percent), top.label.toLowerCase()])}
+      title={format('Account-wide plan usage · shared with other apps\n{0}', [usageLines(usage).join('\n')])}
+      aria-label={format('Plan usage: {0}% of the {1} used', [Math.round(top.percent), top.label.toLowerCase()])}
       onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}
     >
       <span className="usage-bar">
@@ -319,64 +316,30 @@ function Intro() {
   )
 }
 
-const EXERCISE_QUESTIONS = [
-  'Why does this method work here?',
-  'Explain the hardest step more slowly.',
-  'What would change if the numbers were different?',
-  'Give me a similar exercise to practise on.',
-]
-
-const WATCH_QUESTIONS = [
-  'Explain what’s on screen right now more slowly.',
-  'Why does this step work?',
-  'Give me a short exercise to practise this.',
-  'Summarise this episode in five points.',
-]
-
-function WatchIntro() {
+function StudyIntro() {
   return (
-    <div className="chat-intro">
-      <p className="muted">
-        {uiText('Ask about anything in the video. Studio tells the agent where you paused and what was on screen and said there, so “this part” is enough.')}
-      </p>
-      <div className="suggestions">
-        {WATCH_QUESTIONS.map((q) => (
-          <button key={q} className="suggestion" onClick={() => useStore.setState({ chatDraft: q })}>
-            {q}
-          </button>
-        ))}
+    <div className="study-chat-empty">
+      <div className="study-chat-orbit"><Sparkles /><span /><span /></div>
+      <span className="eyebrow">{uiText('Your study companion')}</span>
+      <h3>{uiText('Make this moment click')}</h3>
+      <p>{uiText('Ask a question in your own words. The assistant can see where you paused and what is on screen.')}</p>
+      <div className="study-chat-capabilities">
+        <Video /><ListChecks /><ScanLine />
       </div>
-    </div>
-  )
-}
-
-function ExerciseIntro() {
-  return (
-    <div className="chat-intro">
-      <p className="muted">
-        {uiText(
-          'Ask anything about this exercise: a step you don’t follow, why a method works, a similar one to practise. The answer comes right away, without a new video.',
-        )}
-      </p>
-      <div className="suggestions">
-        {EXERCISE_QUESTIONS.map((q) => (
-          <button key={q} className="suggestion" onClick={() => useStore.setState({ chatDraft: q })}>
-            {q}
-          </button>
-        ))}
-      </div>
+      <p className="hint">{uiText('Open Study tools below to create an explanation video, practise with exercises or select part of the frame.')}</p>
     </div>
   )
 }
 
 function Message({ message: m, streaming, busy }: { message: ChatMessage; streaming?: string; busy: boolean }) {
+  const additional = useStore((s) => m.videoOffer?.dir ? s.watchSeries?.episodes.flatMap((e) => e.followUps).find((f) => f.dir === m.videoOffer!.dir) : undefined)
   if (m.role === 'user') {
     const text = m.parts.find((p) => p.kind === 'text')
     return (
       <div className="msg user">
         {(m.context || m.frame || m.source) && (
           <div className="msg-attach">
-            {m.frame && <img src={m.frame} alt="Preview frame" />}
+            {m.frame && <img src={m.frame} alt={uiText('Preview frame')} />}
             {m.source && (
               <span className="context-chip">
                 <FileText /> {sourceLabel(m.source)}
@@ -390,7 +353,8 @@ function Message({ message: m, streaming, busy }: { message: ChatMessage; stream
             )}
           </div>
         )}
-        <div className="msg-text">{text?.kind === 'text' && text.text}</div>
+        {m.studyAction && <span className="study-request-kind">{m.studyAction === 'video' ? <Video /> : <ListChecks />}{m.studyAction === 'video' ? uiText('Additional video') : uiText('Practice exercises')}</span>}
+        <div className="msg-text md">{text?.kind === 'text' && <Markdown text={text.text} />}</div>
       </div>
     )
   }
@@ -414,7 +378,16 @@ function Message({ message: m, streaming, busy }: { message: ChatMessage; stream
           <span className="caret" />
         </div>
       )}
-      {working && (
+      {m.videoOffer && <div className="study-chat-result">
+        <Video />
+        <div><strong>{m.videoOffer.title}</strong><span>{m.videoOffer.state === 'created' ? additional?.state === 'done' ? uiText('Ready to watch') : additional?.state === 'failed' ? uiText('Didn’t finish') : uiText('Your additional video is being made. You can keep studying.') : uiText('Would a video still help?')}</span></div>
+        <button className="btn small" disabled={busy} onClick={() => {
+          if (m.videoOffer?.state === 'created' && m.videoOffer.dir) void (additional?.state === 'done' ? watchAdditionalVideo(m.videoOffer.dir) : selectStudied(m.videoOffer.dir))
+          else void sendChat(uiText('Create the video anyway'), false, { confirmVideo: m.id, studyAction: 'video' })
+        }}>{m.videoOffer.state === 'created' ? uiText('Open') : uiText('Create the video anyway')}</button>
+      </div>}
+      {m.exerciseFolder && <div className="study-chat-result"><ListChecks /><div><strong>{uiText('Practice exercises')}</strong><span>{uiText('Your exercises are being prepared with checked solutions.')}</span></div><button className="btn small" onClick={() => void import('../store').then(({ openExerciseSet }) => openExerciseSet(m.exerciseFolder!))}>{uiText('Open')}</button></div>}
+      {working && !m.videoOffer && !m.exerciseFolder && (
         <div className="thinking">
           <span />
           <span />
@@ -451,6 +424,11 @@ function Composer() {
   const draft = useStore((s) => s.chatDraft)
   const source = useStore((s) => s.chatSource)
   const [dropping, setDropping] = useState(false)
+  const tool = useStore((s) => s.studyTool)
+  const moment = useStore((s) => s.studyMoment)
+  const attachment = useStore((s) => s.studyAttachment)
+  const dir = useStore((s) => s.project?.path)
+  useEffect(() => { setText('') }, [dir])
 
   useEffect(() => {
     if (draft === null) return
@@ -477,20 +455,14 @@ function Composer() {
   const send = async (value = text) => {
     if (!value.trim() || busy) return
     const ok = await sendChat(value.trim(), frame && !!timeline && !exercise)
-    if (ok) setText('')
+    if (ok) {
+      setText('')
+      useStore.setState({ studyTool: null, studyMoment: null, studyAttachment: null })
+    }
   }
 
   return (
     <div className="composer">
-      {useStore.getState().chat.length === 0 && useStore.getState().screen !== 'study' && (
-        <div className="suggestions">
-          {SUGGESTIONS.map((s) => (
-            <button key={s} className="suggestion" onClick={() => setText(s)}>
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
       <div
         className={`composer-box ${busy ? 'busy' : ''} ${dropping ? 'dropping' : ''}`}
         onDragOver={(e) => {
@@ -507,6 +479,11 @@ function Composer() {
           void addSources(pdfs).then((r) => r?.added[0] && attachSource(r.added[0]))
         }}
       >
+        {exercise && (tool || attachment) && <div className="study-composer-context">
+          {tool && <span className="study-tool-pill">{tool === 'video' ? <Video /> : <ListChecks />}{tool === 'video' ? uiText('Additional video') : uiText('Practice exercises')}<button aria-label={uiText('Remove action')} onClick={() => useStore.setState({ studyTool: null, ...(!attachment ? { studyMoment: null } : {}) })}><X /></button></span>}
+          {moment !== null && <span className="study-moment"><Clock3 />{Math.floor(moment / 60)}:{String(Math.floor(moment % 60)).padStart(2, '0')}</span>}
+          {attachment && <div className="study-frame-attachment"><img src={attachment.preview} alt={uiText('Selected frame area')} /><span>{uiText('Selected frame area')}</span><button className="icon-btn" aria-label={uiText('Remove selection')} onClick={() => useStore.setState({ studyAttachment: null, ...(!tool ? { studyMoment: null } : {}) })}><X /></button></div>}
+        </div>}
         <div className="composer-attach">
           {source && (
             <span className="context-chip">
@@ -536,9 +513,9 @@ function Composer() {
           rows={2}
           placeholder={
             busy
-              ? uiText('Claude is working…')
+              ? uiText('The assistant is working…')
               : exercise
-                ? uiText('Ask about what you’re watching (Enter sends)')
+                ? tool === 'video' ? uiText('What should the additional video explain?') : tool === 'exercises' ? uiText('What would you like to practise?') : uiText('Ask about this moment…')
                 : uiText('What should I make? (Enter sends, Shift+Enter for a new line)')
           }
           value={text}
@@ -551,7 +528,7 @@ function Composer() {
           }}
         />
         <div className="composer-foot">
-          <ModelControls />
+          {exercise ? <StudyTools /> : <button className="icon-btn" title={uiText('Model and effort settings')} aria-label={uiText('Model and effort settings')} onClick={() => openDialog({ kind: 'settings', tab: 'account' })}><Settings2 /></button>}
           {busy ? (
             <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title={uiText('Stop')}>
               <Square />
@@ -567,7 +544,35 @@ function Composer() {
   )
 }
 
-const EFFORTS: Record<Effort, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' }
+function StudyTools() {
+  const id = useId()
+  const menu = useRef<HTMLDivElement>(null)
+  const canCreateVideo = useStore((s) => !!s.project?.meta.series && !s.project.meta.extra && !s.project.meta.exercise)
+  const time = useStore((s) => s.watchTime)
+  const busy = useStore((s) => s.chatBusy)
+  const choose = (action: 'video' | 'exercises' | 'select') => {
+    menu.current?.hidePopover()
+    if (action === 'select') {
+      document.querySelector<HTMLVideoElement>('.study-video-stage video')?.pause()
+      useStore.setState({ studySelecting: true, studyTab: 'chat' })
+    } else prepareStudyAction(action)
+  }
+  return <>
+    <button className="study-tools-trigger" popoverTarget={id} disabled={busy} onClick={(e) => {
+      const r = e.currentTarget.getBoundingClientRect()
+      if (menu.current) { menu.current.style.left = `${Math.min(r.left, window.innerWidth - 300)}px`; menu.current.style.bottom = `${window.innerHeight - r.top + 8}px` }
+    }}><Plus /><span>{uiText('Study tools')}</span></button>
+    <div ref={menu} id={id} popover="auto" className="study-tools-menu">
+      <span className="eyebrow">{uiText('Learn your way')}</span>
+      {canCreateVideo && <button onClick={() => choose('video')}><span><Video /></span><div><strong>{uiText('Additional explanation video')}</strong><small>{uiText('Go deeper into this moment')}</small></div></button>}
+      <button onClick={() => choose('exercises')}><span><ListChecks /></span><div><strong>{uiText('Create practice exercises')}</strong><small>{uiText('Turn this concept into practice')}</small></div></button>
+      <button disabled={time === null} onClick={() => choose('select')}><span><ScanLine /></span><div><strong>{uiText('Select part of the frame')}</strong><small>{uiText('Show exactly what you mean')}</small></div></button>
+      <button className="study-tools-settings" onClick={() => { menu.current?.hidePopover(); openDialog({ kind: 'settings', tab: 'account' }) }}><Settings2 />{uiText('Chat model and effort')}</button>
+    </div>
+  </>
+}
+
+const effortLabel = (effort: Effort) => ({ low: uiText('Low effort'), medium: uiText('Medium effort'), high: uiText('High effort'), xhigh: uiText('Extra high effort'), max: uiText('Maximum effort') })[effort]
 
 /**
  * Which model Claude runs and how hard it thinks; a change applies to the current conversation.
@@ -612,7 +617,7 @@ export function ModelPicker({
 }) {
   const activeModels = useStore((s) => s.models)
   const models = offeredModels ?? activeModels
-  const list: ModelOption[] = models.length ? [...models] : [{ value: '', label: 'Default model', description: '', efforts: [] }]
+  const list: ModelOption[] = models.length ? [...models] : [{ value: model, label: modelName(model) || 'Default model', description: '', efforts: [] }]
   // A saved full id ("claude-sonnet-5-5") is the listed alias of the same name ("sonnet"): same model, same efforts.
   const listed = list.find((m) => m.value === model) ?? list.find((m) => m.value && m.label === modelName(model))
   // A model picked under another account still shows, so the picker never claims the wrong one; its saved effort stays.
@@ -631,9 +636,9 @@ export function ModelPicker({
     <div className="model-controls">
       <label className="chip-select" title={current.description || uiText('Model')}>
         <Sparkles />
-        <select aria-label={uiText('Model')} value={current.value} onChange={(e) => pickModel(e.target.value)}>
+        <select aria-label={uiText('Model')} value={current.value} disabled={!models.length} onChange={(e) => pickModel(e.target.value)}>
           {list.map((m) => (
-            <option key={m.value} value={m.value} title={m.description}>
+            <option key={m.value} value={m.value} title={m.description} disabled={!models.some((offered) => offered.value === m.value)}>
               {m.label}
             </option>
           ))}
@@ -651,7 +656,7 @@ export function ModelPicker({
           {effort ? (
             efforts.map((e) => (
               <option key={e} value={e}>
-                {EFFORTS[e]} {uiText(' effort')}
+                {effortLabel(e)}
               </option>
             ))
           ) : (

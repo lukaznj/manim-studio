@@ -29,7 +29,7 @@ npm run build && node scripts/drive.mjs   # drive the built app over HTTP (scree
 
 ## Rules that apply everywhere
 
-- **English source, localized UI:** identifiers, docs, comments and UI catalog keys are English; the interface supports English and Croatian (ADR 0036). The narration language is per project (`project.json` `voice.language`), so never assume English in the voice, subtitle or text-layout paths either ([ADR 0011](docs/04-decisions/0011-open-source-english.md)).
+- **English source, localized UI:** identifiers, docs, comments and UI catalog keys are English; the interface supports Europe’s national languages through offline catalogs (ADR 0036). The narration language is per project (`project.json` `voice.language`), so never assume English in the voice, subtitle or text-layout paths either ([ADR 0011](docs/04-decisions/0011-open-source-english.md)).
 - **The timeline contract has two halves.** `render.py` produces it and `src/shared/types.ts` types it. Change both, and keep `python/tests/test_runner.py` passing.
 - **No new runtime dependency without a reason** a few lines of code can't cover. Animations use CSS and native APIs, with no motion library.
 - **Verify UI changes in the real app** (`scripts/drive.mjs` + screenshots), not just by typechecking. Most bugs found so far were layout bugs that only showed on screen.

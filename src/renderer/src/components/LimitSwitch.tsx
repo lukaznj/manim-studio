@@ -1,16 +1,14 @@
-import { t as uiText, format } from '../lib/i18n'
-import { Hourglass } from 'lucide-react'
+import { t as uiText, format, currentLocale } from '../lib/i18n'
+import { ArrowRight, Hourglass, KeyRound, UserRound } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Agent, AgentRoute, ClaudeAuth, Settings } from '../../../shared/types'
 import { api } from '../lib/api'
 import { errorText, toast, useStore } from '../store'
 
-const NAMES: Record<Agent, Record<ClaudeAuth, string>> = {
-  claude: { account: 'Claude', 'api-key': 'Claude (API key)' },
-  codex: { account: 'Codex (ChatGPT)', 'api-key': 'Codex (OpenAI API key)' },
-  antigravity: { account: 'Antigravity (Google)', 'api-key': 'Antigravity (Gemini key)' },
-}
-export const routeName = (r: AgentRoute) => uiText(NAMES[r.agent][r.auth])
+const NAMES: Record<Agent, string> = { claude: 'Claude', codex: 'Codex', antigravity: 'Antigravity' }
+const ACCOUNTS: Record<Agent, string> = { claude: 'Claude account', codex: 'ChatGPT account', antigravity: 'Google account' }
+const routeDetail = (r: AgentRoute) => uiText(r.auth === 'api-key' ? 'API key' : ACCOUNTS[r.agent])
+export const routeName = (r: AgentRoute) => `${NAMES[r.agent]}${r.auth === 'api-key' ? ` · ${routeDetail(r)}` : ''}`
 
 /** How Settings → Accounts signs an agent in (mirrors src/main/agent.ts configuredAuth). */
 export function configuredAuth(s: Settings | null, agent: Agent): ClaudeAuth {
@@ -32,7 +30,7 @@ export function LimitSwitch({ until, current, onSwitch }: { until: number; curre
     void api.agentRoutes().then(setRoutes, () => setRoutes([]))
   }, [settings?.hasAnthropicKey, settings?.hasOpenAIKey, settings?.hasGeminiKey, settings?.claudeAuth, settings?.codexAuth, settings?.antigravityAuth])
   const others = (routes ?? []).filter((r) => r.agent !== current.agent || r.auth !== current.auth)
-  const time = new Date(until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const time = new Date(until).toLocaleTimeString(currentLocale(), { hour: '2-digit', minute: '2-digit' })
   const pick = async (to: AgentRoute) => {
     setBusy(true)
     try {
@@ -60,8 +58,21 @@ export function LimitSwitch({ until, current, onSwitch }: { until: number; curre
         {others.length > 0 && (
           <div className="limit-switch-actions">
             {others.map((r) => (
-              <button key={`${r.agent}-${r.auth}`} className="btn small" disabled={busy} onClick={() => void pick(r)}>
-                {routeName(r)}
+              <button
+                key={`${r.agent}-${r.auth}`}
+                className="btn limit-switch-route"
+                aria-label={`${NAMES[r.agent]} · ${routeDetail(r)}`}
+                disabled={busy}
+                onClick={() => void pick(r)}
+              >
+                <span className="limit-switch-route-icon" aria-hidden="true">
+                  {r.auth === 'api-key' ? <KeyRound /> : <UserRound />}
+                </span>
+                <span className="limit-switch-route-label">
+                  <strong>{NAMES[r.agent]}</strong>
+                  <span>{routeDetail(r)}</span>
+                </span>
+                <ArrowRight className="limit-switch-route-arrow" aria-hidden="true" />
               </button>
             ))}
           </div>

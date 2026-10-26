@@ -15,7 +15,7 @@ Testing which agents can make a lesson needs several models to work on individua
 - With comparison enabled in Learn (including Both's Learn workspace), the reviewed series plan offers a connected provider, model and supported effort for every episode. Planning still uses the selected agent. The assignment covers the episode's script, scene and render fixes.
 - Assignments belong to episode objects, so reorder and removal preserve them. They are saved in `series.json` and `.studio/series-run.json`, shown on the run panel, and used again after pause or restart. Ordinary series also capture their initial provider and model.
 - Accounts are checked and model catalogs validated before project folders are created. A catalog is what a provider offers to the client; a completed inference request is still the final access check. Model failures remain visible on the episode.
-- An assigned comparison model may retry a capacity failure, but cannot substitute a fallback. The existing per-project tools and provider-owned authentication boundaries stay in place.
+- An assigned comparison model may retry a capacity failure, but cannot substitute a fallback. The user can explicitly switch unfinished episodes at a usage limit ([[0048-switch-agent-at-usage-limit]]); completed assignments stay intact and mixed work is noted in the report. The existing per-project tools and provider-owned authentication boundaries stay in place.
 
 ## Consequences
 
