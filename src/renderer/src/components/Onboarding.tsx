@@ -24,9 +24,12 @@ import { LANGUAGES, languageName } from '../lib/languages'
 import { errorText, installComponent, openDialog, refreshClaude, refreshProjects, switchMode, updateSettings, useStore } from '../store'
 import { ProjectsFolderStep } from './ProjectsFolderStep'
 import { AntigravityConsent } from './AntigravityConsent'
+import { SignInLog } from './SignInLog'
 import { ElevenLabsStatus } from './SettingsDialog'
 import { ProgressLine } from './ui'
 import { VoicePicker } from './VoicePicker'
+import { LanguagePicker } from './LanguagePicker'
+import { narrationLanguageForUi } from '../../../shared/narration-languages'
 
 /**
  * First launch (ADR 0044): a guided, full-window walk through what Manim Studio is and everything
@@ -140,7 +143,7 @@ export function Onboarding() {
               <span key={s} className={i < at ? 'done' : i === at ? 'on' : ''} />
             ))}
           </div>
-          {step === 'welcome' && <LanguageSwitch />}
+          <LanguageSwitch seedNarration={at < STEPS.indexOf('voice')} />
         </header>
 
         <div className="onb-scroll">
@@ -204,28 +207,16 @@ const CAPTIONS: Record<Step, string> = {
   done: 'Ready when you are.',
 }
 
-function LanguageSwitch() {
+function LanguageSwitch({ seedNarration }: { seedNarration: boolean }) {
   const settings = useStore((s) => s.settings)!
-  const set = (uiLanguage: 'en' | 'hr') =>
-    void updateSettings({ uiLanguage, defaultVoice: { ...settings.defaultVoice, language: uiLanguage, elevenlabs: undefined } })
   return (
-    <div className="onb-lang" role="radiogroup" aria-label={t('App language')}>
-      {(
-        [
-          ['en', 'English'],
-          ['hr', 'Hrvatski'],
-        ] as const
-      ).map(([value, label]) => (
-        <button
-          key={value}
-          role="radio"
-          aria-checked={(settings.uiLanguage ?? 'en') === value}
-          className={(settings.uiLanguage ?? 'en') === value ? 'on' : ''}
-          onClick={() => set(value)}
-        >
-          {label}
-        </button>
-      ))}
+    <div className="onb-lang">
+      <LanguagePicker value={settings.uiLanguage ?? 'en'} onChange={(uiLanguage) => {
+        const narration = narrationLanguageForUi(uiLanguage)
+        void updateSettings({ uiLanguage, ...(seedNarration && narration && narration !== settings.defaultVoice.language ? {
+          defaultVoice: { ...settings.defaultVoice, language: narration, elevenlabs: undefined },
+        } : {}) })
+      }} />
     </div>
   )
 }
@@ -498,8 +489,7 @@ export function SetupGate() {
 }
 
 function FolderPage({ folder, onChange }: { folder: string | null; onChange: (dir: string) => void }) {
-  const hr = useStore((s) => s.settings?.uiLanguage === 'hr')
-  const say = (en: string, croatian: string) => (hr ? croatian : en)
+  const say = (en: string, _croatian: string) => t(en)
   return (
     <>
       <Head eyebrow="Your projects" title="Where should your videos go?" />
@@ -609,6 +599,7 @@ function ConnectPage({ agent }: { agent: Agent }) {
   const [url, setUrl] = useState<string | null>(null)
   const [needsCode, setNeedsCode] = useState(false)
   const [needsConsent, setNeedsConsent] = useState(false)
+  const [loginLog, setLoginLog] = useState<string[]>([])
   const [code, setCode] = useState('')
   const [useKey, setUseKey] = useState(settings[AUTH_SETTING[agent]] === 'api-key')
   const [problem, setProblem] = useState('')
@@ -619,6 +610,7 @@ function ConnectPage({ agent }: { agent: Agent }) {
   useEffect(() => {
     void check()
     return api.on('claude-login', (e) => {
+      if (e.diagnostic) setLoginLog((lines) => [...lines, e.diagnostic!].slice(-100))
       if (e.url) setUrl(e.url)
       if (e.needsCode) setNeedsCode(true)
       if (e.needsConsent) setNeedsConsent(true)
@@ -630,6 +622,7 @@ function ConnectPage({ agent }: { agent: Agent }) {
   }, [programState])
 
   const signIn = async () => {
+    setLoginLog([])
     setProblem('')
     setUrl(null)
     setNeedsCode(false)
@@ -685,6 +678,7 @@ function ConnectPage({ agent }: { agent: Agent }) {
                 {format('Sign in with {0}', [agent === 'codex' ? 'ChatGPT' : agent === 'antigravity' ? 'Google' : 'Claude'])}
               </button>
               {waiting && needsConsent && <AntigravityConsent onContinue={() => setNeedsConsent(false)} />}
+              {agent === 'antigravity' && <SignInLog lines={loginLog} />}
               {waiting && !needsConsent && (
                 <div className="onb-signin-wait">
                   <p>

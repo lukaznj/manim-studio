@@ -1,6 +1,6 @@
 import { t as uiText, localize, format } from '../lib/i18n'
-import { ChevronLeft, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Pencil, Play, Plus, Trash2, Zap } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, Clapperboard, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Trash2, Zap } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ExerciseSet, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
@@ -15,13 +15,12 @@ import {
   openWatch,
   pickAndOpenProject,
   refreshProjects,
-  errorText,
-  toast,
   updateSettings,
   useStore,
 } from '../store'
 import { Modal, Tabs } from './ui'
-import { SeriesPanel } from './SeriesPanel'
+import { SeriesTitle } from './SeriesTitle'
+import { seriesStatus } from '../../../shared/series-presentation'
 
 export function Home() {
   const [adding, setAdding] = useState(false)
@@ -47,6 +46,7 @@ export function Home() {
   }, [])
 
   const homeSeries = useStore((s) => s.homeSeries)
+  const production = useStore((s) => s.series)
   const items = homeItems(projects)
   const inSeries =
     (homeSeries && items.find((i): i is { folder: string; episodes: ProjectSummary[] } => 'episodes' in i && i.folder === homeSeries)?.episodes) || []
@@ -86,8 +86,6 @@ export function Home() {
           </div>
         </header>
 
-        <SeriesPanel />
-
         {projects.length === 0 && !sets.length ? (
           <div className="library-empty" data-tour="home-library">
             <button className="library-add" aria-label={uiText('Add your first video, course or exercises')} onClick={() => setAdding(true)}>
@@ -109,7 +107,7 @@ export function Home() {
                 onClick={() => void openWatch(inSeries[0].series!.folder)}
                 title={uiText('Study the series: the videos, a transcript and a chat that knows where you are')}
               >
-                <Play /> {uiText(' Watch')}
+                {production?.folder === inSeries[0].series!.folder ? <><Clapperboard />{uiText('Production')}</> : <><Play />{uiText(' Watch')}</>}
               </button>
               <button className="btn small ghost" onClick={() => void api.reveal(inSeries[0].series!.folder)}>
                 <FolderOpen /> {revealLabel}
@@ -251,11 +249,14 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
 
 /** A series on Home: its first episodes' pictures stacked, the title and how many episodes it has. */
 function SeriesCard({ folder, episodes, exercises, index }: { folder: string; episodes: ProjectSummary[]; exercises: number; index: number }) {
+  const active = useStore((s) => s.series)
+  const run = active?.folder === folder ? active : undefined
+  const made = run?.episodes.filter((ep) => ep.state === 'done').length ?? 0
   const first = episodes[0]
   const cover = episodes.find((e) => e.thumbnail) ?? first
   const latest = Math.max(...episodes.map((e) => e.updatedAt))
   // Learn mode watches a series; Create opens its episodes to edit.
-  const open = () => (!studying() ? useStore.setState({ homeSeries: folder }) : void openWatch(folder))
+  const open = () => (run || studying() ? void openWatch(folder) : useStore.setState({ homeSeries: folder }))
   return (
     <article
       className="project-card series-card"
@@ -267,6 +268,7 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
     >
       <div className={`thumb stack ${cover.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${cover.theme}`}>
         {cover.thumbnail ? <img src={api.mediaUrl(cover.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
+        {run && <span className={`series-card-status ${run.state}`}><Clapperboard />{uiText(seriesStatus(run))}<span>{made}/{run.episodes.length}</span></span>}
       </div>
       <div className="project-meta">
         <div className="project-name">{first.series!.title}</div>
@@ -282,18 +284,22 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
           )}
         </div>
       </div>
+      {run && <progress className="series-card-progress" value={made} max={run.episodes.length} aria-label={uiText('Production')} />}
     </article>
   )
 }
 
 function ProjectCard({ project: p, index }: { project: ProjectSummary; index: number }) {
   const [menu, setMenu] = useState(false)
+  const production = useStore((s) => s.series)
+  const unfinished = production?.folder === p.series?.folder && production?.episodes.some((ep) => ep.dir === p.path && ep.state !== 'done')
+  const open = () => void (p.missing ? locateProject(p.path) : unfinished && p.series ? openWatch(p.series.folder, p.path) : openProject(p.path))
   return (
     <article
       className={`project-card ${p.missing ? 'missing' : ''}`}
       style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
-      onClick={() => void (p.missing ? locateProject(p.path) : openProject(p.path))}
-      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && void (p.missing ? locateProject(p.path) : openProject(p.path))}
+      onClick={open}
+      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && open()}
       tabIndex={0}
     >
       <div className={`thumb ${p.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${p.theme}`}>
@@ -367,57 +373,5 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
         </>
       )}
     </article>
-  )
-}
-
-/** A series' title in its folder view; the pencil turns it into a field (Enter saves, Escape cancels). */
-function SeriesTitle({ folder, title }: { folder: string; title: string }) {
-  const [draft, setDraft] = useState<string | null>(null)
-  const cancelled = useRef(false) // Escape: the field's blur mustn't save
-  const save = async () => {
-    const name = draft?.trim()
-    setDraft(null)
-    if (cancelled.current || !name || name === title) return
-    try {
-      await api.renameSeries(folder, name)
-      await refreshProjects()
-    } catch (e) {
-      toast(errorText(e), 'error')
-    }
-  }
-  if (draft === null)
-    return (
-      <>
-        <strong>{title}</strong>
-        <button
-          className="icon-btn"
-          onClick={() => {
-            cancelled.current = false
-            setDraft(title)
-          }}
-          aria-label={uiText('Rename series')}
-          title={uiText('Rename series')}
-        >
-          <Pencil />
-        </button>
-      </>
-    )
-  return (
-    <input
-      className="input series-rename"
-      autoFocus
-      aria-label={uiText('Series title')}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onFocus={(e) => e.target.select()}
-      onBlur={() => void save()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur()
-        if (e.key === 'Escape') {
-          cancelled.current = true
-          setDraft(null)
-        }
-      }}
-    />
   )
 }

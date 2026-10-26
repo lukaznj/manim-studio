@@ -2,25 +2,19 @@ import { Check, FolderOpen, HardDrive, Cloud } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FolderInfo, ProjectsFolders } from '../../../shared/types'
 import { api } from '../lib/api'
+import { currentLanguage, format, t } from '../lib/i18n'
+import { uiLocale } from '../../../shared/ui-languages'
 
 type Say = (en: string, croatian: string) => string
 
-/** Croatian plurals: 1 videozapis, 2–4 videozapisa, 5+ (and 11–14) videozapisa. */
-const hrCount = (n: number, one: string, few: string, many: string) =>
-  `${n} ${n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many}`
-
-/** "14 videos, 2 courses and 3 exercise sets": what a folder already holds. */
-export function foundText(found: NonNullable<FolderInfo['found']>, say: Say): string {
+/** Labeled counts avoid inventing a two-form plural system for every language. */
+export function foundText(found: NonNullable<FolderInfo['found']>): string {
   const parts = [
-    found.videos && say(`${found.videos} ${found.videos === 1 ? 'video' : 'videos'}`, hrCount(found.videos, 'videozapis', 'videozapisa', 'videozapisa')),
-    found.courses && say(`${found.courses} ${found.courses === 1 ? 'course' : 'courses'}`, hrCount(found.courses, 'tečaj', 'tečaja', 'tečajeva')),
-    found.exerciseSets &&
-      say(
-        `${found.exerciseSets} ${found.exerciseSets === 1 ? 'exercise set' : 'exercise sets'}`,
-        hrCount(found.exerciseSets, 'skup zadataka', 'skupa zadataka', 'skupova zadataka'),
-      ),
+    found.videos && format('Videos: {0}', [found.videos]),
+    found.courses && format('Courses: {0}', [found.courses]),
+    found.exerciseSets && format('Exercise sets: {0}', [found.exerciseSets]),
   ].filter(Boolean) as string[]
-  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} ${say('and', 'i')} ${parts[parts.length - 1]}` : parts[0]
+  return new Intl.ListFormat(uiLocale(currentLanguage()), { style: 'long', type: 'conjunction' }).format(parts)
 }
 
 /**
@@ -62,15 +56,11 @@ export function ProjectsFolderStep({ say, value, onChange }: { say: Say; value: 
         {value === info.path && <Check className="folder-card-check" />}
       </span>
       <span className="mono faint folder-card-path">{info.path}</span>
-      {info.found && <span className="folder-card-found">{say('Already has ', 'Već sadrži ') + foundText(info.found, say)}</span>}
+      {info.found && <span className="folder-card-found">{foundText(info.found)}</span>}
       <span className="hint">{text}</span>
     </button>
   )
-  const syncedText = (cloud: string) =>
-    say(
-      `${cloud} syncs this folder: your projects are backed up and on your other devices, but they use your cloud storage, and exports are big. Studio keeps its render cache out of it.`,
-      `${cloud} sinkronizira ovu mapu: projekti su sigurnosno kopirani i dostupni na drugim uređajima, ali troše prostor u oblaku, a izvozi su veliki. Studio svoju predmemoriju renderiranja drži izvan nje.`,
-    )
+  const syncedText = (cloud: string) => format('{0} syncs this folder: your projects are backed up and on your other devices, but they use your cloud storage, and exports are big. Studio keeps its render cache out of it.', [cloud])
 
   return (
     <>

@@ -11,6 +11,7 @@ import { initRepo } from './git'
 import { slugify } from './slug'
 import { paths } from './paths'
 import { getSettings, rememberProject, setSettings } from './settings'
+import { readAtomicJson, writeAtomicJson } from './atomic-json'
 
 export interface Current {
   path: string
@@ -36,9 +37,11 @@ export function onSceneChangedOnDisk(fn: (source: string) => void): void {
 const sceneFile = (dir: string) => join(dir, 'scene.py')
 const metaFile = (dir: string) => join(dir, 'project.json')
 const chatFile = (dir: string) => join(dir, '.studio', 'chat.json')
+const metaBackup = (dir: string) => join(dir, '.studio', 'project-meta.json')
 
 export function readMeta(dir: string): ProjectMeta {
-  const meta = JSON.parse(readFileSync(metaFile(dir), 'utf8')) as ProjectMeta
+  const meta = readAtomicJson(metaFile(dir), (value): value is ProjectMeta => !!value && typeof (value as ProjectMeta).name === 'string', metaBackup(dir))
+  if (!meta) throw new Error('The project settings could not be read.')
   return meta.voice ? { ...meta, voice: migrateVoice(meta.voice) } : meta
 }
 
@@ -97,11 +100,12 @@ export function listProjects(): ProjectSummary[] {
 
 export { slugify }
 
-export async function createProject(input: NewProjectInput): Promise<string> {
+export async function createProject(input: NewProjectInput, targetDir?: string): Promise<string> {
   const parent = input.parentDir || getSettings().projectsDir
   mkdirSync(parent, { recursive: true })
-  let dir = join(parent, slugify(input.name))
-  for (let i = 2; existsSync(dir); i++) dir = join(parent, `${slugify(input.name)}-${i}`)
+  let dir = targetDir ?? join(parent, slugify(input.name))
+  if (!targetDir) for (let i = 2; existsSync(dir); i++) dir = join(parent, `${slugify(input.name)}-${i}`)
+  if (targetDir && existsSync(targetDir)) throw new Error('The project folder already exists.')
 
   await cp(join(paths.templates(), 'project'), dir, { recursive: true })
   // electron-builder leaves out files named .gitignore, so the template ships it as "gitignore".
@@ -120,7 +124,7 @@ export async function createProject(input: NewProjectInput): Promise<string> {
     createdAt: new Date().toISOString(),
     voice: { ...(input.voice ?? getSettings().defaultVoice), language: input.language || input.voice?.language || getSettings().defaultVoice.language },
   }
-  writeFileSync(metaFile(dir), JSON.stringify(meta, null, 2))
+  writeAtomicJson(metaFile(dir), meta, metaBackup(dir))
   mkdirSync(join(dir, 'voice', 'recordings'), { recursive: true })
   await initRepo(dir)
   if (input.parentDir && !input.series && !input.exercise) setSettings({ projectsDir: input.parentDir }) // an episode's or exercise's folder isn't a choice to remember
@@ -159,13 +163,13 @@ export function saveScene(source: string): void {
 /** updateMeta for any project: the open one in memory too, any other only on disk. */
 export function updateMetaAt(dir: string, patch: Partial<ProjectMeta>): void {
   if (current?.path === dir) return void updateMeta(patch)
-  writeFileSync(metaFile(dir), JSON.stringify({ ...readMeta(dir), ...patch }, null, 2))
+  writeAtomicJson(metaFile(dir), { ...readMeta(dir), ...patch }, metaBackup(dir))
 }
 
 export function updateMeta(patch: Partial<ProjectMeta>): ProjectMeta {
   const p = requireProject()
   p.meta = { ...p.meta, ...patch }
-  writeFileSync(metaFile(p.path), JSON.stringify(p.meta, null, 2))
+  writeAtomicJson(metaFile(p.path), p.meta, metaBackup(p.path))
   return p.meta
 }
 
@@ -192,16 +196,12 @@ export function listRecordings(dir = requireProject().path): string[] {
 }
 
 export function readChat(dir: string): ChatMessage[] {
-  try {
-    return JSON.parse(readFileSync(chatFile(dir), 'utf8'))
-  } catch {
-    return []
-  }
+  return readAtomicJson(chatFile(dir), (value): value is ChatMessage[] => Array.isArray(value)) ?? []
 }
 
 export function writeChat(messages: ChatMessage[], dir = requireProject().path): void {
   mkdirSync(join(dir, '.studio'), { recursive: true })
-  writeFileSync(chatFile(dir), JSON.stringify(messages.slice(-300)))
+  writeAtomicJson(chatFile(dir), messages.slice(-300))
 }
 
 export const readScript = (dir: string): string | null => (existsSync(join(dir, SCRIPT_FILE)) ? readFileSync(join(dir, SCRIPT_FILE), 'utf8') : null)

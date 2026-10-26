@@ -1,12 +1,14 @@
 import { t as uiText, format } from '../lib/i18n'
-import { Check, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, MessageCircleQuestion, RotateCcw, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, Play, RotateCcw, Video } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { FollowUp, WatchDetail, WatchEpisode } from '../../../shared/types'
+import type { FollowUp, SeriesRun, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { nextStudyEpisode } from '../../../shared/study-playback'
 import { api } from '../lib/api'
-import { canEdit, errorText, selectStudied, toast, useStore } from '../store'
+import { canEdit, errorText, prepareStudyAction, returnToStudyVideo, selectStudied, toast, useStore, watchAdditionalVideo } from '../store'
 import { StudyPlayer } from './StudyPlayer'
-import { Modal } from './ui'
+import { StudyNotes } from './StudyNotes'
+import { nearbyFollowUps } from '../../../shared/study-assistant'
+import { EpisodeStatus, ProductionIcon } from './SeriesProduction'
 
 // The study screen's lessons (StudyView.tsx): a series' episodes and follow-ups, or a single video
 // (src/main/watch.ts, ADR 0028).
@@ -14,7 +16,11 @@ import { Modal } from './ui'
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
 /** A lesson in the study screen's list, with its follow-up videos under it. */
-export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; selected?: string }) {
+export function EpisodeRow({ episode: e, selected, run }: { episode: WatchEpisode; selected?: string; run?: SeriesRun }) {
+  const producing = run?.episodes.find((ep) => ep.dir === e.dir)
+  const [expanded, setExpanded] = useState(false)
+  const selectedFollow = e.followUps.some((f) => f.dir === selected)
+  useEffect(() => { if (selectedFollow) setExpanded(true) }, [selectedFollow])
   return (
     <>
       <li>
@@ -28,7 +34,7 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
           <span className="ex-row-body">
             <span className="ex-row-title">{e.title}</span>
             <span className="ex-row-state">
-              {e.state === 'making'
+              {producing && producing.state !== 'done' ? <EpisodeStatus run={run!} episode={producing} /> : e.state === 'making'
                 ? (e.activity ?? uiText('Making the video'))
                 : e.state === 'failed'
                   ? uiText('Didn’t finish')
@@ -39,7 +45,7 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
                       : uiText('Preview')}
             </span>
           </span>
-          {e.state === 'making' ? (
+          {producing && producing.state !== 'done' ? <span className={`production-row-icon state-${producing.state}`}><ProductionIcon run={run!} episode={producing} /></span> : e.state === 'making' ? (
             <span className="spinner" />
           ) : e.state === 'failed' ? (
             <CircleAlert className="ex-state-icon failed" />
@@ -48,12 +54,13 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
           )}
         </button>
       </li>
-      {e.followUps.map((f) => (
+      {!!e.followUps.length && <li className="study-follow-toggle"><button aria-expanded={expanded} onClick={() => setExpanded(!expanded)}><ChevronDown className={expanded ? 'expanded' : ''} />{uiText('Additional videos')}<small>{e.followUps.length}</small></button></li>}
+      {expanded && e.followUps.map((f) => (
         <li key={f.dir}>
           <button className={`ex-row follow ${f.dir === selected ? 'on' : ''} state-${f.state}`} onClick={() => void selectStudied(f.dir)}>
             <CornerDownRight className="ex-follow-icon" />
             <span className="ex-row-body">
-              <span className="ex-row-title">{f.request}</span>
+              <span className="ex-row-title">{f.title}</span>
               <span className="ex-row-state">
                 {f.state === 'making'
                   ? (f.activity ?? uiText('Making the video'))
@@ -82,6 +89,8 @@ export function EpisodeRow({ episode: e, selected }: { episode: WatchEpisode; se
 export function Watched({ dir, episode, followUp, single }: { dir: string; episode: WatchEpisode; followUp?: FollowUp; single: boolean }) {
   const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
   const startPlaying = useStore((s) => s.studyAutoplayPath === dir)
+  const startAt = useStore((s) => s.studyStartAt)
+  const returning = useStore((s) => s.studyReturn)
   // openProject already returned this lesson's timeline. Keep the player in place while
   // watchDetail discovers its export/subtitles instead of briefly showing a smaller empty card.
   const seed = (): WatchDetail => {
@@ -118,7 +127,7 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
           <span className="eyebrow">
             {followUp ? format('Follow-up to episode {0}', [episode.number]) : single ? uiText('Video') : format('Lesson {0}', [episode.number])}
           </span>
-          <h1>{followUp ? followUp.request : episode.title}</h1>
+          <h1>{followUp ? followUp.title : episode.title}</h1>
         </div>
         <div className="ex-detail-actions">
           <WatchedToggle dir={dir} watched={!!(followUp ? followUp.watched : episode.watched)} />
@@ -152,9 +161,12 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
             video={video}
             resume
             startPlaying={startPlaying}
+            startAt={startAt}
+            overlay={!followUp ? <FollowUpCue episode={episode} /> : returning ? <div className="study-detour-cue"><button onClick={() => void returnToStudyVideo()}><ArrowLeft /><span><strong>{uiText('Return to the lesson')}</strong><small>{uiText('Continue where you left off')}</small></span></button></div> : undefined}
             seriesAutoplay={!followUp && !single}
             onEnded={() => {
               const current = useStore.getState()
+              if (followUp && current.studyReturn) { void returnToStudyVideo(); return }
               if (
                 followUp ||
                 single ||
@@ -183,7 +195,10 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
         </section>
       )}
 
-      {!followUp && !single && src && <FollowUpRequest key={dir} dir={dir} />}
+      {!followUp && !single && src && <div className="study-lesson-tools" data-tour="study-clarity"><span className="hint">{uiText('A different angle can help.')}</span><button className="btn small" onClick={() => prepareStudyAction('video')}><Video />{uiText('Create an additional explanation')}</button></div>}
+      {followUp && <button className="btn small ghost" onClick={() => returning ? void returnToStudyVideo() : void selectStudied(episode.dir)}><ArrowLeft />{uiText('Return to the lesson')}</button>}
+      {!followUp && !!episode.followUps.length && <div className="study-additional-videos"><span className="eyebrow">{uiText('Additional videos')}</span>{episode.followUps.map((f) => <button key={f.dir} disabled={f.state !== 'done'} onClick={() => void watchAdditionalVideo(f.dir)}><Play /><span><strong>{f.title}</strong><small>{f.state === 'done' ? format('Follow-up from {0}', [clock(f.at)]) : f.state === 'failed' ? uiText('Didn’t finish') : uiText('Making the video')}</small></span></button>)}</div>}
+      {src && <StudyNotes key={dir} dir={dir} />}
     </div>
   )
 }
@@ -202,87 +217,11 @@ export function WatchedToggle({ dir, watched }: { dir: string; watched: boolean 
   )
 }
 
-/** A new video that explains the part at the current moment further: it goes under this episode. */
-function FollowUpRequest({ dir }: { dir: string }) {
+/** An optional detour appears near the moment that prompted it, including in fullscreen. */
+function FollowUpCue({ episode }: { episode: WatchEpisode }) {
   const at = useStore((s) => s.watchTime ?? 0)
-  const [open, setOpen] = useState(false)
-  const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [moment, setMoment] = useState(0)
-  return (
-    <>
-      <div className="study-lesson-tools" data-tour="study-clarity">
-        <span className="hint">{uiText('Need a little more clarity?')}</span>
-        <div>
-          <button className="btn small ghost" onClick={() => useStore.setState({ studyTab: 'chat', chatDraft: '' })}>
-            <MessageCircleQuestion />
-            {uiText('Ask a question')}
-          </button>
-          <button
-            className="btn small"
-            onClick={() => {
-              setMoment(at)
-              setOpen(true)
-            }}
-          >
-            <Sparkles />
-            {uiText('Go deeper')}
-          </button>
-        </div>
-      </div>
-      <Modal
-        open={open}
-        onClose={() => !busy && setOpen(false)}
-        title={uiText('A closer look')}
-        icon={<Sparkles className="head-icon" />}
-        width={520}
-        footer={
-          <>
-            <button className="btn ghost" disabled={busy} onClick={() => setOpen(false)}>
-              {uiText('Cancel')}
-            </button>
-            <button
-              className="btn primary"
-              disabled={!text.trim() || busy}
-              onClick={async () => {
-                setBusy(true)
-                try {
-                  await api.requestFollowUp(dir, moment, text)
-                  setOpen(false)
-                  setText('')
-                  toast(uiText('A follow-up video is being made. It shows under this episode.'), 'ok')
-                } catch (e) {
-                  toast(errorText(e), 'error')
-                } finally {
-                  setBusy(false)
-                }
-              }}
-            >
-              {busy ? <span className="spinner" /> : <Sparkles />}
-              {uiText('Create follow-up video')}
-            </button>
-          </>
-        }
-      >
-        <div className="modal-body quick-form">
-          <p className="hint">
-            {uiText('A short video that explains this moment more slowly, with the same notation. You can keep studying while it is made.')}
-          </p>
-          <label className="label" htmlFor="watch-follow">
-            {uiText('What should a new video explain further, around ')}
-            {clock(moment)}?
-          </label>
-          <textarea
-            id="watch-follow"
-            className="textarea ex-input"
-            rows={4}
-            data-autofocus
-            placeholder={uiText('e.g. I don’t see why the current splits here, and where R₂₃ comes from.')}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-        </div>
-      </Modal>
-    </>
-  )
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  const followUps = nearbyFollowUps(episode.followUps, at)
+  const follow = followUps.find((f) => f.dir !== dismissed)
+  return follow ? <div className="study-detour-cue"><button onClick={() => void watchAdditionalVideo(follow.dir)}><Video /><span><strong>{follow.title}</strong><small>{uiText('Watch a deeper explanation · then return here')}</small></span><Play /></button><button className="icon-btn" aria-label={uiText('Dismiss')} onClick={() => setDismissed(follow.dir)}>×</button></div> : null
 }

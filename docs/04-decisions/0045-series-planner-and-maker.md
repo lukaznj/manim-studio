@@ -11,11 +11,10 @@ New series asked for a title, required PDFs and asked for a model each time. Pla
 
 ## Decision
 
-- **Two series models per agent, in Settings → Agent:** "Series: planning" and "Series: making the episodes" (`settings.seriesModels`, defaults in `shared/agent-selection.ts` `SERIES_MODELS`).
-  - Claude: Opus 5.5 plans, Sonnet 5.5 makes.
-  - Codex: GPT-6-Astra for both.
-  - Antigravity: Gemini 4 Argon for both.
-  - Effort defaults to high everywhere.
+- **Two normal model choices in Settings → Agent:** the creation model/effort (editor chat, videos and series episodes) and "Series: planning". [[0051-study-assistant-and-notes]] adds an independent study-chat model/effort in Settings; its questions and notes do not change the creation selection.
+  - Planning defaults: Claude Opus 5.5, Codex GPT-6-Astra, Antigravity Gemini 4 Argon; high effort.
+  - Episode creation inherits the selected provider's normal creation model and effort. Codex creation defaults to GPT-6.1 Sol; its only other choice is GPT-6 Astra. Old blank/retired Codex planner and maker overrides migrate to Astra and Sol respectively.
+  - **Advanced** offers an optional "Override model for series episodes". Existing saved maker selections remain explicit overrides; disabling one restores inheritance. Saved planner selections stay independent (`settings.seriesModels`, planner defaults in `shared/agent-selection.ts` `SERIES_PLANNERS`).
   - New series has no model picker; a run captures the maker at its start, as before.
 - **Claude's model list shows only the 5.5 generation**, plus Studio's default. A saved full model id counts as the listed alias with the same name, so it keeps its effort levels.
 - **New series is two steps:** first the PDFs, or "I have no PDFs"; then the details. Without PDFs, the user says what they want to learn and the planner chooses the curriculum, with episodes that have no sources. The optional instructions stay.
@@ -23,4 +22,4 @@ New series asked for a title, required PDFs and asked for a model each time. Pla
 
 ## Consequences
 
-Planning spends more (Opus) once per series, and every episode runs on the cheaper maker unless Settings say otherwise. Changing the series models affects new series only. This revises the "own model and effort" point of [[0023-parallel-series-episodes]].
+Planning can spend more (Opus) once per series. Normal creation and series episodes share one model choice, with an advanced override when batch production needs a different model. Changing defaults or overrides affects new series only; running series and saved per-episode assignments retain their captured selections. This revises the "own model and effort" point of [[0023-parallel-series-episodes]].

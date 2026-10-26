@@ -1,10 +1,12 @@
-import { t as uiText } from '../lib/i18n'
+import { t as uiText, format, currentLocale } from '../lib/i18n'
 import { Receipt } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { costOf, modelName, usageTotals, type ModelTokens, type UsageEntry } from '../../../shared/usage'
+import { apiEstimateOf, costOf, modelName, usageTotals, type ModelTokens, type UsageEntry } from '../../../shared/usage'
 import { api } from '../lib/api'
 import { closeDialog, openDialog, useStore } from '../store'
 import { Modal } from './ui'
+import { AccountPlanUsage } from './AccountPlanUsage'
+import { configuredAuth } from './LimitSwitch'
 
 const dollars = (n: number) => `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`
 const tokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n))
@@ -25,23 +27,31 @@ const TOOL: Record<string, string> = {
   WebFetch: 'web pages',
 }
 
-/** The project's agent turns in the chat's header: what this video cost so far. Opens the breakdown. */
-export function ProjectCost() {
+/** Recorded project tokens; prices only for known API-key usage or developer comparisons. */
+export function ProjectUsage() {
   const project = useStore((s) => s.project?.path)
-  const [cost, setCost] = useState(0)
+  const developer = useStore((s) => !!s.settings?.developerMode)
+  const [entries, setEntries] = useState<UsageEntry[]>([])
   useEffect(() => {
-    const load = () => void api.projectUsage().then((u) => setCost(u.reduce((s, e) => s + costOf(e.models), 0)))
+    let active = true
+    setEntries([])
+    const load = () => void api.projectUsage().then((usage) => active && setEntries(usage))
     load()
-    return api.on('chat', (e) => e.type === 'done' && load())
+    const off = api.on('chat', (e) => e.type === 'done' && load())
+    return () => { active = false; off() }
   }, [project])
-  if (!cost) return null
+  const total = usageTotals(entries)
+  const count = sum(total, 'input') + sum(total, 'cacheRead') + sum(total, 'cacheWrite') + sum(total, 'output')
+  const estimate = apiEstimateOf(entries)
+  const showCost = estimate !== null || (developer && entries.some((entry) => entry.costKnown !== false))
+  if (!entries.length) return null
   return (
     <button
       className="usage-chip"
-      title={uiText('What this video’s agent turns cost at API prices. Click for where it went.')}
+      title={uiText(showCost ? 'API-equivalent estimate, not subscription charges or an invoice.' : 'Recorded tokens for this video. Open the usage breakdown.')}
       onClick={() => openDialog({ kind: 'usage' })}
     >
-      <Receipt /> {dollars(cost)}
+      <Receipt /> {showCost ? dollars(estimate ?? costOf(total)) : format('{0} tokens', [tokens(count)])}
     </button>
   )
 }
@@ -49,6 +59,7 @@ export function ProjectCost() {
 /** Where a video's usage went: by model (which one ran), by step (script, video, fixes, chat) and turn by turn. */
 export function UsageDialog() {
   const open = useStore((s) => s.dialog?.kind === 'usage')
+  const settings = useStore((s) => s.settings)
   const [log, setLog] = useState<UsageEntry[]>([])
   useEffect(() => {
     if (open) void api.projectUsage().then(setLog)
@@ -56,6 +67,8 @@ export function UsageDialog() {
 
   const totals = usageTotals(log)
   const total = costOf(totals)
+  const showCosts = apiEstimateOf(log) !== null || (!!settings?.developerMode && log.some((entry) => entry.costKnown !== false))
+  const tokenCount = (models: Record<string, ModelTokens>) => sum(models, 'input') + sum(models, 'cacheRead') + sum(models, 'cacheWrite') + sum(models, 'output')
   const steps = new Map<string, UsageEntry[]>()
   for (const e of log) steps.set(e.step, [...(steps.get(e.step) ?? []), e])
   const tools = (t: Record<string, number>) => {
@@ -67,20 +80,14 @@ export function UsageDialog() {
   return (
     <Modal open={open} onClose={closeDialog} title={uiText('What this video used')} icon={<Receipt className="head-icon" />} width={720}>
       <div className="modal-body usage-dialog">
+        {settings && <AccountPlanUsage agent={settings.agent} auth={configuredAuth(settings, settings.agent)} />}
         {!log.length ? (
           <p className="muted">{uiText('No agent turns recorded yet. Every turn from now on is (chat, quick mode and series).')}</p>
         ) : (
           <>
             <p className="muted">
-              {dollars(total)} {uiText(" at API prices over ")}
-              {log.length}{' '}
-              {uiText(
-                " turns. On a Claude plan these tokens count against its limits instead of being billed; the proportions show where the usage went. Most of it is usually ",
-              )}
-              <strong>{uiText('cache reads')}</strong>
-              {uiText(
-                ': on every tool call the agent reads the whole conversation again, pictures of frames and PDF pages included, so long sessions with many renders and looks cost the most.',
-              )}
+              {format('{0} tokens across {1} recorded turns.', [tokens(tokenCount(totals)), log.length])}
+              {showCosts && <> {dollars(total)} · {uiText('API-equivalent estimate, not subscription charges or an invoice.')}</>}
             </p>
             <table className="usage-table">
               <thead>
@@ -90,7 +97,7 @@ export function UsageDialog() {
                   <th>{uiText('Cache reads')}</th>
                   <th>{uiText('Cache writes')}</th>
                   <th>{uiText('Output')}</th>
-                  <th>{uiText('Cost')}</th>
+                  {showCosts && <th>{uiText('API estimate')}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -101,7 +108,7 @@ export function UsageDialog() {
                     <td className="mono">{tokens(n.cacheRead)}</td>
                     <td className="mono">{tokens(n.cacheWrite)}</td>
                     <td className="mono">{tokens(n.output)}</td>
-                    <td className="mono">{dollars(n.costUSD)}</td>
+                    {showCosts && <td className="mono">{log.some((entry) => entry.costKnown !== false && entry.models[model]) ? dollars(n.costUSD) : '—'}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -114,15 +121,15 @@ export function UsageDialog() {
                   <th>{uiText('Step')}</th>
                   <th>{uiText('Turns')}</th>
                   <th>{uiText('What the agent did')}</th>
-                  <th>{uiText('Cost')}</th>
-                  <th>{uiText('Share')}</th>
+                  <th>{uiText('Tokens')}</th>
+                  {showCosts && <th>{uiText('API estimate')}</th>}
                 </tr>
               </thead>
               <tbody>
                 {[...steps]
-                  .map(([step, entries]) => ({ step, entries, cost: entries.reduce((s, e) => s + costOf(e.models), 0) }))
-                  .sort((a, b) => b.cost - a.cost)
-                  .map(({ step, entries, cost }) => (
+                  .map(([step, entries]) => ({ step, entries, count: entries.reduce((s, e) => s + tokenCount(e.models), 0), cost: entries.reduce((s, e) => s + costOf(e.models), 0) }))
+                  .sort((a, b) => b.count - a.count)
+                  .map(({ step, entries, count, cost }) => (
                     <tr key={step}>
                       <td>{step}</td>
                       <td className="mono">{entries.length}</td>
@@ -131,12 +138,8 @@ export function UsageDialog() {
                           entries.reduce<Record<string, number>>((t, e) => (Object.entries(e.tools).forEach(([k, n]) => (t[k] = (t[k] ?? 0) + n)), t), {}),
                         )}
                       </td>
-                      <td className="mono">{dollars(cost)}</td>
-                      <td>
-                        <span className="usage-share">
-                          <span style={{ width: `${total ? (cost / total) * 100 : 0}%` }} />
-                        </span>
-                      </td>
+                      <td className="mono">{tokens(count)}</td>
+                      {showCosts && <td className="mono">{entries.some((entry) => entry.costKnown !== false) ? dollars(cost) : '—'}</td>}
                     </tr>
                   ))}
               </tbody>
@@ -149,7 +152,7 @@ export function UsageDialog() {
                   {[...log].reverse().map((e, i) => (
                     <tr key={i}>
                       <td className="faint mono">
-                        {new Date(e.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(e.at).toLocaleString(currentLocale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td>{e.step}</td>
                       <td className="faint">{Object.keys(e.models).map(modelName).join(', ')}</td>
@@ -157,7 +160,7 @@ export function UsageDialog() {
                         {tokens(sum(e.models, 'cacheRead') + sum(e.models, 'input') + sum(e.models, 'cacheWrite'))} {uiText(" in · ")}
                         {tokens(sum(e.models, 'output'))} {uiText(" out")}
                       </td>
-                      <td className="mono">{dollars(costOf(e.models))}</td>
+                      {showCosts && <td className="mono">{e.costKnown === false ? '—' : dollars(costOf(e.models))}</td>}
                     </tr>
                   ))}
                 </tbody>

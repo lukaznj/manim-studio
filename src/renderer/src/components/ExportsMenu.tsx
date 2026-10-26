@@ -1,4 +1,4 @@
-import { t as uiText } from '../lib/i18n'
+import { t as uiText, format } from '../lib/i18n'
 import { CircleAlert, Download, FolderOpen, Pause, Play, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ExportJob } from '../../../shared/types'
@@ -18,14 +18,14 @@ export function ExportsMenu() {
   const waiting = jobs.filter((j) => j.state === 'waiting').length
   const failed = jobs.some((j) => j.state === 'failed')
   const label = running?.paused
-    ? 'Export paused'
+    ? uiText('Export paused')
     : running
       ? running.percent !== undefined
-        ? `Exporting ${Math.round(running.percent * 100)}%`
-        : 'Exporting…'
+        ? format('{0} {1}%', [uiText(running.phase === 'rendering' ? 'Rendering' : running.phase === 'assembling' ? 'Assembling' : 'Exporting'), Math.round(running.percent * 100)])
+        : uiText(running.phase === 'rendering' ? 'Rendering…' : running.phase === 'assembling' ? 'Assembling…' : 'Exporting…')
       : waiting
         ? `${waiting} waiting`
-        : 'Exports'
+        : uiText('Exports')
 
   return (
     <div className="popover-anchor">

@@ -17,8 +17,9 @@
 // writing in the project only, reading the project and the studio and manim sources, and the six
 // scene tools; shell commands, other paths and symlinks out of the project are refused.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
+  appendFileSync,
   chmodSync,
   copyFileSync,
   createWriteStream,
@@ -45,6 +46,7 @@ import { cleanEnv } from './env'
 import { paths } from './paths'
 import { runRunner } from './runner'
 import { getSecret, getSettings } from './settings'
+import { loginFailureDetails, redactLoginLog } from './login-diagnostics'
 
 export const AGY_VERSION = '1.3.6'
 // The release's assets and their published sha256 (github.com/google-antigravity/antigravity-cli).
@@ -270,18 +272,34 @@ function killLogin(): void {
 
 /** The CLI's own Google sign-in, driven in a pseudo-terminal: the link to open, then the code to paste. */
 export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
+  const record = (text: string) => {
+    const line = redactLoginLog(text)
+    onEvent({ diagnostic: line })
+    console.info(`[Antigravity sign-in] ${line}`)
+    try {
+      mkdirSync(app.getPath('logs'), { recursive: true })
+      appendFileSync(join(app.getPath('logs'), 'antigravity-login.log'), `${new Date().toISOString()} ${line}\n`)
+    } catch { /* The inline log still works if the log folder is unavailable. */ }
+  }
+  const failed = (error: unknown, log = '') => {
+    record(loginFailureDetails(error, log))
+    return new Error('Antigravity sign-in failed. See the sign-in log for details.')
+  }
+  record(`Starting Google sign-in (${process.platform} ${process.arch}).`)
   const bin = installed()
   if (!bin) throw new Error('Install Antigravity first (Settings → Accounts).')
   if (process.platform === 'win32') return windowsLogin(bin, onEvent)
   killLogin()
   mkdirSync(agyHome(), { recursive: true })
   await ensureKeychain()
+  record(`Launching the Python login helper with ${bin}.`)
   const job = await runRunner('default', ['agy-login', bin, agyHome()], {
     onEvent: (e) => {
+      if (e.type === 'diagnostic') record(String(e.line))
       if (e.type === 'url') onEvent({ line: String(e.line), url: String(e.url), needsCode: true })
       if (e.type === 'consent') onEvent({ needsConsent: true })
     },
-  })
+  }).catch((e) => { throw failed(e) })
   loginChild = job.child
   // On macOS the CLI saves the sign-in in Keychain, so the Python helper never sees a
   // token file. Check existence through the same status path as Settings, never its contents.
@@ -305,12 +323,13 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
   try {
     await job.done
   } catch (e) {
-    if (!signedIn) throw e
+    if (!signedIn) throw failed(e, job.log())
   } finally {
     clearInterval(timer)
     if (loginChild === job.child) loginChild = null
     onEvent({ done: true })
   }
+  record('Google sign-in finished. Checking the saved account.')
   return antigravityStatus()
 }
 
@@ -417,7 +436,7 @@ export async function antigravityModels(): Promise<ModelOption[]> {
 /** The CLI's model slug for the chosen model and effort: gemini-4-argon-medium. */
 function slug(selection: { model?: string; effort?: Effort } = {}): string {
   const { antigravityModel, antigravityEffort } = getSettings()
-  return `${selection.model ?? (antigravityModel || DEFAULT_MODEL)}-${selection.effort || antigravityEffort || 'medium'}`
+  return `${(selection.model ?? antigravityModel) || DEFAULT_MODEL}-${selection.effort || antigravityEffort || 'medium'}`
 }
 
 // --- turns ------------------------------------------------------------------------------
@@ -540,12 +559,16 @@ export async function askAntigravity(
   prompt: string,
   what: string,
   images: { name: string; mediaType: string; data: string }[] = [],
-  selection: { model?: string; effort?: Effort } = {},
+  selection: { model?: string; effort?: Effort; signal?: AbortSignal } = {},
 ): Promise<string> {
-  const dir = join(tmpdir(), 'manim-studio-antigravity', String(Date.now()))
+  const dir = join(tmpdir(), 'manim-studio-antigravity', randomUUID())
   mkdirSync(dir, { recursive: true })
   let home = ''
+  let child: ChildProcess | null = null
+  const stop = () => child?.kill()
+  selection.signal?.addEventListener('abort', stop)
   try {
+    if (selection.signal?.aborted) throw new Error('Stopped')
     const files = images.map((img, i) => {
       const file = join(dir, `picture-${i + 1}.${img.mediaType.split('/')[1] === 'jpeg' ? 'jpg' : (img.mediaType.split('/')[1] ?? 'png')}`)
       writeFileSync(file, Buffer.from(img.data, 'base64'))
@@ -553,12 +576,17 @@ export async function askAntigravity(
     })
     const named = images.length ? `${prompt}\n\nThe pictures, in order: ${images.map((img, i) => `${files[i]} is "${img.name}"`).join('; ')}.` : prompt
     home = await prepare(dir, system)
-    const out = await runTurn(home, dir, withImages(named, files), undefined, { part: () => {}, status: () => {}, conversation: () => {} }, () => {}, selection)
+    if (selection.signal?.aborted) throw new Error('Stopped')
+    const out = await runTurn(home, dir, withImages(named, files), undefined, { part: () => {}, status: () => {}, conversation: () => {} }, (process) => {
+      child = process
+      if (selection.signal?.aborted) stop()
+    }, selection)
     if (!out.ok || !out.result) throw new Error(out.error ?? 'no answer')
     return out.result.response
   } catch (e) {
     throw new Error(`Antigravity couldn’t ${what}: ${friendly((e as Error).message)}`)
   } finally {
+    selection.signal?.removeEventListener('abort', stop)
     rmSync(dir, { recursive: true, force: true })
     if (home) rmSync(home, { recursive: true, force: true })
   }

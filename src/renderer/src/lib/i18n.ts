@@ -1,19 +1,18 @@
-import { hr } from './hr'
+import { translateUi } from '../../../shared/i18n'
+import { resolveUiLanguage, uiLocale, type UiLanguage } from '../../../shared/ui-languages'
 
-let language: 'en' | 'hr' = 'en'
-export const currentLanguage = (): 'en' | 'hr' => language
+let language: UiLanguage = 'en'
+export const currentLanguage = (): UiLanguage => language
+export const currentLocale = (): string => uiLocale(language)
 
-export function setLanguage(next: 'en' | 'hr'): void {
-  language = next
-  document.documentElement.lang = next
+export function setLanguage(next: UiLanguage): void {
+  language = resolveUiLanguage(next)
+  document.documentElement.lang = uiLocale(language)
 }
 
 /** Product copy only. Never pass scene source, narration or user documents through this catalog. */
 export function t(text: string): string {
-  if (language === 'en') return text
-  if (hr[text]) return hr[text]
-  const key = text.trim()
-  return hr[key] ? text.replace(key, () => hr[key]) : text
+  return translateUi(language, text)
 }
 
 /** Rendering-boundary helper also accepts icons, fragments and numeric values. */
