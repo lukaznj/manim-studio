@@ -125,7 +125,7 @@ export async function renderFinal(
   dir: string,
   meta: ProjectMeta,
   variant: RenderVariant,
-  opts: { cacheDir?: string; partialDir?: string; signal?: AbortSignal; onProgress?: (t: number) => void; offlineVoice?: boolean; tag?: string } = {},
+  opts: { cacheDir?: string; partialDir?: string; signal?: AbortSignal; onProgress?: (t: number, clips: number) => void; offlineVoice?: boolean; tag?: string } = {},
 ): Promise<Timeline> {
   const args = ['render', dir, '--quality', 'final']
   if (variant.theme) args.push('--theme', variant.theme)
@@ -142,7 +142,7 @@ export async function renderFinal(
       ...(opts.partialDir ? { STUDIO_PARTIAL_DIR: opts.partialDir } : {}),
       ...(opts.offlineVoice ? { STUDIO_VOICE_OFFLINE: '1' } : {}),
     },
-    onEvent: (e) => e.type === 'progress' && opts.onProgress?.(Number(e.t)),
+    onEvent: (e) => e.type === 'progress' && opts.onProgress?.(Number(e.t), Number(e.clips)),
     signal: opts.signal,
     tag: opts.tag,
   })

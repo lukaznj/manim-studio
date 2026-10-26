@@ -28,6 +28,15 @@ STARTUP_TIMEOUT = 45
 TIMEOUT = 10 * 60
 
 
+def diagnostic(text: str) -> None:
+    text = re.sub(r"https?://[^\s\x1b\x07]+", "[URL omitted]", text)
+    text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[email omitted]", text)
+    text = re.sub(r'''(?i)(["']?(?:authorization(?:[_ -]?code)?|access[_ -]?token|refresh[_ -]?token|id[_ -]?token|api[_ -]?key|password|secret)["']?\s*[=:]\s*["']?)[^\s,;"'}]+''', r"\1[redacted]", text)
+    text = re.sub(r"(?i)Bearer\s+\S+", "Bearer [redacted]", text)
+    text = re.sub(r"\b(?:ya29\.[\w.-]+|AIza[\w-]+|eyJ[\w-]+\.[\w-]+\.[\w-]+|4/[\w/-]+)", "[credential omitted]", text)
+    emit("diagnostic", line=text[-6000:])
+
+
 class TerminalOutput:
     """A pty has no terminal emulator to answer the CLI's device/cursor queries."""
 
@@ -64,6 +73,7 @@ def token_file(home: str) -> str:
 
 
 def run(binary: str, home: str) -> int:
+    diagnostic(f"Login helper started with Python {sys.version.split()[0]}.")
     try:
         import fcntl
         import pty
@@ -92,9 +102,18 @@ def run(binary: str, home: str) -> int:
     started = time.monotonic()
     end = started + TIMEOUT
     previous_term = signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    submitted_code = False
+    cli_reaped = False
+    diagnostic("Antigravity started in a pseudo-terminal. Waiting for its setup or login screen.")
+    def terminal_details():
+        if submitted_code:
+            diagnostic("Terminal output omitted after authorization code submission.")
+        else:
+            diagnostic("Last terminal output:\n" + terminal.screen[-6000:])
     try:
         while time.monotonic() < end:
             if not sent_url and not awaiting_consent and time.monotonic() - started >= STARTUP_TIMEOUT:
+                terminal_details()
                 emit("error", message="Antigravity couldn’t start Google sign-in. Try again, or restart Studio.")
                 return 1
             if os.path.exists(token_file(home)):
@@ -111,6 +130,7 @@ def run(binary: str, home: str) -> int:
                 for reply in terminal.feed(chunk):
                     os.write(fd, reply)
                 if not picked_theme and "Choose your color scheme" in terminal.screen:
+                    diagnostic("Selecting the default terminal theme.")
                     os.write(fd, b"\r")  # the CLI's default terminal theme, before its login picker
                     picked_theme = True
                 if not requested_consent and "Terms of Service & Data Use" in terminal.screen and "[Done]" in terminal.screen:
@@ -118,17 +138,21 @@ def run(binary: str, home: str) -> int:
                     if checkbox:
                         consent_checked = checkbox.group(1).lower() == "x"
                         emit("consent")
+                        diagnostic("Waiting for your terms and interaction-sharing choice in Studio.")
                         requested_consent = awaiting_consent = True
                 if not picked and "Select login method" in terminal.screen:
+                    diagnostic("Selecting Google OAuth.")
                     os.write(fd, b"\r")  # 1. Google OAuth
                     picked = True
                 url = terminal.url
                 if url and not sent_url:
+                    diagnostic("Google sign-in URL received. Waiting for the browser authorization code.")
                     emit("url", url=url, line="Sign in with Google in your browser, then paste the code it shows here.")
                     sent_url = True
             if sys.stdin in ready:
                 incoming = os.read(sys.stdin.fileno(), 4096)
                 if not incoming:
+                    diagnostic("Studio closed the login helper’s input.")
                     break
                 lines = (pending_input + incoming).split(b"\n")
                 pending_input = lines.pop()
@@ -146,21 +170,30 @@ def run(binary: str, home: str) -> int:
                         if choice["shareData"] != consent_checked:
                             os.write(fd, b"\r")
                         os.write(fd, b"\x1b[B\x1b[C\r")
+                        diagnostic("First-run setup confirmed. Waiting for Google sign-in.")
                         awaiting_consent = False
                         started = time.monotonic()
                         continue
                     if code.strip():
+                        submitted_code = True
+                        diagnostic("Authorization code submitted to Antigravity. Waiting for it to save the sign-in.")
                         os.write(fd, code.strip().encode() + b"\r")
         if os.path.exists(token_file(home)):
             emit("done", ok=True)
             return 0
+        exited, status = os.waitpid(pid, os.WNOHANG)
+        if exited:
+            cli_reaped = True
+            diagnostic(f"Antigravity CLI exited with code {os.waitstatus_to_exitcode(status)}.")
+        terminal_details()
         emit("error", message="The Antigravity sign-in didn’t finish. Try again.")
         return 1
     finally:
         signal.signal(signal.SIGTERM, previous_term)
         try:
-            os.kill(pid, signal.SIGKILL)
-            os.waitpid(pid, 0)
+            if not cli_reaped:
+                os.kill(pid, signal.SIGKILL)
+                os.waitpid(pid, 0)
         except OSError:
             pass
         os.close(fd)

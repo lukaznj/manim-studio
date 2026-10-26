@@ -57,6 +57,8 @@ class LoginProcess(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.home = Path(self.tmp.name)
         self.child = None
+        self.pending = b""
+        self.diagnostics = []
 
     def tearDown(self):
         if self.child:
@@ -66,6 +68,7 @@ class LoginProcess(unittest.TestCase):
         self.tmp.cleanup()
 
     def start(self, script, startup_timeout=5):
+        self.pending = b""
         binary = self.home / "fake-agy"
         binary.write_text(f"#!{sys.executable}\n" + textwrap.dedent(script))
         binary.chmod(0o755)
@@ -83,10 +86,43 @@ class LoginProcess(unittest.TestCase):
         self.addCleanup(cleanup)
 
     def event(self):
-        self.assertTrue(select.select([self.child.stdout], [], [], 8)[0], "No login event")
-        line = self.child.stdout.readline()
-        self.assertTrue(line.startswith("@@studio "), line)
-        return json.loads(line[len("@@studio "):])
+        while True:
+            while b"\n" not in self.pending:
+                self.assertTrue(select.select([self.child.stdout], [], [], 8)[0], "No login event")
+                chunk = os.read(self.child.stdout.fileno(), 65536)
+                self.assertTrue(chunk, "Login helper exited without an event")
+                self.pending += chunk
+            line, self.pending = self.pending.split(b"\n", 1)
+            self.assertTrue(line.startswith(b"@@studio "), line)
+            event = json.loads(line[len(b"@@studio "):])
+            if event["type"] == "diagnostic":
+                self.diagnostics.append(event["line"])
+            else:
+                return event
+
+    def test_cli_startup_error_is_in_the_diagnostic_log(self):
+        self.start('print("Failed to start: callback port is unavailable", flush=True); raise SystemExit(1)')
+        self.assertEqual(self.event()["type"], "error")
+        self.assertIn("Failed to start: callback port is unavailable", "\n".join(self.diagnostics))
+
+    def test_terminal_output_is_not_logged_after_code_submission(self):
+        self.start(r'''
+            import os, tty
+            tty.setraw(0)
+            os.write(1, b"https://accounts.google.com/auth?state=private\r\n")
+            code = b""
+            while not code.endswith(b"\r"):
+                code += os.read(0, 100)
+            os.write(1, b"Echo: " + code + b"\r\n")
+        ''')
+        self.assertEqual(self.event()["type"], "url")
+        self.child.stdin.write("private-code\n")
+        self.child.stdin.flush()
+        self.assertEqual(self.event()["type"], "error")
+        log = "\n".join(self.diagnostics)
+        self.assertNotIn("private-code", log)
+        self.assertNotIn("state=private", log)
+        self.assertIn("omitted after authorization code", log)
 
     def test_login_answers_terminal_queries_and_forwards_the_code(self):
         self.start(r'''

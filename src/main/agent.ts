@@ -7,7 +7,8 @@
 import { randomUUID } from 'node:crypto'
 import type { Agent, AgentRoute, ChatMessage, ChatPart, ClaudeAuth, Effort } from '../shared/types'
 import type { UsageEntry } from '../shared/usage'
-import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
+import { limitFrom, limitFromText, limitText, usageLimitFromError, type Limit } from '../shared/usage-limit'
+import { reportAgentOutcome } from './agent-limit-notifications'
 import { antigravitySession, antigravityUsesKey } from './antigravity'
 import { antigravityChosen, claudeStatus, codexChosen, Inbox, sdk, studioOptions, studioPrompt, summarize, type TurnResult } from './claude'
 import { codexSession, codexUsesKey } from './codex'
@@ -39,10 +40,25 @@ export interface AgentOptions {
 export const agentBusy = new Set<string>()
 
 export async function episodeAgent(dir: string, opts: AgentOptions): Promise<EpisodeAgent> {
+  const agent = opts.agent ?? getSettings().agent
+  const route: AgentRoute = { agent, auth: opts.auth ?? configuredAuth(agent) }
+  const session = await createEpisodeAgent(dir, opts)
+  return {
+    async turn(text, step) {
+      const result = await session.turn(text, step)
+      reportAgentOutcome(route, result)
+      return result
+    },
+    close: () => session.close(),
+  }
+}
+
+async function createEpisodeAgent(dir: string, opts: AgentOptions): Promise<EpisodeAgent> {
   if (fakeAgents()) return fakeAgent(dir, opts) // driving the app in tests
   if (opts.agent ? opts.agent === 'codex' : codexChosen()) return otherAgent(dir, opts, 'codex')
   if (opts.agent ? opts.agent === 'antigravity' : antigravityChosen()) return otherAgent(dir, opts, 'antigravity')
   const { onTool } = opts
+  const auth = opts.auth ?? configuredAuth('claude')
   const { query } = await sdk()
   const inbox = new Inbox()
   const q = query({
@@ -51,7 +67,7 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
       autopilot: true,
       model: opts.model,
       effort: opts.strictModel && !opts.effort ? null : opts.effort,
-      auth: opts.auth,
+      auth,
     }),
   })
   agentBusy.add(dir)
@@ -98,7 +114,7 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
         } else if (msg.type === 'result') {
           const ok = msg.subtype === 'success' && !msg.is_error
           if (!ok && msg.subtype === 'success') limit = limitFromText(msg.result) ?? limit
-          if (step) opts.onUsage(recordTurn(dir, step, msg, tools, Date.now() - started))
+          if (step) opts.onUsage(recordTurn(dir, step, msg, tools, Date.now() - started, auth))
           finish(ok, ok ? undefined : msg.subtype === 'success' ? msg.result : msg.errors?.join('\n'))
         }
       }
@@ -138,6 +154,7 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
  * is registered with the bridge (mcp.ts agentProjects) while the agent works in it.
  */
 function otherAgent(dir: string, opts: AgentOptions, agent: 'codex' | 'antigravity'): EpisodeAgent {
+  const auth = agent === 'antigravity' ? configuredAuth(agent) : opts.auth ?? configuredAuth(agent)
   agentBusy.add(dir)
   agentProjects.add(dir)
   const messages = readChat(dir)
@@ -165,6 +182,7 @@ function otherAgent(dir: string, opts: AgentOptions, agent: 'codex' | 'antigravi
         step,
         session: agent === 'codex' ? readMeta(dir).codexThreadId : readMeta(dir).antigravityConversationId,
         provider: agent,
+        auth,
         providerUsage: raw,
         costKnown: false,
         tools: { ...tools },
@@ -187,7 +205,7 @@ function otherAgent(dir: string, opts: AgentOptions, agent: 'codex' | 'antigravi
   const instructions = studioPrompt(dir, agent, true)
   const session =
     agent === 'codex'
-      ? codexSession(dir, instructions, meta.codexThreadId, { ...on, thread: (id) => updateMetaAt(dir, { codexThreadId: id }) }, opts)
+      ? codexSession(dir, instructions, meta.codexThreadId, { ...on, thread: (id) => updateMetaAt(dir, { codexThreadId: id }) }, { ...opts, auth })
       : antigravitySession(
           dir,
           instructions,
@@ -214,17 +232,17 @@ function otherAgent(dir: string, opts: AgentOptions, agent: 'codex' | 'antigravi
       writeChat(messages, dir)
       await commitAll(dir, `${name}: ${text.split('\n')[0].slice(0, 72)}`, agent === 'codex' ? 'codex' : 'antigravity').catch(() => null)
       // Their CLIs end a turn at the plan's limit with an error; it waits like Claude's (reset time unknown).
-      return { ok: r.ok, error: r.error, limitedUntil: !r.ok && LIMITED.test(r.error ?? '') ? 0 : undefined }
+      return { ok: r.ok, error: r.error, limitedUntil: !r.ok ? usageLimitFromError(r.error)?.until : undefined }
     },
     close() {
       session.close()
+      // The process may exit after the app's last checkpoint; retain the partial conversation now.
+      writeChat(messages, dir)
       agentBusy.delete(dir)
       agentProjects.delete(dir)
     },
   }
 }
-
-const LIMITED = /usage limit|rate limit|quota|too many requests|limit (?:was |has been )?reached/i
 
 /**
  * Runs a turn, and when a usage limit ends it, waits for the reset and tells the agent to carry on.

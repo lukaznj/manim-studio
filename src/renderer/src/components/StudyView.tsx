@@ -1,3 +1,4 @@
+import { StudyNotes } from './StudyNotes'
 import { t as uiText, format } from '../lib/i18n'
 import { BookOpen, Captions, ListChecks, Plus, Search, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -10,6 +11,10 @@ import { findInTranscript, Transcript } from './Transcript'
 import { Tabs } from './ui'
 import { configuredAuth, LimitSwitch } from './LimitSwitch'
 import { api } from '../lib/api'
+import { lessonIsBuilding } from '../../../shared/series-presentation'
+import { EpisodeProduction, LessonProduction, ProductionNavigation, SeriesOverview } from './SeriesProduction'
+import { showSeriesProduction } from '../store'
+import { SeriesTitle } from './SeriesTitle'
 
 /** Video first, with one library section and one assistant panel visible at a time. */
 export function StudyView() {
@@ -24,9 +29,12 @@ export function StudyView() {
   const [adding, setAdding] = useState(false)
   const hits = useExerciseHits(library === 'exercises' ? query : '')
   const settings = useStore((s) => s.settings)
+  const activeRun = useStore((s) => s.series)
+  const overview = useStore((s) => s.studyProduction)
+  const production = series && (activeRun?.folder === series.folder ? activeRun : series.production)
   useEffect(() => {
-    setLibrary(item || !series ? 'exercises' : 'lessons')
-  }, [path, series?.folder, set?.folder])
+    setLibrary(overview && production ? 'lessons' : item || !series ? 'exercises' : 'lessons')
+  }, [path, series?.folder, set?.folder, overview])
   useEffect(() => {
     setQuery('')
     setLessonQuery('')
@@ -46,19 +54,22 @@ export function StudyView() {
   const single = !!series && series.episodes.length === 1 && series.episodes[0].dir === series.folder
   const episode = series?.episodes.find((e) => e.dir === path || e.followUps.some((f) => f.dir === path))
   const followUp = episode?.followUps.find((f) => f.dir === path)
+  const producing = !followUp ? production?.episodes.find((ep) => ep.dir === path) : undefined
+  const pending = !item && !!episode && lessonIsBuilding(producing, followUp?.state ?? episode.state)
+  const productionView = (!!overview && !!production) || pending
   const version = item ? `${item.state}:${item.video ?? ''}` : `${episode?.video ?? ''}:${followUp?.state ?? ''}`
   const watched = series?.episodes.filter((e) => e.watched).length ?? 0
   const count = series?.episodes.length ?? 0
   const lessons =
-    series?.episodes.filter((e) => `${e.title} ${e.followUps.map((f) => f.request).join(' ')}`.toLocaleLowerCase().includes(lessonQuery.toLocaleLowerCase())) ??
+    series?.episodes.filter((e) => `${e.title} ${e.followUps.map((f) => `${f.title} ${f.request}`).join(' ')}`.toLocaleLowerCase().includes(lessonQuery.toLocaleLowerCase())) ??
     []
 
   return (
-    <div className="ex-view study-view">
+    <div className={`ex-view study-view ${productionView ? 'production-view' : ''}`}>
       <aside className="ex-side" data-tour="study-library">
         <div className="ex-side-head">
           <span className="eyebrow">{series && !single ? uiText('Your course') : uiText('Your library')}</span>
-          <h2 className="ex-set-title">{series?.title ?? set!.title}</h2>
+          <h2 className="ex-set-title study-course-title">{series && series.folder !== series.episodes[0]?.dir ? <SeriesTitle folder={series.folder} title={production?.title ?? series.title} /> : series?.title ?? set!.title}</h2>
           {series ? (
             <>
               <p className="faint">{format('{0} of {1} lessons watched', [watched, count])}</p>
@@ -76,6 +87,7 @@ export function StudyView() {
           ) : (
             <p className="faint">{format('{0} exercises', [set!.items.length])}</p>
           )}
+          {production && <ProductionNavigation run={production} selected={!!overview} onClick={() => { setLibrary('lessons'); showSeriesProduction() }} />}
           {series && !single ? (
             <Tabs
               label={uiText('Course library')}
@@ -125,7 +137,7 @@ export function StudyView() {
           {library === 'lessons' ? (
             <ul className="ex-list">
               {lessons.map((e) => (
-                <EpisodeRow key={e.dir} episode={e} selected={path} />
+                <EpisodeRow key={e.dir} episode={e} selected={overview ? undefined : path} run={production ?? undefined} />
               ))}
               {!lessons.length && <li className="ex-none faint">{uiText('No matching lessons.')}</li>}
             </ul>
@@ -174,10 +186,16 @@ export function StudyView() {
           ) : null}
         </div>
       </aside>
-      <main className="ex-main" data-tour="study-video">
+      <main className="ex-main" data-tour={productionView ? 'study-production' : 'study-video'}>
         <div className="study-content">
-          {item ? (
-            <ExerciseMain key={item.dir} item={item} />
+          {overview && production ? (
+            <SeriesOverview run={production} />
+          ) : pending && producing && production ? (
+            <EpisodeProduction run={production} episode={producing} number={episode!.number} />
+          ) : pending && episode && path ? (
+            <LessonProduction dir={path} episode={episode} followUp={followUp} />
+          ) : item ? (
+            <><ExerciseMain key={item.dir} item={item} /><div className="study-exercise-notes"><StudyNotes key={item.dir} dir={item.dir} /></div></>
           ) : episode && path ? (
             <Watched dir={path} episode={episode} followUp={followUp} single={single} />
           ) : set && !series ? (
@@ -187,7 +205,7 @@ export function StudyView() {
           )}
         </div>
       </main>
-      <aside className="ex-chat study-assistant" data-tour="study-assistant">
+      {!productionView && <aside className="ex-chat study-assistant" data-tour="study-assistant">
         <div className="study-assistant-head">
           <Tabs
             label={uiText('Transcript or chat')}
@@ -227,7 +245,7 @@ export function StudyView() {
             </div>
           </div>
         )}
-      </aside>
+      </aside>}
       {series && !single && <AddLessonDialog open={adding} onClose={() => setAdding(false)} series={series} />}
     </div>
   )

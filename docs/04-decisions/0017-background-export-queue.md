@@ -17,6 +17,7 @@ An export blocked the app: the dialog stayed open until it finished, and the exp
 - **The title bar's Exports button** shows the running export's progress on every screen, and opens the list: stop, show the files, remove. A system notification says when an export is done or failed.
 - **Pause suspends the processes** (`runner.ts` `pauseTag`): every process a job (or the preview render) starts carries its tag, and pausing stops them where they are, with SIGSTOP/SIGCONT on macOS and Linux and NtSuspendProcess on Windows. Nothing is lost or redone, and a stop or quit resumes them first. Exports on a render server can't be paused, only stopped.
 - **Jobs live in memory.** Quitting while exports run or wait asks first.
+- **Quit waits for cancellation and narration copyback** ([[0049-series-recovery-and-shutdown]]). A completed export writes a durable receipt before resolving its queue promise, so a series interrupted just before saving the episode as done can recover that completion. Standalone queue jobs remain in memory.
 - Claude Desktop's `export_video` queues a job the same way and waits for it.
 
 ## Consequences

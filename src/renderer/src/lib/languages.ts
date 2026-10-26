@@ -1,36 +1,6 @@
-/** The narration languages offered in the app (ISO 639-1, plus a few regional variants). */
-export const LANGUAGES = [
-  'en',
-  'en-GB',
-  'es',
-  'fr',
-  'de',
-  'it',
-  'pt',
-  'pt-BR',
-  'nl',
-  'pl',
-  'cs',
-  'sk',
-  'sl',
-  'hr',
-  'sr',
-  'hu',
-  'ro',
-  'sv',
-  'da',
-  'nb',
-  'fi',
-  'tr',
-  'el',
-  'uk',
-  'ru',
-  'ar',
-  'hi',
-  'ja',
-  'ko',
-  'zh',
-]
+export { NARRATION_LANGUAGES as LANGUAGES } from '../../../shared/narration-languages'
+
 
 import { currentLanguage } from './i18n'
-export const languageName = { of: (code: string): string | undefined => new Intl.DisplayNames([currentLanguage()], { type: 'language' }).of(code) }
+import { uiLocale } from '../../../shared/ui-languages'
+export const languageName = { of: (code: string): string | undefined => new Intl.DisplayNames([uiLocale(currentLanguage())], { type: 'language' }).of(code) }

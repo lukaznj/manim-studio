@@ -11,10 +11,7 @@ A lecture is often needed in both themes: dark for screens, light for print-like
 
 ## Decision
 
-- **The video's look is per project** (Settings → Video):
-  - the theme, now changeable after creation
-  - a custom background colour per theme
-  - an optional background picture from media/ ([[0012-own-media-in-scenes]])
+- **The video's look is per project:** the theme, custom background colours per theme and optional background picture from media/ ([[0012-own-media-in-scenes]]) live in project metadata. Settings → Video exposes only the default theme for new videos; per-project theme/background editing and default background controls were removed from Settings ([[0036-settings-onboarding-and-languages]]). Existing project values remain supported.
 - **Versions.** Export renders the final video once per chosen theme, from the same scene (`render --theme <t> --out final-<t>`). The theme only changes the palette and background, never the layout.
 - **Quality.** 1080p or 1440p (2560 × 1440, or 1440 × 2560 in portrait), at 30 or 60 fps, chosen in the export dialog (`render --size --fps`). 1080p at 30 fps is the default. Unlike the format ([[0010-fixed-aspect-per-project]]), resolution and frame rate don't change the layout, so a scene renders the same at either. 1440p keeps thin lines and small text sharp after YouTube's compression; 60 fps makes motion smoother. 4K isn't offered: over 1440p the gain is small for this kind of picture, and the export takes about twice as long again.
 - **Languages.** For each extra language:

@@ -9,7 +9,7 @@ import { basename, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { SCRIPT_FILE, scriptStatus } from '../shared/script'
 import { TONES } from '../shared/tone'
-import { seriesAgentSelection, seriesSelection } from '../shared/agent-selection'
+import { seriesAgentSelection, seriesSelection, switchSeriesSelection } from '../shared/agent-selection'
 import type {
   AgentRoute,
   EpisodeRun,
@@ -24,9 +24,9 @@ import type {
 } from '../shared/types'
 import { configuredAuth, episodeAgent, sameRoute, turnPastLimits, type EpisodeAgent } from './agent'
 import { askClaude, chatModels, claudeStatus, languageName } from './claude'
-import { fakeAgents } from './agent-fake'
-import { beginEpisodeMetrics, episodeMetricsPhase, finishEpisodeMetrics } from './episode-metrics'
-import { cancelExport, queueExport } from './exports'
+import { fakeAgents, fakeSeriesPlan } from './agent-fake'
+import { beginEpisodeMetrics, episodeMetricsPhase, episodeMetricsSelection, finishEpisodeMetrics } from './episode-metrics'
+import { cancelExport, completedExport, pauseExport, queueExport } from './exports'
 import { cancel } from './render'
 import { createProject, readMeta, readScript, updateMetaAt } from './projects'
 import { parsePlan, titlesSoFar } from '../shared/series-plan'
@@ -34,8 +34,13 @@ import { checkAndFix, ensureQuickReady } from './quick'
 import { runRunner } from './runner'
 import { getSettings, setSettings } from './settings'
 import { slugify } from './slug'
-import { appendUsage } from './usage'
+import { appendUsage, readUsage } from './usage'
 import { costOf, type UsageEntry } from '../shared/usage'
+import { isSeriesCheckpoint, recoverSeries } from '../shared/series-recovery'
+import { readAtomicJson, writeAtomicJson } from './atomic-json'
+import { protectWork, shutdownRequested } from './work-lifecycle'
+import { saveSeriesDraft } from './series-draft'
+import { paths } from './paths'
 
 /** Per PDF, at most this much text goes into the planning request. */
 const MAX_TEXT = 40_000
@@ -49,6 +54,7 @@ export async function planSeries(
 ): Promise<SeriesPlan> {
   const topic = req.topic?.trim()
   if (!req.pdfs.length && !topic) throw new Error('Add the PDFs the series is made from, or say what you want to learn.')
+  if (fakeAgents()) return fakeSeriesPlan(req, report, signal)
   if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Accounts): it reads the PDFs and plans the episodes.')
   const work = join(tmpdir(), 'manim-studio-series', randomUUID())
   try {
@@ -112,13 +118,12 @@ const two = (n: number) => String(n).padStart(2, '0')
 
 /**
  * The running series carries on with another agent or sign-in (ADR 0048): new steps use it, and
- * episodes waiting on a usage limit start again with it at once. Episodes with a fixed assignment
- * (a developer comparison) keep theirs.
+ * episodes waiting on a usage limit start again with it at once, including comparison episodes.
  */
 export function switchSeriesAgent(to: AgentRoute): void {
   if (!series || series.state === 'done') throw new Error('No series is being made.')
   const maker = seriesSelection(getSettings(), 'make', to.agent)
-  Object.assign(series, { agent: to.agent, auth: to.auth, model: maker.model, effort: maker.effort })
+  switchSeriesSelection(series, to, maker)
   save()
 }
 
@@ -146,32 +151,59 @@ export function renameSeries(folder: string, title: string): void {
 
 /** Creates the series folder and one project per episode; unattended, makes them all in quick mode. */
 export async function startSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>): Promise<void> {
-  if (start.unattended) await ensureQuickReady(start.plan.episodes[0]?.assignment?.agent)
-  if (start.unattended && series && series.state !== 'done')
-    throw new Error('Another series is still on Home. Let it finish, or stop and dismiss it there, before starting a new one.')
-  const { plan } = start
-  const settings = getSettings()
-  const assignments = plan.episodes.flatMap((ep) => (ep.assignment ? [ep.assignment] : []))
-  if (assignments.length) {
-    const learning = settings.mode === 'learn' || (settings.mode === 'both' && settings.homeTab === 'learn')
-    if (!settings.developerMode || !settings.developerEpisodeModels || !learning || !start.unattended)
-      throw new Error('Enable episode model comparison in Settings → Develop and start the series in Learn.')
-    if (assignments.length !== plan.episodes.length) throw new Error('Choose an agent and model for every episode.')
-    for (const agent of new Set(assignments.map((a) => a.agent))) {
-      if (!['claude', 'codex', 'antigravity'].includes(agent)) throw new Error('Unknown episode agent.')
-      if (fakeAgents()) continue
-      if (!(await claudeStatus(agent)).loggedIn) throw new Error(`Connect ${agent} in Settings → Accounts before starting this series.`)
-      const models = await chatModels(agent)
-      for (const assignment of assignments.filter((a) => a.agent === agent)) {
-        const model = models.find((m) => m.value === assignment.model && m.value)
-        if (!model || (assignment.effort && !model.efforts.includes(assignment.effort)))
-          throw new Error(`The selected model or effort is no longer offered by ${agent}. Review the episode assignments.`)
+  if (creating) throw new Error('A series is already being created.')
+  creating = true
+  try {
+    const pending = pendingCreation()
+    const retry = pending && JSON.stringify(pending.start.plan) === JSON.stringify(start.plan) ? pending.folder : undefined
+    await protectWork(() => createSeries(start, openInWindow, retry))
+  } finally {
+    creating = false
+  }
+}
+
+let creating = false
+const creationFile = () => join(paths.userData(), 'series-creation.json')
+interface SeriesCreation { start: SeriesStart; folder: string }
+const pendingCreation = () => readAtomicJson(creationFile(), (value): value is SeriesCreation => {
+  const item = value as SeriesCreation | null
+  return !!item?.start?.plan && Array.isArray(item.start.plan.episodes) && typeof item.folder === 'string'
+})
+
+async function createSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>, recovering?: string): Promise<void> {
+  if (!start.plan.episodes.length) throw new Error('The series needs at least one episode.')
+  if (!recovering) {
+    if (start.unattended) await ensureQuickReady(start.plan.episodes[0]?.assignment?.agent)
+    if (start.unattended && series && series.state !== 'done')
+      throw new Error('Another series is still on Home. Let it finish, or stop and dismiss it there, before starting a new one.')
+    const { plan } = start
+    const settings = getSettings()
+    const assignments = plan.episodes.flatMap((ep) => (ep.assignment ? [ep.assignment] : []))
+    if (assignments.length) {
+      const learning = settings.mode === 'learn' || (settings.mode === 'both' && settings.homeTab === 'learn')
+      if (!settings.developerMode || !settings.developerEpisodeModels || !learning || !start.unattended)
+        throw new Error('Enable episode model comparison in Settings → Develop and start the series in Learn.')
+      if (assignments.length !== plan.episodes.length) throw new Error('Choose an agent and model for every episode.')
+      for (const agent of new Set(assignments.map((a) => a.agent))) {
+        if (!['claude', 'codex', 'antigravity'].includes(agent)) throw new Error('Unknown episode agent.')
+        if (fakeAgents()) continue
+        if (!(await claudeStatus(agent)).loggedIn) throw new Error(`Connect ${agent} in Settings → Accounts before starting this series.`)
+        const models = await chatModels(agent)
+        for (const assignment of assignments.filter((a) => a.agent === agent)) {
+          const model = models.find((m) => m.value === assignment.model && m.value)
+          if (!model || (assignment.effort && !model.efforts.includes(assignment.effort)))
+            throw new Error(`The selected model or effort is no longer offered by ${agent}. Review the episode assignments.`)
+        }
       }
     }
   }
+  const { plan } = start
   const root = getSettings().projectsDir
-  let folder = join(root, slugify(plan.title))
-  for (let i = 2; existsSync(folder); i++) folder = join(root, `${slugify(plan.title)}-${i}`)
+  const pending = pendingCreation()
+  if (!recovering && pending) throw new Error('Reopen the app to recover the series that was being created.')
+  let folder = recovering ?? join(root, slugify(plan.title))
+  if (!recovering) for (let i = 2; existsSync(folder); i++) folder = join(root, `${slugify(plan.title)}-${i}`)
+  writeAtomicJson(creationFile(), { start, folder })
   mkdirSync(folder, { recursive: true })
   writeFileSync(join(folder, 'series.md'), bibleText(plan))
 
@@ -179,19 +211,26 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
   const dirs: string[] = []
   for (const [i, ep] of plan.episodes.entries()) {
     const series: SeriesRef = { title: plan.title, folder, episode: i + 1, of: plan.episodes.length, brief: episodeBrief(ep) }
-    const dir = await createProject({
-      name: ep.title,
-      aspect: start.aspect,
-      theme: start.theme,
-      tone: start.tone,
-      language: start.language,
-      voice: start.voice,
-      series,
-      parentDir: folder,
-    })
-    // Episode folders sort in order: 01-…, 02-…
-    const ordered = join(folder, `${two(i + 1)}-${basename(dir)}`)
-    if (!existsSync(ordered)) renameSync(dir, ordered)
+    const ordered = join(folder, `${two(i + 1)}-${slugify(ep.title)}`)
+    const staging = join(folder, '.studio', `creating-${i + 1}`)
+    if (existsSync(join(ordered, 'project.json')) && (readMeta(ordered).series?.folder !== folder || readMeta(ordered).series?.episode !== i + 1))
+      throw new Error('An episode folder belongs to another video. Move it before continuing.')
+    if (!existsSync(join(ordered, 'project.json'))) {
+      // Only this transaction's disposable staging folder is removed after an interruption.
+      rmSync(staging, { recursive: true, force: true })
+      mkdirSync(join(folder, '.studio'), { recursive: true })
+      await createProject({
+        name: ep.title,
+        aspect: start.aspect,
+        theme: start.theme,
+        tone: start.tone,
+        language: start.language,
+        voice: start.voice,
+        series,
+        parentDir: folder,
+      }, staging)
+      renameSync(staging, ordered)
+    }
     mkdirSync(join(ordered, 'sources'), { recursive: true })
     for (const s of ep.sources) {
       const from = byName.get(s.file)
@@ -199,16 +238,24 @@ export async function startSeries(start: SeriesStart, openInWindow: (dir: string
     }
     dirs.push(ordered)
   }
-  writeFileSync(join(folder, 'series.json'), JSON.stringify({ plan, episodes: dirs.map((d) => basename(d)) }, null, 2))
+  writeAtomicJson(join(folder, 'series.json'), { plan, episodes: dirs.map((d) => basename(d)) })
   setSettings({ recentProjects: [...dirs, ...getSettings().recentProjects.filter((p) => !dirs.includes(p))] })
 
   if (!start.unattended) {
     writeEpisodeBible(dirs[0])
-    await openInWindow(dirs[0])
+    if (!recovering) await openInWindow(dirs[0])
+    clearCreation()
     return
   }
-  if (plan.usage) appendUsage(folder, plan.usage)
-  return startRun(plan.title, folder, dirs, start, plan.usage && costOf(plan.usage.models))
+  if (plan.usage && !readUsage(folder).some((entry) => entry.at === plan.usage!.at && entry.step === plan.usage!.step)) appendUsage(folder, plan.usage)
+  startRun(plan.title, folder, dirs, start, plan.usage && costOf(plan.usage.models), !!recovering)
+  clearCreation()
+}
+
+function clearCreation(): void {
+  writeAtomicJson(creationFile(), null)
+  writeAtomicJson(creationFile(), null)
+  saveSeriesDraft(null)
 }
 
 // --- making a series unattended, several episodes at once (ADR 0023) ---------------------------
@@ -224,37 +271,74 @@ const agents = new Map<string, EpisodeAgent>() // by episode folder
 const steps = new Map<string, 'script' | 'video'>() // episodes whose agent step is running
 const exporting = new Set<string>()
 const reporting = new Map<string, Promise<void>>()
+const tasks = new Set<Promise<void>>()
+const generations = new Map<string, number>()
+let driving: Promise<void> | null = null
+let continuing = false
 let sendSeries: (run: SeriesRun | null) => void = () => {}
 
 const runFile = (folder: string) => join(folder, '.studio', 'series-run.json')
 
 /** Loads the series Home last showed: a run the app was making when it quit can continue. */
-export function setupSeries(send: typeof sendSeries): void {
+export async function setupSeries(send: typeof sendSeries): Promise<void> {
   sendSeries = send
-  const folder = getSettings().seriesRun
-  if (!folder || !existsSync(runFile(folder))) return
-  try {
-    const saved = JSON.parse(readFileSync(runFile(folder), 'utf8')) as { run: SeriesRun; exportOptions: ExportOptions }
-    series = saved.run
+  const creation = pendingCreation()
+  const folder = creation && readAtomicJson(runFile(creation.folder), isSeriesCheckpoint) ? creation.folder : getSettings().seriesRun
+  const saved = folder && readAtomicJson(runFile(folder), isSeriesCheckpoint)
+  if (folder && !saved && existsSync(runFile(folder)) && !creation)
+    throw new Error(`The series checkpoint and its backup could not be read. The episode projects are still in ${folder}.`)
+  if (saved) {
+    series = recoveredRun(saved.run)
     exportOptions = saved.exportOptions
-    if (series.state === 'working' || series.state === 'paused') series.state = 'stopped' // the app quit while making it
-    for (const ep of series.episodes) Object.assign(ep, { activity: undefined, limitedUntil: undefined })
-  } catch {
-    // an unreadable run: Home just doesn't show it
+    save()
+    if (creation?.folder === folder) setSettings({ seriesRun: folder })
+  }
+  if (creation) {
+    if (series?.folder === creation.folder) clearCreation() // run committed before the last journal cleanup
+    else {
+      try {
+        await protectWork(() => createSeries(creation.start, async () => {}, creation.folder))
+      } catch (error) {
+        console.error('[series recovery]', error)
+        saveSeriesDraft({ request: { pdfs: creation.start.pdfs, instructions: creation.start.plan.instructions, language: creation.start.language, tone: creation.start.tone }, plan: creation.start.plan })
+        throw error
+      }
+    }
   }
 }
 
 export const seriesRun = (): SeriesRun | null => (series ? structuredClone(series) : null)
 
+/** A course owns its production history after Home's active run is dismissed or replaced. */
+export function seriesRunFor(folder: string): SeriesRun | null {
+  if (series?.folder === folder) return seriesRun()
+  const saved = readAtomicJson(runFile(folder), isSeriesCheckpoint)
+  return saved ? recoveredRun(saved.run) : null
+}
+
+function recoveredRun(saved: SeriesRun): SeriesRun {
+  const run = recoverSeries(saved)
+  for (const ep of run.episodes) {
+    if (ep.state === 'script' && scriptStatus(readScript(ep.dir) ?? '') === 'approved') {
+      ep.state = 'scripted'
+      ep.tried = false
+    }
+    if (ep.state === 'export' && ep.exportJob && completedExport(ep.dir, ep.exportJob)) ep.state = 'done'
+  }
+  if (run.episodes.every((ep) => ep.state === 'done' || ep.state === 'failed')) run.state = 'done'
+  return run
+}
+
 /** Saves the run in its folder (for Continue after a restart) and tells the window. */
 function save(): void {
   if (!series) return
   mkdirSync(join(series.folder, '.studio'), { recursive: true })
-  writeFileSync(runFile(series.folder), JSON.stringify({ run: series, exportOptions }))
+  writeAtomicJson(runFile(series.folder), { run: series, exportOptions })
   sendSeries(seriesRun())
 }
 
 const update = (ep: EpisodeRun, patch: Partial<EpisodeRun>) => {
+  if (!series?.episodes.includes(ep)) return // a dismissed run's late callback cannot touch its replacement
   if (patch.state) {
     const phase = (
       { script: 'Script', scripted: 'Waiting for video', scene: 'Implementation', check: 'Render check', export: 'Export' } as Record<string, string>
@@ -269,6 +353,7 @@ const halted = (ep: EpisodeRun) => series?.state !== 'working' || !!ep.held
 
 /** Stops an episode's agent and its render; its state stays, so it carries on from there later. */
 function halt(ep: EpisodeRun): void {
+  generations.set(ep.dir, (generations.get(ep.dir) ?? 0) + 1)
   agents.get(ep.dir)?.close()
   cancel('preview', ep.dir)
 }
@@ -277,6 +362,7 @@ export function pauseSeries(paused: boolean): void {
   if (!series || (paused ? series.state !== 'working' : series.state !== 'paused')) return
   series.state = paused ? 'paused' : 'working'
   if (paused) series.episodes.forEach(halt)
+  for (const ep of series.episodes) if (ep.exportJob) pauseExport(ep.exportJob, paused || !!ep.held)
   if (paused) series.episodes.filter((ep) => ep.state !== 'export').forEach((ep) => episodeMetricsPhase(ep.dir, 'Paused'))
   save()
   if (!paused) void drive()
@@ -288,6 +374,8 @@ export function pauseEpisode(dir: string, paused: boolean): void {
   update(ep, { held: paused })
   if (paused && ep.state !== 'export') episodeMetricsPhase(ep.dir, 'Paused')
   if (paused) halt(ep)
+  if (ep.exportJob) pauseExport(ep.exportJob, paused || series?.state === 'paused')
+  if (!paused) void drive()
 }
 
 /** Stops the agents and the exports; Continue picks the run up again. */
@@ -297,27 +385,75 @@ export function stopSeries(): void {
   for (const ep of series.episodes) {
     halt(ep)
     if (ep.exportJob && exporting.has(ep.dir)) cancelExport(ep.exportJob)
-    void finishMetrics(ep, series, 'stopped')
+    if (ep.state !== 'done' && ep.state !== 'failed') void finishMetrics(ep, series, 'stopped')
   }
   save()
 }
 
 /** Carries on with a stopped run: what didn't finish, including what failed, gets another go. */
-export async function continueSeries(): Promise<void> {
-  if (series?.state !== 'stopped') return
-  for (const agent of new Set(
-    series.episodes.filter((ep) => ep.state !== 'done').map((ep) => seriesAgentSelection(series!, ep, seriesSelection(getSettings(), 'make')).agent),
-  ))
-    await ensureQuickReady(agent)
-  for (const ep of series.episodes) {
-    if (ep.state !== 'failed' && ep.state !== 'stopped') continue
-    const script = readScript(ep.dir)
-    ep.state = script && scriptStatus(script) === 'approved' ? 'scripted' : 'waiting'
-    ep.error = undefined
+function adoptSeries(folder?: string): void {
+  if (folder && folder !== series?.folder) {
+    if (series && series.state !== 'done') throw new Error('Another series is still being made. Stop and dismiss it before continuing this one.')
+    const saved = readAtomicJson(runFile(folder), isSeriesCheckpoint)
+    if (!saved) throw new Error('The series checkpoint could not be read.')
+    series = recoveredRun(saved.run)
+    exportOptions = saved.exportOptions
+    setSettings({ seriesRun: folder })
+    save()
   }
-  series.state = 'working'
+}
+
+function retryState(ep: EpisodeRun): void {
+  const approved = scriptStatus(readScript(ep.dir) ?? '') === 'approved'
+  ep.state = ep.failedAt === 'export' ? 'export' : ep.failedAt === 'check' ? 'check' : approved ? 'scripted' : 'waiting'
+  ep.error = undefined
+  ep.failedAt = undefined
+}
+
+/** Retry one failed lesson without restarting completed lessons or other agents. */
+export async function retrySeriesEpisode(dir: string): Promise<void> {
+  if (shutdownRequested()) return
+  const folder = readMeta(dir).series?.folder
+  if (!folder) throw new Error('That video does not belong to a series.')
+  adoptSeries(folder)
+  const run = series
+  const ep = run?.episodes.find((episode) => episode.dir === dir)
+  if (!run || !ep || ep.state !== 'failed') return
+  await ensureQuickReady(seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')).agent)
+  if (series !== run || ep.state !== 'failed' || shutdownRequested()) return
+  retryState(ep)
+  ep.held = false
+  if (run.state === 'done' || run.state === 'stopped') run.state = 'working'
   save()
   void drive()
+}
+
+export async function continueSeries(folder?: string): Promise<void> {
+  if (continuing || shutdownRequested()) return
+  adoptSeries(folder)
+  if (series?.state === 'done' && series.episodes.some((ep) => ep.state === 'failed')) series.state = 'stopped'
+  if (series?.state !== 'stopped') return
+  continuing = true
+  try {
+    await settleSeries()
+    if (series?.state !== 'stopped' || shutdownRequested()) return
+    for (const agent of new Set(
+      series.episodes.filter((ep) => ep.state !== 'done').map((ep) => seriesAgentSelection(series!, ep, seriesSelection(getSettings(), 'make')).agent),
+    ))
+      await ensureQuickReady(agent)
+    for (const ep of series.episodes) {
+      if (ep.state !== 'failed' && ep.state !== 'stopped') continue
+      retryState(ep)
+    }
+    series.state = 'working'
+    save()
+    void drive()
+  } finally { continuing = false }
+}
+
+/** All agent turns, cancelled exports and report writes have settled before the process exits. */
+export async function settleSeries(): Promise<void> {
+  while (tasks.size || reporting.size) await Promise.allSettled([...tasks, ...reporting.values()])
 }
 
 export function dismissSeries(): void {
@@ -328,7 +464,7 @@ export function dismissSeries(): void {
   sendSeries(null)
 }
 
-function startRun(title: string, folder: string, dirs: string[], start: SeriesStart, planningCostUSD?: number): void {
+function startRun(title: string, folder: string, dirs: string[], start: SeriesStart, planningCostUSD?: number, recovered = false): void {
   const selection = seriesSelection(getSettings(), 'make')
   const settings = getSettings()
   const flags = { usage: !!settings.developerUsageMetrics, timing: !!settings.developerTimingMetrics, resources: !!settings.developerResourceMetrics }
@@ -343,17 +479,29 @@ function startRun(title: string, folder: string, dirs: string[], start: SeriesSt
     model: selection.model,
     effort: selection.effort,
     auth: configuredAuth(selection.agent),
-    state: 'working',
+    state: recovered || shutdownRequested() ? 'stopped' : 'working',
     episodes: dirs.map((dir, i) => ({ dir, title: readMeta(dir).name, assignment: start.plan.episodes[i].assignment, state: 'waiting', warnings: [] })),
     planningCostUSD,
   }
-  setSettings({ seriesRun: folder })
   save()
-  void drive()
+  setSettings({ seriesRun: folder })
+  if (series.state === 'working') void drive()
 }
 
 /** Hands out the work while the series is being made: scripts in order, videos and exports as they're ready. */
-async function drive(): Promise<void> {
+function drive(): Promise<void> {
+  if (driving) return driving
+  driving = driveLoop().catch((error) => {
+    console.error('[series scheduler]', error)
+    stopSeries()
+  }).finally(() => {
+    driving = null
+    if (series?.state === 'working') void drive()
+  })
+  return driving
+}
+
+async function driveLoop(): Promise<void> {
   const run = series
   while (run && series === run && run.state === 'working') {
     if (run.metrics) {
@@ -371,10 +519,10 @@ async function drive(): Promise<void> {
       await new Promise((r) => setTimeout(r, 500))
       continue
     }
-    for (const ep of run.episodes) if (ep.state === 'export' && !exporting.has(ep.dir)) exportEpisode(ep, run)
+    for (const ep of run.episodes) if (ep.state === 'export' && !ep.held && !exporting.has(ep.dir)) exportEpisode(ep, run)
 
     // A paused episode's script waits; the writer goes on with the next one.
-    const nextScript = run.episodes.find((ep) => (ep.state === 'waiting' || ep.state === 'script') && !ep.held)
+    const nextScript = run.episodes.find((ep) => (ep.state === 'waiting' || ep.state === 'script') && !ep.held && !steps.has(ep.dir))
     if (nextScript && ![...steps.values()].includes('script')) {
       launch(nextScript, 'script')
       continue
@@ -399,7 +547,12 @@ async function drive(): Promise<void> {
 function launch(ep: EpisodeRun, kind: 'script' | 'video'): void {
   steps.set(ep.dir, kind)
   const step = kind === 'script' ? writeScript(ep) : episodeVideo(ep)
-  void step.finally(() => steps.delete(ep.dir))
+  track(step.finally(() => steps.delete(ep.dir)))
+}
+
+function track(task: Promise<void>): void {
+  tasks.add(task)
+  void task.catch((error) => console.error('[series task]', error)).finally(() => tasks.delete(task))
 }
 
 async function writeScript(ep: EpisodeRun): Promise<void> {
@@ -408,29 +561,34 @@ async function writeScript(ep: EpisodeRun): Promise<void> {
       `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: you’ll make the video in the next step.`,
       'Script',
     )
-    update(ep, { state: 'scripted', activity: undefined })
+    update(ep, { state: 'scripted', activity: undefined, tried: false })
   })
 }
 
 async function episodeVideo(ep: EpisodeRun): Promise<void> {
-  await episodeStep(ep, 'scene', async (turn) => {
-    await turn(
-      'Your script.md is approved, and series.md lists the episodes with what the ones scripted so far cover. Make this episode’s video from your script: write scene.py, render it and look at the frames.',
-      'Video',
-    )
+  const checking = ep.state === 'check'
+  await episodeStep(ep, checking ? 'check' : 'scene', async (turn, check) => {
+    if (!checking) {
+      await turn(
+        'Your script.md is approved, and series.md lists the episodes with what the ones scripted so far cover. Make this episode’s video from your script: write scene.py, render it and look at the frames.',
+        'Video',
+      )
+    }
+    check()
     update(ep, { state: 'check', activity: 'Checking the render' })
     const warnings = await checkAndFix(
       ep.dir,
       (text) => turn(text, 'Fixing the render'),
-      () => stopIf(ep),
+      check,
     )
-    update(ep, { warnings, state: 'export', activity: undefined })
+    check()
+    update(ep, { warnings, state: 'export', activity: undefined, tried: false })
   })
 }
 
 function exportEpisode(ep: EpisodeRun, run: SeriesRun): void {
   exporting.add(ep.dir)
-  void (async () => {
+  track((async () => {
     try {
       await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
       stopIf(ep)
@@ -443,12 +601,12 @@ function exportEpisode(ep: EpisodeRun, run: SeriesRun): void {
     } catch (e) {
       if (run.state === 'working') {
         await finishMetrics(ep, run, 'failed')
-        update(ep, { state: 'failed', error: (e as Error).message })
+        update(ep, { state: 'failed', failedAt: 'export', error: (e as Error).message })
       }
     } finally {
       exporting.delete(ep.dir)
     }
-  })()
+  })())
 }
 
 function stopIf(ep: EpisodeRun): void {
@@ -463,20 +621,24 @@ function stopIf(ep: EpisodeRun): void {
 async function episodeStep(
   ep: EpisodeRun,
   state: EpisodeRun['state'],
-  work: (turn: (text: string, step: string) => Promise<void>) => Promise<void>,
+  work: (turn: (text: string, step: string) => Promise<void>, check: () => void) => Promise<void>,
 ): Promise<void> {
   const run = series!
+  const generation = generations.get(ep.dir) ?? 0
+  const interrupted = () => series !== run || halted(ep) || (generations.get(ep.dir) ?? 0) !== generation
+  const check = () => { if (interrupted()) throw new Error('Stopped') }
   let again = !!ep.tried
   let agent: EpisodeAgent | null = null
   // The agent and sign-in this episode runs on: the series' (switchable at a limit), or its fixed assignment.
   const route = (): AgentRoute => {
     const selection = seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make'))
-    return { agent: selection.agent, auth: ep.assignment ? configuredAuth(selection.agent) : (run.auth ?? configuredAuth(selection.agent)) }
+    return { agent: selection.agent, auth: ep.assignment ? ep.assignmentAuth ?? configuredAuth(selection.agent) : (run.auth ?? configuredAuth(selection.agent)) }
   }
   const open = async () => {
     const opened = route()
+    episodeMetricsSelection(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')))
     const a = await episodeAgent(ep.dir, {
-      onTool: (summary) => update(ep, { activity: summary }),
+      onTool: (summary) => { if (!interrupted()) update(ep, { activity: summary }) },
       onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models) }),
       ...seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')),
       auth: opened.auth,
@@ -488,15 +650,15 @@ async function episodeStep(
   }
   try {
     await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
-    stopIf(ep)
+    check()
     update(ep, { state, activity: 'Starting', tried: true })
     writeEpisodeBible(ep.dir)
     let current = await open()
     agent = current.a
-    stopIf(ep)
+    check()
     await work(async (text, step) => {
       episodeMetricsPhase(ep.dir, step === 'Script' ? 'Script' : step === 'Fixing the render' ? 'Fixing render' : 'Implementation')
-      stopIf(ep)
+      check()
       let ask = again ? `You were interrupted. Carry on where you stopped, with this task:\n\n${text}` : text
       again = false
       for (;;) {
@@ -504,11 +666,11 @@ async function episodeStep(
         const result = await turnPastLimits(
           (t) => a.turn(t, step),
           ask,
-          (note, until) => update(ep, { activity: note, limitedUntil: until }),
-          () => stopIf(ep),
+          (note, until) => { if (!interrupted()) update(ep, { activity: note, limitedUntil: until }) },
+          check,
           () => !sameRoute(route(), opened),
         )
-        stopIf(ep)
+        check()
         if (result.switched) {
           // Another agent takes over (ADR 0048): it reads where things stand from the project's files.
           a.close()
@@ -520,11 +682,11 @@ async function episodeStep(
         if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
         return
       }
-    })
+    }, check)
     update(ep, { tried: false })
   } catch (e) {
-    if (!halted(ep)) await finishMetrics(ep, run, 'failed')
-    update(ep, halted(ep) ? { activity: undefined } : { state: 'failed', error: (e as Error).message, activity: undefined, tried: false })
+    if (!interrupted()) await finishMetrics(ep, run, 'failed')
+    update(ep, interrupted() ? { activity: undefined } : { state: 'failed', failedAt: state === 'script' ? 'script' : ep.state === 'check' ? 'check' : 'scene', error: (e as Error).message, activity: undefined, tried: false })
   } finally {
     if (agent) {
       if (agents.get(ep.dir) === agent) agents.delete(ep.dir)

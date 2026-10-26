@@ -26,7 +26,8 @@ import type {
   UsageWindow,
   ClaudeAuth,
 } from '../shared/types'
-import { agentBusy } from './agent'
+import { agentBusy, configuredAuth } from './agent'
+import { reportAgentOutcome } from './agent-limit-notifications'
 import {
   antigravityLogin,
   antigravityLoginCode,
@@ -49,12 +50,13 @@ import { getSecret, getSettings } from './settings'
 import { sourcesNote } from './sources'
 import { scriptBrief } from '../shared/script'
 import { styleBrief } from '../shared/tone'
-import { limitFrom, limitFromText, limitText, type Limit } from '../shared/usage-limit'
+import { limitFrom, limitFromText, limitText, usageLimitFromError, type Limit } from '../shared/usage-limit'
 import type { UsageEntry } from '../shared/usage'
 import { entryFrom, readUsage, recordTurn } from './usage'
 import { seriesBrief } from './series'
 import { exerciseBrief } from './exercises'
 import { momentNote } from '../shared/moment'
+import { studyReply } from './study-assistant'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
@@ -198,8 +200,9 @@ interface Session {
 }
 
 let session: Session | null = null
+let studyAbort: AbortController | null = null
 let messages: ChatMessage[] = []
-let turn: { message: ChatMessage; prompt: string; step: string; tools: Record<string, number>; started: number } | null = null
+let turn: { message: ChatMessage; prompt: string; step: string; tools: Record<string, number>; started: number; agent: Agent; auth: 'account' | 'api-key' } | null = null
 let emit: (e: ChatEvent) => void = () => {}
 
 const observers = new Set<(e: ChatEvent) => void>()
@@ -251,6 +254,8 @@ export function loadChat(dir: string): void {
 }
 
 export function closeChat(): void {
+  studyAbort?.abort()
+  studyAbort = null
   closeCodex()
   closeAntigravity()
   session?.inbox.close()
@@ -265,6 +270,50 @@ export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
   const p = requireProject()
   if (turn) throw new Error('Claude is still working on the previous message')
   if (agentBusy.has(p.path)) throw new Error('A background agent is working on this project. Chat here once it’s done.')
+
+  if (req.study || req.watchingAt !== undefined) {
+    if (!req.text.trim() || req.text.length > 40_000) throw new Error('Write a shorter question (up to 40,000 characters).')
+    const controller = new AbortController()
+    studyAbort = controller
+    const history = [...messages]
+    const user: ChatMessage = { id: randomUUID(), role: 'user', parts: [{ kind: 'text', text: req.text }], studyAction: req.studyAction, at: Date.now() }
+    const reply: ChatMessage = { id: randomUUID(), role: 'assistant', parts: [], at: Date.now() }
+    messages.push(user, reply)
+    const agent = getSettings().agent
+    turn = { message: reply, prompt: req.text, step: 'Tutor', tools: {}, started: Date.now(), agent, auth: configuredAuth(agent) }
+    emit({ type: 'message', message: user })
+    emit({ type: 'message', message: reply })
+    emit({ type: 'busy', busy: true })
+    writeChat(messages)
+    void (async () => {
+      try {
+        const result = await studyReply(p.path, req, history, controller.signal, (text) => {
+          if (studyAbort === controller) emit({ type: 'delta', messageId: reply.id, text })
+        }, (png) => {
+          if (studyAbort !== controller) return
+          user.frame = `data:image/png;base64,${png}`
+          emit({ type: 'message', message: user })
+        })
+        if (studyAbort !== controller) return
+        const { text, ...metadata } = result
+        Object.assign(reply, metadata, { parts: text ? [{ kind: 'text', text }] : [] })
+        if (req.confirmVideo && result.videoOffer?.state === 'created') {
+          const original = messages.find((m) => m.id === req.confirmVideo)
+          if (original?.videoOffer) {
+            original.videoOffer = undefined
+            emit({ type: 'message', message: original })
+          }
+        }
+        emit({ type: 'message', message: reply })
+        finishTurn(true)
+      } catch (e) {
+        if (studyAbort === controller) finishTurn(false, (e as Error).message)
+      } finally {
+        if (studyAbort === controller) studyAbort = null
+      }
+    })()
+    return
+  }
 
   const content: Exclude<SDKUserMessage['message']['content'], string> = []
   let frame: string | undefined
@@ -287,7 +336,8 @@ export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
   }
   const reply: ChatMessage = { id: randomUUID(), role: 'assistant', parts: [], at: Date.now() }
   messages.push(user, reply)
-  turn = { message: reply, prompt: req.text, step, tools: {}, started: Date.now() }
+  const agent = getSettings().agent
+  turn = { message: reply, prompt: req.text, step, tools: {}, started: Date.now(), agent, auth: configuredAuth(agent) }
   emit({ type: 'message', message: user })
   emit({ type: 'message', message: reply })
   emit({ type: 'busy', busy: true })
@@ -333,6 +383,7 @@ async function codexChat(dir: string, text: string, frame?: string): Promise<voi
 }
 
 export async function chatInterrupt(): Promise<void> {
+  studyAbort?.abort()
   interruptCodex()
   interruptAntigravity()
   await session?.query.interrupt().catch(() => undefined)
@@ -383,7 +434,20 @@ export async function chatModels(agent?: Agent): Promise<ModelOption[]> {
  * A one-off request with no tools, on the chat's sign-in and model: translation, series planning.
  * `what` names it in errors ("Claude couldn't plan: …").
  */
-export async function askClaude(
+export async function askClaude(...args: Parameters<typeof askWithAgent>): Promise<string> {
+  const agent = getSettings().agent
+  const route = { agent, auth: configuredAuth(agent) }
+  try {
+    const answer = await askWithAgent(...args)
+    reportAgentOutcome(route, { ok: true })
+    return answer
+  } catch (error) {
+    reportAgentOutcome(route, { ok: false, error: (error as Error).message, limitedUntil: agent === 'claude' ? activeLimit()?.until : undefined })
+    throw error
+  }
+}
+
+async function askWithAgent(
   system: string,
   prompt: string,
   what: string,
@@ -398,6 +462,7 @@ export async function askClaude(
 ): Promise<string> {
   if (codexChosen()) return askCodex(system, prompt, what, opts.images, opts) // Codex answers at once at the end
   if (antigravityChosen()) return askAntigravity(system, prompt, what, opts.images, opts)
+  const auth = usingApiKey() ? 'api-key' : 'account'
   const { query } = await sdk()
   const images = opts.images ?? []
   async function* withImages(): AsyncGenerator<SDKUserMessage> {
@@ -412,7 +477,7 @@ export async function askClaude(
     prompt: images.length ? withImages() : prompt,
     options: {
       includePartialMessages: !!opts.onText, // the answer as it's written, for progress
-      env: claudeEnv(),
+      env: claudeEnv(auth),
       pathToClaudeCodeExecutable: paths.claude(),
       settingSources: [],
       tools: [],
@@ -435,7 +500,7 @@ export async function askClaude(
       continue
     }
     if (msg.type !== 'result') continue
-    opts.onUsage?.(entryFrom(what, msg, {}, {}, msg.duration_ms))
+    opts.onUsage?.(entryFrom(what, msg, {}, {}, msg.duration_ms, auth))
     if (msg.subtype !== 'success' || msg.is_error)
       throw new Error(activeLimit() ? limitText(activeLimit()!) : `Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
     answer = msg.result
@@ -680,7 +745,7 @@ function handle(msg: SDKMessage): void {
   }
   if (msg.type === 'result') {
     const dir = project()?.path
-    if (dir) recordTurn(dir, turn.step, msg, turn.tools, Date.now() - turn.started)
+    if (dir) recordTurn(dir, turn.step, msg, turn.tools, Date.now() - turn.started, turn.auth)
     const ok = msg.subtype === 'success' && !msg.is_error
     // A failed turn (e.g. expired sign-in) can still arrive as subtype "success" with is_error.
     const error = ok ? undefined : msg.subtype === 'success' ? msg.result : msg.errors?.join('\n')
@@ -689,10 +754,11 @@ function handle(msg: SDKMessage): void {
 }
 
 function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
-  const limited = ok ? null : activeLimit()
-  if (limited) error = limitText(limited)
-  if (ok) limit = null
   const t = turn
+  const limited = ok ? null : t?.agent === 'claude' ? activeLimit() ?? usageLimitFromError(error) : usageLimitFromError(error)
+  if (limited && t?.agent === 'claude') error = limitText(limited)
+  if (ok) limit = null
+  if (t) reportAgentOutcome(t, { ok, error, limitedUntil: limited?.until })
   turn = null
   pauseCommits(false)
   if (t) {

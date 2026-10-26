@@ -8,6 +8,7 @@ import type { MenuAction } from '../shared/types'
 import { checkForUpdates, RELEASES_URL } from './updater'
 import { listProjects, project } from './projects'
 import { getSettings } from './settings'
+import { translateUi } from '../shared/i18n'
 
 const REPO_URL = 'https://github.com/lukaznj/manim-studio'
 
@@ -32,11 +33,12 @@ export function setupMenu(fn: typeof send, onInstallExtension: () => void): void
 
 export function refreshMenu(): void {
   if (process.platform !== 'darwin') return
+  const t = (text: string) => translateUi(getSettings().uiLanguage ?? 'en', text)
   const open = !!project()
   const appearance = getSettings().appearance
   const learn = getSettings().mode === 'learn'
   const item = (label: string, action: MenuAction, accelerator?: string, extra: Partial<MenuItemConstructorOptions> = {}): MenuItemConstructorOptions => ({
-    label,
+    label: t(label),
     accelerator,
     click: () => send(action),
     ...extra,
@@ -51,7 +53,7 @@ export function refreshMenu(): void {
       label: app.name,
       submenu: [
         { role: 'about' },
-        { label: 'Check for Updates…', click: () => void checkForUpdates() },
+        { label: t('Check for Updates…'), click: () => void checkForUpdates() },
         { type: 'separator' },
         item('Settings…', 'settings', 'Cmd+,'),
         { type: 'separator' },
@@ -65,7 +67,7 @@ export function refreshMenu(): void {
       ],
     },
     {
-      label: 'File',
+      label: t('File'),
       submenu: [
         // Learn mode has no editor (ADR 0029): only what makes something to watch.
         ...(learn ? [] : [item('New Project…', 'new-project', 'Cmd+N')]),
@@ -74,7 +76,7 @@ export function refreshMenu(): void {
         item('New Exercise Set…', 'exercises'),
         ...(learn ? [] : [item('Open Project…', 'open-project', 'Cmd+O')]),
         {
-          label: 'Open Recent',
+          label: t('Open Recent'),
           enabled: recent.length > 0,
           submenu: recent.map((p) => ({ label: p.name, click: () => send('open-recent', { path: p.path }) })),
         },
@@ -86,7 +88,7 @@ export function refreshMenu(): void {
               item('Export Video…', 'export', 'Cmd+E', { enabled: open }),
             ] as MenuItemConstructorOptions[])),
         { type: 'separator' },
-        { label: 'Show in Finder', enabled: open, click: () => open && shell.showItemInFolder(project()!.path) },
+        { label: t('Show in Finder'), enabled: open, click: () => open && shell.showItemInFolder(project()!.path) },
         item('Close Project', 'close-project', 'Shift+Cmd+W', { enabled: open }),
       ],
     },
@@ -95,7 +97,7 @@ export function refreshMenu(): void {
       ? []
       : ([
           {
-            label: 'Video',
+            label: t('Video'),
             submenu: [
               item('Play / Pause', 'play', undefined, { enabled: open }),
               item('Render Preview', 'render', undefined, { enabled: open }),
@@ -106,21 +108,21 @@ export function refreshMenu(): void {
           },
         ] as MenuItemConstructorOptions[])),
     {
-      label: 'Claude',
+      label: t('Claude'),
       submenu: [
         item('New Conversation', 'new-conversation', undefined, { enabled: open }),
         { type: 'separator' },
         item('Account, Model and Usage…', 'claude-settings'),
-        { label: 'Add to Claude Desktop…', click: installExtension },
+        { label: t('Add to Claude Desktop…'), click: installExtension },
       ],
     },
     {
-      label: 'View',
+      label: t('View'),
       submenu: [
         {
-          label: 'Appearance',
+          label: t('Appearance'),
           submenu: (['system', 'light', 'dark'] as const).map((value) => ({
-            label: value === 'system' ? 'System' : value === 'light' ? 'Light' : 'Dark',
+            label: t(value === 'system' ? 'System' : value === 'light' ? 'Light' : 'Dark'),
             type: 'radio' as const,
             checked: appearance === value,
             click: () => send('appearance', { value }),
@@ -137,12 +139,12 @@ export function refreshMenu(): void {
       submenu: [
         item('Show Tutorial', 'tutorial'),
         { type: 'separator' },
-        { label: 'Manim Studio Help', click: () => void shell.openExternal(`${REPO_URL}#readme`) },
-        { label: 'Manim Documentation', click: () => void shell.openExternal('https://docs.manim.community') },
+        { label: t('Manim Studio Help'), click: () => void shell.openExternal(`${REPO_URL}#readme`) },
+        { label: t('Manim Documentation'), click: () => void shell.openExternal('https://docs.manim.community') },
         { type: 'separator' },
-        { label: 'Releases', click: () => void shell.openExternal(RELEASES_URL) },
-        { label: 'Report an Issue', click: () => void shell.openExternal(`${REPO_URL}/issues`) },
-        { label: 'Show Logs', click: showLogs },
+        { label: t('Releases'), click: () => void shell.openExternal(RELEASES_URL) },
+        { label: t('Report an Issue'), click: () => void shell.openExternal(`${REPO_URL}/issues`) },
+        { label: t('Show Logs'), click: showLogs },
       ],
     },
   ]

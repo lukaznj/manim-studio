@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import { errorText, toast, updateSettings, useStore } from '../store'
 import { Modal } from './ui'
 import { PlaybackSpeed, PLAYBACK_RATES } from './PlaybackSpeed'
+import { StudyFrameSelection } from './StudyFrameSelection'
 
 const clock = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`
 function saved(key: string, src: string, duration: number): number {
@@ -40,11 +41,14 @@ export function StudyPlayer(props: {
   video: RefObject<HTMLVideoElement | null>
   resume?: boolean
   startPlaying?: boolean
+  startAt?: number | null
+  overlay?: React.ReactNode
   seriesAutoplay?: boolean
   onEnded?: () => void
   onWatched?: () => void
 }) {
   const { src, vtt, video } = props
+  const selecting = useStore((s) => s.studySelecting)
   const aspect = useStore((s) => s.project?.meta.aspect ?? '16:9')
   const projectPath = useStore((s) => s.project?.path ?? src)
   const autoplay = useStore((s) => s.settings?.studyAutoplay ?? false)
@@ -114,7 +118,7 @@ export function StudyPlayer(props: {
       wasFullscreen = active
     }
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || document.fullscreenElement !== root.current || root.current?.querySelector('dialog[open], :popover-open')) return
+      if (event.key !== 'Escape' || document.fullscreenElement !== root.current || root.current?.querySelector('dialog[open], :popover-open, .study-frame-selector')) return
       event.preventDefault()
       void document.exitFullscreen().catch(() => undefined)
     }
@@ -210,6 +214,7 @@ export function StudyPlayer(props: {
       onFocusCapture={revealControls}
       onKeyDown={(e) => {
         revealControls()
+        if (selecting) return
         if ((e.target as HTMLElement).closest('button,input,select,textarea,summary') || e.altKey || e.ctrlKey || e.metaKey) return
         if ([' ', 'k', 'ArrowLeft', 'ArrowRight', 'm', 'f', 'c'].includes(e.key)) e.preventDefault()
         if (e.key === ' ' || e.key === 'k') toggle()
@@ -223,6 +228,7 @@ export function StudyPlayer(props: {
       <div className="study-video-stage">
         <video
           ref={video}
+          crossOrigin="anonymous"
           key={src}
           className="ex-video"
           style={{ aspectRatio: aspect.replace(':', ' / ') }}
@@ -267,7 +273,7 @@ export function StudyPlayer(props: {
             el.playbackRate = rate
             el.volume = volume
             el.muted = muted
-            const at = !props.startPlaying && props.resume !== false ? saved(projectPath, src, el.duration) : 0
+            const at = props.startAt != null ? Math.min(Math.max(0, props.startAt), Math.max(0, el.duration - .01)) : !props.startPlaying && props.resume !== false ? saved(projectPath, src, el.duration) : 0
             el.currentTime = at
             session.duration = Number.isFinite(el.duration) ? el.duration : 0
             session.position = at
@@ -275,7 +281,7 @@ export function StudyPlayer(props: {
             setNow(el.currentTime)
             useStore.setState({ watchTime: el.currentTime })
             if (props.startPlaying) {
-              useStore.setState({ studyAutoplayPath: null })
+              useStore.setState({ studyAutoplayPath: null, studyStartAt: null })
               void el.play().catch((e) => toast(errorText(e), 'error'))
             }
           }}
@@ -293,11 +299,12 @@ export function StudyPlayer(props: {
             />
           )}
         </video>
-        {paused && now < 0.1 && !failed && (
+        {paused && now < 0.1 && !failed && !selecting && (
           <button className="study-play-overlay" aria-label={uiText('Play video')} onClick={toggle}>
             <Play />
           </button>
         )}
+        {selecting ? <StudyFrameSelection video={video} /> : props.overlay}
         {failed && (
           <div className="study-video-error">
             {uiText('The video could not be loaded. Open its file to check it.')}

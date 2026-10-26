@@ -1,5 +1,7 @@
 import type { EpisodeMetrics, VoiceUsageSample } from './episode-metrics'
 import type { UsageEntry } from './usage'
+import type { UiLanguage } from './ui-languages'
+import { translateUi } from './i18n.ts'
 
 export interface ReportEpisode {
   metrics: EpisodeMetrics
@@ -36,8 +38,8 @@ export function usageTokenCount(entry: UsageEntry): number {
 }
 
 /** Offline, script-free HTML. Turn usage is plotted as a step function, never an invented rate. */
-export function renderMetricsReport(episodes: ReportEpisode[], title: string, language: 'en' | 'hr' = 'en'): string {
-  const t = (en: string, hr: string) => (language === 'hr' ? hr : en)
+export function renderMetricsReport(episodes: ReportEpisode[], title: string, language: UiLanguage = 'en'): string {
+  const t = (en: string, hr: string) => (language === 'hr' ? hr : translateUi(language, en))
   const stage = (name: string) =>
     language === 'hr'
       ? ((
@@ -53,7 +55,7 @@ export function renderMetricsReport(episodes: ReportEpisode[], title: string, la
             'Metrics finalization': 'Završetak mjerenja',
           } as Record<string, string>
         )[name] ?? name)
-      : name
+      : translateUi(language, name)
   const chart = (m: EpisodeMetrics, label: string, unit: string, series: { name: string; points: Point[]; step?: boolean }[]) => {
     const start = m.startedAt,
       end = Math.max(start + 1000, m.finishedAt ?? Date.now())

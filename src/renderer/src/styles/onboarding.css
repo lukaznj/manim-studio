@@ -253,25 +253,12 @@
   background: var(--sun);
 }
 .onb-lang {
-  display: flex;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--raised);
-  border: 1px solid var(--line);
+  min-width: 0;
+  max-width: 220px;
 }
-.onb-lang button {
-  border: 0;
-  background: none;
-  color: var(--text-2);
-  font: 600 14px var(--font-ui);
-  padding: 7px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-.onb-lang button.on {
-  background: var(--panel);
-  color: var(--text);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+.onb-lang .app-language-picker:focus {
+  border-color: var(--line-strong);
+  box-shadow: none;
 }
 
 .onb-scroll {

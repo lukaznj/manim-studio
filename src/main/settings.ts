@@ -3,40 +3,47 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Settings } from '../shared/types'
 import { migrateVoice } from '../shared/voice'
+import { CODEX_EXECUTOR, normalizeCodexSettings } from '../shared/codex-selection'
+import { resolveUiLanguage } from '../shared/ui-languages'
+import { narrationLanguageForUi } from '../shared/narration-languages'
 import { paths } from './paths'
+import { readAtomicJson, writeAtomicJson } from './atomic-json'
 
-const defaults = (): Settings => ({
-  uiLanguage: 'en',
-  defaultAspect: '16:9',
-  defaultTheme: 'dark',
-  defaultTone: 'warm',
-  appearance: 'system',
-  projectsDir: paths.defaultProjectsDir(),
-  recentProjects: [],
-  claudeAuth: 'account',
-  previewSize: 1080,
-  studySize: 1080,
-  previewFps: 15,
-  tutorialDone: false,
-  claudeModel: 'claude-sonnet-5-5', // Sonnet 5.5 at high effort writes scenes well enough, faster and cheaper than Opus
-  claudeEffort: 'high',
-  agent: 'claude',
-  codexModel: '',
-  codexEffort: 'high',
-  antigravityModel: '',
-  antigravityEffort: 'medium', // Antigravity's own default for Argon
-  seriesAgents: 3,
-  autoRender: true,
-  hasElevenLabsKey: false,
-  hasAnthropicKey: false,
-  hasOpenAIKey: false,
-  hasGeminiKey: false,
-  defaultVoice: { provider: 'elevenlabs', language: 'en' },
-  renderServers: [],
-  sidebarWidth: 440,
-  chatWidth: 380,
-  timelineHeight: 248,
-})
+const defaults = (): Settings => {
+  const uiLanguage = resolveUiLanguage(app.getLocale())
+  return {
+    uiLanguage,
+    defaultAspect: '16:9',
+    defaultTheme: 'dark',
+    defaultTone: 'warm',
+    appearance: 'system',
+    projectsDir: paths.defaultProjectsDir(),
+    recentProjects: [],
+    claudeAuth: 'account',
+    previewSize: 1080,
+    studySize: 1080,
+    previewFps: 15,
+    tutorialDone: false,
+    claudeModel: 'claude-sonnet-5-5', // Sonnet 5.5 at high effort writes scenes well enough, faster and cheaper than Opus
+    claudeEffort: 'high',
+    agent: 'claude',
+    codexModel: CODEX_EXECUTOR,
+    codexEffort: 'high',
+    antigravityModel: '',
+    antigravityEffort: 'medium', // Antigravity's own default for Argon
+    seriesAgents: 3,
+    autoRender: true,
+    hasElevenLabsKey: false,
+    hasAnthropicKey: false,
+    hasOpenAIKey: false,
+    hasGeminiKey: false,
+    defaultVoice: { provider: 'elevenlabs', language: narrationLanguageForUi(uiLanguage) ?? 'en' },
+    renderServers: [],
+    sidebarWidth: 440,
+    chatWidth: 380,
+    timelineHeight: 248,
+  }
+}
 
 let cache: Settings | null = null
 
@@ -44,21 +51,25 @@ export function getSettings(): Settings {
   if (!cache) {
     let stored: Partial<Settings> = {}
     try {
-      stored = JSON.parse(readFileSync(paths.settingsFile(), 'utf8'))
+      const saved = readAtomicJson(paths.settingsFile(), (value): value is Partial<Settings> => !!value && typeof value === 'object' && !Array.isArray(value))
+      if (!saved) throw new Error('No saved settings')
+      stored = saved
       // Installs from before 0.11 keep the projects folder they had (Documents), set or not (ADR 0043).
       stored.projectsDir ??= process.env.STUDIO_PROJECTS_DIR ?? paths.legacyProjectsDir()
     } catch {
       // first run, or a corrupt file: fall back to defaults
     }
     if (stored.defaultVoice) stored.defaultVoice = migrateVoice(stored.defaultVoice)
-    cache = { ...defaults(), ...stored, ...secretFlags() }
+    const base = defaults()
+    cache = normalizeCodexSettings({ ...base, ...stored, uiLanguage: resolveUiLanguage(stored.uiLanguage ?? base.uiLanguage), ...secretFlags() })
   }
   return cache
 }
 
 export function setSettings(patch: Partial<Settings>): Settings {
-  cache = { ...getSettings(), ...patch, ...secretFlags() }
-  writeFileSync(paths.settingsFile(), JSON.stringify(cache, null, 2))
+  cache = normalizeCodexSettings({ ...getSettings(), ...patch, ...secretFlags() })
+  cache.uiLanguage = resolveUiLanguage(cache.uiLanguage)
+  writeAtomicJson(paths.settingsFile(), cache)
   return cache
 }
 

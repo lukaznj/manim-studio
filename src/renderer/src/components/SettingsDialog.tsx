@@ -1,4 +1,5 @@
-import { t as uiText, localize, format, currentLanguage } from '../lib/i18n'
+import { studyModel } from '../../../shared/study-assistant'
+import { t as uiText, localize, format, currentLocale } from '../lib/i18n'
 import {
   AudioLines,
   Check,
@@ -23,7 +24,6 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
   Agent,
-  Background,
   ClaudeAuth,
   ClaudeDesktopStatus,
   ClaudeStatus,
@@ -32,10 +32,7 @@ import type {
   ElevenLabsCheck,
   ElevenLabsUsage,
   KeyCheck,
-  PlanUsage,
-  ProjectMeta,
   Settings,
-  Theme,
   VoiceProvider,
   VideoEncoderInfo,
   VoiceSettings,
@@ -45,8 +42,8 @@ import { DEFAULT_EL_MODEL, EL_MODELS } from '../../../shared/voice'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
 import { encodeWav } from '../lib/audio'
-import { resetTime } from '../lib/time'
 import { AntigravityConsent } from './AntigravityConsent'
+import { SignInLog } from './SignInLog'
 import {
   canEdit,
   studying,
@@ -65,9 +62,11 @@ import {
   updateSettings,
   useStore,
 } from '../store'
-import { ModelControls, ModelPicker, usageLevel } from './ChatPane'
+import { ModelControls, ModelPicker } from './ChatPane'
+import { AccountPlanUsage } from './AccountPlanUsage'
 import { seriesSelection } from '../../../shared/agent-selection'
 import { playSound } from '../lib/sounds'
+import { LanguagePicker } from './LanguagePicker'
 import { RevoiceButton, useOutdatedVoice, voiceLabel } from './Revoice'
 import { VoicePicker } from './VoicePicker'
 import { useRecorder } from './RecordingBooth'
@@ -209,10 +208,41 @@ function AgentTab() {
   const status = useStore((s) => s.claude)
   const signedIn = !!status?.loggedIn
   const seriesAgents = useStore((s) => s.settings!.seriesAgents)
+  const [available, setAvailable] = useState<Partial<Record<Agent, boolean>>>({})
+  useEffect(() => {
+    let active = true
+    const check = () => {
+      for (const provider of ['claude', 'codex', 'antigravity'] as const) {
+        void api.claudeStatus(provider).then(
+          (st) => active && setAvailable((before) => ({ ...before, [provider]: st.loggedIn })),
+          () => active && setAvailable((before) => ({ ...before, [provider]: false })),
+        )
+      }
+    }
+    check()
+    window.addEventListener('focus', check)
+    return () => { active = false; window.removeEventListener('focus', check) }
+  }, [])
   const pick = async (next: Agent) => {
-    await updateSettings({ agent: next })
-    await refreshClaude()
+    try {
+      if (!(await api.claudeStatus(next)).loggedIn) {
+        setAvailable((before) => ({ ...before, [next]: false }))
+        toast('Connect this agent under Accounts first.', 'error')
+        return
+      }
+      await updateSettings({ agent: next })
+      await refreshClaude()
+    } catch (e) {
+      setAvailable((before) => ({ ...before, [next]: false }))
+      toast(uiText(errorText(e)), 'error')
+    }
   }
+  const planner = seriesSelection(settings, 'plan')
+  const maker = seriesSelection(settings, 'make')
+  const override = settings.seriesModels?.[agent]?.make
+  const setMaker = (value: typeof override) => updateSettings({
+    seriesModels: { ...settings.seriesModels, [agent]: { ...settings.seriesModels?.[agent], make: value } },
+  })
   return (
     <div className="set-group">
       <Row
@@ -225,17 +255,21 @@ function AgentTab() {
           radio="Agent"
           value={agent}
           onChange={(v) => void pick(v)}
-          items={[
-            { value: 'claude', label: 'Claude' },
-            { value: 'codex', label: 'Codex' },
-            { value: 'antigravity', label: 'Antigravity' },
-          ]}
+          items={(['claude', 'codex', 'antigravity'] as const).map((provider) => ({
+            value: provider, label: AGENT_NAMES[provider], disabled: !available[provider],
+            title: uiText(available[provider] === undefined ? 'Checking account…' : !available[provider] ? 'Connect this agent under Accounts first.' : 'Signed in'),
+          }))}
         />
       </Row>
+      {Object.values(available).some((ready) => !ready) && (
+        <p className="hint">{uiText('Unavailable agents need to be connected under Accounts first.')}{' '}
+          <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>{uiText('Accounts')}</button>
+        </p>
+      )}
       {!status ? (
         <Row title={uiText('Checking account…')} />
       ) : signedIn ? (
-        <Row title={uiText('Model and effort')} text={uiText('Which model writes the scenes and how much it reasons first. Also under the chat box.')}>
+        <Row title={uiText('Creation model and effort')} text={uiText('Used for videos and series episodes, unless you enable an episode override below.')}>
           <ModelControls />
         </Row>
       ) : (
@@ -245,35 +279,25 @@ function AgentTab() {
           </button>
         </Row>
       )}
-      {signedIn &&
-        (['plan', 'make'] as const).map((role) => {
-          const chosen = seriesSelection(settings, role)
-          return (
-            <Row
-              key={role}
-              title={role === 'plan' ? uiText('Series: planning') : uiText('Series: making the episodes')}
-              text={
-                role === 'plan'
-                  ? uiText('Reads the material once and plans every episode and the series bible. A stronger model plans better.')
-                  : uiText('Writes each episode’s script and video, and fixes them. It runs many times, so a faster model saves time and plan limits.')
-              }
-            >
-              <ModelPicker
-                model={chosen.model}
-                effort={chosen.effort ?? 'high'}
-                models={models}
-                onChange={(model, effort) =>
-                  void updateSettings({
-                    seriesModels: {
-                      ...settings.seriesModels,
-                      [agent]: { ...settings.seriesModels?.[agent], [role]: { model, effort: effort ?? chosen.effort ?? 'high' } },
-                    },
-                  })
-                }
-              />
-            </Row>
-          )
-        })}
+      {signedIn && <>
+        <Row title={uiText('Study chat model and effort')} text={uiText('For questions about videos and refining notes. Separate from video creation.')}>
+          <ModelPicker model={studyModel(settings).model} effort={studyModel(settings).effort} models={models} onChange={(model, effort) => void updateSettings({ studyModels: { ...settings.studyModels, [agent]: { model, effort: effort ?? 'high' } } })} />
+        </Row>
+        <Row title={uiText('Series: planning')} text={uiText('Reads the material once and plans every episode and the series bible. A stronger model plans better.')}>
+          <ModelPicker model={planner.model} effort={planner.effort ?? 'high'} models={models} onChange={(model, effort) => void updateSettings({
+            seriesModels: { ...settings.seriesModels, [agent]: { ...settings.seriesModels?.[agent], plan: { model, effort: effort ?? 'high' } } },
+          })} />
+        </Row>
+        <details className="settings-advanced">
+          <summary>{uiText(override ? 'Advanced · series episode override enabled' : 'Advanced')}</summary>
+          <label className="hint"><input type="checkbox" checked={!!override} onChange={(e) => void setMaker(e.target.checked ? { model: maker.model, effort: maker.effort ?? 'high' } : undefined)} />{' '}
+            {uiText('Override model for series episodes')}
+          </label>
+          {override ? <Row title={uiText('Series: making the episodes')} text={uiText('Applies to new series. Running series keep their captured model.')}>
+            <ModelPicker model={maker.model} effort={maker.effort ?? 'high'} models={models} onChange={(model, effort) => void setMaker({ model, effort: effort ?? 'high' })} />
+          </Row> : <p className="hint">{uiText('Series episodes use the creation model and effort above.')}</p>}
+        </details>
+      </>}
       <Row
         title={uiText('Agents at once')}
         text={uiText(
@@ -545,6 +569,7 @@ function CodexAccount({ status, refresh }: AccountProps) {
       {installed && auth === 'api-key' && settings.hasOpenAIKey && (
         <KeyStatus check={(again) => api.checkOpenAIKey(again)} fix="platform.openai.com → API keys" />
       )}
+      {status?.loggedIn && <AccountPlanUsage agent="codex" auth={auth} />}
     </>
   )
 }
@@ -558,15 +583,18 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [needsConsent, setNeedsConsent] = useState(false)
+  const [loginLog, setLoginLog] = useState<string[]>([])
   const installed = setup?.antigravity === 'ready'
   const auth = settings.antigravityAuth ?? (settings.hasGeminiKey ? 'api-key' : 'account') // as antigravity.ts reads it
   useEffect(() => api.on('claude-login', (e) => {
+    if (e.diagnostic) setLoginLog((lines) => [...lines, e.diagnostic!].slice(-100))
     if (e.url) setUrl(e.url)
     if (e.needsConsent) setNeedsConsent(true)
   }), [])
 
   const login = async () => {
     setBusy(true)
+    setLoginLog([])
     setUrl(null)
     setCode('')
     setNeedsConsent(false)
@@ -675,6 +703,8 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
       {installed && auth === 'api-key' && settings.hasGeminiKey && (
         <KeyStatus check={(again) => api.checkGeminiKey(again)} fix="aistudio.google.com → API keys" />
       )}
+      <SignInLog lines={loginLog} />
+      {status?.loggedIn && <AccountPlanUsage agent="antigravity" auth={auth} />}
     </>
   )
 }
@@ -682,7 +712,6 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
 /** Claude: its own account's sign-in (Claude Code's) or an Anthropic API key; the plan's limits when it's the chosen agent. */
 function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { chosen: boolean }) {
   const settings = useStore((s) => s.settings)!
-  const usage = useStore((s) => s.usage)
   const [busy, setBusy] = useState(false)
   const apiKey = settings.claudeAuth === 'api-key'
 
@@ -762,29 +791,10 @@ function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { cho
               </button>
             )}
           </div>
-          {chosen && usage && <PlanUsageList usage={usage} />}
+          <AccountPlanUsage agent="claude" auth="account" />
         </>
       )}
     </>
-  )
-}
-
-/** Every limit of the plan, with when it resets. */
-function PlanUsageList({ usage }: { usage: PlanUsage }) {
-  return (
-    <div className="plan-usage">
-      <div className="eyebrow">{uiText('Plan usage · shared with claude.ai and Claude Desktop')}</div>
-      {usage.windows.map((w) => (
-        <div key={w.label} className={`plan-usage-row ${usageLevel(w.percent)}`}>
-          <span>{uiText(w.label)}</span>
-          <span className="usage-bar">
-            <span style={{ width: `${Math.min(100, w.percent)}%` }} />
-          </span>
-          <span className="mono">{Math.round(w.percent)}%</span>
-          <span className="hint">{w.resetsAt ? format('resets {0}', [resetTime(w.resetsAt, currentLanguage())]) : ''}</span>
-        </div>
-      ))}
-    </div>
   )
 }
 
@@ -884,10 +894,7 @@ const PROVIDERS: { value: VoiceProvider; title: string; text: string; icon: Reac
   { value: 'omnivoice', title: 'OmniVoice', text: 'Local and free, 600+ languages, clones your voice from a short clip.', icon: <Cpu /> },
 ]
 
-// The themes' own backgrounds (python/studio/brand.py), shown until the project picks its own.
-const THEME_BG: Record<Theme, string> = { dark: '#0b1626', light: '#f7f8fa' }
-
-/** The open project's look: theme, background colours, a background picture. Changes re-render the preview. */
+/** Video defaults and rendering controls. */
 function VideoTab() {
   const settings = useStore((s) => s.settings)!
   const project = useStore((s) => s.project)
@@ -895,14 +902,15 @@ function VideoTab() {
   return (
     <div className="set-group">
       {
-        <Row title={uiText('Export quality')} text={uiText('1080p is the default for all videos. Choose 720p for faster rendering.')}>
+        <Row title={uiText('Export quality')} text={uiText('1080p is the default. Choose 720p for faster rendering or 1440p for more detail.')}>
           <Tabs
             radio="Study videos"
             value={String(settings.studySize ?? 1080)}
-            onChange={(v) => void updateSettings({ studySize: Number(v) as 720 | 1080 })}
+            onChange={(v) => void updateSettings({ studySize: Number(v) as Settings['studySize'] })}
             items={[
               { value: '720', label: '720p' },
               { value: '1080', label: '1080p' },
+              { value: '1440', label: '1440p' },
             ]}
           />
         </Row>
@@ -930,26 +938,6 @@ function VideoTab() {
           ]}
         />
       </Row>
-      <Row title={uiText('Background type')}>
-        <Tabs
-          radio="Background type"
-          value={settings.defaultBackground && Object.values(settings.defaultBackground).some(Boolean) ? 'custom' : 'theme'}
-          onChange={(value) => void updateSettings({ defaultBackground: value === 'theme' ? {} : { dark: THEME_BG.dark, light: THEME_BG.light } })}
-          items={[
-            { value: 'theme', label: 'Theme background' },
-            { value: 'custom', label: 'Custom colour' },
-          ]}
-        />
-      </Row>
-      <Row title={uiText('Background colour')} text={uiText('Default background for new videos.')}>
-        <input
-          aria-label={uiText('Default background colour')}
-          type="color"
-          value={settings.defaultBackground?.[settings.defaultTheme ?? 'dark'] ?? THEME_BG[settings.defaultTheme ?? 'dark']}
-          onChange={(e) => void updateSettings({ defaultBackground: { ...settings.defaultBackground, [settings.defaultTheme ?? 'dark']: e.target.value } })}
-        />
-      </Row>
-      {project && <ProjectVideo />}
       {editing && (
         <>
           <Row
@@ -965,6 +953,7 @@ function VideoTab() {
                   { value: '480', label: '480p' },
                   { value: '720', label: '720p' },
                   { value: '1080', label: '1080p' },
+                  { value: '1440', label: '1440p' },
                 ]}
               />
               <Tabs
@@ -991,72 +980,6 @@ function VideoTab() {
           <RenderServers />
         </>
       )}
-    </div>
-  )
-}
-
-function ProjectVideo() {
-  const project = useStore((s) => s.project)
-  const [colours, setColours] = useState<Background>({})
-  const timer = useRef<number>(undefined)
-
-  useEffect(() => {
-    if (!project) return
-    setColours(project.meta.background ?? {})
-  }, [project?.path])
-
-  if (!project) return <p className="hint">{uiText('Open a project to set its theme and background.')}</p>
-  const meta = project.meta
-  const background = meta.background ?? {}
-  const save = async (patch: Partial<ProjectMeta>) => {
-    await updateMeta(patch)
-    void renderNow()
-  }
-  // The colour picker reports every drag step; save once it settles.
-  const pickColour = (theme: Theme, colour: string | undefined) => {
-    const next = { ...colours, [theme]: colour }
-    setColours(next)
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => void save({ background: { ...background, ...next, [theme]: colour } }), 500)
-  }
-
-  return (
-    <div className="set-group">
-      <div className="eyebrow">
-        {uiText('Video of “')}
-        {meta.name}”
-      </div>
-      <Row title={uiText('Theme')} text={uiText('Text and accent colours. Export can make the other version too.')}>
-        <Tabs
-          radio="Theme"
-          value={meta.theme}
-          onChange={(theme) => void save({ theme })}
-          items={[
-            { value: 'dark', label: 'Dark' },
-            { value: 'light', label: 'Light' },
-          ]}
-        />
-      </Row>
-      <Row title={uiText('Background colour')} text={uiText("Each theme's background, if you want another than its own. Keep text readable.")}>
-        <div className="bg-colours">
-          {(['dark', 'light'] as Theme[]).map((t) => (
-            <label key={t} className="bg-colour">
-              <input
-                type="color"
-                value={colours[t] ?? THEME_BG[t]}
-                onChange={(e) => pickColour(t, e.target.value)}
-                aria-label={format('{0} background', [t])}
-              />
-              <span>{t === 'dark' ? uiText('Dark') : uiText('Light')}</span>
-              {colours[t] && (
-                <button className="link-btn" onClick={() => pickColour(t, undefined)}>
-                  {uiText('Reset')}
-                </button>
-              )}
-            </label>
-          ))}
-        </div>
-      </Row>
     </div>
   )
 }
@@ -1648,15 +1571,7 @@ function AboutTab() {
         />
       </Row>
       <Row title={uiText('App language')} text={uiText('The interface language. Narration is chosen separately under Voice.')}>
-        <Tabs
-          radio="App language"
-          value={settings.uiLanguage ?? 'en'}
-          onChange={(uiLanguage) => void updateSettings({ uiLanguage })}
-          items={[
-            { value: 'en', label: 'English' },
-            { value: 'hr', label: 'Hrvatski' },
-          ]}
-        />
+        <LanguagePicker value={settings.uiLanguage ?? 'en'} onChange={(uiLanguage) => void updateSettings({ uiLanguage })} />
       </Row>
       <Row title={uiText('Appearance')} text={uiText('System follows your computer’s light or dark setting.')}>
         <Tabs
@@ -1968,7 +1883,7 @@ export function ElevenLabsStatus() {
           <span className="hint">
             {nf.format(usage.used)} {uiText(' of ')}
             {nf.format(usage.limit)} {uiText(' characters this month')}
-            {usage.resetsAt ? format(' · resets {0}', [new Date(usage.resetsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })]) : ''}
+            {usage.resetsAt ? format(' · resets {0}', [new Date(usage.resetsAt).toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' })]) : ''}
           </span>
         </div>
       ) : (

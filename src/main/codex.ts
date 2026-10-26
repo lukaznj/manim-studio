@@ -6,7 +6,7 @@
 // Desktop's extension uses (mcpb/server.ts), limited to the scene tools; Codex edits the project's
 // files itself, sandboxed to the project.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { createWriteStream, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
@@ -17,6 +17,7 @@ import type { Thread, ThreadEvent, ThreadItem } from '@openai/codex-sdk'
 import { sceneTools } from '../shared/studio-tools'
 import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, SetupEvent, ClaudeAuth } from '../shared/types'
 import { recoverModelCapacity, type CapacityResult } from '../shared/codex-recovery'
+import { studioCodexModels } from '../shared/codex-selection'
 import { listCodexModels, readCodexRateLimits } from './codex-models'
 import { cleanEnv } from './env'
 import { paths } from './paths'
@@ -174,19 +175,16 @@ export async function codexLogout(): Promise<ClaudeStatus> {
   return codexStatus()
 }
 
-/** Codex picks its default model for the account; effort is the reasoning effort. */
+/** Discover availability and efforts for Studio's two supported Codex models. */
 let knownModels: ModelOption[] = []
 export async function codexModels(): Promise<ModelOption[]> {
   const bin = installed()?.bin
   if (!bin) throw new Error('Install Codex first (Settings → Accounts).')
   const env = codexEnv()
   if (apiKey()) env.OPENAI_API_KEY = apiKey()
-  knownModels = await listCodexModels(bin, env)
-  if (!knownModels.length) throw new Error('Codex returned no models. Check your account in Settings → Accounts.')
-  return [
-    { value: '', label: 'Default (Codex chooses)', description: 'The model your OpenAI account defaults to', efforts: ['low', 'medium', 'high', 'xhigh'] },
-    ...knownModels,
-  ]
+  knownModels = studioCodexModels(await listCodexModels(bin, env))
+  if (!knownModels.length) throw new Error('Codex did not offer GPT-6 Astra or GPT-6.1 Sol. Check your account in Settings → Accounts.')
+  return knownModels
 }
 
 export interface CodexOptions {
@@ -488,7 +486,7 @@ export async function askCodex(
   images: { name: string; mediaType: string; data: string }[] = [],
   options: CodexOptions & { signal?: AbortSignal } = {},
 ): Promise<string> {
-  const dir = join(tmpdir(), 'manim-studio-codex', String(Date.now()))
+  const dir = join(tmpdir(), 'manim-studio-codex', randomUUID())
   mkdirSync(dir, { recursive: true })
   try {
     const t = await openThread(dir, system, undefined, options, false)

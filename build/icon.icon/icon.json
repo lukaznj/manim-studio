@@ -46,20 +46,20 @@
             }
           ],
           "glass": true,
-          "image-name": "pen.svg",
-          "name": "pen"
+          "image-name": "finish.svg",
+          "name": "Blue finish"
         }
       ],
       "lighting": "individual",
-      "name": "Pen",
+      "name": "Blue finish",
       "shadow": {
         "kind": "layer-color",
-        "opacity": 0.6
+        "opacity": 0.25
       },
       "specular": true,
       "translucency": {
         "enabled": true,
-        "value": 0.35
+        "value": 0.2
       }
     },
     {
@@ -92,36 +92,21 @@
             }
           ],
           "glass": true,
-          "image-name": "curve.svg",
-          "name": "curve"
+          "image-name": "monogram.svg",
+          "name": "M"
         }
       ],
       "lighting": "individual",
-      "name": "Curve",
+      "name": "M",
       "shadow": {
         "kind": "layer-color",
-        "opacity": 0.5
+        "opacity": 0.25
       },
       "specular": true,
       "translucency": {
         "enabled": true,
-        "value": 0.25
+        "value": 0.16
       }
-    },
-    {
-      "layers": [
-        {
-          "glass": false,
-          "image-name": "grid.svg",
-          "name": "grid"
-        }
-      ],
-      "name": "Paper",
-      "shadow": {
-        "kind": "none",
-        "opacity": 0
-      },
-      "specular": false
     }
   ],
   "supported-platforms": {

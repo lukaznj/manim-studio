@@ -22,10 +22,10 @@ Renders, exports and series take minutes, and people look elsewhere while they r
   - an episode or the series finishing
   - quick mode finishing
   - the engine and LaTeX becoming ready after an install
-  - an agent waiting on a usage limit
   - the chat agent answering while the window isn't focused
 
   A render plays a cue only when you waited for it: at least 4 s, and not during the agent's own iterations. Editor render errors stay silent, because the editor already shows them.
+- **Usage limits also send a native desktop notification and the attention cue**, from the main process after an agent actually refuses a turn. This covers Claude, Codex and Antigravity in chat, planning, series and exercises. Alerts share a gate per provider/sign-in: concurrent episodes and retries do not repeat the same reset window; an unknown window stays quiet until a successful turn, with a one-minute minimum between alerts. The notification names the provider and reset time when available, and opens the app when clicked. It never includes raw provider errors. The renderer plays the cue at the selected volume; without a window, the OS supplies its notification sound. Muting app sounds keeps the visual notification.
 - **Quiet and polite:** one cue at a time, the more important one wins, and nothing plays while a video is playing. Settings → General has on/off and a volume (default 50, about −15 dB).
 - Right answer and not quite are in the set for answer checking, which the app doesn't have yet.
 

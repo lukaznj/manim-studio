@@ -4,11 +4,12 @@ import type { ExerciseSet, SeriesRun, SetupStatus } from '../../../shared/types'
 import { requiredReady } from '../components/Onboarding'
 import { useStore, type State } from '../store'
 import { playback } from './playback'
+import { api } from './api'
 
 export type Sound = 'render' | 'export' | 'episode' | 'series' | 'correct' | 'wrong' | 'setup' | 'attention' | 'error'
 
 /** Which cue wins when two would play at once (an exported episode is also an export). */
-const PRIORITY: Record<Sound, number> = { render: 1, export: 2, correct: 2, wrong: 2, episode: 3, attention: 3, error: 4, series: 5, setup: 5 }
+const PRIORITY: Record<Sound, number> = { render: 1, export: 2, correct: 2, wrong: 2, episode: 3, attention: 4, error: 4, series: 5, setup: 5 }
 const PEAK = 0.5 // every sound is levelled to −6 dBFS before the volume
 
 type Build = (ctx: BaseAudioContext, out: AudioNode, t: number) => void
@@ -221,9 +222,7 @@ export async function playSound(sound: Sound, preview = false): Promise<void> {
 
 // --- when they play: changes in the app's state -------------------------------------------------
 
-const LIMIT = /usage limit/i // agent.ts turnPastLimits says so in the activity while it waits
-
-/** The cues for a series, an exercise set or quick mode moving on: done, failed, waiting on a limit. */
+/** The cues for a series, an exercise set or quick mode moving on: done or failed. */
 function items(before: { id: string; state: string; activity?: string }[], now: { id: string; state: string; activity?: string }[], done: Sound): Sound[] {
   const cues: Sound[] = []
   for (const item of now) {
@@ -231,7 +230,6 @@ function items(before: { id: string; state: string; activity?: string }[], now: 
     if (!was) continue
     if (item.state !== was.state && item.state === 'done') cues.push(done)
     if (item.state !== was.state && item.state === 'failed') cues.push('error')
-    if (LIMIT.test(item.activity ?? '') && !LIMIT.test(was.activity ?? '')) cues.push('attention')
   }
   return cues
 }
@@ -268,9 +266,11 @@ export function cuesFor(s: State, p: State, focused: boolean): Sound[] {
 
 /** Starts listening; call once. */
 export function startSoundCues(): () => void {
-  return useStore.subscribe((s, p) => {
+  const offLimit = api.on('usage-limit', () => void playSound('attention'))
+  const offState = useStore.subscribe((s, p) => {
     const cues = cuesFor(s, p, document.hasFocus())
     if (!cues.length) return
     void playSound(cues.reduce((a, b) => (PRIORITY[b] > PRIORITY[a] ? b : a)))
   })
+  return () => { offLimit(); offState() }
 }
