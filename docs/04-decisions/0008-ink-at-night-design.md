@@ -33,9 +33,9 @@ This is a work tool: serious, used for hours, and showing dark video stages most
   - Dialogs rise in (`@starting-style`), and screens and themes cross-fade (View Transitions).
   - Reduced motion is respected.
   - No animation library: CSS and native APIs only.
-- **Mark.** y = x² halfway through being drawn: an orange→yellow curve with a blue pen dot at its tip. It's the wordmark, the home screen's empty state, and the app icon.
+- **Mark.** A custom rounded M for Manim, drawn in an orange→yellow stroke and finished with a blue dot. The same geometry appears in the wordmark and app icon.
 - **App icon.** An Icon Composer document (`build/icon.icon`) with Liquid Glass on macOS 26 and later.
-  - Groups: an ink gradient fill, faint grid paper, the curve in glass (orange→yellow), and the pen in a blue glass orb.
+  - A plain ink gradient background, a glass M (orange→yellow), and a blue glass finish. No grid or axes. The simple silhouette remains legible at Dock and title-bar sizes.
   - electron-builder compiles it with `actool` into `Assets.car` plus an `.icns` for older macOS.
   - Windows and Linux use `build/icon.png`, rendered from the same document with `ictool`.
 - **Language.** English UI copy (it was Croatian until [[0011-open-source-english]]).

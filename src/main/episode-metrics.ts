@@ -16,7 +16,7 @@ import { fakeAgents } from './agent-fake'
 const file = (dir: string) => join(dir, '.studio', 'episode-metrics.json')
 const active = new Map<
   string,
-  { metrics: EpisodeMetrics; timer: ReturnType<typeof setInterval>; sample: (final?: boolean) => Promise<void>; pending: Promise<void> | null }
+  { metrics: EpisodeMetrics; selection: AgentSelection; timer: ReturnType<typeof setInterval>; sample: (final?: boolean) => Promise<void>; pending: Promise<void> | null }
 >()
 const save = (dir: string, metrics: EpisodeMetrics) => {
   mkdirSync(join(dir, '.studio'), { recursive: true })
@@ -57,6 +57,7 @@ export async function beginEpisodeMetrics(dir: string, selection: AgentSelection
   let accountAt = 0
   const tracker = {
     metrics,
+    selection: metrics.selection,
     timer: null as unknown as ReturnType<typeof setInterval>,
     sample: async (_final = false) => {},
     pending: null as Promise<void> | null,
@@ -77,11 +78,12 @@ export async function beginEpisodeMetrics(dir: string, selection: AgentSelection
       if (options.usage && (final || Date.now() - accountAt >= 60000)) {
         accountAt = Date.now()
         if (!fakeAgents()) {
+          const provider = tracker.selection.agent
           const [usage, voice] = await Promise.all([
-            selection.agent === 'claude' ? claudeUsage(true) : selection.agent === 'codex' ? codexPlanUsage() : null,
+            provider === 'claude' ? claudeUsage(true) : provider === 'codex' ? codexPlanUsage() : null,
             elevenLabsUsage().catch(() => null),
           ])
-          metrics.accounts.push({ at: Date.now(), provider: selection.agent, usage, elevenLabsCharacters: voice?.used })
+          metrics.accounts.push({ at: Date.now(), provider, usage, elevenLabsCharacters: voice?.used })
         } else if (!metrics.notes.includes('Synthetic agent test run; token counts and timings are not a live model benchmark.'))
           metrics.notes.push('Synthetic agent test run; token counts and timings are not a live model benchmark.')
       }
@@ -92,12 +94,23 @@ export async function beginEpisodeMetrics(dir: string, selection: AgentSelection
     await tracker.pending
   }
   active.set(dir, tracker)
+  episodeMetricsSelection(dir, selection)
   if (options.usage) bindVoiceMetrics(readMeta(dir), join(dir, '.studio', 'voice-usage.jsonl'))
   save(dir, metrics)
   await tracker.sample()
   if (active.get(dir) !== tracker) return
   tracker.timer = setInterval(() => void tracker.sample().catch(() => undefined), 5000)
   tracker.timer.unref()
+}
+
+/** Preserve the initial benchmark identity and explicitly record mixed-provider work. */
+export function episodeMetricsSelection(dir: string, selection: AgentSelection): void {
+  const tracker = active.get(dir)
+  if (!tracker || JSON.stringify(tracker.selection) === JSON.stringify(selection)) return
+  const describe = (s: AgentSelection) => `${s.agent} / ${s.model} / ${s.effort ?? 'default effort'}`
+  tracker.metrics.notes.push(`Agent changed from ${describe(tracker.selection)} to ${describe(selection)}. This episode includes work from multiple selections.`)
+  tracker.selection = { ...selection }
+  episodeMetricsPhase(dir, `Agent changed to ${describe(selection)}`)
 }
 
 export function episodeMetricsPhase(dir: string, name: string): void {

@@ -5,6 +5,8 @@ import type {
   AppMode,
   ChatEvent,
   ChatMessage,
+  ChatRequest,
+  FrameRegion,
   ClaudeStatus,
   Component,
   ExportJob,
@@ -114,15 +116,22 @@ export interface State {
   script: string | null // the open project's script.md (ScriptPane.tsx)
   quick: QuickRun | null // quick mode's run (QuickView.tsx)
   quickEditor: boolean // show the editor instead of quick mode's progress
-  series: SeriesRun | null // a series being made unattended (SeriesPanel.tsx on Home)
+  series: SeriesRun | null // the active production run; the course viewer owns its detailed UI
   homeSeries: string | null // the series folder Home has open, or null for all projects
   exerciseSets: ExerciseSet[] // Home's cards
   // The study screen (StudyView.tsx, ADR 0030) shows a course: its lessons, its exercises, or both.
   exerciseSet: ExerciseSet | null // its exercises
   watchSeries: WatchSeries | null // its lessons (a series, or a single video)
   studyTab: 'transcript' | 'chat' // the study screen's right column (ADR 0032)
+  studyProduction: boolean // the course's production overview instead of the selected lesson
   watchTime: number | null // where the study player is, for the chat; null without a video
   studyAutoplayPath: string | null // only an automatic lesson handoff starts playback
+  studyStartAt: number | null
+  studyReturn: { dir: string; at: number; playing: boolean } | null
+  studyTool: 'video' | 'exercises' | null
+  studyMoment: number | null
+  studySelecting: boolean
+  studyAttachment: { at: number; region: FrameRegion; preview: string } | null
   elevenLabsCheck: ElevenLabsCheck | null // the saved key's permissions, once checked this session
   selection: number[] // clip indices
   recordings: string[]
@@ -170,8 +179,15 @@ export const useStore = create<State>(() => ({
   exerciseSet: null,
   watchSeries: null,
   studyTab: 'transcript',
+  studyProduction: false,
   watchTime: null,
   studyAutoplayPath: null,
+  studyStartAt: null,
+  studyReturn: null,
+  studyTool: null,
+  studyMoment: null,
+  studySelecting: false,
+  studyAttachment: null,
   elevenLabsCheck: null,
   selection: [],
   recordings: [],
@@ -251,7 +267,7 @@ export async function boot(): Promise<void> {
   api.on('projects-changed', () => void refreshProjects())
   api.on('quick', (quick) => set((s) => ({ quick, quickEditor: quick?.id === s.quick?.id ? s.quickEditor : false })))
   void api.quickRun().then((quick) => set({ quick }))
-  api.on('series', (series) => set({ series }))
+  api.on('series', receiveSeries)
   api.on('watch', (w) => set((st) => (st.watchSeries?.folder === w.folder ? { watchSeries: w } : {})))
   api.on('exercises', (s) => {
     set((st) => ({
@@ -264,10 +280,34 @@ export async function boot(): Promise<void> {
     if (st.screen === 'study' && !st.watchSeries && st.exerciseSet?.folder === s.folder && s.items.length && st.project?.meta.exercise?.set !== s.folder)
       void selectStudied(s.items[0].dir)
   })
-  void api.seriesRun().then((series) => set({ series }))
+  void api.seriesRun().then(receiveSeries)
+  // An interrupted planning request or edited plan reopens without starting paid work automatically.
+  void api.seriesDraft().then((draft) => {
+    if (draft && settings.onboardingDone && !get().dialog && (draft.plan || draft.request.pdfs.length || draft.request.topic?.trim()))
+      openDialog({ kind: 'series' })
+  })
   // Claude wrote the script: show it, unless you're in the middle of something else.
   api.on('script', ({ text }) => set((s) => ({ script: text, leftTab: text && s.leftTab === 'code' && !s.dirty ? 'script' : s.leftTab })))
   void api.exportJobs().then((exports) => set({ exports }))
+}
+
+function receiveSeries(series: SeriesRun | null): void {
+  const previous = get().series
+  set((s) => ({ series, watchSeries: s.watchSeries && series?.folder === s.watchSeries.folder ? { ...s.watchSeries, title: series.title, production: series } : s.watchSeries }))
+  const changed = previous?.folder !== series?.folder || previous?.episodes.filter((ep) => ep.state === 'done').length !== series?.episodes.filter((ep) => ep.state === 'done').length
+  if (!changed) return
+  void refreshProjects()
+  if (series && get().watchSeries?.folder === series.folder) {
+    void api.watchSeries(series.folder).then((fresh) => {
+      if (get().watchSeries?.folder !== fresh.folder) return
+      const current = get().series
+      set({ watchSeries: current?.folder === fresh.folder ? { ...fresh, production: current } : fresh })
+    }).catch(() => undefined)
+  }
+}
+
+export function showSeriesProduction(): void {
+  set({ studyProduction: true, watchTime: null, studyAutoplayPath: null })
 }
 
 export async function refreshProjects(): Promise<void> {
@@ -282,7 +322,7 @@ export async function openExerciseSet(folder: string, dir?: string): Promise<voi
   const exerciseSet = await guard(api.exerciseSet(folder))
   if (!exerciseSet) return
   const watchSeries = exerciseSet.course ? await api.watchSeries(exerciseSet.course).catch(() => null) : null
-  withTransition(() => set({ screen: 'study', exerciseSet, watchSeries }))
+  withTransition(() => set({ screen: 'study', exerciseSet, watchSeries, studyProduction: false }))
   const pick = dir ?? (get().project?.meta.exercise?.set === folder ? get().project!.path : exerciseSet.items[0]?.dir)
   if (pick) await selectStudied(pick)
 }
@@ -292,17 +332,41 @@ export async function openWatch(folder: string, dir?: string): Promise<void> {
   const watchSeries = await guard(api.watchSeries(folder))
   if (!watchSeries) return
   const exerciseSet = watchSeries.exercises ? await api.exerciseSet(watchSeries.exercises).catch(() => null) : null
-  withTransition(() => set({ screen: 'study', watchSeries, exerciseSet }))
+  const production = get().series?.folder === folder ? get().series : watchSeries.production
+  const overview = !dir && !!production && (production.state !== 'done' || production.episodes.some((ep) => ep.state === 'failed'))
+  if (get().dirty) await saveScene()
+  withTransition(() => set({ screen: 'study', watchSeries, exerciseSet, studyProduction: overview, ...(overview ? { watchTime: null, studyAutoplayPath: null } : {}) }))
   const pick = dir ?? (get().project?.meta.series?.folder === folder ? get().project!.path : watchSeries.episodes[0]?.dir)
-  if (pick) await selectStudied(pick)
+  if (pick && !overview) await selectStudied(pick)
 }
 
 /** Opens a video of the course as the project (for the chat), staying on the study screen. */
-export async function selectStudied(dir: string, autoplay = false): Promise<void> {
+export async function selectStudied(dir: string, autoplay = false, startAt: number | null = null, detour = false): Promise<void> {
+  set({ studyProduction: false, ...(!detour ? { studyReturn: null } : {}) })
   if (get().project?.path === dir) return
   if (get().dirty) await saveScene()
   const opened = await guard(api.openProject(dir))
-  if (opened) applyOpened(opened, 'study', autoplay)
+  if (opened) {
+    applyOpened(opened, 'study', autoplay)
+    set({ studyStartAt: startAt })
+  }
+}
+
+/** A voluntary detour returns to exactly where the viewer left the original lesson. */
+export async function watchAdditionalVideo(dir: string): Promise<void> {
+  const current = get()
+  if (!current.project) return
+  const back = { dir: current.project.path, at: current.watchTime ?? 0, playing: !(document.querySelector<HTMLVideoElement>('.study-video-stage video')?.paused ?? true) }
+  await selectStudied(dir, true, 0, true)
+  if (get().project?.path === dir) set({ studyReturn: back })
+}
+export async function returnToStudyVideo(): Promise<void> {
+  const back = get().studyReturn
+  if (back) await selectStudied(back.dir, back.playing, back.at)
+}
+export function prepareStudyAction(tool: State['studyTool']): void {
+  document.querySelector<HTMLVideoElement>('.study-video-stage video')?.pause()
+  set({ studyTool: tool, studyMoment: get().studyAttachment?.at ?? get().watchTime ?? 0, studyTab: 'chat', chatDraft: '' })
 }
 
 /** A question about what's being studied: into the chat's box, with the chat shown. */
@@ -369,13 +433,19 @@ export async function refreshClaude(): Promise<void> {
 }
 
 let usageAt = 0
+let usageRequest = 0
 
 /** At most once a minute unless forced (after a sign-in or a chat turn): each check starts Claude Code. */
 export async function refreshUsage(force = false): Promise<void> {
-  if (!get().claude?.loggedIn) return set({ usage: null })
+  if (!get().claude?.loggedIn) { usageRequest++; return set({ usage: null }) }
   if (!force && Date.now() - usageAt < 60_000) return
   usageAt = Date.now()
-  set({ usage: await api.claudeUsage().catch(() => null) })
+  const request = ++usageRequest
+  const agent = get().settings?.agent ?? 'claude'
+  const auth = get().claude?.method === 'api-key' ? 'api-key' : 'account'
+  if (auth === 'api-key' || get().usage?.agent !== agent) set({ usage: null })
+  const usage = await api.agentPlanUsage(agent, auth).catch(() => null)
+  if (request === usageRequest && get().settings?.agent === agent) set({ usage })
 }
 
 /** The guided tours (Tour.tsx, ADR 0047): Home and the study page, and the editor. */
@@ -548,6 +618,12 @@ function applyOpened(o: OpenProject, screen: State['screen'] = 'editor', autopla
   set({
     screen,
     watchTime: null,
+    studyTool: null,
+    studyMoment: null,
+    studyAttachment: null,
+    studySelecting: false,
+    studyStartAt: null,
+    studyReturn: null,
     studyAutoplayPath: autoplay ? o.path : null,
     project: { path: o.path, meta: o.meta },
     savedSource: o.source,
@@ -700,7 +776,7 @@ export function selectClips(indices: number[]): void {
 // --- chat -------------------------------------------------------------------------------------------
 
 function onChat(e: ChatEvent): void {
-  if (e.type === 'message') set((s) => ({ chat: [...s.chat.filter((m) => m.id !== e.message.id), e.message] }))
+  if (e.type === 'message') set((s) => ({ chat: s.chat.some((m) => m.id === e.message.id) ? s.chat.map((m) => m.id === e.message.id ? e.message : m) : [...s.chat, e.message] }))
   if (e.type === 'delta') set((s) => ({ streaming: { ...s.streaming, [e.messageId]: (s.streaming[e.messageId] ?? '') + e.text } }))
   if (e.type === 'part')
     set((s) => ({
@@ -731,7 +807,7 @@ function onChat(e: ChatEvent): void {
   if (e.type === 'reset') set({ chat: [], streaming: {}, chatBusy: false })
 }
 
-export async function sendChat(text: string, withFrame: boolean): Promise<boolean> {
+export async function sendChat(text: string, withFrame: boolean, studyRequest: Partial<ChatRequest> = {}): Promise<boolean> {
   const { timeline, selection, dirty } = get()
   if (dirty) await saveScene({ render: false })
   const clips = timeline ? selection.map((i) => timeline.clips[i]).filter(Boolean) : []
@@ -751,6 +827,8 @@ export async function sendChat(text: string, withFrame: boolean): Promise<boolea
       context: studying ? undefined : context,
       frameAt: !studying && withFrame && timeline ? playback.time : undefined,
       watchingAt: studying && watchTime !== null ? watchTime : undefined,
+      ...(studying ? { study: true, watchingAt: get().studyMoment ?? get().studyAttachment?.at ?? watchTime ?? 0, studyAction: get().studyTool ?? undefined, frameRegion: get().studyAttachment?.region, frameImage: get().studyAttachment?.preview } : {}),
+      ...studyRequest,
       source: get().chatSource ?? undefined,
     })
     set({ chatSource: null })

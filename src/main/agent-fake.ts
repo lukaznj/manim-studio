@@ -7,12 +7,21 @@ import type { AgentOptions, EpisodeAgent } from './agent'
 import { appendUsage } from './usage'
 import { readMeta } from './projects'
 import { currentOrNewRender } from './render'
+import { setTimeout as delay } from 'node:timers/promises'
+import type { SeriesDraft, SeriesPlan, SeriesPlanProgress } from '../shared/types'
 
 /** Only in a driven test profile (with STUDIO_USER_DATA), never in a real install. */
 export const fakeAgents = (): boolean => !!(process.env.STUDIO_FAKE_AGENT && process.env.STUDIO_USER_DATA)
 
 let limitedOnce = false
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Exercise the real planning lifecycle without sending documents or spending an account's usage. */
+export async function fakeSeriesPlan(req: SeriesDraft['request'], report: (p: SeriesPlanProgress) => void, signal?: AbortSignal): Promise<SeriesPlan> {
+  report({ stage: 'planning', total: req.pdfs.length, read: [], episodes: [], startedAt: Date.now() })
+  await delay(2500, undefined, { signal })
+  return { title: req.topic ?? 'Recovery test', bible: 'Use consistent notation.', episodes: [1, 2].map((n) => ({ title: `Test episode ${n}`, summary: `Teach topic ${n}.`, sources: [], buildsOn: n > 1 ? [n - 1] : [] })) }
+}
 
 export function fakeAgent(dir: string, { onTool, onUsage, model }: AgentOptions): EpisodeAgent {
   const meta = readMeta(dir)

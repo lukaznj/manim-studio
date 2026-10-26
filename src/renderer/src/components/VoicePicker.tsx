@@ -1,4 +1,4 @@
-import { t as uiText, format } from '../lib/i18n'
+import { t as uiText, format, currentLocale } from '../lib/i18n'
 import { Check, ChevronDown, Pause, Play, Search } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import type { VoiceOption, VoiceSettings } from '../../../shared/types'
@@ -7,14 +7,13 @@ import { api } from '../lib/api'
 import { languageName } from '../lib/languages'
 import { errorText, toast, useStore } from '../store'
 
-const compact = new Intl.NumberFormat('en', { notation: 'compact' })
-
 /**
  * ElevenLabs voices the way their site lists them: the language's ten most used, a search of the
  * whole library, and the voices in your account, each with a sample to play. The list is a native
  * popover anchored to the button, so it can reach past the dialog it's in.
  */
 export function VoicePicker(props: { language: string; hasKey: boolean; value?: { id: string; name?: string }; onPick: (v: VoiceOption) => void }) {
+  const compact = new Intl.NumberFormat(currentLocale(), { notation: 'compact' })
   const anchor = `--voice-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const panel = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)

@@ -1,6 +1,6 @@
 import { t as uiText, localize } from '../lib/i18n'
 import { X } from 'lucide-react'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 export function Modal(props: {
   open: boolean
@@ -71,7 +71,7 @@ export function Modal(props: {
 export function Tabs<T extends string>(props: {
   value: T
   onChange: (v: T) => void
-  items: { value: T; label: ReactNode }[]
+  items: { value: T; label: ReactNode; disabled?: boolean; title?: string }[]
   radio?: string
   label?: string
   disabled?: boolean
@@ -106,15 +106,18 @@ export function Tabs<T extends string>(props: {
       onKeyDown={(e) => {
         if (props.disabled || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
         e.preventDefault()
-        const selected = props.items.findIndex((it) => it.value === props.value)
+        const enabled = props.items.filter((it) => !it.disabled)
+        if (!enabled.length) return
+        const selected = enabled.findIndex((it) => it.value === props.value)
         const index =
           e.key === 'Home'
             ? 0
             : e.key === 'End'
-              ? props.items.length - 1
-              : (selected + (e.key === 'ArrowRight' ? 1 : -1) + props.items.length) % props.items.length
-        props.onChange(props.items[index].value)
-        ref.current?.querySelectorAll('button')[index]?.focus()
+              ? enabled.length - 1
+              : selected < 0 ? (e.key === 'ArrowRight' ? 0 : enabled.length - 1)
+                : (selected + (e.key === 'ArrowRight' ? 1 : -1) + enabled.length) % enabled.length
+        props.onChange(enabled[index].value)
+        ref.current?.querySelectorAll('button')[props.items.indexOf(enabled[index])]?.focus()
       }}
     >
       <span
@@ -127,8 +130,10 @@ export function Tabs<T extends string>(props: {
           key={it.value}
           role={props.radio ? 'radio' : 'tab'}
           {...(props.radio ? { 'aria-checked': props.value === it.value } : { 'aria-selected': props.value === it.value })}
-          disabled={props.disabled}
-          tabIndex={props.value === it.value ? 0 : -1}
+          disabled={props.disabled || it.disabled}
+          title={it.title}
+          tabIndex={(props.items.some((item) => item.value === props.value && !item.disabled)
+            ? props.value === it.value : props.items.find((item) => !item.disabled) === it) ? 0 : -1}
           onClick={() => props.onChange(it.value)}
         >
           {localize(it.label)}
@@ -171,18 +176,19 @@ export function Ring({ value, size = 18 }: { value: number; size?: number }) {
 }
 
 export function Wordmark({ size = 15 }: { size?: number }) {
-  // The app icon's mark: y = x² mid-way through being drawn, the pen at its tip.
+  // The Icon Composer monogram, with a tighter view box for the small inline mark.
+  const gradient = useId()
   return (
     <span className="wordmark" style={{ fontSize: size }}>
-      <svg viewBox="0 0 24 24" width={size * 1.3} height={size * 1.3} aria-hidden>
+      <svg viewBox="170 220 684 624" width={size * 1.3} height={size * 1.3} aria-hidden>
         <defs>
-          <linearGradient id="wm-curve" x1="0" y1="0" x2="1" y2="0.4">
+          <linearGradient id={gradient} x1="20%" y1="30%" x2="72%" y2="60%">
             <stop offset="0" style={{ stopColor: 'var(--mark-from)' }} />
             <stop offset="1" style={{ stopColor: 'var(--mark-to)' }} />
           </linearGradient>
         </defs>
-        <path d="M5.4 7 Q11 24.2 16.6 12.2" fill="none" stroke="url(#wm-curve)" strokeWidth="2.6" strokeLinecap="round" />
-        <circle cx="16.6" cy="12.2" r="2.5" fill="var(--blue)" />
+        <path d="M258 728 L312 326 Q316 298 334 322 L495 550 Q512 573 529 550 L690 322 Q708 298 712 326 L766 728" fill="none" stroke={`url(#${gradient})`} strokeWidth="116" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="766" cy="728" r="66" fill="var(--blue)" />
       </svg>
       {uiText('Manim Studio')}
     </span>

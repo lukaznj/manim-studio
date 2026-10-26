@@ -11,6 +11,7 @@ export interface ModelTokens {
 }
 
 export interface UsageEntry {
+  auth?: 'account' | 'api-key' // recorded at execution; missing on older entries, never inferred as API billing
   provider?: 'claude' | 'codex' | 'antigravity'
   providerUsage?: Record<string, number> // original CLI counters; no invented category semantics
   costKnown?: boolean // false: this provider did not report an API price
@@ -64,6 +65,10 @@ export function usageTotals(entries: UsageEntry[]): Record<string, ModelTokens> 
 }
 
 export const costOf = (models: Record<string, ModelTokens>): number => Object.values(models).reduce((s, n) => s + n.costUSD, 0)
+
+/** API estimates are relevant only when every recorded turn used a key and reported pricing. */
+export const apiEstimateOf = (entries: UsageEntry[]): number | null => entries.length && entries.every((entry) => entry.auth === 'api-key' && entry.costKnown !== false)
+  ? entries.reduce((total, entry) => total + costOf(entry.models), 0) : null
 
 /** "claude-sonnet-5-5" → "Sonnet 5.5"; "claude-opus-5-5-20261001" → "Opus 5.5". */
 export function modelName(id: string): string {

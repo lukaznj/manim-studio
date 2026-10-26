@@ -15,16 +15,16 @@ export function readUsage(dir: string): UsageEntry[] {
 }
 
 /** A turn's entry from its result message; `prev` is the session's running totals before it. */
-export function entryFrom(step: string, result: SDKResultMessage, prev: Record<string, ModelTokens>, tools: Record<string, number>, ms: number): UsageEntry {
+export function entryFrom(step: string, result: SDKResultMessage, prev: Record<string, ModelTokens>, tools: Record<string, number>, ms: number, auth?: UsageEntry['auth']): UsageEntry {
   const cumulative: Record<string, ModelTokens> = {}
   for (const [model, u] of Object.entries(result.modelUsage ?? {})) cumulative[model] = tokensFrom(u)
-  return { at: Date.now(), step, session: result.session_id, models: usageDelta(prev, cumulative), tools, ms, cumulative }
+  return { at: Date.now(), step, provider: 'claude', auth, session: result.session_id, models: usageDelta(prev, cumulative), tools, ms, cumulative }
 }
 
 /** Records a turn from its result message; returns the entry (this turn's own use). */
-export function recordTurn(dir: string, step: string, result: SDKResultMessage, tools: Record<string, number>, ms: number): UsageEntry {
+export function recordTurn(dir: string, step: string, result: SDKResultMessage, tools: Record<string, number>, ms: number, auth?: UsageEntry['auth']): UsageEntry {
   const prev = readUsage(dir).findLast((e) => e.session === result.session_id)?.cumulative ?? {}
-  const entry = entryFrom(step, result, prev, tools, ms)
+  const entry = entryFrom(step, result, prev, tools, ms, auth)
   appendUsage(dir, entry)
   return entry
 }

@@ -23,12 +23,6 @@ const TOURS: Record<TourId, Step[]> = {
       text: 'Your library has two sides: Learn, to watch and ask about videos, and Create, to make and edit them. Switch here.',
     },
     {
-      target: 'home-progress',
-      title: 'What’s being made',
-      text: 'While a series is made, each episode’s progress shows here. Pause it, stop it, or carry on later, even after quitting the app.',
-      learn: { title: 'Courses being made', text: 'While a course is made, each lesson’s progress shows here, and lessons open as soon as they’re ready.' },
-    },
-    {
       target: 'home-library',
       title: 'Your projects',
       text: 'Every project is a card. A series opens as a folder of episodes; rename it with the pencil next to its title.',
@@ -45,6 +39,11 @@ const TOURS: Record<TourId, Step[]> = {
     },
   ],
   study: [
+    {
+      target: 'study-production',
+      title: 'What’s being made',
+      text: 'While a series is made, each episode’s progress shows here. Pause it, stop it, or carry on later, even after quitting the app.',
+    },
     {
       target: 'study-library',
       title: 'Your course',
