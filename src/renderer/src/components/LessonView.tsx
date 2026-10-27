@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, SeriesRun, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { nextStudyEpisode } from '../../../shared/study-playback'
 import { api } from '../lib/api'
-import { canEdit, errorText, prepareStudyAction, returnToStudyVideo, selectStudied, toast, useStore, watchAdditionalVideo } from '../store'
+import { canEdit, errorText, returnToStudyVideo, selectStudied, toast, useStore, watchAdditionalVideo } from '../store'
 import { StudyPlayer } from './StudyPlayer'
 import { StudyNotes } from './StudyNotes'
 import { nearbyFollowUps } from '../../../shared/study-assistant'
 import { EpisodeStatus, ProductionIcon } from './SeriesProduction'
+import { StudyRowProgress } from './StudyRowProgress'
 
 // The study screen's lessons (StudyView.tsx): a series' episodes and follow-ups, or a single video
 // (src/main/watch.ts, ADR 0028).
@@ -33,7 +34,7 @@ export function EpisodeRow({ episode: e, selected, run }: { episode: WatchEpisod
           <span className="ex-num mono">{e.number}</span>
           <span className="ex-row-body">
             <span className="ex-row-title">{e.title}</span>
-            <span className="ex-row-state">
+            <StudyRowProgress dir={e.dir} available={(!producing || producing.state === 'done') && e.state !== 'making' && e.state !== 'failed'}>
               {producing && producing.state !== 'done' ? <EpisodeStatus run={run!} episode={producing} /> : e.state === 'making'
                 ? (e.activity ?? uiText('Making the video'))
                 : e.state === 'failed'
@@ -43,7 +44,7 @@ export function EpisodeRow({ episode: e, selected, run }: { episode: WatchEpisod
                     : e.video
                       ? uiText('Ready to watch')
                       : uiText('Preview')}
-            </span>
+            </StudyRowProgress>
           </span>
           {producing && producing.state !== 'done' ? <span className={`production-row-icon state-${producing.state}`}><ProductionIcon run={run!} episode={producing} /></span> : e.state === 'making' ? (
             <span className="spinner" />
@@ -61,13 +62,13 @@ export function EpisodeRow({ episode: e, selected, run }: { episode: WatchEpisod
             <CornerDownRight className="ex-follow-icon" />
             <span className="ex-row-body">
               <span className="ex-row-title">{f.title}</span>
-              <span className="ex-row-state">
+              <StudyRowProgress dir={f.dir} available={f.state === 'done'}>
                 {f.state === 'making'
                   ? (f.activity ?? uiText('Making the video'))
                   : f.state === 'failed'
                     ? (f.error ?? uiText('Didn’t finish'))
                     : format('Follow-up from {0}', [clock(f.at)])}
-              </span>
+              </StudyRowProgress>
             </span>
             {f.state === 'making' ? (
               <span className="spinner" />
@@ -162,11 +163,11 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
             resume
             startPlaying={startPlaying}
             startAt={startAt}
-            overlay={!followUp ? <FollowUpCue episode={episode} /> : returning ? <div className="study-detour-cue"><button onClick={() => void returnToStudyVideo()}><ArrowLeft /><span><strong>{uiText('Return to the lesson')}</strong><small>{uiText('Continue where you left off')}</small></span></button></div> : undefined}
+            overlay={returning ? <div className="study-detour-cue"><button onClick={() => void returnToStudyVideo()}><ArrowLeft /><span><strong>{uiText('Return to the lesson')}</strong><small>{uiText('Continue where you left off')}</small></span></button></div> : !followUp ? <FollowUpCue episode={episode} /> : undefined}
             seriesAutoplay={!followUp && !single}
             onEnded={() => {
               const current = useStore.getState()
-              if (followUp && current.studyReturn) { void returnToStudyVideo(); return }
+              if (current.studyReturn) { void returnToStudyVideo(); return }
               if (
                 followUp ||
                 single ||
@@ -195,7 +196,6 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
         </section>
       )}
 
-      {!followUp && !single && src && <div className="study-lesson-tools" data-tour="study-clarity"><span className="hint">{uiText('A different angle can help.')}</span><button className="btn small" onClick={() => prepareStudyAction('video')}><Video />{uiText('Create an additional explanation')}</button></div>}
       {followUp && <button className="btn small ghost" onClick={() => returning ? void returnToStudyVideo() : void selectStudied(episode.dir)}><ArrowLeft />{uiText('Return to the lesson')}</button>}
       {!followUp && !!episode.followUps.length && <div className="study-additional-videos"><span className="eyebrow">{uiText('Additional videos')}</span>{episode.followUps.map((f) => <button key={f.dir} disabled={f.state !== 'done'} onClick={() => void watchAdditionalVideo(f.dir)}><Play /><span><strong>{f.title}</strong><small>{f.state === 'done' ? format('Follow-up from {0}', [clock(f.at)]) : f.state === 'failed' ? uiText('Didn’t finish') : uiText('Making the video')}</small></span></button>)}</div>}
       {src && <StudyNotes key={dir} dir={dir} />}

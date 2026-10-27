@@ -27,10 +27,9 @@ const TOOL: Record<string, string> = {
   WebFetch: 'web pages',
 }
 
-/** Recorded project tokens; prices only for known API-key usage or developer comparisons. */
+/** Recorded project tokens; prices only for a verified, fully priced API-key history. */
 export function ProjectUsage() {
   const project = useStore((s) => s.project?.path)
-  const developer = useStore((s) => !!s.settings?.developerMode)
   const [entries, setEntries] = useState<UsageEntry[]>([])
   useEffect(() => {
     let active = true
@@ -43,7 +42,7 @@ export function ProjectUsage() {
   const total = usageTotals(entries)
   const count = sum(total, 'input') + sum(total, 'cacheRead') + sum(total, 'cacheWrite') + sum(total, 'output')
   const estimate = apiEstimateOf(entries)
-  const showCost = estimate !== null || (developer && entries.some((entry) => entry.costKnown !== false))
+  const showCost = estimate !== null
   if (!entries.length) return null
   return (
     <button
@@ -67,7 +66,7 @@ export function UsageDialog() {
 
   const totals = usageTotals(log)
   const total = costOf(totals)
-  const showCosts = apiEstimateOf(log) !== null || (!!settings?.developerMode && log.some((entry) => entry.costKnown !== false))
+  const showCosts = apiEstimateOf(log) !== null
   const tokenCount = (models: Record<string, ModelTokens>) => sum(models, 'input') + sum(models, 'cacheRead') + sum(models, 'cacheWrite') + sum(models, 'output')
   const steps = new Map<string, UsageEntry[]>()
   for (const e of log) steps.set(e.step, [...(steps.get(e.step) ?? []), e])

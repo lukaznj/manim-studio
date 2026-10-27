@@ -2,6 +2,10 @@
 
 How auto-update works: [[../04-decisions/0006-auto-update-github-releases|ADR 0006]].
 
+## Source and license
+
+Future releases use AGPLv3 ([[../04-decisions/0054-agpl-copyleft-license|ADR 0054]]). Ship LICENSE, LICENSE-EXCEPTION and NOTICE in the app and integration archives. Keep each release’s matching source archive, dependency locks and build instructions available alongside its binaries. Do not replace or relabel the MIT terms of v0.13.0 and earlier releases. Third-party agent binaries and libraries retain their own terms.
+
 ## Each release
 
 ```bash

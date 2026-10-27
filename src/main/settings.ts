@@ -6,6 +6,8 @@ import { migrateVoice } from '../shared/voice'
 import { CODEX_EXECUTOR, normalizeCodexSettings } from '../shared/codex-selection'
 import { resolveUiLanguage } from '../shared/ui-languages'
 import { narrationLanguageForUi } from '../shared/narration-languages'
+import { interfaceSize, chatTextSize } from '../shared/text-size'
+import { normalizeModelOrder } from '../shared/model-fallback'
 import { paths } from './paths'
 import { readAtomicJson, writeAtomicJson } from './atomic-json'
 
@@ -63,11 +65,17 @@ export function getSettings(): Settings {
     const base = defaults()
     cache = normalizeCodexSettings({ ...base, ...stored, uiLanguage: resolveUiLanguage(stored.uiLanguage ?? base.uiLanguage), ...secretFlags() })
   }
+  if (cache.modelFallback) cache.modelFallback = { enabled: cache.modelFallback.enabled === true, order: normalizeModelOrder(cache.modelFallback.order) }
+  cache.interfaceSize = interfaceSize(cache.interfaceSize)
+  cache.chatTextSize = chatTextSize(cache.chatTextSize)
   return cache
 }
 
 export function setSettings(patch: Partial<Settings>): Settings {
   cache = normalizeCodexSettings({ ...getSettings(), ...patch, ...secretFlags() })
+  if (cache.modelFallback) cache.modelFallback = { enabled: cache.modelFallback.enabled === true, order: normalizeModelOrder(cache.modelFallback.order) }
+  cache.interfaceSize = interfaceSize(cache.interfaceSize)
+  cache.chatTextSize = chatTextSize(cache.chatTextSize)
   cache.uiLanguage = resolveUiLanguage(cache.uiLanguage)
   writeAtomicJson(paths.settingsFile(), cache)
   return cache

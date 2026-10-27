@@ -1,3 +1,5 @@
+import { FallbackSettings } from './ModelRouting'
+import { INTERFACE_SIZES, CHAT_TEXT_SIZES } from '../../../shared/text-size'
 import { studyModel } from '../../../shared/study-assistant'
 import { t as uiText, localize, format, currentLocale } from '../lib/i18n'
 import {
@@ -53,6 +55,7 @@ import {
   openDialog,
   refreshClaude,
   refreshProjects,
+  refreshSetup,
   refreshUsage,
   renderNow,
   startTour,
@@ -248,7 +251,7 @@ function AgentTab() {
       <Row
         title={uiText('Agent')}
         text={uiText(
-          'Who writes the scenes, solves exercises and makes series episodes. Quick mode, series planning and translation use it too. Switching starts a new conversation.',
+          'Who writes the scenes, solves exercises and makes series episodes. Quick mode, series planning and translation use it too. Switching keeps the saved conversation.',
         )}
       >
         <Tabs
@@ -298,6 +301,7 @@ function AgentTab() {
           </Row> : <p className="hint">{uiText('Series episodes use the creation model and effort above.')}</p>}
         </details>
       </>}
+      <FallbackSettings />
       <Row
         title={uiText('Agents at once')}
         text={uiText(
@@ -1249,9 +1253,20 @@ function EnvTab() {
   const log = useStore((s) => s.setupLog)
   const progress = useStore((s) => s.setupProgress)
   const [openLog, setOpenLog] = useState<Component | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const canUninstall = useStore((s) => s.app?.canUninstall)
+  const remove = async (uninstall = false) => {
+    setRemoving(true)
+    try {
+      if (await api.removeDownloadedTools(uninstall)) { await refreshSetup(); if (!uninstall) toast(uiText('Done.')) }
+    } catch (error) { toast(errorText(error), 'error') }
+    finally { setRemoving(false) }
+  }
   if (!setup) return null
   return (
     <div className="set-group">
+      <div className="set-row"><button className="btn small" disabled={checking} onClick={() => { setChecking(true); void refreshSetup(true).catch((error) => toast(errorText(error), 'error')).finally(() => setChecking(false)) }}><RefreshCw />{uiText('Check installation')}</button></div>
       {COMPONENTS.map((c) => (
         <div key={c.id} className="env-row">
           <Row title={c.title} text={setup.errors[c.id] ?? c.text}>
@@ -1266,6 +1281,12 @@ function EnvTab() {
           {openLog === c.id && <pre className="env-log mono">{log[c.id]?.join('\n')}</pre>}
         </div>
       ))}
+      <div className="runtime-cleanup"><Row title={uiText('Downloaded tools')} text={uiText('Removes Studio’s downloaded tools and caches. Projects, recordings, settings and sign-ins are kept.')}>
+        <div className="pane-actions">
+          <button className="btn small" disabled={removing || checking || Object.values(setup).includes('installing')} onClick={() => void remove()}><Trash2 />{uiText('Remove downloaded tools…')}</button>
+          {canUninstall && <button className="btn small" disabled={removing || checking} onClick={() => void remove(true)}><LogOut />{uiText('Uninstall Manim Studio…')}</button>}
+        </div>
+      </Row></div>
     </div>
   )
 }
@@ -1413,14 +1434,14 @@ const STATE_TEXT: Record<ComponentState, string> = {
 function InstallButton({ component, state }: { component: Component; state: ComponentState }) {
   if (state === 'ready')
     return (
-      <span className="badge mint">
+      <><span className="badge mint">
         <Check /> {uiText(' Ready')}
-      </span>
+      </span>{['env', 'latex', 'omnivoice', 'transcribe'].includes(component) && <button className="btn small ghost" onClick={() => void installComponent(component, true)}><RefreshCw />{uiText('Reinstall')}</button>}</>
     )
   if (state === 'unsupported') return <span className="badge">{uiText('Not supported on this computer')}</span>
   return (
-    <button className="btn small" disabled={state === 'installing'} onClick={() => void installComponent(component)}>
-      {state === 'installing' && <span className="spinner" />} {localize(STATE_TEXT[state])}
+    <button className="btn small" disabled={state === 'installing'} onClick={() => void installComponent(component, state === 'error' && component !== 'codex' && component !== 'antigravity')}>
+      {state === 'installing' && <span className="spinner" />} {state === 'error' && component !== 'codex' && component !== 'antigravity' ? uiText('Reinstall') : localize(STATE_TEXT[state])}
     </button>
   )
 }
@@ -1609,6 +1630,16 @@ function AboutTab() {
           ]}
         />
       </Row>
+      <Row title={uiText('Interface size')} text={uiText('Resize text and controls throughout the app. Use Cmd/Ctrl + plus or minus; Cmd/Ctrl + 0 resets to 100%.')}>
+        <select className="select" aria-label={uiText('Interface size')} value={settings.interfaceSize ?? 100} onChange={(e) => void updateSettings({ interfaceSize: Number(e.target.value) })}>
+          {INTERFACE_SIZES.map((size) => <option key={size} value={size}>{size}%</option>)}
+        </select>
+      </Row>
+      <Row title={uiText('Chat text size')} text={uiText('Adjust questions, explanations and the chat input independently of the rest of the interface.')}>
+        <select className="select" aria-label={uiText('Chat text size')} value={settings.chatTextSize ?? 13} onChange={(e) => void updateSettings({ chatTextSize: Number(e.target.value) })}>
+          {CHAT_TEXT_SIZES.map((size) => <option key={size} value={size}>{size} px</option>)}
+        </select>
+      </Row>
       <Row
         title={uiText('Sounds')}
         text={uiText('A short cue when something finishes while you look elsewhere: a render, an export, an episode, a series. Silent while a video plays.')}
@@ -1677,8 +1708,9 @@ function AboutTab() {
             {format('Manim Studio {0}', [app.version])}
           </button>
         }
-        text={format('{0} · {1} · open source (MIT)', [app.platform, app.arch])}
+        text={`${app.platform} · ${app.arch} · ${uiText('Open source')} (AGPLv3)`}
       >
+        <button className="btn small ghost" onClick={() => void api.openExternal('https://github.com/lukaznj/manim-studio')}>{uiText('Source code')}</button>
         <button className="btn small" onClick={() => void api.checkForUpdates()}>
           {uiText('Check for updates')}
         </button>

@@ -1,3 +1,5 @@
+import { archiveStudySources } from './study-source-archive'
+import { fallbackEnabled } from './model-fallback'
 // Series mode: a batch of PDFs (a course's lectures) becomes a series of videos. Claude reads them
 // and proposes the episodes and a series bible; the user edits and accepts the plan; Studio creates
 // one project per episode in a series folder, and either makes them all in quick mode, one after
@@ -35,7 +37,7 @@ import { runRunner } from './runner'
 import { getSettings, setSettings } from './settings'
 import { slugify } from './slug'
 import { appendUsage, readUsage } from './usage'
-import { costOf, type UsageEntry } from '../shared/usage'
+import { apiEstimateOf, costOf, type UsageEntry } from '../shared/usage'
 import { isSeriesCheckpoint, recoverSeries } from '../shared/series-recovery'
 import { readAtomicJson, writeAtomicJson } from './atomic-json'
 import { protectWork, shutdownRequested } from './work-lifecycle'
@@ -206,6 +208,7 @@ async function createSeries(start: SeriesStart, openInWindow: (dir: string) => P
   writeAtomicJson(creationFile(), { start, folder })
   mkdirSync(folder, { recursive: true })
   writeFileSync(join(folder, 'series.md'), bibleText(plan))
+  const courseSources = archiveStudySources(folder, start.pdfs)
 
   const byName = new Map(start.pdfs.map((p) => [basename(p), p]))
   const dirs: string[] = []
@@ -238,7 +241,7 @@ async function createSeries(start: SeriesStart, openInWindow: (dir: string) => P
     }
     dirs.push(ordered)
   }
-  writeAtomicJson(join(folder, 'series.json'), { plan, episodes: dirs.map((d) => basename(d)) })
+  writeAtomicJson(join(folder, 'series.json'), { plan, episodes: dirs.map((d) => basename(d)), sources: courseSources })
   setSettings({ recentProjects: [...dirs, ...getSettings().recentProjects.filter((p) => !dirs.includes(p))] })
 
   if (!start.unattended) {
@@ -318,7 +321,9 @@ export function seriesRunFor(folder: string): SeriesRun | null {
 
 function recoveredRun(saved: SeriesRun): SeriesRun {
   const run = recoverSeries(saved)
+  run.planningApiEstimateUSD = apiEstimateOf(readUsage(run.folder))
   for (const ep of run.episodes) {
+    ep.apiEstimateUSD = apiEstimateOf(readUsage(ep.dir))
     if (ep.state === 'script' && scriptStatus(readScript(ep.dir) ?? '') === 'approved') {
       ep.state = 'scripted'
       ep.tried = false
@@ -482,6 +487,7 @@ function startRun(title: string, folder: string, dirs: string[], start: SeriesSt
     state: recovered || shutdownRequested() ? 'stopped' : 'working',
     episodes: dirs.map((dir, i) => ({ dir, title: readMeta(dir).name, assignment: start.plan.episodes[i].assignment, state: 'waiting', warnings: [] })),
     planningCostUSD,
+    planningApiEstimateUSD: apiEstimateOf(readUsage(folder)),
   }
   save()
   setSettings({ seriesRun: folder })
@@ -635,15 +641,25 @@ async function episodeStep(
     return { agent: selection.agent, auth: ep.assignment ? ep.assignmentAuth ?? configuredAuth(selection.agent) : (run.auth ?? configuredAuth(selection.agent)) }
   }
   const open = async () => {
-    const opened = route()
+    let opened = route()
     episodeMetricsSelection(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')))
     const a = await episodeAgent(ep.dir, {
       onTool: (summary) => { if (!interrupted()) update(ep, { activity: summary }) },
-      onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models) }),
+      onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models), apiEstimateUSD: apiEstimateOf(readUsage(ep.dir)) }),
       ...seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')),
       auth: opened.auth,
       allowFallback: !ep.assignment,
       strictModel: !!ep.assignment,
+      followPriority: true,
+      onSelection: (actual) => {
+        if (interrupted()) return
+        const { auth, ...assignment } = actual
+        if (fallbackEnabled()) {
+          update(ep, { assignment, assignmentAuth: auth })
+          episodeMetricsSelection(ep.dir, assignment)
+          opened = route()
+        }
+      },
     })
     agents.set(ep.dir, a)
     return { a, opened }

@@ -158,6 +158,34 @@ class LoginProcess(unittest.TestCase):
         self.assertEqual(self.event(), {"type": "done", "ok": True})
         self.assertEqual(self.child.wait(timeout=5), 0)
 
+    def test_trusts_only_the_dedicated_login_workspace_before_selecting_google(self):
+        self.start(r'''
+            import os, select, time, tty
+            tty.setraw(0)
+            os.write(1, ("Accessing workspace:\r\n" + os.getcwd() + "\r\nDo you trust the contents of this project?\r\n> Yes, I trust this folder\r\n  No, exit\r\n").encode())
+            assert select.select([0], [], [], 3)[0], "Trust prompt was not answered"
+            assert os.read(0, 100) == b"\r"
+            os.write(1, b"Select login method")
+            assert select.select([0], [], [], 3)[0], "Google selection was not answered"
+            assert os.read(0, 100) == b"\r"
+            os.write(1, b"https://accounts.google.com/test\r\n")
+            time.sleep(30)
+        ''')
+        self.assertEqual(self.event()["type"], "url")
+        self.assertIn("dedicated sign-in folder", "\n".join(self.diagnostics))
+
+    def test_does_not_trust_an_unrelated_workspace(self):
+        self.start(r'''
+            import os, select, time, tty
+            tty.setraw(0)
+            os.write(1, ("Accessing workspace:\r\n" + os.getcwd() + "-unrelated\r\nDo you trust the contents of this project?\r\n> Yes, I trust this folder\r\n  No, exit\r\n").encode())
+            if select.select([0], [], [], 1)[0]:
+                raise RuntimeError("An unrelated workspace was trusted")
+            time.sleep(30)
+        ''', startup_timeout=0.5)
+        self.assertEqual(self.event()["type"], "error")
+        self.assertNotIn("Confirming trust", "\n".join(self.diagnostics))
+
     def test_startup_timeout_reports_failure_and_reaps_the_cli(self):
         self.start('''
             import os, time

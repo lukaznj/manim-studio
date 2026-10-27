@@ -1,9 +1,15 @@
 import { setLanguage, t as uiText } from './lib/i18n'
 import { create } from 'zustand'
+import { productionVisible } from '../../shared/series-presentation'
+import { validStudySelection } from '../../shared/study-navigation'
+import { readStudySelection, rememberStudySelection } from './lib/study-navigation'
+import { stepInterfaceSize } from '../../shared/text-size'
 import type {
   AppInfo,
   AppMode,
   ChatEvent,
+  ModelRoute,
+  StudyReferenceTarget,
   ChatMessage,
   ChatRequest,
   FrameRegion,
@@ -122,6 +128,7 @@ export interface State {
   // The study screen (StudyView.tsx, ADR 0030) shows a course: its lessons, its exercises, or both.
   exerciseSet: ExerciseSet | null // its exercises
   watchSeries: WatchSeries | null // its lessons (a series, or a single video)
+  studyFullscreenChat: boolean // transient fullscreen assistant; independent of the window layout
   studyTab: 'transcript' | 'chat' // the study screen's right column (ADR 0032)
   studyProduction: boolean // the course's production overview instead of the selected lesson
   watchTime: number | null // where the study player is, for the chat; null without a video
@@ -137,6 +144,7 @@ export interface State {
   recordings: string[]
 
   chat: ChatMessage[]
+  chatRoute: ModelRoute | null
   chatBusy: boolean
   streaming: Record<string, string>
 
@@ -178,6 +186,7 @@ export const useStore = create<State>(() => ({
   exerciseSets: [],
   exerciseSet: null,
   watchSeries: null,
+  studyFullscreenChat: false,
   studyTab: 'transcript',
   studyProduction: false,
   watchTime: null,
@@ -192,6 +201,7 @@ export const useStore = create<State>(() => ({
   selection: [],
   recordings: [],
   chat: [],
+  chatRoute: null,
   chatBusy: false,
   streaming: {},
   update: { state: 'idle' },
@@ -231,7 +241,11 @@ function withTransition(update: () => void): void {
   else update()
 }
 
-export const openDialog = (dialog: Dialog) => set({ dialog })
+export const openDialog = (dialog: Dialog) => {
+  // Global settings live outside the fullscreen workspace; leave it before opening them.
+  if (document.fullscreenElement?.matches('.study-view')) void document.exitFullscreen().catch(() => undefined)
+  set({ dialog })
+}
 export const closeDialog = () => set({ dialog: null })
 
 // --- boot ---------------------------------------------------------------------------------
@@ -257,7 +271,7 @@ export async function boot(): Promise<void> {
   api.on('file-changed', ({ source, agent }) => onExternalChange(source, agent))
   api.on('menu', onMenu)
   // Plan usage moves while you work elsewhere too (claude.ai, Claude Desktop), so look again on return.
-  window.addEventListener('focus', () => void refreshUsage())
+  window.addEventListener('focus', () => { void refreshUsage(); void refreshSetup() })
   api.on('open-project', ({ path }) => {
     if (get().project?.path === path) return
     // Quick mode opens its project the same way, with its own screen; only Claude Desktop needs saying.
@@ -307,6 +321,8 @@ function receiveSeries(series: SeriesRun | null): void {
 }
 
 export function showSeriesProduction(): void {
+  const folder = get().watchSeries?.folder
+  if (folder) rememberStudySelection(folder, { production: true, dir: get().project?.path })
   set({ studyProduction: true, watchTime: null, studyAutoplayPath: null })
 }
 
@@ -327,29 +343,51 @@ export async function openExerciseSet(folder: string, dir?: string): Promise<voi
   if (pick) await selectStudied(pick)
 }
 
-/** A series (or a single video) with its exercises, if it has some. With `dir`, that video, else the first episode. */
-export async function openWatch(folder: string, dir?: string): Promise<void> {
+/** Reopen the last course view; an explicit video path always takes precedence. */
+export async function openWatch(folder: string, dir?: string, startAt?: number): Promise<void> {
   const watchSeries = await guard(api.watchSeries(folder))
   if (!watchSeries) return
   const exerciseSet = watchSeries.exercises ? await api.exerciseSet(watchSeries.exercises).catch(() => null) : null
   const production = get().series?.folder === folder ? get().series : watchSeries.production
-  const overview = !dir && !!production && (production.state !== 'done' || production.episodes.some((ep) => ep.state === 'failed'))
+  const remembered = validStudySelection(watchSeries, exerciseSet, readStudySelection(folder))
+  const overview = !dir && !!production && productionVisible(production, !!get().settings?.developerMode) && (remembered?.production || (!remembered?.dir && (production.state !== 'done' || production.episodes.some((ep) => ep.state === 'failed'))))
   if (get().dirty) await saveScene()
   withTransition(() => set({ screen: 'study', watchSeries, exerciseSet, studyProduction: overview, ...(overview ? { watchTime: null, studyAutoplayPath: null } : {}) }))
-  const pick = dir ?? (get().project?.meta.series?.folder === folder ? get().project!.path : watchSeries.episodes[0]?.dir)
-  if (pick && !overview) await selectStudied(pick)
+  const pick = dir ?? remembered?.dir ?? (get().project?.meta.series?.folder === folder ? get().project!.path : watchSeries.episodes[0]?.dir)
+  if (pick && !overview) await selectStudied(pick, startAt !== undefined, startAt ?? null)
 }
 
 /** Opens a video of the course as the project (for the chat), staying on the study screen. */
 export async function selectStudied(dir: string, autoplay = false, startAt: number | null = null, detour = false): Promise<void> {
   set({ studyProduction: false, ...(!detour ? { studyReturn: null } : {}) })
-  if (get().project?.path === dir) return
+  if (get().project?.path === dir) {
+    if (startAt !== null) (await import('./components/StudyPlayer')).seekStudy(startAt, autoplay)
+    const course = get().watchSeries
+    if (course && validStudySelection(course, get().exerciseSet, { dir })) rememberStudySelection(course.folder, { dir })
+    return
+  }
   if (get().dirty) await saveScene()
   const opened = await guard(api.openProject(dir))
   if (opened) {
     applyOpened(opened, 'study', autoplay)
+    const course = get().watchSeries
+    if (course && validStudySelection(course, get().exerciseSet, { dir })) rememberStudySelection(course.folder, { dir })
     set({ studyStartAt: startAt })
   }
+}
+
+/** References are resolved from the saved answer in main, never from a URL supplied by the model. */
+export async function followStudyReference(messageId: string, id: string): Promise<StudyReferenceTarget | null> {
+  const before = get()
+  if (!before.project) return null
+  const target = await api.studyReference(messageId, id)
+  if (get().project?.path !== before.project.path) return null
+  if (target.kind === 'pdf') return target
+  const back = { dir: before.project.path, at: before.watchTime ?? 0, playing: !(document.querySelector<HTMLVideoElement>('.study-video-stage video')?.paused ?? true) }
+  if (target.course && get().watchSeries?.folder !== target.course) await openWatch(target.course, target.dir, target.at)
+  else await selectStudied(target.dir, true, target.at, true)
+  if (get().project?.path === target.dir) set({ studyReturn: back })
+  return target
 }
 
 /** A voluntary detour returns to exactly where the viewer left the original lesson. */
@@ -364,13 +402,20 @@ export async function returnToStudyVideo(): Promise<void> {
   const back = get().studyReturn
   if (back) await selectStudied(back.dir, back.playing, back.at)
 }
+export function showStudyAssistant(): void {
+  if (document.fullscreenElement?.matches('.study-view')) { set({ studyFullscreenChat: true }); return }
+  if (get().settings?.studyAssistantCollapsed) void updateSettings({ studyAssistantCollapsed: false })
+}
+
 export function prepareStudyAction(tool: State['studyTool']): void {
+  showStudyAssistant()
   document.querySelector<HTMLVideoElement>('.study-video-stage video')?.pause()
   set({ studyTool: tool, studyMoment: get().studyAttachment?.at ?? get().watchTime ?? 0, studyTab: 'chat', chatDraft: '' })
 }
 
 /** A question about what's being studied: into the chat's box, with the chat shown. */
 export function askInChat(text: string): void {
+  showStudyAssistant()
   set({ chatDraft: text, studyTab: 'chat' })
 }
 
@@ -437,15 +482,15 @@ let usageRequest = 0
 
 /** At most once a minute unless forced (after a sign-in or a chat turn): each check starts Claude Code. */
 export async function refreshUsage(force = false): Promise<void> {
-  if (!get().claude?.loggedIn) { usageRequest++; return set({ usage: null }) }
+  if (!get().chatRoute && !get().claude?.loggedIn) { usageRequest++; return set({ usage: null }) }
   if (!force && Date.now() - usageAt < 60_000) return
   usageAt = Date.now()
   const request = ++usageRequest
-  const agent = get().settings?.agent ?? 'claude'
-  const auth = get().claude?.method === 'api-key' ? 'api-key' : 'account'
+  const agent = get().chatRoute?.agent ?? get().settings?.agent ?? 'claude'
+  const auth = get().chatRoute?.auth ?? (get().claude?.method === 'api-key' ? 'api-key' : 'account')
   if (auth === 'api-key' || get().usage?.agent !== agent) set({ usage: null })
   const usage = await api.agentPlanUsage(agent, auth).catch(() => null)
-  if (request === usageRequest && get().settings?.agent === agent) set({ usage })
+  if (request === usageRequest && (get().chatRoute?.agent ?? get().settings?.agent) === agent) set({ usage })
 }
 
 /** The guided tours (Tour.tsx, ADR 0047): Home and the study page, and the editor. */
@@ -511,6 +556,11 @@ function onMenu({ action, path, value }: { action: MenuAction; path?: string; va
       return void pickAndOpenProject()
     case 'open-recent':
       return void (path && openProject(path))
+    case 'zoom-in':
+    case 'zoom-out':
+      return void updateSettings({ interfaceSize: stepInterfaceSize(get().settings?.interfaceSize, action === 'zoom-in' ? 1 : -1) })
+    case 'zoom-reset':
+      return void updateSettings({ interfaceSize: 100 })
     case 'appearance':
       return void updateSettings({ appearance: value as Settings['appearance'] })
     case 'tutorial':
@@ -532,13 +582,11 @@ function onMenu({ action, path, value }: { action: MenuAction; path?: string; va
       return set((s) => ({ historyOpen: !s.historyOpen }))
     case 'close-project':
       return void closeProject()
-    case 'new-conversation':
-      if (get().chat.length && confirm('Start a new conversation? Claude forgets the context of this project’s current one.')) void api.chatReset()
   }
 }
 
-export async function refreshSetup(): Promise<void> {
-  set({ setup: await api.setupStatus() })
+export async function refreshSetup(check = false): Promise<void> {
+  set({ setup: await api.setupStatus(check) })
 }
 
 export async function updateSettings(patch: Partial<Settings>): Promise<void> {
@@ -554,9 +602,9 @@ export async function updateSettings(patch: Partial<Settings>): Promise<void> {
   else set(next)
 }
 
-export async function installComponent(c: Component): Promise<void> {
+export async function installComponent(c: Component, repair = false): Promise<void> {
   set((s) => ({ setupLog: { ...s.setupLog, [c]: [] }, setupProgress: { ...s.setupProgress, [c]: undefined } }))
-  await guard(api.install(c))
+  await guard(api.install(c, repair))
   await refreshSetup()
 }
 
@@ -639,6 +687,7 @@ function applyOpened(o: OpenProject, screen: State['screen'] = 'editor', autopla
     selection: [],
     recordings: o.recordings,
     chat: o.chat,
+    chatRoute: o.meta.chatRoute ?? null,
     chatBusy: false,
     streaming: {},
   })
@@ -669,6 +718,7 @@ export async function closeProject(): Promise<void> {
       project: null,
       timeline: null,
       chat: [],
+      chatRoute: null,
       selection: [],
       historyOpen: false,
       chatSource: null,
@@ -776,7 +826,15 @@ export function selectClips(indices: number[]): void {
 // --- chat -------------------------------------------------------------------------------------------
 
 function onChat(e: ChatEvent): void {
-  if (e.type === 'message') set((s) => ({ chat: s.chat.some((m) => m.id === e.message.id) ? s.chat.map((m) => m.id === e.message.id ? e.message : m) : [...s.chat, e.message] }))
+  if (e.type === 'route') {
+    set((s) => ({ chatRoute: e.route, usage: null, ...(s.project ? { project: { ...s.project, meta: { ...s.project.meta, chatRoute: e.route ?? undefined } } } : {}) }))
+    void refreshUsage(true)
+  }
+  if (e.type === 'message') set((s) => {
+    const streaming = { ...s.streaming }
+    delete streaming[e.message.id] // a completed/checkpointed message replaces its streamed text
+    return { streaming, chat: s.chat.some((m) => m.id === e.message.id) ? s.chat.map((m) => m.id === e.message.id ? e.message : m) : [...s.chat, e.message] }
+  })
   if (e.type === 'delta') set((s) => ({ streaming: { ...s.streaming, [e.messageId]: (s.streaming[e.messageId] ?? '') + e.text } }))
   if (e.type === 'part')
     set((s) => ({
@@ -804,7 +862,6 @@ function onChat(e: ChatEvent): void {
         : [...s.chat, { id: crypto.randomUUID(), role: 'error', parts: [{ kind: 'text', text: e.error || 'Claude stopped with an error.' }], at: Date.now() }],
     }))
   }
-  if (e.type === 'reset') set({ chat: [], streaming: {}, chatBusy: false })
 }
 
 export async function sendChat(text: string, withFrame: boolean, studyRequest: Partial<ChatRequest> = {}): Promise<boolean> {

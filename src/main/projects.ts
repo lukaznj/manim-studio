@@ -201,7 +201,7 @@ export function readChat(dir: string): ChatMessage[] {
 
 export function writeChat(messages: ChatMessage[], dir = requireProject().path): void {
   mkdirSync(join(dir, '.studio'), { recursive: true })
-  writeAtomicJson(chatFile(dir), messages.slice(-300))
+  writeAtomicJson(chatFile(dir), messages)
 }
 
 export const readScript = (dir: string): string | null => (existsSync(join(dir, SCRIPT_FILE)) ? readFileSync(join(dir, SCRIPT_FILE), 'utf8') : null)

@@ -1,8 +1,9 @@
 import { t as uiText } from '../lib/i18n'
-import { Captions, Check, FolderOpen, ListVideo, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from 'lucide-react'
+import { Captions, Check, ChevronDown, FolderOpen, ListVideo, Maximize, MessageCircle, Minimize, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Section, Settings } from '../../../shared/types'
-import { resumePosition, type StudyProgress } from '../../../shared/study-playback'
+import { readStudyProgress, resumePosition } from '../../../shared/study-playback'
+import { saveStudyProgress as save } from '../lib/study-progress'
 import { api } from '../lib/api'
 import { errorText, toast, updateSettings, useStore } from '../store'
 import { Modal } from './ui'
@@ -15,13 +16,6 @@ function saved(key: string, src: string, duration: number): number {
     return resumePosition(localStorage.getItem(`watch:project:${key}`) ?? localStorage.getItem(`watch:${src}`), duration)
   } catch {
     return 0
-  }
-}
-function save(key: string, progress: StudyProgress): void {
-  try {
-    localStorage.setItem(`watch:project:${key}`, JSON.stringify({ position: progress.position, duration: progress.duration, completed: progress.completed }))
-  } catch {
-    /* resume is optional */
   }
 }
 let playing: HTMLVideoElement | null = null
@@ -48,6 +42,7 @@ export function StudyPlayer(props: {
   onWatched?: () => void
 }) {
   const { src, vtt, video } = props
+  const fullscreenChat = useStore((s) => s.studyFullscreenChat)
   const selecting = useStore((s) => s.studySelecting)
   const aspect = useStore((s) => s.project?.meta.aspect ?? '16:9')
   const projectPath = useStore((s) => s.project?.path ?? src)
@@ -111,16 +106,21 @@ export function StudyPlayer(props: {
   useEffect(() => {
     let wasFullscreen = false
     const changed = () => {
-      const active = document.fullscreenElement === root.current
+      const active = !!document.fullscreenElement && (document.fullscreenElement === root.current || document.fullscreenElement === root.current?.closest('.study-view'))
       setFullscreen(active)
       // Leave button activation behind: Space and arrows should control playback immediately.
       if (active || wasFullscreen) root.current?.focus({ preventScroll: true })
       wasFullscreen = active
     }
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || document.fullscreenElement !== root.current || root.current?.querySelector('dialog[open], :popover-open, .study-frame-selector')) return
+      const element = document.fullscreenElement
+      if (event.key !== 'Escape' || !element?.contains(root.current) || element.querySelector('dialog[open], :popover-open, .study-frame-selector')) return
       event.preventDefault()
-      void document.exitFullscreen().catch(() => undefined)
+      if (useStore.getState().studyFullscreenChat) {
+        event.stopPropagation()
+        useStore.setState({ studyFullscreenChat: false })
+        root.current?.focus({ preventScroll: true })
+      } else void document.exitFullscreen().catch(() => undefined)
     }
     document.addEventListener('fullscreenchange', changed)
     document.addEventListener('keydown', escape, true)
@@ -181,7 +181,7 @@ export function StudyPlayer(props: {
     else el.pause()
   }
   const expand = () => {
-    const request = document.fullscreenElement ? document.exitFullscreen() : root.current?.requestFullscreen()
+    const request = document.fullscreenElement ? document.exitFullscreen() : (root.current?.closest<HTMLElement>('.study-view') ?? root.current)?.requestFullscreen()
     void request?.catch((e) => toast(errorText(e), 'error'))
   }
   const mute = () => {
@@ -196,7 +196,8 @@ export function StudyPlayer(props: {
   const remember = (el: HTMLVideoElement, flush = false) => {
     if (!session.ready) return
     session.position = el.currentTime
-    session.completed = el.ended
+    // Opening an ended lesson at zero is not itself a replay. Keep completion until playback or seeking starts.
+    session.completed = el.ended || session.completed && el.paused && el.currentTime === 0
     if (props.resume !== false && (flush || performance.now() - session.lastSaved > 1000)) {
       save(session.key, session)
       session.lastSaved = performance.now()
@@ -206,7 +207,7 @@ export function StudyPlayer(props: {
   return (
     <section
       ref={root}
-      className={`ex-player study-player ${fullscreen && !controlsVisible ? 'controls-hidden' : ''}`}
+      className={`ex-player study-player ${fullscreen ? 'is-fullscreen' : ''} ${fullscreen && !controlsVisible ? 'controls-hidden' : ''}`}
       tabIndex={0}
       aria-label={uiText('Video player')}
       onPointerMove={revealControls}
@@ -215,11 +216,11 @@ export function StudyPlayer(props: {
       onKeyDown={(e) => {
         revealControls()
         if (selecting) return
-        if ((e.target as HTMLElement).closest('button,input,select,textarea,summary') || e.altKey || e.ctrlKey || e.metaKey) return
+        if ((e.target as HTMLElement).closest('button,input,select,textarea,summary,[contenteditable=true]') || e.altKey || e.ctrlKey || e.metaKey) return
         if ([' ', 'k', 'ArrowLeft', 'ArrowRight', 'm', 'f', 'c'].includes(e.key)) e.preventDefault()
         if (e.key === ' ' || e.key === 'k') toggle()
-        else if (e.key === 'ArrowLeft') seek(now - 10)
-        else if (e.key === 'ArrowRight') seek(now + 10)
+        else if (e.key === 'ArrowLeft') seek(now - 5)
+        else if (e.key === 'ArrowRight') seek(now + 5)
         else if (e.key === 'm') mute()
         else if (e.key === 'f') expand()
         else if (e.key === 'c' && vtt) toggleCaptions()
@@ -238,7 +239,7 @@ export function StudyPlayer(props: {
           onClick={toggle}
           onDoubleClick={expand}
           onError={() => setFailed(true)}
-          onPlay={() => setPaused(false)}
+          onPlay={(e) => { setPaused(false); remember(e.currentTarget, true) }}
           onPause={(e) => {
             setPaused(true)
             remember(e.currentTarget, true)
@@ -277,7 +278,9 @@ export function StudyPlayer(props: {
             el.currentTime = at
             session.duration = Number.isFinite(el.duration) ? el.duration : 0
             session.position = at
+            try { session.completed = at === 0 && !props.startPlaying && props.startAt == null && !!readStudyProgress(localStorage.getItem(`watch:project:${projectPath}`))?.completed } catch { session.completed = false }
             session.ready = true
+            remember(el, true)
             setNow(el.currentTime)
             useStore.setState({ watchTime: el.currentTime })
             if (props.startPlaying) {
@@ -359,7 +362,9 @@ export function StudyPlayer(props: {
             <span className="study-time mono">
               {clock(now)} <span>/ {clock(duration)}</span>
             </span>
-            <div className="study-control-spacer" />
+            {chapters.length ? <button className="study-current-chapter" onClick={() => setChaptersOpen(true)} aria-label={`${uiText('Browse chapters')}: ${chapters[chapterIndex].name}`} title={chapters[chapterIndex].name} aria-haspopup="dialog" aria-expanded={chaptersOpen}>
+              <span>{chapters[chapterIndex].name}</span><ChevronDown />
+            </button> : <div className="study-control-spacer" />}
             <div className="study-volume">
               <button className="icon-btn" onClick={mute} aria-label={muted ? uiText('Unmute') : uiText('Mute')} title={uiText('Mute (M)')}>
                 {muted || volume === 0 ? <VolumeX /> : <Volume2 />}
@@ -384,11 +389,6 @@ export function StudyPlayer(props: {
             >
               <Captions />
             </button>
-            {!!chapters.length && (
-              <button className="icon-btn" onClick={() => setChaptersOpen(true)} aria-label={uiText('Browse chapters')} title={uiText('Chapters')}>
-                <ListVideo />
-              </button>
-            )}
             {props.seriesAutoplay && (
               <button
                 className={`study-autoplay ${autoplay ? 'active' : ''}`}
@@ -403,6 +403,20 @@ export function StudyPlayer(props: {
                 </span>
               </button>
             )}
+            {fullscreen && <button
+              className={`icon-btn study-fullscreen-chat ${fullscreenChat ? 'active' : ''}`}
+              aria-label={fullscreenChat ? uiText('Hide assistant') : uiText('Show assistant')}
+              title={uiText('Chat')}
+              aria-expanded={fullscreenChat}
+              aria-controls="study-assistant"
+              onClick={() => {
+                useStore.setState({ studyFullscreenChat: !fullscreenChat, ...(!fullscreenChat ? { studyTab: 'chat' as const } : {}) })
+                if (!fullscreenChat) {
+                  video.current?.pause()
+                  requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('.study-assistant .composer-input')?.focus())
+                }
+              }}
+            ><MessageCircle /></button>}
             <PlaybackSpeed rate={rate} onChange={(studyPlaybackRate) => void updateSettings({ studyPlaybackRate })} onOpen={setSpeedOpen} />
             <button
               className="icon-btn"

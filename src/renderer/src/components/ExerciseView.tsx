@@ -9,6 +9,7 @@ import { askInChat, canEdit, errorText, openDialog, openExerciseSet, selectStudi
 import { Markdown } from './Markdown'
 import { StudyPlayer } from './StudyPlayer'
 import { WatchedToggle } from './LessonView'
+import { StudyRowProgress } from './StudyRowProgress'
 
 // The study screen's exercises (StudyView.tsx, src/main/exercises.ts, ADR 0025).
 
@@ -102,13 +103,13 @@ export function ExerciseRows({ set, selected }: { set: ExerciseSet; selected?: s
             <span className="ex-num mono">{it.number}</span>
             <span className="ex-row-body">
               <span className="ex-row-title">{it.title}</span>
-              <span className="ex-row-state">
+              <StudyRowProgress dir={it.dir} available={it.state === 'done' && !!it.video}>
                 {it.state === 'done'
                   ? it.topic || uiText('Done')
                   : set.paused && ['waiting', 'solved'].includes(it.state)
                     ? uiText('Paused')
                     : (it.activity ?? LABEL[it.state])}
-              </span>
+              </StudyRowProgress>
             </span>
             <StateIcon item={it} paused={!!set.paused} />
           </button>
@@ -118,27 +119,16 @@ export function ExerciseRows({ set, selected }: { set: ExerciseSet; selected?: s
   )
 }
 
-/** Under the list: the set's lecture video and pausing its agents. */
+/** Under the list: pause/resume controls and any existing lecture result. */
 export function ExerciseActions({ set }: { set: ExerciseSet }) {
   const working = set.items.some((i) => ['solving', 'video', 'export'].includes(i.state))
-  const done = set.items.filter((i) => i.state === 'done').length
   return (
     <>
-      <div className="ex-side-actions">
-        <button
-          className="btn small ghost"
-          disabled={!done}
-          title={done ? undefined : uiText('Once an exercise has its video')}
-          onClick={() => openDialog({ kind: 'lecture' })}
-        >
-          <Film /> {uiText(' Lecture video')}
-        </button>
-        {(working || set.paused) && (
+      {(working || set.paused) && <div className="ex-side-actions">
           <button className="btn small ghost" onClick={() => void api.pauseExercises(set.folder, !set.paused)}>
             {set.paused ? <Play /> : <Pause />} {set.paused ? uiText('Resume') : uiText('Pause')}
           </button>
-        )}
-      </div>
+      </div>}
       {set.lecture && <LectureNote set={set} />}
     </>
   )
@@ -341,6 +331,8 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
 }
 
 function ExercisePlayer({ item, detail, video }: { item: ExerciseItem; detail: ExerciseDetail | null; video: React.RefObject<HTMLVideoElement | null> }) {
+  const startAt = useStore((s) => s.studyStartAt)
+  const startPlaying = useStore((s) => s.studyAutoplayPath === item.dir)
   const src = item.video ?? detail?.preview
   if (!src)
     return (
@@ -362,6 +354,8 @@ function ExercisePlayer({ item, detail, video }: { item: ExerciseItem; detail: E
         vtt={item.video ? item.subtitles : undefined}
         chapters={detail?.chapters ?? []}
         video={video}
+        startAt={startAt}
+        startPlaying={startPlaying}
         onWatched={() => item.video && !item.watched && void api.setWatched(item.dir, true)}
       />
       {!item.video && <p className="faint ex-preview-note">{uiText('The preview, until the video is exported.')}</p>}

@@ -131,4 +131,8 @@ Manim Studio is an independent project. It isn't affiliated with Anthropic, Open
 
 ## License
 
-[MIT](LICENSE)
+[GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`), with the [narrow Claude SDK linking exception](LICENSE-EXCEPTION). Copyright © 2026 Luka Ražem.
+
+When distributing modified versions, provide their corresponding source under AGPLv3. Modified versions offered for interaction over a network must also offer their corresponding source to those users. See [the license](LICENSE) for the full terms.
+
+Previously published versions through v0.13.0 retain their original MIT license. The exception permits combining Studio with the unmodified Claude SDK and its corresponding executable; Studio and modifications to it still carry AGPLv3 source-sharing requirements. Third-party components retain their own licenses.

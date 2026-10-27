@@ -97,7 +97,7 @@ def run(binary: str, home: str) -> int:
 
     terminal = TerminalOutput()
     pending_input = b""
-    picked_theme = picked = sent_url = requested_consent = awaiting_consent = False
+    picked_theme = picked_trust = picked = sent_url = requested_consent = awaiting_consent = False
     consent_checked = False
     started = time.monotonic()
     end = started + TIMEOUT
@@ -129,6 +129,15 @@ def run(binary: str, home: str) -> int:
                     break
                 for reply in terminal.feed(chunk):
                     os.write(fd, reply)
+                # Only trust Studio's dedicated sign-in workspace, never an arbitrary project.
+                workspace = re.search(r"Accessing workspace:\s*([^\r\n]+)", terminal.screen)
+                if (not picked_trust and "Do you trust the contents of this project?" in terminal.screen
+                        and "Yes, I trust this folder" in terminal.screen
+                        and workspace and os.path.realpath(workspace.group(1).strip()) == os.path.realpath(work)):
+                    diagnostic("Confirming trust for Studio’s dedicated sign-in folder.")
+                    os.write(fd, b"\r")
+                    picked_trust = True
+                    started = time.monotonic()
                 if not picked_theme and "Choose your color scheme" in terminal.screen:
                     diagnostic("Selecting the default terminal theme.")
                     os.write(fd, b"\r")  # the CLI's default terminal theme, before its login picker
