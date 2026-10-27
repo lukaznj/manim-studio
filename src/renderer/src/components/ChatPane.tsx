@@ -1,14 +1,15 @@
+import { ChatRouting } from './ModelRouting'
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowUp, Camera, Check, ChevronDown, CircleAlert, Clock3, Download, FileText, Film, Gauge, ListChecks, Loader, Plus, RotateCcw, ScanLine, Settings2, Sparkles, Square, Video, X } from 'lucide-react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { ArrowDown, ArrowUp, BookOpen, Camera, Check, ChevronDown, CircleAlert, Clock3, Download, FileText, Film, Gauge, ListChecks, Loader, Plus, ScanLine, Settings2, Sparkles, Square, Video, X, ZoomIn } from 'lucide-react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { pageRanges } from '../../../shared/pages'
-import type { ChatMessage, ChatPart, Effort, ModelOption, PlanUsage, SourceRef } from '../../../shared/types'
+import type { StudyReference, ChatMessage, ChatPart, Effort, ModelOption, SourceRef } from '../../../shared/types'
 import { modelName } from '../../../shared/usage'
 import { api } from '../lib/api'
-import { ProjectUsage } from './UsageDialog'
-import { resetTime } from '../lib/time'
-import { errorText, installComponent, openDialog, prepareStudyAction, refreshClaude, refreshUsage, selectClips, selectStudied, sendChat, toast, updateSettings, useStore, watchAdditionalVideo } from '../store'
+import { errorText, followStudyReference, installComponent, openDialog, prepareStudyAction, refreshClaude, refreshUsage, selectClips, selectStudied, sendChat, toast, updateSettings, useStore, watchAdditionalVideo } from '../store'
 import { addSources, attachSource } from './SourcesPane'
+import { useStudyFullscreen } from '../lib/study-fullscreen'
+import { Modal } from './ui'
 import { Markdown } from './Markdown'
 
 /** "notes.pdf · p. 3–5" */
@@ -16,10 +17,14 @@ const sourceLabel = (s: SourceRef) => (s.pages?.length ? `${s.name} · p. ${page
 
 /** The chat; `head` replaces its title (the study screen puts its Transcript and Chat tabs there). */
 export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; embedded?: boolean } = {}) {
+  const textSize = useStore((s) => s.settings?.chatTextSize ?? 13)
+  const [preview, setPreview] = useState<{ image: string; question: string; title?: string } | null>(null)
+  const path = useStore((s) => s.project?.path)
+  useEffect(() => setPreview(null), [path])
   const claude = useStore((s) => s.claude)
-  const agent = useStore((s) => s.settings?.agent ?? 'claude')
+  const route = useStore((s) => s.chatRoute)
+  const agent = useStore((s) => s.chatRoute?.agent ?? s.settings?.agent ?? 'claude')
   const codex = agent === 'codex'
-  const agentName = codex ? 'Codex' : agent === 'antigravity' ? 'Antigravity' : 'Claude'
   const all = useStore((s) => s.chat)
   // On the exercises screen the chat is the student's: the agents' own turns stay out of it.
   const exercise = useStore((s) => s.screen === 'study') // studying a finished video
@@ -27,46 +32,38 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
   const busy = useStore((s) => s.chatBusy)
   const streaming = useStore((s) => s.streaming)
   const list = useRef<HTMLDivElement>(null)
+  const following = useRef(true)
+  const latestUser = useRef<string | undefined>(undefined)
+  const [atLatest, setAtLatest] = useState(true)
+  const follow = (value: boolean) => { following.current = value; setAtLatest(value) }
+  const scrollToLatest = () => {
+    const el = list.current
+    if (el && following.current) el.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
+  }
   useEffect(() => {
     void refreshUsage()
     const timer = setInterval(() => void refreshUsage(), 60_000)
     return () => clearInterval(timer)
   }, [agent, claude?.loggedIn])
 
+  useLayoutEffect(() => {
+    const user = chat.findLast((message) => message.role === 'user')?.id
+    if (user !== latestUser.current) { latestUser.current = user; follow(true) }
+    scrollToLatest()
+  }, [chat, streaming])
   useEffect(() => {
     const el = list.current
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-  }, [chat, streaming])
+    if (!el) return
+    const observer = new ResizeObserver(scrollToLatest)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [claude?.loggedIn])
 
   return (
-    <div className={`chat-pane ${exercise ? 'study-chat' : ''}`}>
-      <div className="pane-head">
-        {embedded ? (
-          <span className="study-chat-provider"><Sparkles />{agentName}</span>
-        ) : (
-          (head ?? (
-            <div className="file-tab">
-              <Sparkles className="claude-mark" /> {agent === 'claude' ? uiText('Claude Agent') : agentName}
-            </div>
-          ))
-        )}
-        <div className="pane-actions">
-          {!exercise && <ProjectUsage />}
-          <UsageMeter />
-          <button
-            className="icon-btn"
-            title={uiText('New conversation')}
-            disabled={busy || chat.length === 0}
-            onClick={() => {
-              if (confirm(uiText('Start a new conversation? The assistant will forget this conversation.'))) void api.chatReset()
-            }}
-          >
-            <RotateCcw />
-          </button>
-        </div>
-      </div>
+    <div className={`chat-pane ${head && !embedded ? 'chat-with-head' : ''} ${exercise ? 'study-chat' : ''}`} style={{ '--chat-text-size': `${textSize}px` } as CSSProperties}>
+      {head && !embedded && <div className="pane-head">{head}</div>}
 
-      {!claude?.loggedIn ? (
+      {!(route || claude?.loggedIn) ? (
         codex ? (
           <CodexSignIn />
         ) : agent === 'antigravity' ? (
@@ -76,41 +73,35 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
         )
       ) : (
         <>
-          <div className="chat-list" ref={list}>
+          <div className="chat-scroll">
+          <div className="chat-list" ref={list} tabIndex={0} role="region" aria-label={uiText('Chat')}
+            onScroll={() => {
+              const el = list.current
+              if (el) follow(el.scrollHeight - el.scrollTop - el.clientHeight <= 48)
+            }}
+            onWheel={(event) => { if (event.deltaY < 0) follow(false) }}
+            onKeyDown={(event) => { if (['ArrowUp', 'PageUp', 'Home'].includes(event.key)) follow(false) }}
+            onLoadCapture={scrollToLatest}
+          >
             {chat.length === 0 && (exercise ? <StudyIntro /> : <Intro />)}
             {chat.map((m) => (
-              <Message key={m.id} message={m} streaming={streaming[m.id]} busy={busy} />
+              <Message key={m.id} message={m} streaming={streaming[m.id]} busy={busy} onPreview={(image, question) => setPreview({ image, question })} onReference={async (id) => {
+                try {
+                  const target = await followStudyReference(m.id, id)
+                  if (target?.kind === 'pdf') setPreview({ image: target.image, question: '', title: format('{0} · page {1}', [target.title, target.page]) })
+                } catch (error) { toast(uiText(errorText(error)), 'error') }
+              }} />
             ))}
+          </div>
+          {!atLatest && <button className="btn small chat-jump-latest" onClick={() => { follow(true); scrollToLatest() }}><ArrowDown />{uiText('Jump to latest')}</button>}
           </div>
           <Composer />
         </>
       )}
+      <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.title ?? uiText('Preview frame')} icon={preview?.title ? <FileText className="head-icon" /> : <Camera className="head-icon" />} width={1120} className="chat-frame-modal">
+        {preview && <div className="chat-frame-preview"><img src={preview.image} alt={uiText('Preview frame')} />{preview.question && <div className="md"><Markdown text={preview.question} /></div>}</div>}
+      </Modal>
     </div>
-  )
-}
-
-/** How much of the Claude plan is used: the tightest limit here, every limit in the tooltip and in Settings. */
-export const usageLines = (usage: PlanUsage) =>
-  usage.windows.map((w) => `${w.label.split(' · ').map(uiText).join(' · ')}: ${format('{0}% used', [Math.round(w.percent)])}${w.resetsAt ? `, ${format('resets {0}', [resetTime(w.resetsAt)])}` : ''}`)
-
-export const usageLevel = (percent: number) => (percent >= 90 ? 'hot' : percent >= 70 ? 'warm' : '')
-
-function UsageMeter() {
-  const usage = useStore((s) => s.usage)
-  if (!usage?.windows.length) return null
-  const top = usage.windows.reduce((a, b) => (b.percent > a.percent ? b : a))
-  return (
-    <button
-      className={`usage-chip ${usageLevel(top.percent)}`}
-      title={format('Account-wide plan usage · shared with other apps\n{0}', [usageLines(usage).join('\n')])}
-      aria-label={format('Plan usage: {0}% of the {1} used', [Math.round(top.percent), top.label.toLowerCase()])}
-      onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}
-    >
-      <span className="usage-bar">
-        <span style={{ width: `${Math.min(100, top.percent)}%` }} />
-      </span>
-      {Math.round(top.percent)}%
-    </button>
   )
 }
 
@@ -322,7 +313,7 @@ function StudyIntro() {
       <div className="study-chat-orbit"><Sparkles /><span /><span /></div>
       <span className="eyebrow">{uiText('Your study companion')}</span>
       <h3>{uiText('Make this moment click')}</h3>
-      <p>{uiText('Ask a question in your own words. The assistant can see where you paused and what is on screen.')}</p>
+      <p>{uiText('Ask about this moment, the whole course or the original PDFs. Follow references to a lesson, timestamp or source page.')}</p>
       <div className="study-chat-capabilities">
         <Video /><ListChecks /><ScanLine />
       </div>
@@ -331,7 +322,7 @@ function StudyIntro() {
   )
 }
 
-function Message({ message: m, streaming, busy }: { message: ChatMessage; streaming?: string; busy: boolean }) {
+function Message({ message: m, streaming, busy, onPreview, onReference }: { message: ChatMessage; streaming?: string; busy: boolean; onPreview: (image: string, question: string) => void; onReference: (id: string) => Promise<void> }) {
   const additional = useStore((s) => m.videoOffer?.dir ? s.watchSeries?.episodes.flatMap((e) => e.followUps).find((f) => f.dir === m.videoOffer!.dir) : undefined)
   if (m.role === 'user') {
     const text = m.parts.find((p) => p.kind === 'text')
@@ -339,7 +330,7 @@ function Message({ message: m, streaming, busy }: { message: ChatMessage; stream
       <div className="msg user">
         {(m.context || m.frame || m.source) && (
           <div className="msg-attach">
-            {m.frame && <img src={m.frame} alt={uiText('Preview frame')} />}
+            {m.frame && <button className="msg-frame-button" aria-label={uiText('Enlarge screenshot')} title={uiText('Enlarge screenshot')} onClick={() => onPreview(m.frame!, text?.kind === 'text' ? text.text : '')}><img src={m.frame} alt={uiText('Preview frame')} /><span><ZoomIn /></span></button>}
             {m.source && (
               <span className="context-chip">
                 <FileText /> {sourceLabel(m.source)}
@@ -365,19 +356,27 @@ function Message({ message: m, streaming, busy }: { message: ChatMessage; stream
       </div>
     )
 
+  const reference = (id: string) => {
+    const ref = m.studyReferences?.find((item) => item.id === id)
+    return ref ? <ReferenceButton reference={ref} onClick={() => void onReference(id)} /> : null
+  }
   const last = m.parts.at(-1)
   const working = busy && !streaming && (!last || last.kind === 'tool')
   return (
     <div className="msg assistant">
       {m.parts.map((p, i) => (
-        <Part key={i} part={p} />
+        <Part key={i} part={p} reference={reference} />
       ))}
       {streaming && (
         <div className="msg-text md">
-          <Markdown text={streaming} />
+          <Markdown text={streaming} reference={reference} />
           <span className="caret" />
         </div>
       )}
+      {m.studyContext && <details className="study-answer-context"><summary><BookOpen />{uiText('Course materials')}<span>{format('{0} PDFs · {1} lessons', [m.studyContext.sources, m.studyContext.episodes])}</span></summary>
+        {m.studyReferences?.map((ref) => <ReferenceButton key={ref.id} reference={ref} onClick={() => void onReference(ref.id)} />)}
+        {m.studyContext.incomplete && <p>{uiText('Some course material could not be read. Ask again after restoring missing sources.')}</p>}
+      </details>}
       {m.videoOffer && <div className="study-chat-result">
         <Video />
         <div><strong>{m.videoOffer.title}</strong><span>{m.videoOffer.state === 'created' ? additional?.state === 'done' ? uiText('Ready to watch') : additional?.state === 'failed' ? uiText('Didn’t finish') : uiText('Your additional video is being made. You can keep studying.') : uiText('Would a video still help?')}</span></div>
@@ -398,11 +397,19 @@ function Message({ message: m, streaming, busy }: { message: ChatMessage; stream
   )
 }
 
-function Part({ part }: { part: ChatPart }) {
+function ReferenceButton({ reference, onClick }: { reference: StudyReference; onClick: () => void }) {
+  const stamp = reference.kind === 'video' ? `${Math.floor(reference.at / 60)}:${String(Math.floor(reference.at % 60)).padStart(2, '0')}` : ''
+  return <button className="study-reference-link" onClick={onClick} title={reference.title} aria-label={`${reference.title} · ${reference.kind === 'video' ? stamp : format('{0} · page {1}', [reference.title, reference.page])}`}>
+    {reference.kind === 'video' ? <Video /> : <FileText />}
+    <span>{reference.kind === 'video' ? `${format('Lesson {0}', [reference.episode])} · ${stamp}` : format('{0} · page {1}', [reference.title, reference.page])}</span>
+  </button>
+}
+
+function Part({ part, reference }: { part: ChatPart; reference?: (id: string) => React.ReactNode }) {
   if (part.kind === 'text')
     return (
       <div className="msg-text md">
-        <Markdown text={part.text} />
+        <Markdown text={part.text} reference={reference} />
       </div>
     )
   return (
@@ -421,6 +428,8 @@ function Composer() {
   const [frame, setFrame] = useState(true)
   const exercise = useStore((s) => s.screen === 'study') // a student's questions: the moment, not clips
   const area = useRef<HTMLTextAreaElement>(null)
+  const fullscreen = useStudyFullscreen()
+  const collapsed = useStore((s) => fullscreen ? !s.studyFullscreenChat : s.settings?.studyAssistantCollapsed)
   const draft = useStore((s) => s.chatDraft)
   const source = useStore((s) => s.chatSource)
   const [dropping, setDropping] = useState(false)
@@ -436,6 +445,9 @@ function Composer() {
     useStore.setState({ chatDraft: null })
     area.current?.focus()
   }, [draft])
+  useEffect(() => {
+    if (exercise && collapsed === false && useStore.getState().studyTab === 'chat') area.current?.focus()
+  }, [collapsed])
 
   const sel = useMemo(() => {
     const clips = selection.map((i) => timeline?.clips[i]).filter(Boolean)
@@ -529,6 +541,7 @@ function Composer() {
         />
         <div className="composer-foot">
           {exercise ? <StudyTools /> : <button className="icon-btn" title={uiText('Model and effort settings')} aria-label={uiText('Model and effort settings')} onClick={() => openDialog({ kind: 'settings', tab: 'account' })}><Settings2 /></button>}
+          <ChatRouting />
           {busy ? (
             <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title={uiText('Stop')}>
               <Square />

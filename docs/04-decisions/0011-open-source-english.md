@@ -11,7 +11,7 @@ Manim Studio was built for Maturita's admins: Croatian UI, Croatian narration, a
 
 ## Decision
 
-- **Public, MIT-licensed** at `lukaznj/manim-studio`.
+- **Public** at `lukaznj/manim-studio`. Initially MIT-licensed; the licensing part is superseded by [[0054-agpl-copyleft-license]] for future versions.
 - **English source language**, with English and Croatian UI catalogs ([[0036-settings-onboarding-and-languages]]): the project template and the `CLAUDE.md` Claude follows inside projects, docs, and identifiers.
 - **Narration language is per project** (`project.json` `voice.language`), seeded from the onboarding language, then chosen independently in Settings → Voice:
   - Claude writes narration and on-screen text in it, and replies in whatever language the user writes in.

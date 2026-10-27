@@ -21,3 +21,7 @@ The Codex picker exposed only the account default. A model that is temporarily a
 ## Consequences
 
 Users choose their preferred tradeoff when an OpenAI model is busy. Recovery is bounded and preserves conversation history, while evaluation episodes keep their stated identity. CLI catalog failures stay visible instead of inventing a list of model IDs. See [OpenAI's model discovery protocol](https://learn.chatgpt.com/docs/app-server) and [capacity guidance](https://developers.openai.com/api/docs/guides/rate-limits).
+
+## Extension
+
+[[0053-ordered-model-usage-fallback]] adds a separate, explicitly enabled usage-limit routing policy across an ordered list of models and connected sign-in methods. Its quota recovery may continue a comparison episode with mixed-selection metrics; the capacity-only policy above remains unchanged.

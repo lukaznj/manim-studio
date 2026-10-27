@@ -40,7 +40,7 @@ test('provider totals do not double-count cached input or invent missing prices'
   const episode = sample()
   assert.equal(usageTokenCount(episode.usage[0]), 120)
   const html = renderMetricsReport([episode], 'Test')
-  assert.match(html, /Not reported/)
+  assert(!html.includes('API USD'), 'Unpriced usage has no dollar column')
   assert.match(html, /Incomplete/)
   assert.match(html, /Missing data is not zero/)
 })
@@ -75,4 +75,20 @@ test('comparison time excludes measurement setup and finalization overhead', () 
   assert.match(html, /Episode comparison/)
   assert.match(html, /<td>0m 4s<\/td>/)
   assert.match(html, /Peak Studio RAM/)
+})
+
+
+test('subscription and legacy reports omit API prices even when the SDK reports equivalent dollars', () => {
+  const episode = sample()
+  episode.usage[0].models.sol.costUSD = 12.34
+  episode.usage[0].costKnown = true
+  for (const auth of ['account', undefined] as const) {
+    episode.usage[0].auth = auth
+    const html = renderMetricsReport([episode], 'Account usage')
+    assert(!html.includes('API USD'))
+    assert(!html.includes('costUSD'))
+    assert(!html.includes('12.34'))
+  }
+  episode.usage[0].auth = 'api-key'
+  assert.match(renderMetricsReport([episode], 'API usage'), /API USD/)
 })

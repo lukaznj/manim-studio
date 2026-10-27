@@ -1,0 +1,11 @@
+Manim Studio
+Copyright (c) 2026 Luka Ražem
+
+Manim Studio's original source code is licensed under the GNU Affero General
+Public License, version 3 only (SPDX base license: AGPL-3.0-only), with the
+additional permission in LICENSE-EXCEPTION for the unmodified Claude SDK
+and its corresponding executable. See LICENSE and LICENSE-EXCEPTION.
+
+Source: https://github.com/lukaznj/manim-studio
+Third-party software retains its own copyright notices and license terms.
+Versions released through v0.13.0 remain available under their original MIT license.

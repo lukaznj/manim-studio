@@ -1,7 +1,8 @@
 // Talks to `python -m studio_runner`: JSON events on stdout behind a prefix, everything
 // else (manim's own logging, tracebacks) collected as the log.
 import { spawn, type ChildProcess } from 'node:child_process'
-import { spawnPython, type EnvName } from './env'
+import { reportDependencyFailure, spawnPython, type EnvName } from './env'
+import { dependencyFailure, REPAIR_MESSAGE } from './dependency-health'
 
 const PREFIX = '@@studio '
 
@@ -128,6 +129,12 @@ export async function runRunner<T = RunnerEvent>(
       if (pending) onStdout(Buffer.from('\n')) // retain a final event/log line without a trailing newline
       if (pid) runningJobs.delete(pid)
       const event = final as RunnerEvent | null
+      const broken = !opts.signal?.aborted && dependencyFailure(`${log.join('\n')}\n${event?.message ?? ''}`, env)
+      if (broken) {
+        reportDependencyFailure(broken)
+        reject(Object.assign(new Error(REPAIR_MESSAGE), { event, log: log.join('\n'), component: broken }))
+        return
+      }
       if (event?.type === 'done') resolve(event as T)
       else if (event?.type === 'error') reject(Object.assign(new Error(String(event.message)), { event, log: log.join('\n') }))
       else if (signal || opts.signal?.aborted) reject(Object.assign(new Error('cancelled'), { cancelled: true })) // Windows reports a kill as an exit code

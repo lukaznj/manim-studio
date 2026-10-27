@@ -93,7 +93,8 @@ function ProductionDetails({ run }: { run: SeriesRun }) {
   const settings = useStore((s) => s.settings)
   const [expanded, setExpanded] = useState(false)
   const providers = [...new Set(run.episodes.map((ep) => ep.assignment?.agent ?? run.agent ?? settings?.agent ?? 'claude'))]
-  const cost = (run.planningCostUSD ?? 0) + run.episodes.reduce((total, ep) => total + (ep.costUSD ?? 0), 0)
+  const estimates = [...(run.planningCostUSD !== undefined ? [run.planningApiEstimateUSD] : []), ...run.episodes.filter((ep) => ep.costUSD !== undefined).map((ep) => ep.apiEstimateUSD)]
+  const cost = estimates.length && estimates.every((value): value is number => typeof value === 'number') ? estimates.reduce((total, value) => total + value, 0) : null
   return <details className="production-usage" onToggle={(event) => setExpanded(event.currentTarget.open)}>
     <summary><Gauge />{t('Usage')}<ChevronRight /></summary>
     {expanded && <div>
@@ -101,7 +102,7 @@ function ProductionDetails({ run }: { run: SeriesRun }) {
       {settings?.developerMode && <p className="hint">
         {run.episodes.some((ep) => ep.assignment) ? t('Episode model comparison') : modelName(run.model || 'default')}
         {run.effort ? format(', {0} effort', [run.effort]) : ''}
-        {cost > 0 && <> · {dollars(cost)} {t('API-equivalent estimate')}{run.planningCostUSD ? format(' (planning {0})', [dollars(run.planningCostUSD)]) : ''}</>}
+        {cost !== null && cost > 0 && <> · {dollars(cost)} {t('API-equivalent estimate')}{run.planningApiEstimateUSD ? format(' (planning {0})', [dollars(run.planningApiEstimateUSD)]) : ''}</>}
       </p>}
     </div>}
   </details>
@@ -131,9 +132,9 @@ export function SeriesOverview({ run }: { run: SeriesRun }) {
           <ChevronRight />
         </button>
         <EpisodeActions run={run} episode={episode} />
-        {developer && (episode.assignment || episode.costUSD || episode.elapsedMs !== undefined) && <div className="production-episode-debug hint">
+        {developer && (episode.assignment || episode.apiEstimateUSD || episode.elapsedMs !== undefined) && <div className="production-episode-debug hint">
           {episode.assignment && <span>{episode.assignment.agent} · {modelName(episode.assignment.model)} · {episode.assignment.effort}</span>}
-          {!!episode.costUSD && <span>{dollars(episode.costUSD)} {t('API-equivalent estimate')}</span>}
+          {!!episode.apiEstimateUSD && <span>{dollars(episode.apiEstimateUSD)} {t('API-equivalent estimate')}</span>}
           {run.metrics?.timing && episode.elapsedMs !== undefined && <span>{format('Elapsed: {0}', [`${Math.floor(episode.elapsedMs / 60000)}m ${Math.round((episode.elapsedMs % 60000) / 1000)}s`])}</span>}
         </div>}
       </li>)}

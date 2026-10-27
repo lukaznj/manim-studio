@@ -61,6 +61,7 @@
 | `<set>/lecture/` | The lecture video joined from the exercises' exports, its subtitles and chapter list | no |
 | `userData/python-env/` | pixi manifest + lock + `.pixi/envs/{default,omnivoice,transcribe}` | – |
 | `userData/tinytex/` | LaTeX | – |
+| `userData/runtime-cache/`, `userData/models/` | Private Pixi packages and speech model caches; removable with runtimes ([[../04-decisions/0056-private-runtime-cleanup\|ADR 0056]]) | – |
 | `userData/settings.json`, `elevenlabs.secret`, `anthropic.secret`, `openai.secret`, `gemini.secret` | Settings; API keys encrypted with the OS keychain | – |
 | `userData/antigravity/` | The Antigravity CLI (`<version>/`) and its own home (`home/`: settings, rules, MCP config, conversations) | – |
 | `userData/mcp-endpoint.json` | Port and per-run token for the Claude Desktop extension; owner-only, removed on quit | – |
@@ -80,3 +81,7 @@
 ## Video jobs from desktop conversations
 
 The Claude extension and Codex/compatible ChatGPT desktop plugin share the stdio bridge. `create_video` starts a project-bound background agent using Studio’s configured account, then checks and exports its video. `get_video` reports progress and returns readable media resources. Learn stays in the background, Create opens the editor, and Both defaults to Learn unless the caller explicitly requests production. These agents do not replace the editor’s open chat; the library receives project-change events. The endpoint only serves media belonging to completed jobs. See [[../04-decisions/0037-desktop-conversation-videos|ADR 0037]].
+
+## Course evidence in study chat
+
+`study-context.ts` builds a read-only catalog and evidence index from the course plan, scripts, rendered transcripts and complete PDF indices. A provider-independent bounded retrieval loop selects local chunks or page images through opaque ids, then the tutor answers with validated citations. The typed `studyReference` IPC resolves a reference saved in the current episode’s chat, revalidates its course membership and freshness, and returns a video target or PDF page image. The renderer keeps fullscreen and offers returning to the original lesson. See [[../04-decisions/0055-course-aware-study-evidence|ADR 0055]].

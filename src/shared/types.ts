@@ -27,6 +27,8 @@ export interface Background {
 }
 
 export interface ProjectMeta {
+  chatRoute?: ModelRoute // selected or automatically continued model for this episode
+
   name: string
   aspect: Aspect
   theme: Theme
@@ -156,7 +158,7 @@ export interface ExerciseSet {
   /** Reading new exercises out of what the user gave (files: how many pictures and PDFs). */
   intake?: { state: 'reading' | 'failed'; files: number; error?: string }
   paused?: boolean // its agents are stopped until it's resumed
-  route?: AgentRoute // the agent it switched to at a usage limit (ADR 0048); unset: Settings
+  route?: ModelRoute | AgentRoute // the agent it switched to at a usage limit (ADR 0048); unset: Settings
   items: ExerciseItem[]
   lecture?: { state: 'making' | 'done' | 'failed'; file?: string; error?: string }
   /** The series this set is the exercises of (<series>/exercises/, ADR 0030); none for a set on its own. */
@@ -265,7 +267,8 @@ export interface EpisodeRun {
   warnings: string[]
   held?: boolean // paused by the user: its agent stops, and it waits until resumed
   tried?: boolean // its current step was started before and interrupted: it carries on from there
-  costUSD?: number // what its agent turns cost so far, at API prices (.studio/usage.json has the detail)
+  costUSD?: number // historical provider/API-equivalent counter; never proof of API-key billing
+  apiEstimateUSD?: number | null // verified from the complete usage ledger; null/absent: not an all-key priced history
 }
 
 /**
@@ -287,6 +290,7 @@ export interface SeriesRun {
   state: 'working' | 'paused' | 'stopped' | 'done'
   episodes: EpisodeRun[]
   planningCostUSD?: number
+  planningApiEstimateUSD?: number | null
 }
 
 /** Claude's proposal for a series, which the user edits and accepts. */
@@ -499,6 +503,10 @@ export interface AgentRoute {
   auth: ClaudeAuth
 }
 
+/** An explicitly ordered model and its sign-in, used only after the user enables automatic fallback. */
+export type ModelRoute = AgentRoute & AgentSelection
+export interface FallbackModelOption { route: ModelRoute; label: string; efforts: Effort[] }
+
 /** One plan limit window, e.g. the 5-hour or the weekly limit. */
 export interface UsageWindow {
   label: string
@@ -652,7 +660,9 @@ export type MenuAction =
   | 'series'
   | 'exercises'
   | 'close-project'
-  | 'new-conversation'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'zoom-reset'
   | 'appearance'
   | 'tutorial'
 
@@ -712,6 +722,7 @@ export interface Settings {
   antigravityEffort: Effort | ''
   exerciseSets?: string[] // exercise set folders (Home lists them; search looks in them)
   seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed
+  modelFallback?: { enabled: boolean; order: ModelRoute[] }
   seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
   seriesModels?: Partial<Record<Agent, Partial<Record<SeriesRole, { model: string; effort: Effort }>>>> // per agent; unset make inherits the creation model, plan uses SERIES_PLANNERS (ADR 0045)
   autoRender: boolean
@@ -727,6 +738,11 @@ export interface Settings {
   studySize?: ExportSize // default export size in every mode; unset: 1080 (ADR 0035)
   sidebarWidth: number
   chatWidth: number
+  interfaceSize?: number // percent, 75–150; unset: 100
+  chatTextSize?: number // CSS pixels before interface scaling, 12–24; unset: 13
+  studyLibraryCollapsed?: boolean
+  studyAssistantCollapsed?: boolean
+  studyAssistantWidth?: number // independent of the editor; unset: responsive minimum
   timelineHeight: number
 }
 
@@ -767,6 +783,13 @@ export interface StudyVideoOffer {
 
 export type ChatPart = { kind: 'text'; text: string } | { kind: 'tool'; id: string; name: string; summary: string; status: 'running' | 'ok' | 'error' }
 
+/** Validated evidence links retained with a tutor answer, never arbitrary model-supplied paths. */
+export type StudyReference =
+  | { kind: 'video'; id: string; title: string; course?: string; dir: string; relativeDir?: string; episode: number; at: number; fingerprint: string; anchor?: { kind: 'chapter' | 'transcript'; text: string } }
+  | { kind: 'pdf'; id: string; title: string; dir: string; relativeDir?: string; source: string; page: number; hash: string }
+export type StudyReferenceTarget = { kind: 'video'; dir: string; course?: string; at: number } | { kind: 'pdf'; title: string; page: number; image: string }
+export interface StudyContextInfo { sources: number; pages: number; episodes: number; incomplete: boolean }
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'error'
@@ -774,6 +797,8 @@ export interface ChatMessage {
   context?: ChatContext
   frame?: string // data URL thumbnail sent with the message
   source?: SourceRef
+  studyReferences?: StudyReference[]
+  studyContext?: StudyContextInfo
   videoOffer?: StudyVideoOffer
   studyAction?: 'video' | 'exercises'
   exerciseFolder?: string
@@ -782,13 +807,13 @@ export interface ChatMessage {
 }
 
 export type ChatEvent =
+  | { type: 'route'; route: ModelRoute | null }
   | { type: 'message'; message: ChatMessage }
   | { type: 'delta'; messageId: string; text: string }
   | { type: 'part'; messageId: string; part: ChatPart }
   | { type: 'tool-status'; messageId: string; toolId: string; status: 'ok' | 'error' }
   | { type: 'busy'; busy: boolean }
   | { type: 'done'; ok: boolean; error?: string; costUsd?: number }
-  | { type: 'reset' }
 
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
@@ -828,6 +853,7 @@ export interface OpenProject {
 }
 
 export interface AppInfo {
+  canUninstall: boolean
   version: string
   platform: string
   arch: string
@@ -871,8 +897,9 @@ export interface StudioApi {
   appInfo(): Promise<AppInfo>
   mediaUrl(path: string): string
 
-  setupStatus(): Promise<SetupStatus>
-  install(component: Component): Promise<void>
+  setupStatus(check?: boolean): Promise<SetupStatus>
+  install(component: Component, repair?: boolean): Promise<void>
+  removeDownloadedTools(uninstall?: boolean): Promise<boolean>
 
   getSettings(): Promise<Settings>
   desktopConnection(): Promise<{ command: string; args: string[]; env: Record<string, string>; config: string; codexCommand: string }>
@@ -940,6 +967,8 @@ export interface StudioApi {
   cancelSeriesPlan(): Promise<void>
   /** Who can take over past a usage limit: each signed-in agent, and a saved Claude or OpenAI key (ADR 0048). */
   agentRoutes(): Promise<AgentRoute[]>
+  fallbackModels(): Promise<FallbackModelOption[]>
+  chatSelectModel(route: ModelRoute): Promise<void>
   /** The running series carries on with this agent; episodes waiting on a limit start again at once. */
   switchSeriesAgent(route: AgentRoute): Promise<void>
   /** The same for an exercise set's agents. */
@@ -989,6 +1018,7 @@ export interface StudioApi {
   courseExercises(series: string): Promise<string>
   watchDetail(dir: string): Promise<WatchDetail>
   /** Per-video notes and a reviewed, read-only AI revision. */
+  studyReference(messageId: string, referenceId: string): Promise<StudyReferenceTarget>
   studyNotes(dir: string): Promise<string>
   saveStudyNotes(dir: string, text: string): Promise<void>
   refineStudyNotes(dir: string, text: string): Promise<string>
@@ -1049,7 +1079,6 @@ export interface StudioApi {
 
   chatSend(request: ChatRequest): Promise<void>
   chatInterrupt(): Promise<void>
-  chatReset(): Promise<void>
   chatModels(agent?: Agent): Promise<ModelOption[]>
   openEpisodeReport(dir: string): Promise<void>
   /** Opens the bundled Claude Desktop extension, which Claude Desktop offers to install. */

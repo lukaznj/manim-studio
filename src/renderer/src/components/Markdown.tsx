@@ -16,7 +16,7 @@ function math(tex: string, display: boolean, key: number): ReactNode {
 
 const LIST = /^\s*([-*]|\d+[.)])\s/
 
-export function Markdown({ text }: { text: string }) {
+export function Markdown({ text, reference }: { text: string; reference?: (id: string) => ReactNode }) {
   const blocks: ReactNode[] = []
   const lines = text.split('\n')
   let i = 0
@@ -51,7 +51,7 @@ export function Markdown({ text }: { text: string }) {
       blocks.push(
         <List key={blocks.length}>
           {items.map((it, k) => (
-            <li key={k}>{inline(it)}</li>
+            <li key={k}>{inline(it, reference)}</li>
           ))}
         </List>,
       )
@@ -60,7 +60,7 @@ export function Markdown({ text }: { text: string }) {
     if (/^#{1,4}\s/.test(line)) {
       blocks.push(
         <p key={blocks.length} className="md-h">
-          {inline(line.replace(/^#+\s/, ''))}
+          {inline(line.replace(/^#+\s/, ''), reference)}
         </p>,
       )
       i++
@@ -73,13 +73,15 @@ export function Markdown({ text }: { text: string }) {
     const para: string[] = []
     while (i < lines.length && lines[i].trim() && !lines[i].startsWith('```') && !lines[i].trim().startsWith('$$') && !lines[i].trim().startsWith('\\[') && !LIST.test(lines[i]))
       para.push(lines[i++])
-    blocks.push(<p key={blocks.length}>{inline(para.join(' '))}</p>)
+    blocks.push(<p key={blocks.length}>{inline(para.join(' '), reference)}</p>)
   }
   return <>{blocks}</>
 }
 
-export function inline(text: string): ReactNode[] {
-  return text.split(/(\\\([^\n]+?\\\)|\\\[[^\n]+?\\\]|\$\$[^$]+\$\$|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*)/g).map((seg, k) => {
+export function inline(text: string, reference?: (id: string) => ReactNode): ReactNode[] {
+  return text.split(/(\[[^\]\n]+\]\(study:[a-zA-Z0-9._-]+\)|\\\([^\n]+?\\\)|\\\[[^\n]+?\\\]|\$\$[^$]+\$\$|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*)/g).map((seg, k) => {
+    const link = /^\[([^\]\n]+)\]\(study:([a-zA-Z0-9._-]+)\)$/.exec(seg)
+    if (link) return <span key={k}>{reference?.(link[2]) ?? link[1]}</span>
     if (seg.startsWith('\\(') && seg.endsWith('\\)')) return math(seg.slice(2, -2), false, k)
     if (seg.startsWith('\\[') && seg.endsWith('\\]')) return math(seg.slice(2, -2), true, k)
     if (seg.startsWith('$$') && seg.endsWith('$$') && seg.length > 4) return math(seg.slice(2, -2), true, k)

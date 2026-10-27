@@ -16,7 +16,7 @@ Renders, exports and series take minutes, and people look elsewhere while they r
   - right answer, not quite
   - setup finished, needs you, something failed
 
-  They're oscillators with envelopes, bell partials, filtered noise and a short generated room. Each is rendered once, levelled to −6 dBFS and played at the Settings volume. No audio files and no dependency, and the sounds are ours under MIT.
+  They're oscillators with envelopes, bell partials, filtered noise and a short generated room. Each is rendered once, levelled to −6 dBFS and played at the Settings volume. No audio files and no dependency, and the sounds are original project code under the project license (now AGPLv3; [[0054-agpl-copyleft-license]]).
 - **They follow the app's state, not its handlers.** One store subscription turns transitions into cues:
   - an export or exercise moving to done or failed
   - an episode or the series finishing

@@ -17,6 +17,7 @@ import { UsageDialog } from './components/UsageDialog'
 import { Tour } from './components/Tour'
 import { canEdit, leaveEditor, useStore } from './store'
 import { startSoundCues } from './lib/sounds'
+import { EnvironmentRepair } from './components/EnvironmentRepair'
 
 export function App() {
   // Language updates rerender the complete interface without remounting open dialogs or editors.
@@ -25,7 +26,7 @@ export function App() {
   const ready = useStore((s) => !!s.app)
   // First launch is its own screen until a mode is chosen; after it, nothing opens until the engine is in.
   const onboarding = useStore((s) => !!s.settings && !s.settings.mode)
-  const installing = useStore((s) => !!s.settings?.mode && !!s.setup && !requiredReady(s.setup))
+  const installing = useStore((s) => !s.settings?.onboardingDone && !!s.settings?.mode && !!s.setup && !requiredReady(s.setup))
   const toasts = useStore((s) => s.toasts)
   // Quick mode shows its progress instead of the editor, until you ask for the editor.
   const quickHere = useStore((s) => !!s.quick && s.quick.project === s.project?.path && !s.quickEditor)
@@ -47,12 +48,13 @@ export function App() {
   const mode = useStore((s) => s.settings?.mode)
   const setupLoaded = useStore((s) => !!s.setup)
   useEffect(() => {
-    if (mode && setupLoaded) startInstalls(mode)
+    if (mode && setupLoaded && !useStore.getState().settings?.onboardingDone) startInstalls(mode)
   }, [mode, setupLoaded])
 
   return (
     <div className={`app ${window.studio ? '' : 'no-bridge'}`}>
       <TitleBar />
+      <EnvironmentRepair />
       <main className="app-main">
         {onboarding ? (
           <Onboarding />

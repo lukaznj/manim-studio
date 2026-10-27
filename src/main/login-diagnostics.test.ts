@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { loginFailureDetails, redactLoginLog } from './login-diagnostics.ts'
+import { googleLoginUrl, loginFailureDetails, redactLoginLog } from './login-diagnostics.ts'
 
 test('Python startup failures preserve their traceback and final cause', () => {
   const result = loginFailureDetails(new Error('Python exited with code 1'), 'Traceback (most recent call last):\n  File "agy_login.py", line 92\nOSError: [Errno 24] Too many open files')
@@ -15,4 +15,10 @@ test('sign-in logs remove URLs, account identities and credential values', () =>
   assert.match(result, /\[URL omitted\]/)
   assert.ok(redactLoginLog('a'.repeat(20000)).length <= 12000)
   assert.ok(!redactLoginLog('{"refresh_token":"quoted-private-value"}').includes('quoted-private-value'))
+})
+
+
+test('login helper can open only the Google HTTPS origin', () => {
+  assert.equal(googleLoginUrl('https://accounts.google.com/o/oauth2/auth?state=test'), 'https://accounts.google.com/o/oauth2/auth?state=test')
+  for (const value of ['http://accounts.google.com/auth', 'https://accounts.google.com.evil.test/auth', 'javascript:alert(1)', 'https://user@accounts.google.com/auth', 'broken']) assert.equal(googleLoginUrl(value), null)
 })

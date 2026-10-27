@@ -15,7 +15,8 @@
     "That project isn’t open in Manim Studio, and no agent is working in it.": "Ky projekt nuk është i hapur në Manim Studio dhe asnjë agjent nuk po punon në të.",
     "Production": "Krijimi",
     "Waiting for its script": "Në pritje të skenarit",
-    "Script ready": "Skenari është gati"
+    "Script ready": "Skenari është gati",
+    "{0} left": "{0} të mbetura"
   },
   "hy": {
     "Environment": "Միջավայր",
@@ -33,7 +34,9 @@
     "That sample isn’t from ElevenLabs.": "Այդ նմուշը ElevenLabs-ից չէ։",
     "Production": "Ստեղծում",
     "Waiting for its script": "Սպասում է սցենարին",
-    "Script ready": "Սցենարը պատրաստ է"
+    "Script ready": "Սցենարը պատրաստ է",
+    "{0} left": "Մնացել է {0}",
+    "Uninstall Manim Studio…": "Հեռացնել Manim Studio…"
   },
   "az": {
     "Environment": "Mühit",
@@ -51,7 +54,8 @@
     "Exported “{0}”": "“{0}” ixrac edildi",
     "Production": "Hazırlanma",
     "Waiting for its script": "Ssenarini gözləyir",
-    "Script ready": "Ssenari hazırdır"
+    "Script ready": "Ssenari hazırdır",
+    "{0} left": "{0} qalıb"
   },
   "be": {
     "Environment": "Асяроддзе",
@@ -75,7 +79,8 @@
     "The Codex download didn’t match its published checksum. Try again.": "Спампаваны Codex не супадае з апублікаванай кантрольнай сумай. Паспрабуйце яшчэ раз.",
     "Production": "Стварэнне",
     "Waiting for its script": "Чакае сцэнарыя",
-    "Script ready": "Сцэнарый гатовы"
+    "Script ready": "Сцэнарый гатовы",
+    "{0} left": "Засталося {0}"
   },
   "bs": {
     "Environment": "Okruženje",
@@ -93,7 +98,8 @@
     "That project isn’t open in Manim Studio, and no agent is working in it.": "Taj projekt nije otvoren u aplikaciji Manim Studio i nijedan agent ne radi na njemu.",
     "Production": "Izrada",
     "Waiting for its script": "Čeka scenarij",
-    "Script ready": "Scenarij je spreman"
+    "Script ready": "Scenarij je spreman",
+    "{0} left": "Preostalo {0}"
   },
   "bg": {
     "Environment": "Среда",
@@ -117,7 +123,12 @@
     "This key may not send requests to Gemini. Check its restrictions at aistudio.google.com → API keys.": "Този ключ няма право да изпраща заявки до Gemini. Проверете ограниченията му на aistudio.google.com → API keys.",
     "Production": "Изработка",
     "Waiting for its script": "Изчакване на сценария",
-    "Script ready": "Сценарият е готов"
+    "Script ready": "Сценарият е готов",
+    "{0} left": "Остават {0}",
+    "Reinstall Manim Studio": "Преинсталирай Manim Studio",
+    "The bundled installer is missing or damaged. Reinstall Manim Studio.": "Вграденият инсталатор липсва или е повреден. Преинсталирайте Manim Studio.",
+    "Uninstall Manim Studio…": "Деинсталиране на Manim Studio…",
+    "Removes Studio’s downloaded tools and caches. Projects, recordings, settings and sign-ins are kept.": "Премахва изтеглените инструменти и кешове на Studio. Проектите, записите, настройките и данните за вход се запазват."
   },
   "ca": {
     "Environment": "Entorn",
@@ -135,7 +146,8 @@
     "The Codex download didn’t match its published checksum. Try again.": "La baixada del Codex no coincideix amb la suma de verificació publicada. Torna-ho a provar.",
     "Production": "Producció",
     "Waiting for its script": "Esperant el guió",
-    "Script ready": "Guió preparat"
+    "Script ready": "Guió preparat",
+    "{0} left": "Queden {0}"
   },
   "cs": {
     "Environment": "Prostředí",
@@ -154,7 +166,8 @@
     "The scripts are written. Videos are being made, {0} at a time, and exported as soon as they pass the check.": "Scénáře jsou napsané. Videa se vytvářejí po {0} současně a exportují se hned, jak projdou kontrolou.",
     "Production": "Tvorba",
     "Waiting for its script": "Čeká na scénář",
-    "Script ready": "Scénář je připraven"
+    "Script ready": "Scénář je připraven",
+    "{0} left": "Zbývá {0}"
   },
   "da": {
     "Environment": "Miljø",
@@ -172,7 +185,9 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Ikke færdige: {0}. Åbn en episode for at se hvorfor, og bed din agent om at gøre den færdig.",
     "Production": "Produktion",
     "Waiting for its script": "Venter på manuskript",
-    "Script ready": "Manuskript klar"
+    "Script ready": "Manuskript klar",
+    "Course materials": "Kursusmaterialer",
+    "{0} left": "{0} tilbage"
   },
   "nl": {
     "Environment": "Omgeving",
@@ -191,7 +206,9 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Niet voltooid: {0}. Open een aflevering om te zien waarom en vraag je agent deze af te maken.",
     "Production": "Productie",
     "Waiting for its script": "Wacht op het script",
-    "Script ready": "Script gereed"
+    "Script ready": "Script gereed",
+    "Course materials": "Cursusmateriaal",
+    "{0} left": "Nog {0}"
   },
   "et": {
     "Environment": "Keskkond",
@@ -213,7 +230,8 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Lõpetamata: {0}. Ava episood, et näha põhjust, ja palu agendil see lõpetada.",
     "Production": "Loomine",
     "Waiting for its script": "Ootab stsenaariumi",
-    "Script ready": "Stsenaarium valmis"
+    "Script ready": "Stsenaarium valmis",
+    "{0} left": "{0} jäänud"
   },
   "fi": {
     "Environment": "Ympäristö",
@@ -232,7 +250,9 @@
     "{0} syncs this folder: your projects are backed up and on your other devices, but they use your cloud storage, and exports are big. Studio keeps its render cache out of it.": "{0} synkronoi tämän kansion: projektisi varmuuskopioidaan ja ovat käytettävissä muilla laitteillasi, mutta ne käyttävät pilvitallennustilaasi, ja viennit ovat suuria. Studio pitää renderöintivälimuistinsa sen ulkopuolella.",
     "Production": "Tuotanto",
     "Waiting for its script": "Odottaa käsikirjoitusta",
-    "Script ready": "Käsikirjoitus valmis"
+    "Script ready": "Käsikirjoitus valmis",
+    "Course materials": "Kurssimateriaalit",
+    "{0} left": "{0} jäljellä"
   },
   "fr": {
     "Environment": "Environnement",
@@ -277,7 +297,8 @@
     "{0} syncs this folder: your projects are backed up and on your other devices, but they use your cloud storage, and exports are big. Studio keeps its render cache out of it.": "{0} synchronise ce dossier : vos projets sont sauvegardés et disponibles sur vos autres appareils, mais ils utilisent votre stockage cloud et les exports sont volumineux. Studio conserve son cache de rendu en dehors de ce dossier.",
     "Production": "Création",
     "Waiting for its script": "En attente du scénario",
-    "Script ready": "Scénario prêt"
+    "Script ready": "Scénario prêt",
+    "{0} left": "{0} restantes"
   },
   "ka": {
     "Environment": "გარემო",
@@ -304,7 +325,38 @@
     "The Antigravity download didn’t match its published checksum. Try again.": "ჩამოტვირთული Antigravity-ის საკონტროლო ჯამი გამოქვეყნებულს არ ემთხვევა. ხელახლა სცადეთ.",
     "Production": "შექმნა",
     "Waiting for its script": "ელოდება სცენარს",
-    "Script ready": "სცენარი მზადაა"
+    "Script ready": "სცენარი მზადაა",
+    "Ask about this moment, the whole course or the original PDFs. Follow references to a lesson, timestamp or source page.": "იკითხეთ ამ მომენტის, მთელი კურსის ან ორიგინალი PDF-ების შესახებ. ბმულები გადაგიყვანთ გაკვეთილზე, ვიდეოს კონკრეტულ მომენტზე ან წყაროს გვერდზე.",
+    "Course materials": "კურსის მასალები",
+    "Some course material could not be read. Ask again after restoring missing sources.": "კურსის ზოგიერთი მასალა ვერ წაიკითხა. აღადგინეთ დაკარგული წყაროები და ხელახლა იკითხეთ.",
+    "That reference does not belong to this course.": "ეს ბმული ამ კურსს არ ეკუთვნის.",
+    "That reference is no longer available. Ask for an updated reference.": "ეს ბმული აღარ არის ხელმისაწვდომი. მოითხოვეთ განახლებული ბმული.",
+    "That source changed since this answer. Ask for an updated reference.": "წყარო ამ პასუხის შემდეგ შეიცვალა. მოითხოვეთ განახლებული ბმული.",
+    "That source page is no longer available.": "წყაროს ეს გვერდი აღარ არის ხელმისაწვდომი.",
+    "That video changed since this answer. Ask for an updated reference.": "ვიდეო ამ პასუხის შემდეგ შეიცვალა. მოითხოვეთ განახლებული ბმული.",
+    "That video is not available yet.": "ეს ვიდეო ჯერ არ არის ხელმისაწვდომი.",
+    "{0} PDFs · {1} lessons": "PDF-ები: {0} · გაკვეთილები: {1}",
+    "{0} · page {1}": "{0} · გვერდი {1}",
+    "{0} left": "დარჩა {0}",
+    "Check installation": "შეამოწმე ინსტალაცია",
+    "Details": "დეტალები",
+    "Reinstall": "ხელახლა დააყენე",
+    "Reinstall Manim Studio": "ხელახლა დააყენე Manim Studio",
+    "Some video tools are missing or damaged. Reinstall them in Settings → Environment.": "ზოგიერთი ვიდეოინსტრუმენტი აკლია ან დაზიანებულია. ხელახლა დააყენეთ ისინი პარამეტრებიდან → გარემო.",
+    "Stop video creation before reinstalling tools.": "ინსტრუმენტების ხელახლა დაყენებამდე შეაჩერეთ ვიდეოების შექმნა.",
+    "The bundled installer is missing or damaged. Reinstall Manim Studio.": "ჩაშენებული საინსტალაციო პროგრამა აკლია ან დაზიანებულია. ხელახლა დააყენეთ Manim Studio.",
+    "Unknown installation component.": "უცნობი საინსტალაციო კომპონენტი.",
+    "Video tools need repair": "ვიდეოინსტრუმენტებს შეკეთება სჭირდება",
+    "Your saved videos and projects are safe. Reinstall the tools to make videos again.": "თქვენი შენახული ვიდეოები და პროექტები უსაფრთხოდაა. ვიდეოების შესაქმნელად ხელახლა დააყენეთ ინსტრუმენტები.",
+    "Done.": "დასრულებულია.",
+    "Downloaded tools": "ჩამოტვირთული ხელსაწყოები",
+    "Remove downloaded tools…": "ჩამოტვირთული ხელსაწყოების წაშლა…",
+    "Removes Studio’s downloaded tools and caches. Projects, recordings, settings and sign-ins are kept.": "შლის Studio-ს ჩამოტვირთულ ხელსაწყოებსა და ქეშს. პროექტები, ჩანაწერები, პარამეტრები და შესვლის მონაცემები ინახება.",
+    "Some folders were kept because they contain projects or link outside Studio’s storage.": "ზოგიერთი საქაღალდე შენარჩუნდა, რადგან შეიცავს პროექტებს ან ბმულებს Studio-ს საცავის გარეთ.",
+    "Stop video creation before removing tools.": "ხელსაწყოების წაშლამდე შეაჩერეთ ვიდეოების შექმნა.",
+    "This entry point is for the Windows uninstaller only.": "ეს შესვლის წერტილი მხოლოდ Windows-ის დეინსტალაციის პროგრამისთვისაა.",
+    "This installation cannot uninstall itself. Remove downloaded tools here, then uninstall the app normally.": "ეს ინსტალაცია საკუთარ თავს ვერ წაშლის. აქ წაშალეთ ჩამოტვირთული ხელსაწყოები, შემდეგ კი აპი ჩვეულებრივი გზით წაშალეთ.",
+    "Uninstall Manim Studio…": "Manim Studio-ს წაშლა…"
   },
   "de": {
     "Environment": "Umgebung",
@@ -333,7 +385,11 @@
     "The scripts are written. Videos are being made, {0} at a time, and exported as soon as they pass the check.": "Die Drehbücher sind geschrieben. Es werden jeweils {0} Videos gleichzeitig erstellt und nach bestandener Prüfung exportiert.",
     "Production": "Erstellung",
     "Waiting for its script": "Wartet auf das Skript",
-    "Script ready": "Skript fertig"
+    "Script ready": "Skript fertig",
+    "Course materials": "Kursmaterialien",
+    "{0} left": "Noch {0}",
+    "Uninstall Manim Studio…": "Manim Studio deinstallieren…",
+    "Done.": "Fertig."
   },
   "el": {
     "Environment": "Περιβάλλον",
@@ -357,7 +413,13 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Μη ολοκληρωμένα: {0}. Ανοίξτε ένα επεισόδιο για να δείτε την αιτία και ζητήστε από τον πράκτορά σας να το ολοκληρώσει.",
     "Production": "Δημιουργία",
     "Waiting for its script": "Αναμονή σεναρίου",
-    "Script ready": "Το σενάριο είναι έτοιμο"
+    "Script ready": "Το σενάριο είναι έτοιμο",
+    "{0} left": "Απομένουν {0}",
+    "Reinstall Manim Studio": "Επανεγκατάσταση του Manim Studio",
+    "The bundled installer is missing or damaged. Reinstall Manim Studio.": "Το ενσωματωμένο πρόγραμμα εγκατάστασης λείπει ή έχει καταστραφεί. Εγκαταστήστε ξανά το Manim Studio.",
+    "Uninstall Manim Studio…": "Απεγκατάσταση του Manim Studio…",
+    "Done.": "Ολοκληρώθηκε.",
+    "Removes Studio’s downloaded tools and caches. Projects, recordings, settings and sign-ins are kept.": "Καταργεί τα ληφθέντα εργαλεία και τις προσωρινές μνήμες του Studio. Τα έργα, οι εγγραφές, οι ρυθμίσεις και οι συνδέσεις διατηρούνται."
   },
   "hu": {
     "Environment": "Környezet",
@@ -377,7 +439,8 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Nem készült el: {0}. Nyiss meg egy epizódot az ok megtekintéséhez, és kérd meg az ügynököt a befejezésére.",
     "Production": "Készítés",
     "Waiting for its script": "Várakozás a forgatókönyvre",
-    "Script ready": "A forgatókönyv kész"
+    "Script ready": "A forgatókönyv kész",
+    "{0} left": "{0} van hátra"
   },
   "is": {
     "Environment": "Umhverfi",
@@ -395,7 +458,19 @@
     "Pair render server": "Tengja myndvinnsluþjón",
     "Production": "Gerð",
     "Waiting for its script": "Bíður eftir handriti",
-    "Script ready": "Handrit tilbúið"
+    "Script ready": "Handrit tilbúið",
+    "Ask about this moment, the whole course or the original PDFs. Follow references to a lesson, timestamp or source page.": "Spyrðu um þetta augnablik, allt námskeiðið eða upprunalegu PDF-skjölin. Fylgdu tilvísunum í kennslustund, tímapunkt eða síðu í heimild.",
+    "Course materials": "Námsefni",
+    "Some course material could not be read. Ask again after restoring missing sources.": "Ekki tókst að lesa hluta námsefnisins. Endurheimtu heimildirnar sem vantar og spurðu aftur.",
+    "That reference does not belong to this course.": "Þessi tilvísun tilheyrir ekki þessu námskeiði.",
+    "That reference is no longer available. Ask for an updated reference.": "Þessi tilvísun er ekki lengur tiltæk. Biddu um nýja tilvísun.",
+    "That source changed since this answer. Ask for an updated reference.": "Þessari heimild hefur verið breytt síðan þetta svar var gefið. Biddu um nýja tilvísun.",
+    "That source page is no longer available.": "Þessi síða í heimildinni er ekki lengur tiltæk.",
+    "That video changed since this answer. Ask for an updated reference.": "Þessu myndbandi hefur verið breytt síðan þetta svar var gefið. Biddu um nýja tilvísun.",
+    "That video is not available yet.": "Þetta myndband er ekki tiltækt enn.",
+    "{0} PDFs · {1} lessons": "PDF-skjöl: {0} · Kennslustundir: {1}",
+    "{0} · page {1}": "{0} · síða {1}",
+    "{0} left": "{0} eftir"
   },
   "ga": {
     "Environment": "Timpeallacht",
@@ -413,7 +488,8 @@
     "That project isn’t open in Manim Studio, and no agent is working in it.": "Níl an tionscadal sin oscailte in Manim Studio, agus níl aon ghníomhaire ag obair air.",
     "Production": "Léiriú",
     "Waiting for its script": "Ag fanacht leis an script",
-    "Script ready": "An script réidh"
+    "Script ready": "An script réidh",
+    "{0} left": "{0} fágtha"
   },
   "it": {
     "Environment": "Ambiente",
@@ -431,7 +507,8 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Non completati: {0}. Apri un episodio per scoprire il motivo e chiedi al tuo agente di completarlo.",
     "Production": "Produzione",
     "Waiting for its script": "In attesa del copione",
-    "Script ready": "Copione pronto"
+    "Script ready": "Copione pronto",
+    "{0} left": "{0} rimanenti"
   },
   "kk": {
     "Environment": "Орта",
@@ -449,7 +526,8 @@
     "The Codex download didn’t match its published checksum. Try again.": "Жүктелген Codex жарияланған бақылау сомасына сәйкес келмейді. Қайталап көріңіз.",
     "Production": "Дайындау",
     "Waiting for its script": "Сценарийді күтуде",
-    "Script ready": "Сценарий дайын"
+    "Script ready": "Сценарий дайын",
+    "{0} left": "{0} қалды"
   },
   "la": {
     "Environment": "Ambitus",
@@ -519,7 +597,38 @@
     "The Antigravity download didn’t match its published checksum. Try again.": "Archivum Antigravity receptum cum summa comprobatoria publicata non congruit. Iterum conare.",
     "Production": "Productio",
     "Waiting for its script": "Exspectatur scriptum",
-    "Script ready": "Scriptum paratum"
+    "Script ready": "Scriptum paratum",
+    "Ask about this moment, the whole course or the original PDFs. Follow references to a lesson, timestamp or source page.": "De hoc momento, toto cursu vel documentis PDF originalibus quaere. Nexus ad lectionem, momentum temporis vel paginam fontis sequere.",
+    "Course materials": "Materiae cursus",
+    "Some course material could not be read. Ask again after restoring missing sources.": "Quaedam materiae cursus legi non potuerunt. Fontes absentes restitue et iterum quaere.",
+    "That reference does not belong to this course.": "Hic nexus ad hunc cursum non pertinet.",
+    "That reference is no longer available. Ask for an updated reference.": "Hic nexus iam non praesto est. Novum nexum pete.",
+    "That source changed since this answer. Ask for an updated reference.": "Hic fons post hanc responsionem mutatus est. Novum nexum pete.",
+    "That source page is no longer available.": "Haec pagina fontis iam non praesto est.",
+    "That video changed since this answer. Ask for an updated reference.": "Haec pellicula post hanc responsionem mutata est. Novum nexum pete.",
+    "That video is not available yet.": "Haec pellicula nondum praesto est.",
+    "{0} PDFs · {1} lessons": "PDF: {0} · Lectiones: {1}",
+    "{0} · page {1}": "{0} · pagina {1}",
+    "{0} left": "{0} restant",
+    "Check installation": "Installationem verifica",
+    "Details": "Singula",
+    "Reinstall": "Iterum institue",
+    "Reinstall Manim Studio": "Manim Studio iterum institue",
+    "Some video tools are missing or damaged. Reinstall them in Settings → Environment.": "Quaedam instrumenta ad pelliculas desunt aut corrupta sunt. Ea iterum institue in Configuratione → Ambitu.",
+    "Stop video creation before reinstalling tools.": "Creationem pellicularum siste antequam instrumenta iterum instituas.",
+    "The bundled installer is missing or damaged. Reinstall Manim Studio.": "Programma institutionis inclusum deest aut corruptum est. Manim Studio iterum institue.",
+    "Unknown installation component.": "Pars institutionis ignota.",
+    "Video tools need repair": "Instrumenta ad pelliculas reparanda sunt",
+    "Your saved videos and projects are safe. Reinstall the tools to make videos again.": "Pelliculae servatae et opera tuta sunt. Instrumenta iterum institue ut pelliculas iterum creare possis.",
+    "Done.": "Perfectum.",
+    "Downloaded tools": "Instrumenta recepta",
+    "Remove downloaded tools…": "Instrumenta recepta remove…",
+    "Removes Studio’s downloaded tools and caches. Projects, recordings, settings and sign-ins are kept.": "Instrumenta recepta et memorias temporarias Studio removet. Opera, voces incisae, optiones et aditus servantur.",
+    "Some folders were kept because they contain projects or link outside Studio’s storage.": "Nonnullae directorii servantur, quia opera continent aut extra repositorium Studio ducunt.",
+    "Stop video creation before removing tools.": "Creationem pellicularum siste antequam instrumenta removes.",
+    "This entry point is for the Windows uninstaller only.": "Hic aditus soli programmatum removendorum instrumento Windows destinatur.",
+    "This installation cannot uninstall itself. Remove downloaded tools here, then uninstall the app normally.": "Haec institutio se ipsam removere non potest. Instrumenta recepta hic remove, deinde applicationem more solito remove.",
+    "Uninstall Manim Studio…": "Manim Studio remove…"
   },
   "lv": {
     "Environment": "Vide",
@@ -548,7 +657,8 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Nepabeigti: {0}. Atveriet epizodi, lai uzzinātu iemeslu, un lūdziet aģentam to pabeigt.",
     "Production": "Izveide",
     "Waiting for its script": "Gaida scenāriju",
-    "Script ready": "Scenārijs gatavs"
+    "Script ready": "Scenārijs gatavs",
+    "{0} left": "Atlikušas {0}"
   },
   "lt": {
     "Environment": "Aplinka",
@@ -567,7 +677,8 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Nebaigta: {0}. Atidarykite epizodą, kad sužinotumėte priežastį, ir paprašykite agento ją užbaigti.",
     "Production": "Kūrimas",
     "Waiting for its script": "Laukiama scenarijaus",
-    "Script ready": "Scenarijus paruoštas"
+    "Script ready": "Scenarijus paruoštas",
+    "{0} left": "Liko {0}"
   },
   "lb": {
     "Environment": "Ëmfeld",
@@ -597,7 +708,8 @@
     "That sample isn’t from ElevenLabs.": "Dat Beispill ass net vun ElevenLabs.",
     "Production": "Erstellung",
     "Waiting for its script": "Waart op den Dréibuch",
-    "Script ready": "Dréibuch ass prett"
+    "Script ready": "Dréibuch ass prett",
+    "{0} left": "Nach {0}"
   },
   "mk": {
     "Environment": "Околина",
@@ -616,7 +728,8 @@
     "The Codex download didn’t match its published checksum. Try again.": "Преземениот Codex не се совпаѓа со објавената контролна сума. Обидете се повторно.",
     "Production": "Изработка",
     "Waiting for its script": "Чека на сценариото",
-    "Script ready": "Сценариото е подготвено"
+    "Script ready": "Сценариото е подготвено",
+    "{0} left": "Преостануваат {0}"
   },
   "mt": {
     "Environment": "Ambjent",
@@ -633,7 +746,8 @@
     "Settings": "Issettjar",
     "Production": "Produzzjoni",
     "Waiting for its script": "Qed jistenna l-iskript",
-    "Script ready": "L-iskript lest"
+    "Script ready": "L-iskript lest",
+    "{0} left": "Fadal {0}"
   },
   "cnr": {
     "Environment": "Okruženje",
@@ -661,7 +775,10 @@
     "The Antigravity download didn’t match its published checksum. Try again.": "Preuzeti Antigravity ne odgovara objavljenoj kontrolnoj sumi. Pokušajte ponovo.",
     "Production": "Izrada",
     "Waiting for its script": "Čeka scenario",
-    "Script ready": "Scenario je spreman"
+    "Script ready": "Scenario je spreman",
+    "{0} left": "Preostalo {0}",
+    "The bundled installer is missing or damaged. Reinstall Manim Studio.": "Ugrađeni instalacioni program nedostaje ili je oštećen. Ponovo instalirajte Manim Studio.",
+    "Uninstall Manim Studio…": "Deinstaliraj Manim Studio…"
   },
   "nb": {
     "Environment": "Miljø",
@@ -678,7 +795,9 @@
     "Settings": "Innstillinger",
     "Production": "Produksjon",
     "Waiting for its script": "Venter på manus",
-    "Script ready": "Manus klart"
+    "Script ready": "Manus klart",
+    "Course materials": "Kursmateriell",
+    "{0} left": "{0} igjen"
   },
   "pl": {
     "Environment": "Środowisko",
@@ -697,7 +816,8 @@
     "The Codex download didn’t match its published checksum. Try again.": "Pobrany Codex nie zgadza się z opublikowaną sumą kontrolną. Spróbuj ponownie.",
     "Production": "Tworzenie",
     "Waiting for its script": "Oczekuje na scenariusz",
-    "Script ready": "Scenariusz gotowy"
+    "Script ready": "Scenariusz gotowy",
+    "{0} left": "Pozostało {0}"
   },
   "pt": {
     "Environment": "Ambiente",
@@ -718,7 +838,8 @@
     "{0} did not finish. Open an episode to see why and ask your agent to finish it.": "Por concluir: {0}. Abra um episódio para ver o motivo e peça ao seu agente para o terminar.",
     "Production": "Produção",
     "Waiting for its script": "A aguardar o guião",
-    "Script ready": "Guião pronto"
+    "Script ready": "Guião pronto",
+    "{0} left": "Faltam {0}"
   },
   "ro": {
     "Environment": "Mediu",
@@ -736,7 +857,8 @@
     "Text to Speech": "Text în vorbire",
     "Production": "Creare",
     "Waiting for its script": "Se așteaptă scenariul",
-    "Script ready": "Scenariul este gata"
+    "Script ready": "Scenariul este gata",
+    "{0} left": "{0} rămase"
   },
   "rm": {
     "Environment": "Ambient",
@@ -890,7 +1012,6 @@
     "{0} background": "Fund {0}",
     "{0} of {1} episodes made.": "{0} da {1} episodas creadas.",
     "{0} · episode {1} of {2}": "{0} · episoda {1} da {2}",
-    "{0} · {1} · open source (MIT)": "{0} · {1} · code avert (MIT)",
     "Sign in to your agent first (Settings → Accounts): it makes the video.": "S’annunziai l’emprim tar voss agent (Parameters → Contos): el creescha il video.",
     "Sign in to your agent first (Settings → Accounts): it reads the PDFs and plans the episodes.": "S’annunziai l’emprim tar voss agent (Parameters → Contos): el legia ils PDFs e planisescha las episodas.",
     "Sign in to your agent first (Settings → Accounts): it solves the exercises.": "S’annunziai l’emprim tar voss agent (Parameters → Contos): el schlia ils exercizis.",
@@ -908,7 +1029,8 @@
     "Google privacy policy": "Decleraziun da protecziun da datas da Google",
     "Production": "Producziun",
     "Waiting for its script": "Spetgar il scenari",
-    "Script ready": "Scenari pront"
+    "Script ready": "Scenari pront",
+    "{0} left": "Restan {0}"
   },
   "ru": {
     "Environment": "Окружение",
@@ -926,7 +1048,8 @@
     "The Codex download didn’t match its published checksum. Try again.": "Загруженный Codex не соответствует опубликованной контрольной сумме. Попробуйте ещё раз.",
     "Production": "Создание",
     "Waiting for its script": "Ожидание сценария",
-    "Script ready": "Сценарий готов"
+    "Script ready": "Сценарий готов",
+    "{0} left": "Осталось {0}"
   },
   "sr": {
     "Environment": "Окружење",
@@ -953,7 +1076,10 @@
     "The Antigravity download didn’t match its published checksum. Try again.": "Преузети Antigravity не одговара објављеној контролној суми. Покушајте поново.",
     "Production": "Израда",
     "Waiting for its script": "Чека сценарио",
-    "Script ready": "Сценарио је спреман"
+    "Script ready": "Сценарио је спреман",
+    "{0} left": "Преостало {0}",
+    "The bundled installer is missing or damaged. Reinstall Manim Studio.": "Уграђени инсталациони програм недостаје или је оштећен. Поново инсталирајте Manim Studio.",
+    "Uninstall Manim Studio…": "Деинсталирај Manim Studio…"
   },
   "sk": {
     "Environment": "Prostredie",
@@ -972,7 +1098,8 @@
     "The Codex download didn’t match its published checksum. Try again.": "Stiahnutý Codex nezodpovedá zverejnenému kontrolnému súčtu. Skúste to znova.",
     "Production": "Tvorba",
     "Waiting for its script": "Čaká na scenár",
-    "Script ready": "Scenár je pripravený"
+    "Script ready": "Scenár je pripravený",
+    "{0} left": "Zostáva {0}"
   },
   "sl": {
     "Environment": "Okolje",
@@ -990,7 +1117,8 @@
     "That project isn’t open in Manim Studio, and no agent is working in it.": "Ta projekt ni odprt v aplikaciji Manim Studio in noben agent ne dela na njem.",
     "Production": "Izdelava",
     "Waiting for its script": "Čaka na scenarij",
-    "Script ready": "Scenarij je pripravljen"
+    "Script ready": "Scenarij je pripravljen",
+    "{0} left": "Preostalo {0}"
   },
   "es": {
     "Environment": "Entorno",
@@ -1007,7 +1135,9 @@
     "Settings": "Configuración",
     "Production": "Producción",
     "Waiting for its script": "Esperando el guion",
-    "Script ready": "Guion listo"
+    "Script ready": "Guion listo",
+    "{0} left": "Quedan {0}",
+    "The bundled installer is missing or damaged. Reinstall Manim Studio.": "El instalador incluido falta o está dañado. Vuelve a instalar Manim Studio."
   },
   "sv": {
     "Environment": "Miljö",
@@ -1024,7 +1154,9 @@
     "Settings": "Inställningar",
     "Production": "Produktion",
     "Waiting for its script": "Väntar på manus",
-    "Script ready": "Manus klart"
+    "Script ready": "Manus klart",
+    "Course materials": "Kursmaterial",
+    "{0} left": "{0} kvar"
   },
   "tr": {
     "Environment": "Ortam",
@@ -1042,7 +1174,8 @@
     "That project isn’t open in Manim Studio, and no agent is working in it.": "Bu proje Manim Studio içinde açık değil ve hiçbir ajan üzerinde çalışmıyor.",
     "Production": "Oluşturma",
     "Waiting for its script": "Senaryo bekleniyor",
-    "Script ready": "Senaryo hazır"
+    "Script ready": "Senaryo hazır",
+    "{0} left": "{0} kaldı"
   },
   "uk": {
     "Environment": "Середовище",
@@ -1060,7 +1193,8 @@
     "The Codex download didn’t match its published checksum. Try again.": "Завантажений Codex не відповідає опублікованій контрольній сумі. Спробуйте ще раз.",
     "Production": "Створення",
     "Waiting for its script": "Очікування сценарію",
-    "Script ready": "Сценарій готовий"
+    "Script ready": "Сценарій готовий",
+    "{0} left": "Залишилося {0}"
   },
   "hr": {
     "That project isn’t open in Manim Studio, and no agent is working in it.": "Taj projekt nije otvoren u aplikaciji Manim Studio i nijedan agent ne radi na njemu.",
@@ -1100,6 +1234,39 @@
     "Medium effort": "Umjereno razmišljanje",
     "High effort": "Visoko razmišljanje",
     "Extra high effort": "Vrlo visoko razmišljanje",
-    "Maximum effort": "Maksimalno razmišljanje"
+    "Maximum effort": "Maksimalno razmišljanje",
+    "Resize assistant": "Promijeni širinu pomoćnika",
+    "Chat text size": "Veličina teksta razgovora",
+    "Ask about this moment, the whole course or the original PDFs. Follow references to a lesson, timestamp or source page.": "Pitajte o ovom trenutku, cijelom tečaju ili izvornim PDF-ovima. Poveznice vas vode na lekciju, određeni trenutak ili stranicu izvora.",
+    "Course materials": "Materijali tečaja",
+    "Some course material could not be read. Ask again after restoring missing sources.": "Dio materijala tečaja nije moguće pročitati. Vratite izvore koji nedostaju pa pitajte ponovno.",
+    "That reference does not belong to this course.": "Ova poveznica ne pripada ovom tečaju.",
+    "That reference is no longer available. Ask for an updated reference.": "Ova poveznica više nije dostupna. Zatražite novu poveznicu.",
+    "That source changed since this answer. Ask for an updated reference.": "Izvor je promijenjen nakon ovog odgovora. Zatražite novu poveznicu.",
+    "That source page is no longer available.": "Ova stranica izvora više nije dostupna.",
+    "That video changed since this answer. Ask for an updated reference.": "Videozapis je promijenjen nakon ovog odgovora. Zatražite novu poveznicu.",
+    "That video is not available yet.": "Ovaj videozapis još nije dostupan.",
+    "{0} PDFs · {1} lessons": "PDF-ovi: {0} · Lekcije: {1}",
+    "{0} · page {1}": "{0} · stranica {1}",
+    "{0} left": "Preostalo {0}",
+    "Check installation": "Provjeri instalaciju",
+    "Details": "Pojedinosti",
+    "Reinstall": "Ponovno instaliraj",
+    "Reinstall Manim Studio": "Ponovno instaliraj Manim Studio",
+    "Some video tools are missing or damaged. Reinstall them in Settings → Environment.": "Neki alati za videozapise nedostaju ili su oštećeni. Ponovno ih instalirajte u Postavke → Okruženje.",
+    "Stop video creation before reinstalling tools.": "Zaustavite izradu videozapisa prije ponovne instalacije alata.",
+    "The bundled installer is missing or damaged. Reinstall Manim Studio.": "Priloženi instalacijski program nedostaje ili je oštećen. Ponovno instalirajte Manim Studio.",
+    "Unknown installation component.": "Nepoznata komponenta za instalaciju.",
+    "Video tools need repair": "Potrebno je popraviti alate za videozapise",
+    "Your saved videos and projects are safe. Reinstall the tools to make videos again.": "Spremljeni videozapisi i projekti su sigurni. Ponovno instalirajte alate za nastavak izrade videozapisa.",
+    "Done.": "Gotovo.",
+    "Downloaded tools": "Preuzeti alati",
+    "Remove downloaded tools…": "Ukloni preuzete alate…",
+    "Removes Studio’s downloaded tools and caches. Projects, recordings, settings and sign-ins are kept.": "Uklanja preuzete alate i predmemorije programa Studio. Projekti, snimke, postavke i prijave ostaju sačuvani.",
+    "Some folders were kept because they contain projects or link outside Studio’s storage.": "Neke su mape zadržane jer sadrže projekte ili poveznice izvan pohrane programa Studio.",
+    "Stop video creation before removing tools.": "Zaustavite izradu videozapisa prije uklanjanja alata.",
+    "This entry point is for the Windows uninstaller only.": "Ova je ulazna točka namijenjena samo programu za deinstalaciju u sustavu Windows.",
+    "This installation cannot uninstall itself. Remove downloaded tools here, then uninstall the app normally.": "Ova se instalacija ne može sama deinstalirati. Ovdje uklonite preuzete alate, a zatim deinstalirajte aplikaciju na uobičajeni način.",
+    "Uninstall Manim Studio…": "Deinstaliraj Manim Studio…"
   }
 }

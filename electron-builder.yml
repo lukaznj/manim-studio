@@ -9,6 +9,9 @@ directories:
 files:
   - out/**
   - package.json
+  - LICENSE
+  - LICENSE-EXCEPTION
+  - NOTICE
   - '!**/*.map'
   - '!out/mcpb/**'
   - '!out/*.mcpb'
@@ -21,6 +24,8 @@ asarUnpack:
   - node_modules/@anthropic-ai/claude-agent-sdk-*/**
 
 extraResources:
+  - from: out/main/cleanup-cli.cjs
+    to: cleanup-cli.cjs
   - from: out/manim-studio-plugin.zip
     to: manim-studio-plugin.zip
   - from: python
@@ -73,6 +78,7 @@ linux:
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 nsis:
+  include: build/installer.nsh
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false

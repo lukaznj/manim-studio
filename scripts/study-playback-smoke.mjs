@@ -179,6 +179,7 @@ await command('mouse button[aria-label="Full screen"]')
 await until(() => !!document.fullscreenElement, 'fullscreen')
 await evaluate(() => {
   window.playbackRoot = document.querySelector('.study-player')
+  window.fullscreenRoot = document.querySelector('.study-view')
   return true
 })
 await command('click button[aria-label="Playback speed"]')
@@ -200,7 +201,7 @@ for (const number of [2, 3]) {
     `eval new Promise(resolve => { const timer = setInterval(() => { if (document.querySelector('.ex-detail .eyebrow')?.textContent.trim() === 'Lesson ${number}' && !document.querySelector('video')?.paused) { clearInterval(timer); resolve(true) } }, 50); setTimeout(() => {clearInterval(timer);resolve(false)}, 5000) })`,
   ).then((result) => assert.equal(JSON.parse(result), true, `Autoplay starts lesson ${number}`))
   assert(
-    await evaluate(() => document.fullscreenElement === window.playbackRoot && document.querySelector('.study-player') === window.playbackRoot),
+    await evaluate(() => document.fullscreenElement === window.fullscreenRoot && document.querySelector('.study-player') === window.playbackRoot),
     'Autoplay preserves the fullscreen player DOM',
   )
   assert((await evaluate(() => document.querySelector('video').currentTime)) < 2, 'Next lesson starts at beginning')

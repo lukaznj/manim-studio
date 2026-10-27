@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Subtitle } from '../../../shared/types'
 import { lineAt, transcriptHits, type TranscriptHit } from '../../../shared/transcript'
 import { api } from '../lib/api'
-import { askInChat, useStore } from '../store'
+import { askInChat, showStudyAssistant, useStore } from '../store'
+import { useStudyFullscreen } from '../lib/study-fullscreen'
 import { seekStudy } from './StudyPlayer'
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
@@ -13,6 +14,7 @@ let findPending = false // Cmd/Ctrl+F came while the Chat tab was showing: the s
 
 /** Shows the transcript and puts the cursor in its search (Cmd/Ctrl+F on the study screen). */
 export function findInTranscript(): void {
+  showStudyAssistant()
   findPending = true
   useStore.setState({ studyTab: 'transcript' })
   window.dispatchEvent(new Event('studio:find'))
@@ -30,6 +32,8 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
   })
   const [query, setQuery] = useState('')
   const [pick, setPick] = useState(0) // which hit is chosen
+  const fullscreen = useStudyFullscreen()
+  const collapsed = useStore((s) => fullscreen ? !s.studyFullscreenChat : s.settings?.studyAssistantCollapsed)
   const now = useStore((s) => s.watchTime ?? 0)
   const list = useRef<HTMLOListElement>(null)
   const [following, setFollowing] = useState(true)
@@ -66,7 +70,7 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
   // Cmd/Ctrl+F: the search takes the cursor, now or once the lines are in (the box is off until then).
   useEffect(() => {
     const focus = () => {
-      if (!input.current || input.current.disabled) return
+      if (collapsed || !input.current || input.current.disabled) return
       findPending = false
       input.current.focus()
       input.current.select()
@@ -74,7 +78,7 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
     if (findPending) requestAnimationFrame(focus)
     window.addEventListener('studio:find', focus)
     return () => window.removeEventListener('studio:find', focus)
-  }, [lines])
+  }, [lines, collapsed])
 
   function scrollTo(line: number) {
     const el = list.current?.children[line] as HTMLElement | undefined

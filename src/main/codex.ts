@@ -14,6 +14,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { app } from 'electron'
 import type { Thread, ThreadEvent, ThreadItem } from '@openai/codex-sdk'
+import { cliUsageEntry, type UsageEntry } from '../shared/usage'
 import { sceneTools } from '../shared/studio-tools'
 import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, SetupEvent, ClaudeAuth } from '../shared/types'
 import { recoverModelCapacity, type CapacityResult } from '../shared/codex-recovery'
@@ -142,6 +143,7 @@ export async function codexStatus(): Promise<ClaudeStatus> {
 }
 
 let loginChild: ChildProcess | null = null
+export const codexLoginBusy = () => !!loginChild && loginChild.exitCode === null && loginChild.signalCode === null
 
 /** `codex login` opens the browser for ChatGPT and waits for the callback. */
 export function codexLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
@@ -177,11 +179,11 @@ export async function codexLogout(): Promise<ClaudeStatus> {
 
 /** Discover availability and efforts for Studio's two supported Codex models. */
 let knownModels: ModelOption[] = []
-export async function codexModels(): Promise<ModelOption[]> {
+export async function codexModels(auth?: ClaudeAuth): Promise<ModelOption[]> {
   const bin = installed()?.bin
   if (!bin) throw new Error('Install Codex first (Settings → Accounts).')
   const env = codexEnv()
-  if (apiKey()) env.OPENAI_API_KEY = apiKey()
+  if (apiKey(auth)) env.OPENAI_API_KEY = apiKey(auth)
   knownModels = studioCodexModels(await listCodexModels(bin, env))
   if (!knownModels.length) throw new Error('Codex did not offer GPT-6 Astra or GPT-6.1 Sol. Check your account in Settings → Accounts.')
   return knownModels
@@ -378,7 +380,7 @@ async function runRecovering(
 }
 
 /** A background agent's thread in one project (agent.ts): its own client and bridge, turns one after another. */
-export function codexSession(dir: string, instructions: string, threadId: string | undefined, on: CodexTurnHandlers, options: CodexOptions = {}) {
+export function codexSession(dir: string, instructions: string, threadId: string | undefined, on: CodexTurnHandlers, options: CodexOptions = {}, images: string[] = []) {
   let t: Thread | null = null
   let stop: AbortController | null = null
   let closed = false
@@ -388,7 +390,7 @@ export function codexSession(dir: string, instructions: string, threadId: string
       stop = new AbortController()
       try {
         t ??= await openThread(dir, instructions, threadId, options)
-        return await runRecovering(t, dir, instructions, text, [], on, stop.signal, options, (next) => {
+        return await runRecovering(t, dir, instructions, text, images, on, stop.signal, options, (next) => {
           t = next
         })
       } catch (e) {
@@ -484,8 +486,9 @@ export async function askCodex(
   prompt: string,
   what: string,
   images: { name: string; mediaType: string; data: string }[] = [],
-  options: CodexOptions & { signal?: AbortSignal } = {},
+  options: CodexOptions & { signal?: AbortSignal; onUsage?: (entry: UsageEntry) => void } = {},
 ): Promise<string> {
+  const started = Date.now()
   const dir = join(tmpdir(), 'manim-studio-codex', randomUUID())
   mkdirSync(dir, { recursive: true })
   try {
@@ -500,6 +503,7 @@ export async function askCodex(
       images.length ? [{ type: 'text' as const, text: named }, ...files.map((path) => ({ type: 'local_image' as const, path }))] : named,
       { signal: options.signal },
     )
+    options.onUsage?.(cliUsageEntry('codex', options.auth ?? (codexUsesKey() ? 'api-key' : 'account'), options.model || getSettings().codexModel, { ...turn.usage }, what, Date.now() - started))
     return turn.finalResponse
   } catch (e) {
     throw new Error(`Codex couldn’t ${what}: ${friendly((e as Error).message)}`)

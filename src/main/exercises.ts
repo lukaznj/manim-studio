@@ -1,3 +1,4 @@
+import { fallbackEnabled } from './model-fallback'
 // Exercise sets (ADR 0025): the user hands over exercises (typed, photographed, in PDFs), an agent
 // reads them out one per project, and background agents solve each one in writing (solution.md,
 // checked with the calculate tool), then make a short video of the solution and export it. The set
@@ -95,6 +96,7 @@ const agents = new Map<string, EpisodeAgent>() // by exercise folder
 const busy = new Map<string, 'solve' | 'video'>() // exercises whose agent step is running
 const exporting = new Map<string, string>() // exercise folder → export job id
 const driving = new Set<string>() // set folders whose loop runs
+export const exercisesBusy = (): boolean => busy.size > 0 || exporting.size > 0 || [...sets.values()].some((set) => set.intake?.state === 'reading')
 let send: (set: ExerciseSet) => void = () => {}
 
 export function setupExercises(sendSet: typeof send): void {
@@ -540,11 +542,15 @@ async function agentStep(
   // The set's agent: Settings', or the one it switched to at a usage limit (ADR 0048).
   const route = (): AgentRoute => set.route ?? { agent: getSettings().agent, auth: configuredAuth(getSettings().agent) }
   const open = async () => {
-    const opened = route()
+    let opened = route()
     const a = await episodeAgent(it.dir, {
       onTool: (summary) => update(set, it, { activity: summary }),
       onUsage: () => undefined,
       ...(set.route ? opened : {}),
+      followPriority: true,
+      onSelection: (actual) => {
+        if (fallbackEnabled()) { set.route = actual; opened = actual; changed(set) }
+      },
     })
     agents.set(it.dir, a)
     return { a, opened }

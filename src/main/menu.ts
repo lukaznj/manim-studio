@@ -21,10 +21,12 @@ function showLogs(): void {
 
 let send: (action: MenuAction, extra?: { path?: string; value?: string }) => void = () => {}
 let installExtension: () => void = () => {}
+let uninstall: (() => void) | undefined
 
-export function setupMenu(fn: typeof send, onInstallExtension: () => void): void {
+export function setupMenu(fn: typeof send, onInstallExtension: () => void, onUninstall?: () => void): void {
   send = fn
   installExtension = onInstallExtension
+  uninstall = onUninstall
   // Without a menu of our own, Electron keeps its default one: hidden by the page-drawn title bar,
   // but its accelerators still fire, so Ctrl+Shift+R (Record voice) force-reloaded the window.
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
@@ -56,6 +58,7 @@ export function refreshMenu(): void {
         { label: t('Check for Updates…'), click: () => void checkForUpdates() },
         { type: 'separator' },
         item('Settings…', 'settings', 'Cmd+,'),
+        ...(uninstall ? [{ label: t('Uninstall Manim Studio…'), click: uninstall }] : []),
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -110,8 +113,6 @@ export function refreshMenu(): void {
     {
       label: t('Claude'),
       submenu: [
-        item('New Conversation', 'new-conversation', undefined, { enabled: open }),
-        { type: 'separator' },
         item('Account, Model and Usage…', 'claude-settings'),
         { label: t('Add to Claude Desktop…'), click: installExtension },
       ],
@@ -119,6 +120,10 @@ export function refreshMenu(): void {
     {
       label: t('View'),
       submenu: [
+        item('Increase interface size', 'zoom-in'),
+        item('Decrease interface size', 'zoom-out'),
+        item('Reset interface size', 'zoom-reset'),
+        { type: 'separator' },
         {
           label: t('Appearance'),
           submenu: (['system', 'light', 'dark'] as const).map((value) => ({
