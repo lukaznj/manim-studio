@@ -48,6 +48,7 @@ import { paths } from './paths'
 import { runRunner } from './runner'
 import { getSecret, getSettings } from './settings'
 import { googleLoginUrl, loginFailureDetails, redactLoginLog } from './login-diagnostics'
+import { AGY_KEYRING_ACCOUNT, AGY_KEYRING_SERVICE, googleSignInSaved, macGoogleCredentialArgs } from './antigravity-auth'
 
 export const AGY_VERSION = '1.3.6'
 // The release's assets and their published sha256 (github.com/google-antigravity/antigravity-cli).
@@ -89,14 +90,13 @@ async function shareSignIn(home: string): Promise<void> {
     copyFileSync(tokenFile(), own)
   }
 }
-const KEYCHAIN_ITEM = 'antigravity' // the service the CLI stores its sign-in under (macOS: seen in its keychain prompt)
-const WIN_CREDENTIAL = 'gemini:antigravity' // go-keyring's "<service>:<user>" in Windows Credential Manager
+const WIN_CREDENTIAL = `${AGY_KEYRING_SERVICE}:${AGY_KEYRING_ACCOUNT}` // go-keyring's "<service>:<user>" in Windows Credential Manager
 
 /**
  * macOS: the CLI keeps its Google sign-in in the keychain through /usr/bin/security, which looks
  * for the keychains under HOME. With HOME moved to the CLI's own folder it found none and asked
  * the user to reset their keychain. The folder's Library/Keychains therefore links to the user's
- * own: the sign-in is one item, "antigravity", in their login keychain, as when they use the CLI
+ * own: the sign-in is the service "gemini", account "antigravity", as when they use the CLI
  * themselves; its settings and rules stay in its own folder. (A separate keychain in the folder
  * can't be unlocked on macOS 27.)
  */
@@ -126,7 +126,7 @@ async function inKeychain(): Promise<boolean> {
     )
   if (process.platform !== 'darwin') return false
   await ensureKeychain()
-  return run('/usr/bin/security', ['find-generic-password', '-s', KEYCHAIN_ITEM], agyEnvBase()).then(
+  return run('/usr/bin/security', macGoogleCredentialArgs('find'), agyEnvBase()).then(
     () => true,
     () => false,
   )
@@ -257,6 +257,10 @@ async function prepare(project: string, instructions: string): Promise<string> {
 export async function antigravityStatus(): Promise<ClaudeStatus> {
   if (!installed()) return { loggedIn: false, method: 'not-installed' }
   if (antigravityUsesKey()) return { loggedIn: !!apiKey(), method: 'api-key', subscription: apiKey() ? 'Gemini API key' : undefined }
+  return googleAccountStatus()
+}
+
+async function googleAccountStatus(): Promise<ClaudeStatus> {
   // Where the CLI keeps it: its keychain / Credential Manager item, or the file it falls back to. Existence only: the app never reads it.
   const loggedIn = (existsSync(tokenFile()) && statSync(tokenFile()).size > 0) || (await inKeychain())
   return { loggedIn, method: loggedIn ? 'google' : undefined, subscription: loggedIn ? 'Google account' : undefined }
@@ -290,6 +294,12 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
   record(`Starting Google sign-in (${process.platform} ${process.arch}).`)
   const bin = installed()
   if (!bin) throw new Error('Install Antigravity first (Settings → Accounts).')
+  if (await googleSignInSaved(googleAccountStatus)) {
+    killLogin()
+    record('Google account is already connected. No browser sign-in is needed.')
+    onEvent({ done: true })
+    return googleAccountStatus()
+  }
   if (process.platform === 'win32') return windowsLogin(bin, onEvent)
   killLogin()
   mkdirSync(agyHome(), { recursive: true })
@@ -321,7 +331,7 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
     if (checking || loginChild !== job.child) return
     checking = true
     try {
-      const status = await antigravityStatus()
+      const status = await googleAccountStatus()
       if (status.loggedIn && loginChild === job.child) {
         signedIn = true
         killLogin()
@@ -335,6 +345,8 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
   try {
     await job.done
   } catch (e) {
+    // The CLI can save to Keychain immediately before the helper exits, between timer polls.
+    if (!signedIn) signedIn = await googleSignInSaved(googleAccountStatus)
     if (!signedIn) throw failed(e, job.log())
   } finally {
     clearInterval(timer)
@@ -342,7 +354,7 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
     onEvent({ done: true })
   }
   record('Google sign-in finished. Checking the saved account.')
-  return antigravityStatus()
+  return googleAccountStatus()
 }
 
 /**
@@ -371,11 +383,11 @@ async function windowsLogin(bin: string, onEvent: (e: ClaudeLoginEvent) => void)
   const closed = new Promise<boolean>((resolve) => child.on('exit', () => resolve(false)))
   for (let open = true; open; ) {
     open = await Promise.race([closed, new Promise<boolean>((r) => setTimeout(() => r(true), 1500))])
-    if ((await antigravityStatus()).loggedIn) break
+    if ((await googleAccountStatus()).loggedIn) break
   }
   if (loginChild === child) killLogin()
   onEvent({ done: true })
-  return antigravityStatus()
+  return googleAccountStatus()
 }
 
 /** The code the browser showed, typed into the CLI's sign-in. */
@@ -398,7 +410,7 @@ export async function antigravityLogout(): Promise<ClaudeStatus> {
   await ensureKeychain()
   if (process.platform === 'darwin')
     while (
-      await run('/usr/bin/security', ['delete-generic-password', '-s', KEYCHAIN_ITEM], agyEnvBase()).then(
+      await run('/usr/bin/security', macGoogleCredentialArgs('delete'), agyEnvBase()).then(
         () => true,
         () => false,
       )
@@ -413,7 +425,7 @@ export async function antigravityLogout(): Promise<ClaudeStatus> {
  */
 async function forgetOnWindows(): Promise<void> {
   const list = await run('cmdkey', ['/list']).catch(() => '')
-  const targets = [...list.matchAll(/target=(\S+)/gi)].map((m) => m[1]).filter((t) => new RegExp(`(^|:)${KEYCHAIN_ITEM}(:|$)`, 'i').test(t))
+  const targets = [...list.matchAll(/target=(\S+)/gi)].map((m) => m[1]).filter((t) => new RegExp(`(^|:)${AGY_KEYRING_ACCOUNT}(:|$)`, 'i').test(t))
   for (const t of targets) await run('cmdkey', [`/delete:${t}`]).catch(() => undefined)
 }
 
