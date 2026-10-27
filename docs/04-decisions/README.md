@@ -6,7 +6,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 |---|---|---|
 | [[0001-electron-desktop-app]] | Desktop app on Electron, not a web app | accepted |
 | [[0002-timeline-derived-from-render]] | The timeline is produced by each render; no separate model | accepted |
-| [[0003-python-env-via-pixi]] | Python, manim and LaTeX are installed by the app (pixi + TinyTeX) | accepted |
+| [[0003-python-env-via-pixi]] | Private Python/Pixi and TinyTeX installs, health checks, safe component reinstall and continued access to saved videos | accepted |
 | [[0004-claude-via-agent-sdk]] | Claude through the Agent SDK with each user's own sign-in or API key | accepted |
 | [[0005-voice-providers]] | ElevenLabs, OmniVoice and recordings, chosen per project; sidecar subtitles | accepted |
 | [[0006-auto-update-github-releases]] | Auto-update from this repo's GitHub Releases, three platforms | accepted |
@@ -14,7 +14,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0008-ink-at-night-design]] | "Ink at night" design language with a light twin (System by default), rounded M mark and Liquid Glass icon on plain navy | accepted |
 | [[0009-mcp-server-later]] | Claude Desktop drives Studio through an extension (.mcpb) and a local endpoint | accepted |
 | [[0010-fixed-aspect-per-project]] | 16:9 or 9:16 chosen per project, fixed | accepted |
-| [[0011-open-source-english]] | Open source (MIT), English, platform integrations in forks | accepted |
+| [[0011-open-source-english]] | Open source, English, platform integrations in forks; MIT licensing superseded by 0054 | accepted (licensing superseded) |
 | [[0012-own-media-in-scenes]] | Your own pictures and videos go into the scene through studio helpers, not a separate track | accepted |
 | [[0013-export-versions-and-languages]] | Export light and dark versions, dubbed audio tracks and subtitles; preserve project look metadata without Settings controls | accepted |
 | [[0014-pdf-sources]] | PDFs are sources in the project, read by Claude through Studio tools and shown with pdf_page() | accepted |
@@ -44,8 +44,8 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
 | [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI availability for GPT-6 Astra and GPT-6.1 Sol, with opt-in OpenAI capacity fallback | accepted |
 | [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
-| [[0041-focused-study-workspace]] | Focused study page, separate lesson/exercise tabs, compact video controls and adding lessons to existing courses | accepted |
-| [[0042-study-playback-preferences]] | Per-project resume, optional continuous series playback preserving fullscreen, and remembered speed, subtitles and volume | accepted |
+| [[0041-focused-study-workspace]] | Focused study page, collapsible sidebars and resizable assistant, separate lesson/exercise tabs, compact video controls and adding lessons to existing courses | accepted |
+| [[0042-study-playback-preferences]] | Per-video resume and sidebar progress, per-course selected view, continuous playback preserving fullscreen with the assistant, and remembered playback preferences | accepted |
 | [[0043-projects-folder-and-render-cache]] | Render cache in a local, unsynced cache folder (20 GB, LRU); new installs keep projects out of iCloud/OneDrive; onboarding asks where projects go and finds a returning user's folder | accepted |
 | [[0044-full-window-onboarding]] | Full-window first launch that explains the app, installs the engine and LaTeX in the background from the mode choice, and waits for them before the app opens | accepted |
 | [[0045-series-planner-and-maker]] | Separate series planner; episodes inherit the creation model with an optional advanced override; series without PDFs; planner names titles | accepted |
@@ -54,4 +54,9 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0048-switch-agent-at-usage-limit]] | At a usage limit, explicitly switch unfinished series episodes (including comparisons) or an exercise set to another signed-in agent or saved API key | accepted |
 | [[0049-series-recovery-and-shutdown]] | Journalled series creation and planning drafts, atomic checkpoints, exclusive scheduling and graceful quit/system shutdown with idle-sleep protection | accepted |
 | [[0050-course-production-workspace]] | Course-owned production overview and unfinished-lesson views; compact library status, retained controls, historical recovery and per-episode retry | accepted |
-| [[0051-study-assistant-and-notes]] | Study chat tools and text-first video offers, selected frame areas, collapsible timestamp detours, and local notes with reviewed AI revisions | accepted |
+| [[0051-study-assistant-and-notes]] | Persistent per-episode conversations, study chat tools and text-first video offers, selected frame areas and enlarged screenshot previews, collapsible timestamp detours, and local notes with reviewed AI revisions | accepted |
+| [[0052-interface-and-chat-text-size]] | Persistent interface zoom with Cmd/Ctrl shortcuts and independently adjustable chat text, including math and code | accepted |
+| [[0053-ordered-model-usage-fallback]] | Optional ordered model takeover across connected accounts and explicit keys, persistent chat model choices, and expandable provider usage rings; production returns to the highest available priority between turns | accepted |
+| [[0054-agpl-copyleft-license]] | AGPLv3-only for future source and distributions, preserving prior MIT grants and third-party licenses | accepted |
+| [[0055-course-aware-study-evidence]] | Read-only full-course/PDF retrieval, verified persisted lesson/timestamp/page references, and return navigation | accepted |
+| [[0056-private-runtime-cleanup]] | App-owned runtime caches and protected tool cleanup; explicit macOS/AppImage uninstall and Windows uninstall hook, retaining projects and sign-ins | accepted |

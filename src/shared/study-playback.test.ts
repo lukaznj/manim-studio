@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { nextStudyEpisode, resumePosition } from './study-playback.ts'
+import { nextStudyEpisode, readStudyProgress, resumePosition, studyProgressSummary } from './study-playback.ts'
+
+test('sidebar progress validates stored history and distinguishes near completion from an ended video', () => {
+  const progress = readStudyProgress('{"position":75.25,"duration":120,"completed":false}')!
+  assert.deepEqual(studyProgressSummary(progress), { percent: 75.25 / 120 * 100, remaining: 45 })
+  assert.deepEqual(studyProgressSummary({ position: 120, duration: 120, completed: true }), { percent: 100, remaining: 0 })
+  assert.deepEqual(studyProgressSummary({ position: 120, duration: 120, completed: false }), { percent: 99, remaining: 0 })
+  assert.equal(readStudyProgress('{"position":200,"duration":120}')?.position, 120)
+  for (const raw of [null, '{}', '12', '{"position":-1,"duration":10}', '{"position":1,"duration":0}', '{"position":"1","duration":10}', '{"position":1,"duration":1e999}']) assert.equal(readStudyProgress(raw), null)
+})
 
 test('resume keeps short and nearly finished positions, and reads old numeric history', () => {
   assert.equal(resumePosition('2.25', 9), 2.25)

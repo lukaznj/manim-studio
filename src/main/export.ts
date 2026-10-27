@@ -1,3 +1,4 @@
+import { writeAtomicJson } from './atomic-json'
 // Export: everything a video needs to be published, in <folder>/<name>/ (ADR 0013). The folder is
 // the project's exports/ unless the export dialog chose another one.
 //   <name>.mp4 (or <name>.dark.mp4 + <name>.light.mp4)   the video, one per chosen theme
@@ -186,6 +187,9 @@ export async function exportVideo(
       }
     }
 
+    // Keep evidence tied to the exported video, even after its editable preview changes.
+    const studyTimeline = JSON.parse(readFileSync(timelinePath, 'utf8')) as Timeline
+    writeAtomicJson(join(folder, 'study-context.json'), { duration: studyTimeline.duration, chapters: studyTimeline.sections, subtitles: studyTimeline.subtitles })
     const narration = [...new Set((JSON.parse(readFileSync(timelinePath, 'utf8')) as Timeline).voice.map((v) => v.text))]
     for (const lang of options.languages.filter((l) => l !== original)) {
       const name = languageName(lang)

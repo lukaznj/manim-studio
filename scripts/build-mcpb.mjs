@@ -25,6 +25,9 @@ await build({
   legalComments: 'none',
   logLevel: 'warning',
 })
+copyFileSync(join(root, 'LICENSE'), join(dir, 'LICENSE'))
+copyFileSync(join(root, 'LICENSE-EXCEPTION'), join(dir, 'LICENSE-EXCEPTION'))
+copyFileSync(join(root, 'NOTICE'), join(dir, 'NOTICE'))
 copyFileSync(join(root, 'build', 'icon-512.png'), join(dir, 'icon.png')) // Claude Desktop's recommended size
 
 const manifest = {
@@ -57,6 +60,9 @@ const require = createRequire(import.meta.url)
 const packerRequire = createRequire(require.resolve('@anthropic-ai/mcpb'))
 const { zipSync } = packerRequire('fflate')
 const plugin = {
+  LICENSE: readFileSync(join(root, 'LICENSE')),
+  'LICENSE-EXCEPTION': readFileSync(join(root, 'LICENSE-EXCEPTION')),
+  NOTICE: readFileSync(join(root, 'NOTICE')),
   'plugin.json': Buffer.from(
     JSON.stringify(
       {

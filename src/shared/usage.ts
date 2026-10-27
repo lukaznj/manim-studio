@@ -72,7 +72,18 @@ export const apiEstimateOf = (entries: UsageEntry[]): number | null => entries.l
 
 /** "claude-sonnet-5-5" → "Sonnet 5.5"; "claude-opus-5-5-20261001" → "Opus 5.5". */
 export function modelName(id: string): string {
+  if (id === 'gpt-6-astra') return 'GPT-6 Astra'
+  if (id === 'gpt-6.1-sol') return 'GPT-6.1 Sol'
+  if (id === 'gemini-4-argon') return 'Gemini 4 Argon'
   const m = /claude-(opus|sonnet|haiku|fable)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?/.exec(id)
   if (!m) return id
   return `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
+}
+
+/** Managed CLI counters retain their actual provider and auth, without inventing a price. */
+export function cliUsageEntry(provider: 'codex' | 'antigravity', auth: 'account' | 'api-key', model: string, raw: Record<string, number>, step: string, ms: number): UsageEntry {
+  const cached = raw.cached_input_tokens ?? raw.cache_read_tokens ?? 0
+  return { at: Date.now(), provider, auth, providerUsage: raw, costKnown: false, step, ms, tools: {}, models: {
+    [model]: { input: provider === 'codex' ? Math.max(0, (raw.input_tokens ?? 0) - cached) : raw.input_tokens ?? 0, output: raw.output_tokens ?? 0, cacheRead: cached, cacheWrite: raw.cache_write_input_tokens ?? 0, costUSD: 0 },
+  } }
 }

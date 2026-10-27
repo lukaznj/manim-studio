@@ -16,6 +16,7 @@
 // leaving the sandbox), so headless runs refuse everything the rules don't allow. The rules allow
 // writing in the project only, reading the project and the studio and manim sources, and the six
 // scene tools; shell commands, other paths and symlinks out of the project are refused.
+import { cliUsageEntry, type UsageEntry } from '../shared/usage'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import {
@@ -38,7 +39,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { app } from 'electron'
+import { app, shell } from 'electron'
 import { desktopTools, sceneTools } from '../shared/studio-tools'
 import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, SetupEvent } from '../shared/types'
 import { agyFollower, type AgyEvent, type AgyResult } from './antigravity-events'
@@ -46,7 +47,7 @@ import { cleanEnv } from './env'
 import { paths } from './paths'
 import { runRunner } from './runner'
 import { getSecret, getSettings } from './settings'
-import { loginFailureDetails, redactLoginLog } from './login-diagnostics'
+import { googleLoginUrl, loginFailureDetails, redactLoginLog } from './login-diagnostics'
 
 export const AGY_VERSION = '1.3.6'
 // The release's assets and their published sha256 (github.com/google-antigravity/antigravity-cli).
@@ -262,6 +263,7 @@ export async function antigravityStatus(): Promise<ClaudeStatus> {
 }
 
 let loginChild: ChildProcess | null = null
+export const antigravityLoginBusy = () => !!loginChild && loginChild.exitCode === null && loginChild.signalCode === null
 
 function killLogin(): void {
   if (!loginChild) return
@@ -274,7 +276,7 @@ function killLogin(): void {
 export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): Promise<ClaudeStatus> {
   const record = (text: string) => {
     const line = redactLoginLog(text)
-    onEvent({ diagnostic: line })
+    if (getSettings().developerMode) onEvent({ diagnostic: line })
     console.info(`[Antigravity sign-in] ${line}`)
     try {
       mkdirSync(app.getPath('logs'), { recursive: true })
@@ -283,7 +285,7 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
   }
   const failed = (error: unknown, log = '') => {
     record(loginFailureDetails(error, log))
-    return new Error('Antigravity sign-in failed. See the sign-in log for details.')
+    return new Error(getSettings().developerMode ? 'Antigravity sign-in failed. See the sign-in log for details.' : 'The Antigravity sign-in didn’t finish. Try again.')
   }
   record(`Starting Google sign-in (${process.platform} ${process.arch}).`)
   const bin = installed()
@@ -293,10 +295,20 @@ export async function antigravityLogin(onEvent: (e: ClaudeLoginEvent) => void): 
   mkdirSync(agyHome(), { recursive: true })
   await ensureKeychain()
   record(`Launching the Python login helper with ${bin}.`)
+  let openedBrowser = false
   const job = await runRunner('default', ['agy-login', bin, agyHome()], {
     onEvent: (e) => {
       if (e.type === 'diagnostic') record(String(e.line))
-      if (e.type === 'url') onEvent({ line: String(e.line), url: String(e.url), needsCode: true })
+      if (e.type === 'url') {
+        const url = googleLoginUrl(String(e.url))
+        if (url) {
+          onEvent({ line: String(e.line), url, needsCode: true })
+          if (!openedBrowser) {
+            openedBrowser = true
+            void shell.openExternal(url).catch((error) => record(`Could not open the browser: ${(error as Error).message}`))
+          }
+        }
+      }
       if (e.type === 'consent') onEvent({ needsConsent: true })
     },
   }).catch((e) => { throw failed(e) })
@@ -559,8 +571,9 @@ export async function askAntigravity(
   prompt: string,
   what: string,
   images: { name: string; mediaType: string; data: string }[] = [],
-  selection: { model?: string; effort?: Effort; signal?: AbortSignal } = {},
+  selection: { model?: string; effort?: Effort; signal?: AbortSignal; onUsage?: (entry: UsageEntry) => void } = {},
 ): Promise<string> {
+  const started = Date.now()
   const dir = join(tmpdir(), 'manim-studio-antigravity', randomUUID())
   mkdirSync(dir, { recursive: true })
   let home = ''
@@ -581,6 +594,7 @@ export async function askAntigravity(
       child = process
       if (selection.signal?.aborted) stop()
     }, selection)
+    selection.onUsage?.(cliUsageEntry('antigravity', antigravityUsesKey() ? 'api-key' : 'account', selection.model || getSettings().antigravityModel || DEFAULT_MODEL, { ...out.result?.usage }, what, Date.now() - started))
     if (!out.ok || !out.result) throw new Error(out.error ?? 'no answer')
     return out.result.response
   } catch (e) {

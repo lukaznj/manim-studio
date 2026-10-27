@@ -5,6 +5,19 @@ export interface StudyProgress {
   completed: boolean
 }
 
+/** Sidebar history needs both a valid position and duration; legacy numeric entries resume only. */
+export function readStudyProgress(raw: string | null): StudyProgress | null {
+  try {
+    const value = JSON.parse(raw ?? 'null') as StudyProgress | null
+    if (!value || !Number.isFinite(value.position) || value.position < 0 || !Number.isFinite(value.duration) || value.duration <= 0) return null
+    return { position: Math.min(value.position, value.duration), duration: value.duration, completed: value.completed === true }
+  } catch { return null }
+}
+
+export function studyProgressSummary(progress: StudyProgress): { percent: number; remaining: number } {
+  return { percent: progress.completed ? 100 : Math.min(99, progress.position / progress.duration * 100), remaining: progress.completed ? 0 : Math.ceil(Math.max(0, progress.duration - progress.position)) }
+}
+
 export function resumePosition(raw: string | null, duration: number): number {
   if (!raw || !Number.isFinite(duration) || duration <= 0) return 0
   try {

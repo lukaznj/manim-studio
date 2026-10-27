@@ -1,6 +1,6 @@
 # Manim Studio
 
-Open-source (MIT) desktop editor (Electron) for maths explainer videos. The video is manim code (`scene.py`); an agent writes it, the app renders it, and the timeline is produced by each render. Product and decisions: `docs/` (an Obsidian vault). Start at `docs/README.md`.
+Open-source (AGPLv3) desktop editor (Electron) for maths explainer videos. The video is manim code (`scene.py`); an agent writes it, the app renders it, and the timeline is produced by each render. Product and decisions: `docs/` (an Obsidian vault). Start at `docs/README.md`.
 
 ## Stack
 

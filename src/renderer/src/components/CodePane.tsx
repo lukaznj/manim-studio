@@ -172,13 +172,14 @@ export function CodePane() {
     <div className="code-pane">
       <div className="pane-head">
         <div className="pane-tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'code'} className="file-tab" onClick={() => setTab('code')} title={uiText('scene.py')}>
+          <button role="tab" aria-label={uiText('scene.py')} aria-selected={tab === 'code'} className="file-tab" onClick={() => setTab('code')} title={uiText('scene.py')}>
             <FileCode2 />
             <span className="tab-label">{uiText('scene.py')}</span>
             {dirty && <span className="dirty-dot" />}
           </button>
           <button
             role="tab"
+            aria-label={uiText('Script')}
             aria-selected={tab === 'script'}
             className="file-tab"
             onClick={() => setTab('script')}
@@ -189,6 +190,7 @@ export function CodePane() {
           </button>
           <button
             role="tab"
+            aria-label={uiText('Media')}
             aria-selected={tab === 'media'}
             className="file-tab"
             onClick={() => setTab('media')}
@@ -200,6 +202,7 @@ export function CodePane() {
           </button>
           <button
             role="tab"
+            aria-label={uiText('Sources')}
             aria-selected={tab === 'sources'}
             className="file-tab"
             onClick={() => setTab('sources')}

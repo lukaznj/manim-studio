@@ -1,8 +1,8 @@
 // The managed Python environment (pixi) and LaTeX (TinyTeX), both installed into the
 // app's data folder so colleagues need nothing but the app. See docs ADR 0003.
-import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
+import { execFile, spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { copyFileSync, createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -11,6 +11,9 @@ import type { Component, ComponentState, SetupEvent, SetupStatus } from '../shar
 import { antigravityInstalled, installAntigravity } from './antigravity'
 import { codexInstalled, installCodex } from './codex'
 import { paths } from './paths'
+import { ENV_IMPORTS, envFilesReady, findLatexBin, INSTALLER_MESSAGE, latexFilesReady, REPAIR_MESSAGE, usableExecutable } from './dependency-health'
+import { protectWork } from './work-lifecycle'
+import { runtimeCacheEnv } from './runtime-cleanup'
 
 export type EnvName = 'default' | 'omnivoice' | 'transcribe'
 
@@ -27,6 +30,34 @@ const LATEX_PACKAGES = [
 
 const installing = new Set<Component>()
 const errors: SetupStatus['errors'] = {}
+const damaged: SetupStatus['errors'] = {}
+const installs = new Map<Component, Promise<void>>()
+const livePython = new Set<ChildProcess>()
+let startingPython = 0
+let envInstall: Promise<void> = Promise.resolve()
+let healthCheck: Promise<SetupStatus> | null = null
+let checkedAt = 0
+let installerBroken = false
+let maintenance = false
+export const runtimeMaintenance = () => maintenance
+
+/** Prevent fresh installs/processes and invalidate cached activation after removing tools. */
+export async function maintainRuntimes<T>(work: () => Promise<T>): Promise<T> {
+  if (maintenance || installs.size || livePython.size || startingPython) throw new Error('Stop video creation before removing tools.')
+  maintenance = true
+  try {
+    if (healthCheck) await healthCheck
+    return await protectWork(work)
+  } finally {
+    activation.clear()
+    checkedAt = 0
+    for (const key of Object.keys(errors) as Component[]) delete errors[key]
+    for (const key of Object.keys(damaged) as Component[]) delete damaged[key]
+    maintenance = false
+    const status = setupStatus()
+    for (const component of ['env', 'latex', 'omnivoice', 'transcribe', 'codex', 'antigravity'] as const) emit({ component, state: status[component] })
+  }
+}
 let emit: (e: SetupEvent) => void = () => {}
 
 export function onSetupEvent(fn: (e: SetupEvent) => void): void {
@@ -48,6 +79,7 @@ function envState(name: EnvName, component: Component): ComponentState {
   if (installing.has(component)) return 'installing'
   if (errors[component]) return 'error'
   if (!existsSync(envDir(name))) return 'missing'
+  if (!envFilesReady(envDir(name)) || damaged[component]) return 'error'
   const installed = existsSync(installedHashFile()) ? readFileSync(installedHashFile(), 'utf8') : ''
   return installed === manifestHash() ? 'ready' : 'outdated'
 }
@@ -56,24 +88,85 @@ function envState(name: EnvName, component: Component): ComponentState {
 const latexMarker = () => join(paths.tinytex(), '.manim-studio-ready')
 
 export function latexBin(): string | null {
-  const bin = join(paths.tinytex(), 'bin')
-  if (!existsSync(bin)) return null
-  const platformDir = readdirSync(bin)[0]
-  return platformDir ? join(bin, platformDir) : null
+  return findLatexBin(paths.tinytex())
 }
 
 export function setupStatus(): SetupStatus {
   const omnivoiceSupported = !(process.platform === 'darwin' && process.arch === 'x64')
+  const problems = { ...errors, ...damaged }
+  for (const [name, component] of [['default', 'env'], ['omnivoice', 'omnivoice'], ['transcribe', 'transcribe']] as const)
+    if (existsSync(envDir(name)) && !envFilesReady(envDir(name))) problems[component] = REPAIR_MESSAGE
+  const marker = existsSync(latexMarker()), latexReady = marker && latexFilesReady(paths.tinytex())
+  if (marker && !latexReady) problems.latex = REPAIR_MESSAGE
+  const pixi = !installerBroken && usableExecutable(paths.pixi())
+  if (!pixi) problems.env = INSTALLER_MESSAGE
   return {
-    pixi: existsSync(paths.pixi()),
-    env: envState('default', 'env'),
-    latex: installing.has('latex') ? 'installing' : errors.latex ? 'error' : existsSync(latexMarker()) ? 'ready' : 'missing',
+    pixi,
+    env: !pixi ? 'error' : envState('default', 'env'),
+    latex: installing.has('latex') ? 'installing' : problems.latex ? 'error' : latexReady ? 'ready' : 'missing',
     omnivoice: omnivoiceSupported ? envState('omnivoice', 'omnivoice') : 'unsupported',
     transcribe: envState('transcribe', 'transcribe'),
     codex: installing.has('codex') ? 'installing' : errors.codex ? 'error' : codexInstalled() ? 'ready' : 'missing',
     antigravity: installing.has('antigravity') ? 'installing' : errors.antigravity ? 'error' : antigravityInstalled() ? 'ready' : 'missing',
-    errors,
+    errors: problems,
   }
+}
+
+/** Bounded real execution checks catch removed modules and broken native libraries behind valid markers. */
+export function checkSetup(force = false): Promise<SetupStatus> {
+  if (maintenance) return Promise.resolve(setupStatus())
+  if (healthCheck) return healthCheck
+  if (installing.size || !force && Date.now() - checkedAt < 60_000) return Promise.resolve(setupStatus())
+  healthCheck = (async () => {
+    const status = setupStatus()
+    if (!usableExecutable(paths.pixi())) return status
+    try { await probe(paths.pixi(), ['--version'], cleanEnv()); installerBroken = false } catch {
+      installerBroken = true
+      checkedAt = Date.now()
+      emit({ component: 'env', state: 'error', line: INSTALLER_MESSAGE })
+      return setupStatus()
+    }
+    for (const [name, component] of [['default', 'env'], ['omnivoice', 'omnivoice'], ['transcribe', 'transcribe']] as const) {
+      if (!envFilesReady(envDir(name)) || status[component] === 'unsupported') continue
+      try {
+        await verifyEnv(name)
+        delete damaged[component]
+        delete errors[component]
+      } catch { damaged[component] = REPAIR_MESSAGE }
+    }
+    const bin = latexBin()
+    if (bin && latexFilesReady(paths.tinytex())) {
+      try {
+        const suffix = process.platform === 'win32' ? '.exe' : ''
+        await probe(join(bin, 'latex' + suffix), ['--version'], cleanEnv())
+        await probe(join(bin, 'dvisvgm' + suffix), ['--version'], cleanEnv())
+        delete damaged.latex
+        delete errors.latex
+      } catch { damaged.latex = REPAIR_MESSAGE }
+    }
+    checkedAt = Date.now()
+    const next = setupStatus()
+    for (const component of ['env', 'latex', 'omnivoice', 'transcribe'] as const) if (next[component] !== status[component]) emit({ component, state: next[component], ...(next.errors[component] ? { line: next.errors[component] } : {}) })
+    return next
+  })().finally(() => { healthCheck = null })
+  return healthCheck
+}
+
+function probe(file: string, args: string[], env: NodeJS.ProcessEnv, timeout = 20_000): Promise<void> {
+  return new Promise((resolve, reject) => execFile(file, args, { env, windowsHide: true, timeout, maxBuffer: 512_000 }, (error) => error ? reject(error) : resolve()))
+}
+
+async function verifyEnv(name: EnvName): Promise<void> {
+  const env = await pythonEnv(name)
+  await probe(pythonExe(name), ['-c', `import importlib; [importlib.import_module(m) for m in ${JSON.stringify(ENV_IMPORTS[name])}]`], env, 60_000)
+  if (name === 'default') await probe(join(envDir(name), process.platform === 'win32' ? 'Library/bin/ffmpeg.exe' : 'bin/ffmpeg'), ['-version'], env)
+}
+
+export function reportDependencyFailure(component: Component): void {
+  if (installing.has(component)) return
+  damaged[component] = REPAIR_MESSAGE
+  activation.clear()
+  emit({ component, state: 'error', line: REPAIR_MESSAGE })
 }
 
 // --- running Python ---------------------------------------------------------------------
@@ -84,7 +177,7 @@ const activation = new Map<EnvName, Record<string, string>>()
 async function activate(name: EnvName): Promise<Record<string, string>> {
   const cached = activation.get(name)
   if (cached) return cached
-  const out = await capture(paths.pixi(), ['shell-hook', '--json', '-e', name, '--manifest-path', join(paths.env(), 'pixi.toml')])
+  const out = await capture(paths.pixi(), ['shell-hook', '--json', '--as-is', '--no-config', '-e', name, '--manifest-path', join(paths.env(), 'pixi.toml')])
   const vars = JSON.parse(out).environment_variables as Record<string, string>
   activation.set(name, vars)
   return vars
@@ -100,6 +193,7 @@ export async function pythonEnv(name: EnvName, extra: Record<string, string> = {
   for (const k of Object.keys(env)) if (k.toUpperCase() === 'PATH') delete env[k]
   return {
     ...env,
+    ...runtimeCacheEnv(paths.userData()),
     PATH: [latexBin(), activated].filter(Boolean).join(delimiter),
     PYTHONPATH: paths.python(),
     PYTHONUNBUFFERED: '1',
@@ -114,12 +208,26 @@ export function pythonExe(name: EnvName): string {
 }
 
 export async function spawnPython(name: EnvName, args: string[], extra: Record<string, string> = {}, cwd?: string): Promise<ChildProcess> {
-  return spawn(pythonExe(name), ['-m', 'studio_runner', ...args], {
-    env: await pythonEnv(name, extra),
+  if (maintenance) throw new Error('Stop video creation before removing tools.')
+  const component = name === 'default' ? 'env' : name
+  if (!envFilesReady(envDir(name)) || installing.has(component)) {
+    reportDependencyFailure(component)
+    throw new Error(REPAIR_MESSAGE)
+  }
+  startingPython++
+  let env: NodeJS.ProcessEnv
+  try { env = await pythonEnv(name, extra) } finally { startingPython-- }
+  if (installing.has(component)) throw new Error(REPAIR_MESSAGE)
+  const child = spawn(pythonExe(name), ['-m', 'studio_runner', ...args], {
+    env,
     cwd: cwd ?? paths.python(),
     windowsHide: true,
     detached: process.platform !== 'win32', // one group for the runner and its manim/ffmpeg children
   })
+  livePython.add(child)
+  const gone = () => livePython.delete(child)
+  child.once('close', gone); child.once('error', gone)
+  return child
 }
 
 /** process.env minus anything that would redirect Claude/Anthropic auth or leak from a parent tool. */
@@ -138,16 +246,47 @@ export function cleanEnv(): NodeJS.ProcessEnv {
 
 // --- installing ---------------------------------------------------------------------------
 
-export async function install(component: Component): Promise<void> {
-  if (installing.has(component)) return
+export function install(component: Component, repair = false): Promise<void> {
+  if (maintenance) return Promise.reject(new Error('Stop video creation before removing tools.'))
+  if (!['env', 'latex', 'omnivoice', 'transcribe', 'codex', 'antigravity'].includes(component)) return Promise.reject(new Error('Unknown installation component.'))
+  const pending = installs.get(component)
+  if (pending) return pending
+  const task = protectWork(() => performInstall(component, repair)).finally(() => installs.delete(component))
+  installs.set(component, task)
+  return task
+}
+
+async function performInstall(component: Component, repair: boolean): Promise<void> {
+  if (healthCheck) await healthCheck
+  if (repair && (livePython.size || startingPython)) throw new Error('Stop video creation before reinstalling tools.')
   installing.add(component)
   delete errors[component]
+  delete damaged[component]
   emit({ component, state: 'installing', line: 'Starting the install…' })
   try {
-    if (component === 'latex') await installLatex(component)
+    if (component === 'latex') {
+      await installLatex(component)
+      if (!latexFilesReady(paths.tinytex())) throw new Error(REPAIR_MESSAGE)
+      const suffix = process.platform === 'win32' ? '.exe' : ''
+      await probe(join(latexBin()!, 'latex' + suffix), ['--version'], cleanEnv())
+      await probe(join(latexBin()!, 'dvisvgm' + suffix), ['--version'], cleanEnv())
+    }
     else if (component === 'codex') await installCodex(emit)
     else if (component === 'antigravity') await installAntigravity(emit)
-    else await installEnv(component === 'env' ? 'default' : component, component)
+    else {
+      const name = component === 'env' ? 'default' : component
+      const before = envInstall
+      const current = before.catch(() => undefined).then(async () => {
+        if (repair && (livePython.size || startingPython)) throw new Error('Stop video creation before reinstalling tools.')
+        if (!usableExecutable(paths.pixi())) throw new Error(INSTALLER_MESSAGE)
+        if (repair) { activation.delete(name); rmSync(envDir(name), { recursive: true, force: true }) }
+        await installEnv(name, component)
+        await verifyEnv(name)
+      })
+      envInstall = current.catch(() => undefined)
+      await current
+    }
+    checkedAt = 0
     installing.delete(component)
     emit({ component, state: 'ready', line: 'Done.' })
   } catch (e) {
@@ -159,14 +298,14 @@ export async function install(component: Component): Promise<void> {
 }
 
 async function installEnv(name: EnvName, component: Component): Promise<void> {
-  if (!existsSync(paths.pixi())) throw new Error(`pixi is missing (${paths.pixi()}). In development, run: npm run fetch-pixi`)
+  if (!usableExecutable(paths.pixi())) throw new Error(INSTALLER_MESSAGE)
   mkdirSync(paths.env(), { recursive: true })
   for (const f of ['pixi.toml', 'pixi.lock']) {
     const src = join(paths.python(), f)
     if (existsSync(src)) copyFileSync(src, join(paths.env(), f))
   }
   const frozen = existsSync(join(paths.env(), 'pixi.lock')) ? ['--frozen'] : []
-  await run(paths.pixi(), ['install', ...frozen, '-e', name, '--manifest-path', join(paths.env(), 'pixi.toml')], component)
+  await run(paths.pixi(), ['install', '--no-config', ...frozen, '-e', name, '--manifest-path', join(paths.env(), 'pixi.toml')], component, { env: { ...cleanEnv(), PIXI_CACHE_DIR: runtimeCacheEnv(paths.userData()).PIXI_CACHE_DIR } })
   activation.delete(name)
   if (name === 'default') writeFileSync(installedHashFile(), manifestHash())
 }
@@ -243,12 +382,6 @@ function run(cmd: string, args: string[], component: Component, opts: SpawnOptio
 
 function capture(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { env: cleanEnv(), windowsHide: true })
-    let out = ''
-    let err = ''
-    child.stdout.on('data', (b) => (out += b))
-    child.stderr.on('data', (b) => (err += b))
-    child.on('error', reject)
-    child.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(err.trim() || `exit ${code}`))))
+    execFile(cmd, args, { env: { ...cleanEnv(), PIXI_CACHE_DIR: runtimeCacheEnv(paths.userData()).PIXI_CACHE_DIR }, windowsHide: true, timeout: 20_000, maxBuffer: 2_000_000 }, (error, stdout, stderr) => error ? reject(new Error(stderr.trim() || error.message)) : resolve(stdout))
   })
 }

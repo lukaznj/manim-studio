@@ -23,3 +23,7 @@ When a plan's usage limit stopped a series or an exercise set, its agents waited
 ## Consequences
 
 A run can finish on a different agent than it started with, and its chat history in each episode shows both. A switched exercise set reverts to Settings after a restart; a series keeps its switch in its saved run.
+
+## Automatic takeover
+
+[[0053-ordered-model-usage-fallback]] adds an explicitly enabled ordered model policy for automatic usage-limit takeover, including chat and one-off requests. These manual run controls remain available when automatic alternatives are exhausted or the policy is off.

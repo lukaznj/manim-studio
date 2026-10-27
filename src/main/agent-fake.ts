@@ -1,6 +1,8 @@
 // A stand-in for Claude in a series' background agents, for driving the app in tests without a
 // signed-in agent (STUDIO_FAKE_AGENT=1; "limit" also hits one usage limit, STUDIO_FAKE_LIMIT_MS long). It writes a real script
 // and scene and renders them through the same per-project path a real agent's tools use.
+import { randomUUID } from 'node:crypto'
+import { writeChat, readChat } from './projects'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AgentOptions, EpisodeAgent } from './agent'
@@ -23,7 +25,27 @@ export async function fakeSeriesPlan(req: SeriesDraft['request'], report: (p: Se
   return { title: req.topic ?? 'Recovery test', bible: 'Use consistent notation.', episodes: [1, 2].map((n) => ({ title: `Test episode ${n}`, summary: `Teach topic ${n}.`, sources: [], buildsOn: n > 1 ? [n - 1] : [] })) }
 }
 
-export function fakeAgent(dir: string, { onTool, onUsage, model }: AgentOptions): EpisodeAgent {
+export function fakeAgent(dir: string, opts: AgentOptions): EpisodeAgent {
+  const { onTool, onUsage, model } = opts
+  let closed = false
+  if (process.env.STUDIO_FAKE_AGENT === 'fallback') return {
+    async turn(text) {
+      const user = { id: randomUUID(), role: 'user' as const, parts: [{ kind: 'text' as const, text: opts.displayText ?? text }], frame: opts.frame, auto: opts.autopilot !== false, at: Date.now() }
+      const reply = { id: randomUUID(), role: 'assistant' as const, parts: [] as { kind: 'text'; text: string }[], auto: opts.autopilot !== false, at: Date.now() }
+      const chat = [...readChat(dir), user, reply]
+      writeChat(chat, dir)
+      opts.onChat?.({ type: 'message', message: user })
+      opts.onChat?.({ type: 'message', message: reply })
+      await sleep(800)
+      if (closed) return { ok: false, error: 'Stopped' }
+      if (opts.agent === 'claude' || /all exhausted/i.test(opts.displayText ?? text)) return { ok: false, error: 'Usage limit reached', limitedUntil: Date.now() + 60_000, limitKind: 'five_hour' }
+      reply.parts = [{ kind: 'text', text: 'Continued on Codex, preserving the conversation and completed work.' }]
+      writeChat(chat, dir)
+      opts.onChat?.({ type: 'message', message: reply })
+      return { ok: true }
+    },
+    close() { closed = true },
+  }
   const meta = readMeta(dir)
   const n = meta.series?.episode ?? 1
   // What a turn would have used: made up, but shaped like the real thing.
@@ -87,4 +109,17 @@ export function fakeAgent(dir: string, { onTool, onUsage, model }: AgentOptions)
     },
     close() {},
   }
+}
+
+/** Synthetic read-only limits exercise the production coordinator without spending an account. */
+export async function fakeReadOnly(prompt: string, opts: { agent?: string; signal?: AbortSignal; onText?: (text: string) => void }): Promise<string> {
+  await delay(500, undefined, { signal: opts.signal })
+  if (opts.agent === 'claude') {
+    opts.onText?.('The first part of the explanation. ')
+    await delay(500, undefined, { signal: opts.signal })
+    throw Object.assign(new Error('Usage limit reached'), { limit: { until: Date.now() + 60_000, kind: 'five_hour' } })
+  }
+  const result = prompt.includes('previous model reached its usage limit') ? 'The continuation on Codex, with $e(t)=r(t)-y(t)$.' : 'An explanation on Codex, with $e(t)=r(t)-y(t)$.'
+  opts.onText?.(result)
+  return result
 }

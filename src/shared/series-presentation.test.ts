@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { episodePresentation, lessonIsBuilding } from './series-presentation.ts'
+import { episodePresentation, lessonIsBuilding, productionVisible } from './series-presentation.ts'
 import type { EpisodeRun, ExportJob, SeriesRun } from './types.ts'
 
 const episode: EpisodeRun = { dir: '/course/1', title: 'Lesson', state: 'scene', warnings: [] }
@@ -47,4 +47,14 @@ test('remote exports keep their true running state when the series agents are pa
   assert.equal(view.active, true)
   assert.equal(view.percent, 50)
   assert.equal(view.label, 'Rendering')
+})
+
+
+test('finished successful courses hide production for viewers but preserve failures and developer history', () => {
+  const complete = { ...run, state: 'done' as const, episodes: [{ ...episode, state: 'done' as const }] }
+  assert.equal(productionVisible(complete), false)
+  assert.equal(productionVisible(complete, true), true)
+  assert.equal(productionVisible({ ...complete, episodes: [{ ...episode, state: 'failed' }] }), true)
+  assert.equal(productionVisible({ ...complete, state: 'working' }), true)
+  assert.equal(productionVisible({ ...complete, state: 'stopped', episodes: [episode] }), true)
 })

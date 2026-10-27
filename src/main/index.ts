@@ -1,4 +1,7 @@
+import { studyReference } from './study-context'
+import { fallbackModels, clearFallbackCatalog } from './model-fallback'
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerMonitor, powerSaveBlocker, protocol, session, shell, systemPreferences, type WebContents } from 'electron'
+import { refreshMetricsReport } from './episode-metrics'
 import { onAgentLimit } from './agent-limit-notifications'
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path'
@@ -17,9 +20,11 @@ import type {
 } from '../shared/types'
 import {
   applyChatSettings,
+  agentRuntimeBusy,
   chatInterrupt,
   chatModels,
-  chatReset,
+  chatSelectModel,
+  resetChatModel,
   chatSend,
   claudeLogin,
   claudeLoginCode,
@@ -31,7 +36,9 @@ import {
   onChatEvent,
   projectUsage,
 } from './claude'
-import { install, onSetupEvent, setupStatus } from './env'
+import { checkSetup, install, onSetupEvent, setupStatus, runtimeMaintenance } from './env'
+import { canUninstall, removeDownloadedTools } from './uninstall'
+import { agentBusy } from './agent'
 import { antigravityLoginConsent } from './antigravity'
 import { agentPlanUsage, clearPlanUsage } from './plan-usage'
 import { studyNotes, saveStudyNotes, refineStudyNotes } from './study-assistant'
@@ -80,7 +87,7 @@ import { checkAnthropicKey, checkGeminiKey, checkOpenAIKey, keyUsable } from './
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
-import { cancel, frame, onRenderEvent, render } from './render'
+import { cancel, frame, onRenderEvent, render, rendersBusy } from './render'
 import { pauseTag, runningJobs, stopRunners } from './runner'
 import { criticalWork, QuitCoordinator, settleCriticalWork, shutdownRequested } from './work-lifecycle'
 import { saveSeriesDraft, seriesDraft } from './series-draft'
@@ -100,6 +107,7 @@ import {
   saveRecording,
   saveReference,
   stopTtsWorker,
+  stopTtsWorkerAndWait,
 } from './voice'
 
 // Isolated data for automated runs (scripts/drive.mjs); never set in normal use.
@@ -145,6 +153,12 @@ function createWindow(): void {
       sandbox: true,
       contextIsolation: true,
     },
+  })
+  win.webContents.on('did-finish-load', () => win?.webContents.setZoomFactor((getSettings().interfaceSize ?? 100) / 100))
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(process.platform === 'darwin' ? input.meta : input.control) || input.alt) return
+    const action = input.key === '+' || input.key === '=' ? 'zoom-in' : input.key === '-' || input.key === '_' ? 'zoom-out' : input.key === '0' ? 'zoom-reset' : null
+    if (action) { event.preventDefault(); send('menu', { action }) }
   })
   win.once('ready-to-show', () => {
     if (!backgroundLaunch) win?.show()
@@ -239,11 +253,15 @@ function registerMediaProtocol(): void {
 }
 
 function handle(name: string, fn: (...args: never[]) => unknown): void {
-  ipcMain.handle(name, (_e, ...args) => fn(...(args as never[])))
+  ipcMain.handle(name, (_e, ...args) => {
+    if (runtimeMaintenance()) throw new Error('Stop video creation before removing tools.')
+    return fn(...(args as never[]))
+  })
 }
 
 function registerIpc(): void {
   handle('appInfo', () => ({
+    canUninstall: canUninstall(),
     version: app.getVersion(),
     platform: process.platform,
     arch: process.arch,
@@ -251,18 +269,30 @@ function registerIpc(): void {
     releasesUrl: RELEASES_URL,
   }))
 
-  handle('setupStatus', () => setupStatus())
-  handle('install', (c: Parameters<typeof install>[0]) => install(c))
+  handle('setupStatus', (check?: boolean) => {
+    if (check === true) return checkSetup(true)
+    void checkSetup().catch((error) => console.error('[environment check]', error))
+    return setupStatus()
+  })
+  const toolsBusy = () => productionBusy() || rendersBusy() || !!agentBusy.size || agentRuntimeBusy() || ex.exercisesBusy()
+  handle('removeDownloadedTools', (uninstall?: boolean) => removeDownloadedTools(uninstall === true, toolsBusy, () => app.quit()))
+  handle('install', async (c: Parameters<typeof install>[0], repair?: boolean) => {
+    if (repair && (productionBusy() || rendersBusy() || agentBusy.size || ex.exercisesBusy())) throw new Error('Stop video creation before reinstalling tools.')
+    if (repair) await stopTtsWorkerAndWait()
+    return install(c, repair === true)
+  })
 
   handle('getSettings', () => getSettings())
   handle('setSettings', (patch: Parameters<typeof setSettings>[0]) => {
     const settings = setSettings(patch)
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
+    if ('interfaceSize' in patch) win?.webContents.setZoomFactor((settings.interfaceSize ?? 100) / 100)
     // Another sign-in method means another Claude Code process: the next message starts it.
-    if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch) clearPlanUsage()
+    if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch) { clearPlanUsage(); clearFallbackCatalog() }
     if ('claudeAuth' in patch || 'codexAuth' in patch || 'antigravityAuth' in patch || 'agent' in patch || 'codexModel' in patch || 'codexEffort' in patch)
       closeChat()
+    if (['agent', 'claudeModel', 'claudeEffort', 'codexModel', 'codexEffort', 'antigravityModel', 'antigravityEffort', 'studyModels', 'claudeAuth', 'codexAuth', 'antigravityAuth'].some((key) => key in patch)) resetChatModel()
     if (patch.appearance || patch.recentProjects || patch.mode || patch.uiLanguage) refreshMenu()
     return settings
   })
@@ -275,18 +305,21 @@ function registerIpc(): void {
   handle('setAnthropicKey', async (key: string) => {
     if (key.trim()) await keyUsable('anthropic', key.trim())
     closeChat() // the next message starts Claude Code with the new key
+    clearFallbackCatalog()
     return setSecret('anthropic', key.trim())
   })
   handle('checkAnthropicKey', (again?: boolean) => checkAnthropicKey(undefined, again))
   handle('setOpenAIKey', async (key: string) => {
     if (key.trim()) await keyUsable('openai', key.trim())
     closeChat() // Codex picks the key up when it starts again
+    clearFallbackCatalog()
     return setSecret('openai', key.trim())
   })
   handle('checkOpenAIKey', (again?: boolean) => checkOpenAIKey(undefined, again))
   handle('setGeminiKey', async (key: string) => {
     if (key.trim()) await keyUsable('gemini', key.trim())
     closeChat() // Antigravity picks the key up on its next run
+    clearFallbackCatalog()
     return setSecret('gemini', key.trim())
   })
   handle('checkGeminiKey', (again?: boolean) => checkGeminiKey(undefined, again))
@@ -295,21 +328,25 @@ function registerIpc(): void {
   handle('claudeUsage', () => claudeUsage())
   handle('agentPlanUsage', (agent?: Agent, auth?: import('../shared/types').ClaudeAuth) => agentPlanUsage(agent, auth))
   handle('claudeLogin', async (agent?: Agent) => {
-    clearPlanUsage()
+    clearPlanUsage(); clearFallbackCatalog()
     try { return await claudeLogin((e) => send('claude-login', e), agent) }
-    finally { clearPlanUsage() }
+    finally { clearPlanUsage(); clearFallbackCatalog() }
   })
   handle('claudeLoginCode', (code: string, agent?: Agent) => claudeLoginCode(code, agent))
   handle('antigravityLoginConsent', (shareData: boolean) => antigravityLoginConsent(shareData))
   handle('claudeLogout', async (agent?: Agent) => {
     try { return await claudeLogout(agent) }
-    finally { clearPlanUsage() }
+    finally {
+      clearPlanUsage(); clearFallbackCatalog()
+      if (projects.project()?.meta.chatRoute?.agent === (agent ?? getSettings().agent)) resetChatModel()
+    }
   })
 
   handle('listProjects', () => projects.listProjects())
   handle('createProject', (input: Parameters<typeof projects.createProject>[0]) => projects.createProject(input))
   handle('openProject', (path: string) => {
     writeEpisodeBible(path) // an episode's series.md picks up what the earlier episodes became
+    closeChat() // checkpoint the old episode before openProject reads the next history
     const opened = projects.openProject(path)
     loadChat(path)
     refreshMenu()
@@ -401,6 +438,8 @@ function registerIpc(): void {
   handle('cancelSeriesPlan', () => planning?.abort())
   handle('renameSeries', (folder: string, title: string) => renameSeries(folder, title))
   handle('agentRoutes', () => agentRoutes())
+  handle('fallbackModels', () => fallbackModels())
+  handle('chatSelectModel', (route: import('../shared/types').ModelRoute) => chatSelectModel(route))
   handle('switchSeriesAgent', (route: AgentRoute) => switchSeriesAgent(route))
   handle('switchExercisesAgent', (folder: string, route: AgentRoute) => ex.switchExercisesAgent(folder, route))
   handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
@@ -413,7 +452,7 @@ function registerIpc(): void {
         ? join(root, 'developer-report.html')
         : ''
     if (!report || !existsSync(report)) throw new Error('No developer report has been generated here yet.')
-    const error = await shell.openPath(report)
+    const error = await shell.openPath(refreshMetricsReport(root))
     if (error) throw new Error(error)
   })
   handle('stopSeries', () => stopSeries())
@@ -446,6 +485,7 @@ function registerIpc(): void {
   handle('watchSeries', (folder: string) => watchSeries(folder))
   handle('courseExercises', (series: string) => ex.courseExercises(series))
   handle('watchDetail', (dir: string) => watchDetail(dir))
+  handle('studyReference', (messageId: string, referenceId: string) => studyReference(messageId, referenceId))
   handle('studyNotes', (dir: string) => studyNotes(dir))
   handle('saveStudyNotes', (dir: string, text: string) => saveStudyNotes(dir, text))
   handle('refineStudyNotes', (dir: string, text: string) => refineStudyNotes(dir, text))
@@ -504,7 +544,6 @@ function registerIpc(): void {
 
   handle('chatSend', (req: Parameters<typeof chatSend>[0]) => chatSend(req))
   handle('chatInterrupt', () => chatInterrupt())
-  handle('chatReset', () => chatReset())
   handle('chatModels', (agent?: Agent) => chatModels(agent))
 
   handle('history', () => history(projects.requireProject().path))
@@ -541,6 +580,7 @@ app.whenReady().then(async () => {
   setupMenu(
     (action, extra) => void showWindow().then(() => send('menu', { action, ...extra })),
     () => void installClaudeExtension().catch((e: Error) => dialog.showErrorBox('Claude Desktop', e.message)),
+    canUninstall() ? () => void removeDownloadedTools(true, () => productionBusy() || rendersBusy() || !!agentBusy.size || agentRuntimeBusy() || ex.exercisesBusy(), () => app.quit()).catch((e: Error) => dialog.showErrorBox('Manim Studio', e.message)) : undefined,
   )
 
   nativeTheme.themeSource = getSettings().appearance

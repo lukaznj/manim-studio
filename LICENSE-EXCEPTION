@@ -1,0 +1,19 @@
+Additional permission under GNU AGPLv3, section 7
+
+As an additional permission under section 7 of the GNU Affero General Public
+License, version 3, Luka Ražem permits you to link or combine Manim Studio
+with unmodified versions of Anthropic's @anthropic-ai/claude-agent-sdk and
+its corresponding Claude Code executable, and to copy and distribute the
+resulting combination.
+
+This permission applies only to the specified Anthropic components. Manim
+Studio and modifications to it remain subject to the GNU AGPLv3, including
+its corresponding-source and remote-network-interaction requirements.
+The specified Anthropic components remain subject to their own license
+and service terms. This permission grants no rights in Anthropic's code
+and does not waive any requirement imposed by Anthropic.
+
+For such a combination, the Corresponding Source required for Manim Studio
+need not include the specified Anthropic components' source code. It must
+include the Studio source, integration code, build scripts and dependency
+information necessary to build Studio with those components.

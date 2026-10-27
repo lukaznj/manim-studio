@@ -135,23 +135,19 @@ body.resizing-y .code-host {
   margin-left: 2px;
 }
 
-/* A narrow sidebar (300 px at least) drops the extras first, then the labels of the other tabs. */
-@container (max-width: 500px) {
-  .pane-actions .kbd,
-  .pane-actions .btn-label {
-    display: none;
-  }
+/* Reserve action space first; tab labels may truncate but can never paint over it. */
+.code-pane > .pane-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.code-pane .pane-tabs { overflow: hidden; }
+.code-pane .pane-tabs .file-tab { flex: 1 1 0; min-width: 28px; overflow: hidden; }
+.code-pane .tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.code-pane .file-tab > svg, .code-pane .dirty-dot { flex: none; }
+@container (max-width: 560px) {
+  .code-pane .pane-actions .kbd, .code-pane .pane-actions .btn-label { display: none; }
+  .code-pane .pane-tabs .file-tab:not([aria-selected='true']) { flex: 0 0 30px; justify-content: center; padding-inline: 7px; }
+  .code-pane .pane-tabs .file-tab:not([aria-selected='true']) .tab-label { display: none; }
 }
-@container (max-width: 420px) {
-  .pane-tabs .file-tab:not([aria-selected='true']) .tab-label {
-    display: none;
-  }
-}
-
-@container (max-width: 360px) {
-  .pane-actions .render-label {
-    display: none;
-  }
+@container (max-width: 380px) {
+  .code-pane .pane-actions .render-label { display: none; }
 }
 
 /* ---- code ----------------------------------------------------------------------------------- */

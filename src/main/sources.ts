@@ -147,6 +147,13 @@ export async function sourcePages(name: string, pages: number[], width: number, 
   return done.paths
 }
 
+/** Complete local text index for course retrieval; unlike read_source this is not a prompt. */
+export async function indexedSource(name: string, dir: string): Promise<{ pages: number; noText: number[]; text: string }> {
+  name = requireSource(name, dir)
+  const metadata = await info(name, dir)
+  return { pages: metadata.pages, noText: metadata.noText, text: readFileSync(join(cache(name, dir), 'text.txt'), 'utf8') }
+}
+
 /** The text of pages from..to (1-based, inclusive), each after its "=== Page N ===" line. */
 export async function sourceText(name: string, from = 1, to = Infinity, dir = requireProject().path): Promise<string> {
   name = requireSource(name, dir)

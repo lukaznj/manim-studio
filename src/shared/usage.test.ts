@@ -28,3 +28,16 @@ test('totals add up by model, and model ids read as names', () => {
   assert.equal(modelName('claude-haiku-5-5'), 'Haiku 5.5')
   assert.equal(modelName('gpt-5'), 'gpt-5')
 })
+
+test('CLI read-only turns retain their provider and auth without pretending unknown API prices are zero', async () => {
+  const { cliUsageEntry } = await import('./usage.ts')
+  const account = cliUsageEntry('codex', 'account', 'gpt-6.1-sol', { input_tokens: 100, cached_input_tokens: 40, output_tokens: 15 }, 'Tutor', 300)
+  assert.equal(account.auth, 'account')
+  assert.equal(account.provider, 'codex')
+  assert.equal(account.models['gpt-6.1-sol'].input, 60)
+  assert.equal(account.models['gpt-6.1-sol'].cacheRead, 40)
+  assert.equal(apiEstimateOf([account]), null)
+  assert.equal(apiEstimateOf([{ ...account, auth: 'api-key' }]), null)
+  assert.equal(modelName('gpt-6-astra'), 'GPT-6 Astra')
+  assert.equal(modelName('gpt-6.1-sol'), 'GPT-6.1 Sol')
+})

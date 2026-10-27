@@ -1,6 +1,11 @@
 /* A quiet study workspace. Motion follows explicit navigation and respects reduced motion. */
 .study-view {
-  grid-template-columns: 248px minmax(0, 1fr) 350px;
+  --study-library-width: 248px;
+  --study-assistant-min: 350px;
+  --study-library-track: var(--study-library-width);
+  --study-assistant-track: var(--study-assistant-width, var(--study-assistant-min));
+  position: relative;
+  grid-template-columns: var(--study-library-track) minmax(0, 1fr) var(--study-assistant-track);
 }
 .study-view .ex-side,
 .study-view .ex-side-head {
@@ -98,6 +103,15 @@
   margin-top: 3px;
   font-size: 10.5px;
 }
+.study-lesson-progress { display: block; height: 3px; margin-top: 7px; border-radius: 3px; overflow: hidden; background: var(--raised-2); }
+.study-lesson-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--sun); }
+.environment-repair { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line-strong); background: var(--sun-soft); color: var(--text); flex: none; }
+.environment-repair > svg { color: var(--sun-text); width: 20px; flex: none; }
+.environment-repair > div:first-of-type { min-width: 0; flex: 1; display: grid; gap: 3px; }
+.environment-repair strong { font-size: 12px; }
+.environment-repair span { color: var(--text-2); font-size: 11px; }
+.environment-repair-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+@media (max-width: 1000px) { .environment-repair { flex-wrap: wrap; } .environment-repair-actions { margin-left: 32px; justify-content: flex-start; } }
 .study-view .ex-num {
   width: 25px;
   height: 25px;
@@ -176,21 +190,6 @@
   width: 13px;
   height: 13px;
 }
-.study-lesson-tools {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 0 2px;
-}
-.study-lesson-tools > div {
-  display: flex;
-  gap: 6px;
-}
-.study-lesson-tools > .hint {
-  font-size: 11.5px;
-}
 .study-lesson-sources {
   display: grid;
   justify-items: start;
@@ -215,13 +214,16 @@
 }
 
 /* Persistent tabs with two independent panels: keep transcript search and chat drafts intact. */
-.study-assistant {
+.study-assistant-inner {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
 }
 .study-assistant-head {
   padding: 12px;
   border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 .study-assistant-body {
   display: grid;
@@ -676,19 +678,19 @@
   height: 14px;
   color: var(--sun-text);
 }
-.study-player:fullscreen {
+.study-player.is-fullscreen {
   width: 100%;
   height: 100%;
   border: 0;
   border-radius: 0;
   display: block;
 }
-.study-player:fullscreen .study-video-stage {
+.study-player.is-fullscreen .study-video-stage {
   height: 100%;
   min-height: 0;
   z-index: 0;
 }
-.study-player:fullscreen .study-player-toolbar {
+.study-player.is-fullscreen .study-player-toolbar {
   position: absolute;
   z-index: 1;
   inset: auto 0 0;
@@ -697,22 +699,22 @@
     opacity 0.2s ease,
     transform 0.2s var(--ease-out);
 }
-.study-player.controls-hidden:fullscreen .study-player-toolbar {
+.study-player.is-fullscreen.controls-hidden .study-player-toolbar {
   opacity: 0;
   transform: translateY(8px);
   pointer-events: none;
 }
-.study-player.controls-hidden:fullscreen,
-.study-player.controls-hidden:fullscreen .study-video-stage,
-.study-player.controls-hidden:fullscreen .ex-video {
+.study-player.is-fullscreen.controls-hidden,
+.study-player.is-fullscreen.controls-hidden .study-video-stage,
+.study-player.is-fullscreen.controls-hidden .ex-video {
   cursor: none;
 }
-.study-player:fullscreen .study-video-stage .ex-video {
+.study-player.is-fullscreen .study-video-stage .ex-video {
   max-height: 100%;
   height: 100%;
   object-fit: contain;
 }
-.study-player:fullscreen .study-controls {
+.study-player.is-fullscreen .study-controls {
   padding-inline: 26px;
 }
 @keyframes study-reveal {
@@ -735,7 +737,7 @@
     font-size: 12px;
   }
   .study-view {
-    grid-template-columns: 218px minmax(0, 1fr) 300px;
+    --study-library-width: 218px; --study-assistant-min: 300px;
   }
   .study-view .ex-detail {
     padding: 22px 20px 30px;
@@ -749,7 +751,7 @@
     display: none;
   }
   .study-view {
-    grid-template-columns: 195px minmax(0, 1fr) 280px;
+    --study-library-width: 195px; --study-assistant-min: 280px;
   }
   .study-view .ex-side-head {
     padding-inline: 12px;
@@ -778,7 +780,7 @@
 }
 
 /* Course production uses the lesson navigation, with the whole remaining width for its work. */
-.study-view.production-view { grid-template-columns: 248px minmax(0, 1fr); }
+.study-view.production-view { grid-template-columns: var(--study-library-track) minmax(0, 1fr); }
 .production-nav { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--raised); color: var(--text-2); text-align: left; cursor: pointer; }
 .production-nav > svg { width: 17px; height: 17px; flex: none; }
 .production-nav > svg:last-child { width: 14px; margin-left: auto; }
@@ -809,7 +811,8 @@
 .production-episodes { list-style: none; display: grid; gap: 10px; margin: 0; padding: 0; }
 .production-episode { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); overflow: hidden; }
 .production-episode-open { display: flex; align-items: center; gap: 16px; min-width: 0; padding: 18px 20px; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
-.production-episode-open:hover { background: var(--raised); }
+.production-episode:hover, .production-episode:focus-within { background: var(--raised); border-color: var(--line-strong); }
+.production-episode-actions .icon-btn:hover { background: var(--raised-2); }
 .production-episode-open > svg { width: 15px; height: 15px; color: var(--text-3); flex: none; margin-left: auto; }
 .production-episode-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--raised); color: var(--text-3); flex: none; }
 .production-episode-icon > svg, .production-episode-icon > .spinner { width: 17px; height: 17px; }
@@ -853,7 +856,7 @@
 .series-card-status > span { margin-left: auto; font: 10px var(--font-mono); color: var(--text-2); }
 .series-card-progress { height: 3px; border-radius: 0; }
 @media (max-width: 1180px) {
-  .study-view.production-view { grid-template-columns: 218px minmax(0, 1fr); }
+  .study-view.production-view { --study-library-width: 218px; }
   .production-page { padding: 28px; }
   .production-head { flex-wrap: wrap; }
   .production-head > .production-actions { justify-content: flex-start; }
@@ -864,3 +867,46 @@
 .study-course-title > .icon-btn { flex: none; width: 24px; height: 24px; padding: 4px; color: var(--text-3); }
 .study-course-title .series-rename { min-width: 0; width: 100%; }
 .production-editor { align-self: flex-start; }
+
+/* Collapsing keeps both panels mounted, including their drafts and scroll positions. */
+.study-view .ex-side { display: block; overflow: hidden; }
+.study-library-inner, .study-assistant-inner { min-width: 0; min-height: 0; height: 100%; }
+.study-library-inner { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.study-library-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.study-library-heading .icon-btn, .study-assistant-head > .icon-btn { flex-shrink: 0; }
+.study-assistant-head > .tabs { min-width: 0; }
+.study-view.library-collapsed { --study-library-track: 40px; }
+.study-view.assistant-collapsed { --study-assistant-track: 40px; }
+.study-view.library-collapsed .study-library-inner, .study-view.assistant-collapsed .study-assistant-inner { display: none; }
+.study-panel-restore { position: absolute; top: 12px; z-index: 3; }
+.study-library-show { left: 4px; }
+.study-assistant-show { right: 4px; }
+.study-assistant-splitter { position: absolute; z-index: 4; top: 0; bottom: 0; right: calc(var(--study-assistant-track) - 4px); width: 9px; cursor: col-resize; touch-action: none; }
+.study-assistant-splitter::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 3px; background: transparent; transition: background .15s; }
+.study-assistant-splitter:hover::after, .study-assistant-splitter:focus-visible::after { background: var(--sun); }
+
+/* The fullscreen workspace keeps the exact player and assistant DOM in place. */
+.study-view:fullscreen { width: 100%; height: 100%; grid-template-columns: minmax(0, 1fr) var(--study-assistant-track); background: var(--bg); }
+.study-view:fullscreen.assistant-collapsed { --study-assistant-track: 0px; gap: 0; }
+.study-view:fullscreen > .ex-side, .study-view:fullscreen > .study-library-show { display: none; }
+.study-view:fullscreen .ex-main { min-height: 0; overflow: hidden; }
+.study-view:fullscreen .study-content, .study-view:fullscreen .ex-detail { height: 100%; min-height: 0; max-width: none; padding: 0; margin: 0; display: block; }
+.study-view:fullscreen .study-content > :not(.ex-detail), .study-view:fullscreen .ex-detail > :not(.study-player) { display: none; }
+.study-player.is-fullscreen { position: relative; box-shadow: none; }
+
+/* The chapter title fills the quiet centre of the toolbar and opens chapter navigation. */
+.study-player { container: study-player / inline-size; }
+.study-current-chapter { display: flex; justify-content: center; align-items: center; gap: 5px; flex: 1 1 100px; min-width: 0; padding: 7px 5px; margin-inline: 5px; border: 0; border-radius: 7px; background: transparent; color: var(--text-2); cursor: pointer; font-size: 11px; }
+.study-current-chapter:hover { background: var(--raised); color: var(--text); }
+.study-current-chapter > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.study-current-chapter > svg { width: 12px; height: 12px; flex: none; }
+.study-control-row > .icon-btn, .study-volume, .study-rate, .study-autoplay, .study-time { flex-shrink: 0; }
+@container study-player (max-width: 620px) {
+  .study-volume input { display: none; }
+  .study-control-row { gap: 2px; }
+  .study-current-chapter { margin-inline: 2px; font-size: 10px; }
+}
+@container study-player (max-width: 440px) {
+  .study-skip { display: none !important; }
+  .study-current-chapter { flex-basis: 60px; }
+}

@@ -170,3 +170,24 @@ export async function finishEpisodeMetrics(
   writeFileSync(seriesReport, renderMetricsReport(finished, course.title, language))
   return { report, elapsedMs: tracker.metrics.finishedAt - tracker.metrics.startedAt, seriesReport }
 }
+
+/** Re-render saved measurements on opening, so older HTML follows the current presentation rules. */
+export function refreshMetricsReport(root: string): string {
+  const language = getSettings().uiLanguage ?? 'en'
+  if (existsSync(join(root, 'project.json'))) {
+    const episode = readEpisodeReport(root)
+    if (!episode) throw new Error('The saved measurement data for this report could not be read.')
+    const report = join(root, '.studio', 'episode-report.html')
+    writeFileSync(report, renderMetricsReport([episode], episode.metrics.title, language))
+    return report
+  }
+  const source = JSON.parse(readFileSync(join(root, 'series.json'), 'utf8')) as { plan: { title: string }; episodes: string[] }
+  const episodes = source.episodes.flatMap((name) => {
+    const episode = readEpisodeReport(join(root, name))
+    return episode?.metrics.finishedAt ? [episode] : []
+  })
+  if (!episodes.length) throw new Error('No saved episode measurements could be read for this report.')
+  const report = join(root, 'developer-report.html')
+  writeFileSync(report, renderMetricsReport(episodes, source.plan.title, language))
+  return report
+}
