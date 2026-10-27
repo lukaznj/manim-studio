@@ -28,7 +28,7 @@ test('the shared archive preserves full inputs, including unassigned and collidi
   try {
     const input = join(root, 'inputs'), course = join(root, 'course')
     mkdirSync(input)
-    const a = join(input, 'Notes!.pdf'), b = join(input, 'Notes?.pdf'), c = join(input, 'Unused.pdf')
+    const a = join(input, 'Notes!.pdf'), b = join(input, 'Notes+.pdf'), c = join(input, 'Unused.pdf')
     for (const [file, body] of [[a, 'Full original A'], [b, 'Full original B'], [c, 'Original not assigned to any episode']]) writeFileSync(file, body)
     const result = archiveStudySources(course, [a, b, c])
     assert.equal(new Set(result.map((item) => item.name)).size, 3)
