@@ -41,7 +41,7 @@ Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017
 - Several scene files per project, with helper modules opened as editor tabs.
 - **Sound effects and music in the videos.**
   - The agent places short cues where the animation calls for them: a soft whoosh as a formula transforms, a tick as a point lands, a chime on the result. They play through manim's `self.add_sound()`, so they're part of the render and are timed to its animations.
-  - Cues come from code-synthesized sounds (like the app's own) or a library whose licence fits an MIT project, and each video keeps them sparse.
+  - Cues come from code-synthesized sounds (like the app's own) or a library whose licence is compatible with the project’s AGPLv3 license, and each video keeps them sparse.
   - The timeline gets an audio lane for them; narration stays on top (cues duck under speech), and the export mix includes them.
   - This touches the timeline contract (`render.py` and `src/shared/types.ts`) and the voice pipeline's mix, so it needs its own ADR.
 - Translated subtitles and narration, for one video in several languages.

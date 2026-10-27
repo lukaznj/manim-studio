@@ -413,7 +413,7 @@ function InstallRow({ id, offer, i = 0 }: { id: Component; offer?: boolean; i?: 
         {state === 'error' && (
           <div className="onb-install-error">
             <span>{error}</span>
-            <button className="onb-btn small" onClick={() => void installComponent(id)}>
+            <button className="onb-btn small" onClick={() => void installComponent(id, ['env', 'latex', 'omnivoice', 'transcribe'].includes(id))}>
               {t('Try again')}
             </button>
           </div>

@@ -5,6 +5,7 @@
   grid-template-rows: 44px 1fr;
   height: 100%;
 }
+.app:has(> .environment-repair) { grid-template-rows: 44px auto minmax(0, 1fr); }
 .app-main {
   min-height: 0;
   position: relative;
@@ -1000,6 +1001,13 @@
 .set-row-control .select {
   min-width: 240px;
 }
+.runtime-cleanup {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.runtime-cleanup .set-row { align-items: stretch; flex-direction: column; }
+.runtime-cleanup .set-row-control { max-width: none; }
+.runtime-cleanup .pane-actions { flex-wrap: wrap; gap: 8px; }
 /* ElevenLabs voice picker (VoicePicker.tsx): a select-like button and a popover list anchored to it. */
 .voice-picker {
   display: flex;

@@ -55,11 +55,6 @@ const TOURS: Record<TourId, Step[]> = {
       text: 'Play, pause, subtitles and speed are on the video. It remembers where you stopped, and can play the next lesson on its own.',
     },
     {
-      target: 'study-clarity',
-      title: 'Stuck on a moment?',
-      text: 'Pause there and ask a question, or have a short follow-up video made that explains just that part more slowly. It appears under the lesson.',
-    },
-    {
       target: 'study-steps',
       title: 'Worked solutions',
       text: 'Each step plays its part of the video, and Ask sends that step to the chat. Explain something better redoes the video where it was unclear.',

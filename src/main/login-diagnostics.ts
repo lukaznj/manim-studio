@@ -15,3 +15,11 @@ export function loginFailureDetails(error: unknown, log = ''): string {
   const message = error instanceof Error ? error.message : String(error)
   return redactLoginLog([message, log].filter(Boolean).join('\n'))
 }
+
+/** Only the provider's HTTPS sign-in page may be opened from login-helper output. */
+export function googleLoginUrl(value: string): string | null {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && url.hostname === 'accounts.google.com' && !url.username && !url.password ? url.href : null
+  } catch { return null }
+}

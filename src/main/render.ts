@@ -22,6 +22,7 @@ interface Running {
 }
 
 const running = new Map<string, Running>() // by project folder and quality
+export const rendersBusy = (): boolean => running.size > 0
 const key = (dir: string, quality: Quality) => `${dir}\n${quality}`
 let nextId = 1
 let sendEvent: (e: RenderEvent) => void = () => {}

@@ -25,13 +25,18 @@ import type {
   PlanUsage,
   UsageWindow,
   ClaudeAuth,
+  ModelRoute,
 } from '../shared/types'
-import { agentBusy, configuredAuth } from './agent'
+import { agentBusy, configuredAuth, episodeAgent, type EpisodeAgent } from './agent'
+import { availableFallback, fallbackBlocked, fallbackEnabled, fallbackModels, rejectFallback } from './model-fallback'
+import { modelRouteKey, normalizeModelOrder } from '../shared/model-fallback'
+import { defaultAgentSelection } from '../shared/agent-selection'
 import { reportAgentOutcome } from './agent-limit-notifications'
 import {
   antigravityLogin,
   antigravityLoginCode,
   antigravityLogout,
+  antigravityLoginBusy,
   antigravityModels,
   antigravityStatus,
   antigravityTurn,
@@ -39,8 +44,8 @@ import {
   closeAntigravity,
   interruptAntigravity,
 } from './antigravity'
-import { askCodex, closeCodex, codexLogin, codexLogout, codexModels, codexStatus, codexTurn, interruptCodex } from './codex'
-import { cleanEnv, pythonExe } from './env'
+import { askCodex, closeCodex, codexLogin, codexLoginBusy, codexLogout, codexModels, codexStatus, codexTurn, interruptCodex } from './codex'
+import { cleanEnv, pythonExe, runtimeMaintenance } from './env'
 import { commitAll } from './git'
 import { paths } from './paths'
 import { mediaNames, project, readChat, readMeta, readTimeline, requireProject, updateMeta, writeChat } from './projects'
@@ -56,6 +61,7 @@ import { entryFrom, readUsage, recordTurn } from './usage'
 import { seriesBrief } from './series'
 import { exerciseBrief } from './exercises'
 import { momentNote } from '../shared/moment'
+import { fakeAgents, fakeReadOnly } from './agent-fake'
 import { studyReply } from './study-assistant'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
@@ -202,8 +208,13 @@ interface Session {
 let session: Session | null = null
 let studyAbort: AbortController | null = null
 let messages: ChatMessage[] = []
+let chatDir: string | null = null
 let turn: { message: ChatMessage; prompt: string; step: string; tools: Record<string, number>; started: number; agent: Agent; auth: 'account' | 'api-key' } | null = null
 let emit: (e: ChatEvent) => void = () => {}
+
+let readOnlyRequests = 0
+export const agentRuntimeBusy = () => readOnlyRequests > 0 || !!turn || !!foreground || !!studyAbort || codexLoginBusy() || antigravityLoginBusy()
+  || !!loginChild && loginChild.exitCode === null && loginChild.signalCode === null
 
 const observers = new Set<(e: ChatEvent) => void>()
 
@@ -229,7 +240,7 @@ export function setAutopilot(on: boolean): void {
 }
 
 let turnDone: ((r: TurnResult) => void) | null = null
-export type TurnResult = { ok: boolean; error?: string; limitedUntil?: number; switched?: boolean }
+export type TurnResult = { ok: boolean; error?: string; limitedUntil?: number; limitKind?: string; switched?: boolean }
 
 /** The plan's usage limit while Claude refuses for it (claude.ai sign-in only; API keys have none). */
 let limit: Limit | null = null
@@ -251,9 +262,104 @@ export async function chatAndWait(text: string, step = 'Chat'): Promise<TurnResu
 export function loadChat(dir: string): void {
   closeChat()
   messages = readChat(dir)
+  chatDir = dir
+}
+
+let foreground: { dir: string; agent?: EpisodeAgent; stopped: boolean } | null = null
+
+export function resetChatModel(): void {
+  closeChat()
+  if (project()) {
+    updateMeta({ chatRoute: undefined })
+    messages = readChat(requireProject().path)
+  }
+  emit({ type: 'route', route: null })
+}
+
+/** Manual changes affect this episode's future turns and keep its saved conversation. */
+export async function chatSelectModel(value: ModelRoute): Promise<void> {
+  const p = requireProject()
+  if (turn || foreground || agentBusy.has(p.path)) throw new Error('Wait for the current message to finish before switching models.')
+  const route = normalizeModelOrder([value])[0]
+  const option = route && (await fallbackModels()).find((option) => modelRouteKey(option.route) === modelRouteKey(route))
+  if (!option) throw new Error('Connect this agent under Accounts first.')
+  if (turn || foreground || agentBusy.has(p.path)) throw new Error('Wait for the current message to finish before switching models.')
+  if (requireProject().path !== p.path) throw new Error('The open episode changed. Select its model again.')
+  if (route.effort && !option.efforts.includes(route.effort) && option.efforts.length) route.effort = option.route.effort
+  closeChat()
+  messages = readChat(p.path)
+  updateMeta({ chatRoute: route })
+  emit({ type: 'route', route })
+}
+
+async function routedChat(dir: string, text: string, displayText: string, step: string, frame?: string): Promise<void> {
+  const active = { dir, stopped: false } as NonNullable<typeof foreground>
+  foreground = active
+  emit({ type: 'busy', busy: true })
+  pauseCommits(true)
+  try {
+    const images: string[] = []
+    if (frame) {
+      const file = join(dir, '.studio', 'frames', `chat-${Date.now()}.png`)
+      mkdirSync(dirname(file), { recursive: true })
+      writeFileSync(file, Buffer.from(frame.split(',')[1], 'base64'))
+      images.push(file)
+    }
+    const saved = readMeta(dir).chatRoute
+    const a = await episodeAgent(dir, {
+      ...saved, preferSelected: !!saved, withHistory: true, autopilot, images, frame, displayText,
+      onTool: () => {}, onUsage: () => {},
+      onSelection: (route) => {
+        if (foreground !== active || active.stopped) return
+        updateMeta({ chatRoute: route })
+        emit({ type: 'route', route })
+      },
+      onChat: (event) => { if (foreground === active && !active.stopped) emit(event) },
+    })
+    active.agent = a
+    if (active.stopped) { a.close(); return }
+    const result = await a.turn(text, step)
+    if (foreground !== active || active.stopped) return
+    messages = readChat(dir)
+    emit({ type: 'done', ...result })
+    turnDone?.(result)
+    turnDone = null
+  } catch (error) {
+    if (foreground === active && !active.stopped) {
+      const result = { ok: false, error: (error as Error).message }
+      emit({ type: 'done', ...result })
+      turnDone?.(result)
+      turnDone = null
+    }
+  } finally {
+    active.agent?.close()
+    if (foreground === active) {
+      foreground = null
+      messages = readChat(dir)
+      pauseCommits(false)
+      emit({ type: 'busy', busy: false })
+    }
+  }
 }
 
 export function closeChat(): void {
+  // The open project may already have changed; history belongs to the loaded episode.
+  const interrupted = !!turn || !!foreground
+  if (foreground) {
+    const active = foreground
+    active.agent?.close()
+    active.stopped = true
+    foreground = null
+    messages = readChat(active.dir)
+    turnDone?.({ ok: false, error: 'Stopped' })
+    turnDone = null
+  }
+  if (turn && chatDir) {
+    for (const part of turn.message.parts) if (part.kind === 'tool' && part.status === 'running') part.status = 'error'
+    writeChat(messages, chatDir)
+    emit({ type: 'message', message: turn.message })
+  }
+  turn = null
   studyAbort?.abort()
   studyAbort = null
   closeCodex()
@@ -261,14 +367,14 @@ export function closeChat(): void {
   session?.inbox.close()
   session?.query.close()
   session = null
-  turn = null
   pauseCommits(false)
+  if (interrupted) emit({ type: 'busy', busy: false })
 }
 
 /** `step` labels the turn in the project's usage log (quick mode says which step it is). */
 export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
   const p = requireProject()
-  if (turn) throw new Error('Claude is still working on the previous message')
+  if (turn || foreground) throw new Error('The assistant is still working on the previous message')
   if (agentBusy.has(p.path)) throw new Error('A background agent is working on this project. Chat here once it’s done.')
 
   if (req.study || req.watchingAt !== undefined) {
@@ -288,11 +394,21 @@ export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
     void (async () => {
       try {
         const result = await studyReply(p.path, req, history, controller.signal, (text) => {
-          if (studyAbort === controller) emit({ type: 'delta', messageId: reply.id, text })
+          if (studyAbort === controller) {
+            const part = reply.parts[0]
+            if (part?.kind === 'text') part.text += text
+            else reply.parts.push({ kind: 'text', text })
+            emit({ type: 'delta', messageId: reply.id, text })
+          }
         }, (png) => {
           if (studyAbort !== controller) return
           user.frame = `data:image/png;base64,${png}`
           emit({ type: 'message', message: user })
+        }, (route) => {
+          if (studyAbort !== controller) return
+          updateMeta({ chatRoute: route })
+          if (turn) { turn.agent = route.agent; turn.auth = route.auth }
+          emit({ type: 'route', route })
         })
         if (studyAbort !== controller) return
         const { text, ...metadata } = result
@@ -324,6 +440,11 @@ export async function chatSend(req: ChatRequest, step = 'Chat'): Promise<void> {
     frame = `data:image/png;base64,${png}`
   }
   content.push({ type: 'text', text: contextNote(req) + req.text })
+
+  if (fallbackEnabled() || p.meta.chatRoute) {
+    void routedChat(p.path, contextNote(req) + req.text, req.text, step, frame)
+    return
+  }
 
   const user: ChatMessage = {
     id: randomUUID(),
@@ -383,6 +504,7 @@ async function codexChat(dir: string, text: string, frame?: string): Promise<voi
 }
 
 export async function chatInterrupt(): Promise<void> {
+  if (foreground) { closeChat(); return }
   studyAbort?.abort()
   interruptCodex()
   interruptAntigravity()
@@ -397,23 +519,13 @@ export async function applyChatSettings(): Promise<void> {
   await session?.query.applyFlagSettings({ effortLevel: claudeEffort || 'high' }).catch(() => undefined)
 }
 
-export async function chatReset(): Promise<void> {
-  closeChat()
-  messages = []
-  if (project()) {
-    updateMeta({ claudeSessionId: undefined })
-    writeChat([])
-  }
-  emit({ type: 'reset' })
-}
-
 /** What this account can use. Not cached: it changes with the sign-in or API key (the renderer asks once per account). */
-export async function chatModels(agent?: Agent): Promise<ModelOption[]> {
-  if (agentOr(agent) === 'codex') return codexModels()
+export async function chatModels(agent?: Agent, auth?: ClaudeAuth): Promise<ModelOption[]> {
+  if (agentOr(agent) === 'codex') return codexModels(auth)
   if (agentOr(agent) === 'antigravity') return antigravityModels()
   const { query } = await sdk()
   const inbox = new Inbox()
-  const q = query({ prompt: inbox, options: { env: claudeEnv(), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
+  const q = query({ prompt: inbox, options: { env: claudeEnv(auth), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
   try {
     // Only the current generation (5.5): older models wrote noticeably worse scenes, and Fable isn't for this.
     const list = (await q.supportedModels()).filter((m) => m.value === 'default' || /\b5\.5\b/.test(m.displayName))
@@ -434,35 +546,77 @@ export async function chatModels(agent?: Agent): Promise<ModelOption[]> {
  * A one-off request with no tools, on the chat's sign-in and model: translation, series planning.
  * `what` names it in errors ("Claude couldn't plan: …").
  */
-export async function askClaude(...args: Parameters<typeof askWithAgent>): Promise<string> {
-  const agent = getSettings().agent
-  const route = { agent, auth: configuredAuth(agent) }
-  try {
-    const answer = await askWithAgent(...args)
-    reportAgentOutcome(route, { ok: true })
-    return answer
-  } catch (error) {
-    reportAgentOutcome(route, { ok: false, error: (error as Error).message, limitedUntil: agent === 'claude' ? activeLimit()?.until : undefined })
-    throw error
+export async function askClaude(system: string, prompt: string, what: string, opts: AskOptions = {}): Promise<string> {
+  if (runtimeMaintenance()) throw new Error('Stop video creation before removing tools.')
+  readOnlyRequests++
+  try { return await askRoutedClaude(system, prompt, what, opts) }
+  finally { readOnlyRequests-- }
+}
+
+async function askRoutedClaude(system: string, prompt: string, what: string, opts: AskOptions): Promise<string> {
+  const agent = opts.agent ?? getSettings().agent
+  const base = normalizeModelOrder([{ ...defaultAgentSelection(getSettings(), agent), ...opts, agent, auth: opts.auth ?? configuredAuth(agent) }])[0]
+  let route = fallbackEnabled() && !opts.preferSelected ? await availableFallback() ?? base : base
+  const tried = new Set<string>()
+  let prefix = ''
+  let request = prompt
+  for (;;) {
+    if (opts.signal?.aborted) throw new Error('Stopped')
+    if (fallbackEnabled() && fallbackBlocked(route)) {
+      const next = await availableFallback(tried)
+      if (opts.signal?.aborted) throw new Error('Stopped')
+      if (!next) throw new Error('All models in your fallback order have reached their usage limits.')
+      route = next
+    }
+    opts.onSelection?.(route)
+    let partial = ''
+    try {
+      const answer = await askWithAgent(system, request, what, { ...opts, ...route, onText: opts.onText ? (text) => { partial = text; opts.onText!(prefix + text) } : undefined })
+      reportAgentOutcome(route, { ok: true })
+      return prefix + answer
+    } catch (error) {
+      if (opts.signal?.aborted) throw error
+      const failure = (error as Error).message
+      const limited = (error as Error & { limit?: Limit }).limit ?? usageLimitFromError(failure)
+      reportAgentOutcome(route, { ok: false, error: failure, limitedUntil: limited?.until, limitKind: limited?.kind })
+      if (!fallbackEnabled() || !limited) throw error
+      rejectFallback(route, limited.until, limited.kind)
+      tried.add(modelRouteKey(route))
+      const next = await availableFallback(tried)
+      if (!next) throw error
+      if (opts.continueText && partial) {
+        prefix += partial
+        request = `${prompt}\n\nYour previous model reached its usage limit. Continue this partial answer from exactly where it stopped, without repeating it:\n${prefix}`
+      }
+      route = next
+    }
   }
+}
+
+interface AskOptions {
+  onText?: (soFar: string) => void
+  signal?: AbortSignal
+  model?: string
+  effort?: Effort
+  agent?: Agent
+  auth?: ClaudeAuth
+  preferSelected?: boolean
+  continueText?: boolean
+  onSelection?: (route: ModelRoute) => void
+  onUsage?: (entry: UsageEntry) => void
+  images?: { name: string; mediaType: string; data: string }[]
 }
 
 async function askWithAgent(
   system: string,
   prompt: string,
   what: string,
-  opts: {
-    onText?: (soFar: string) => void
-    signal?: AbortSignal
-    model?: string
-    effort?: Effort
-    onUsage?: (entry: UsageEntry) => void
-    images?: { name: string; mediaType: string; data: string }[] // pictures to read along with the prompt
-  } = {},
+  opts: AskOptions = {},
 ): Promise<string> {
-  if (codexChosen()) return askCodex(system, prompt, what, opts.images, opts) // Codex answers at once at the end
-  if (antigravityChosen()) return askAntigravity(system, prompt, what, opts.images, opts)
-  const auth = usingApiKey() ? 'api-key' : 'account'
+  if (fakeAgents() && process.env.STUDIO_FAKE_AGENT === 'fallback') return fakeReadOnly(prompt, opts)
+  if ((opts.agent ?? getSettings().agent) === 'codex') return askCodex(system, prompt, what, opts.images, opts) // Codex answers at once at the end
+  if ((opts.agent ?? getSettings().agent) === 'antigravity') return askAntigravity(system, prompt, what, opts.images, opts)
+  const auth = opts.auth ?? (usingApiKey() ? 'api-key' : 'account')
   const { query } = await sdk()
   const images = opts.images ?? []
   async function* withImages(): AsyncGenerator<SDKUserMessage> {
@@ -491,21 +645,24 @@ async function askWithAgent(
   opts.signal?.addEventListener('abort', stop)
   let answer = ''
   let soFar = ''
-  for await (const msg of q) {
-    if (opts.signal?.aborted) break
-    noteLimit(msg)
-    if (msg.type === 'stream_event' && msg.event.type === 'content_block_delta' && msg.event.delta.type === 'text_delta') {
-      soFar += msg.event.delta.text
-      opts.onText?.(soFar)
-      continue
+  let requestLimit: Limit | null = null
+  try {
+    for await (const msg of q) {
+      if (opts.signal?.aborted) break
+      if (msg.type === 'rate_limit_event') requestLimit = limitFrom(msg.rate_limit_info)
+      if (msg.type === 'result' && msg.subtype === 'success' && msg.is_error) requestLimit = limitFromText(msg.result) ?? requestLimit
+      if (msg.type === 'stream_event' && msg.event.type === 'content_block_delta' && msg.event.delta.type === 'text_delta') {
+        soFar += msg.event.delta.text
+        opts.onText?.(soFar)
+        continue
+      }
+      if (msg.type !== 'result') continue
+      opts.onUsage?.(entryFrom(what, msg, {}, {}, msg.duration_ms, auth))
+      if (msg.subtype !== 'success' || msg.is_error)
+        throw Object.assign(new Error(requestLimit ? limitText(requestLimit) : `Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`), { limit: requestLimit })
+      answer = msg.result
     }
-    if (msg.type !== 'result') continue
-    opts.onUsage?.(entryFrom(what, msg, {}, {}, msg.duration_ms, auth))
-    if (msg.subtype !== 'success' || msg.is_error)
-      throw new Error(activeLimit() ? limitText(activeLimit()!) : `Claude couldn’t ${what}: ${msg.subtype === 'success' ? msg.result : msg.errors?.join(' ')}`)
-    answer = msg.result
-  }
-  opts.signal?.removeEventListener('abort', stop)
+  } finally { opts.signal?.removeEventListener('abort', stop); q.close() }
   if (opts.signal?.aborted) throw Object.assign(new Error('cancelled'), { cancelled: true })
   return answer
 }
@@ -758,7 +915,7 @@ function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
   const limited = ok ? null : t?.agent === 'claude' ? activeLimit() ?? usageLimitFromError(error) : usageLimitFromError(error)
   if (limited && t?.agent === 'claude') error = limitText(limited)
   if (ok) limit = null
-  if (t) reportAgentOutcome(t, { ok, error, limitedUntil: limited?.until })
+  if (t && t.step !== 'Tutor') reportAgentOutcome(t, { ok, error, limitedUntil: limited?.until, limitKind: limited?.kind })
   turn = null
   pauseCommits(false)
   if (t) {

@@ -6,7 +6,7 @@ import type { ElevenLabsCheck, ElevenLabsUsage, ProjectMeta, SetupEvent, VoiceOp
 import { DEFAULT_EL_MODEL } from '../shared/voice'
 import { setupStatus } from './env'
 import { listRecordings, requireProject } from './projects'
-import { runRunner } from './runner'
+import { killJob, runRunner } from './runner'
 import { getSecret, setSecret } from './settings'
 import { voiceMetricsFile } from './metrics-state'
 
@@ -272,4 +272,12 @@ export function stopTtsWorker(): void {
   workerChild?.kill()
   workerChild = null
   workerUrl = null
+}
+
+/** A repair must release the idle worker's Python prefix before replacing it (especially on Windows). */
+export async function stopTtsWorkerAndWait(): Promise<void> {
+  const child = workerChild
+  workerChild = null; workerUrl = null
+  if (!child || child.exitCode !== null || child.signalCode !== null) return
+  await new Promise<void>((resolve) => { child.once('close', () => resolve()); killJob(child) })
 }

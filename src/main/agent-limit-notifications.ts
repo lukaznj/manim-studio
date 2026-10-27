@@ -16,8 +16,9 @@ export function onAgentLimit(send: typeof emit, show: typeof showWindow): void {
 }
 
 /** Called on actual turn outcomes, not polling. No notification text contains raw provider errors. */
-export function reportAgentOutcome(route: AgentRoute, result: { ok: boolean; error?: string; limitedUntil?: number }): void {
-  const key = `${route.agent}:${route.auth}`
+export function reportAgentOutcome(route: AgentRoute, result: { ok: boolean; error?: string; limitedUntil?: number; limitKind?: string }): void {
+  const scoped = /(?:seven_day_|model_)(opus|sonnet|haiku)/.test(result.limitKind ?? '') ? result.limitKind : 'account'
+  const key = `${route.agent}:${route.auth}:${scoped}`
   if (result.ok) {
     alerts.recovered(key)
     return
@@ -32,7 +33,7 @@ export function reportAgentOutcome(route: AgentRoute, result: { ok: boolean; err
   const when = limit.until ? new Date(limit.until).toLocaleString(uiLocale(language), { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : ''
   const title = formatUi(language, '{0} reached its usage limit', [name])
   const body = (when ? formatUi(language, 'The limit resets {0}.', [when]) + ' ' : '') +
-    translateUi(language, 'Open Manim Studio to continue with another connected agent, or wait for the limit to reset.')
+    (settings.modelFallback?.enabled ? '' : translateUi(language, 'Open Manim Studio to continue with another connected agent, or wait for the limit to reset.'))
   try {
     const notification = new Notification({
       title, body,

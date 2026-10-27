@@ -1,5 +1,5 @@
 import type { EpisodeMetrics, VoiceUsageSample } from './episode-metrics'
-import type { UsageEntry } from './usage'
+import { apiEstimateOf, type UsageEntry } from './usage.ts'
 import type { UiLanguage } from './ui-languages'
 import { translateUi } from './i18n.ts'
 
@@ -176,7 +176,7 @@ export function renderMetricsReport(episodes: ReportEpisode[], title: string, la
       ${m.options.timing ? `<h3>${t('Time by phase', 'Vrijeme po koraku')}</h3><table><thead><tr><th>${t('Phase', 'Korak')}</th><th>${t('Time', 'Vrijeme')}</th></tr></thead><tbody>${phases.map((p) => `<tr><td>${escapeHtml(stage(p.name))}</td><td>${duration(p.ms)}</td></tr>`).join('')}</tbody></table>` : ''}
       ${
         m.options.usage
-          ? `<h3>${t('Usage over time', 'Korištenje kroz vrijeme')}</h3><p class="muted">${t('Agent counts arrive at turn completion. Steps show reported totals, not a continuous token rate. Failed or interrupted turns may omit counters. API-equivalent prices are not subscription charges.', 'Brojači agenta stižu po završetku koraka. Graf prikazuje prijavljene ukupne vrijednosti, a ne kontinuiranu brzinu tokena. Neuspjeli ili prekinuti koraci mogu izostaviti brojače. API cijene nisu trošak pretplate.')}</p>${chart(
+          ? `<h3>${t('Usage over time', 'Korištenje kroz vrijeme')}</h3><p class="muted">${t('Agent counts arrive at turn completion. Steps show reported totals, not a continuous token rate. Failed or interrupted turns may omit counters.', 'Brojači agenta stižu po završetku koraka. Graf prikazuje prijavljene ukupne vrijednosti, a ne kontinuiranu brzinu tokena. Neuspjeli ili prekinuti koraci mogu izostaviti brojače.')}</p>${chart(
               m,
               t('Agent tokens', 'Tokeni agenta'),
               'tokens',
@@ -195,7 +195,7 @@ export function renderMetricsReport(episodes: ReportEpisode[], title: string, la
       ])}
       <p class="muted">${t('ElevenLabs billing uses the response character-cost header. Text length is shown separately and never treated as the bill. Cache hits cost zero new characters; missing billing headers remain unknown.', 'Naplata ElevenLabsa koristi zaglavlje odgovora character-cost. Duljina teksta prikazuje se zasebno i nije iznos računa. Predmemorija ne troši nove znakove; nedostajuća zaglavlja naplate ostaju nepoznata.')}</p>
       <h3>${t('Account plan windows', 'Ograničenja plana računa')}</h3><p class="muted">${t('Account-wide snapshots: other chats and apps can affect these percentages even with episodes serialized. Reset times and provider reporting delays can change the curve. These are not per-episode token counters.', 'Snimke cijelog računa: drugi razgovori i aplikacije mogu utjecati na postotke čak i kada epizode rade pojedinačno. Obnove ograničenja i kašnjenja pružatelja mijenjaju krivulju. Ovo nisu brojači tokena po epizodi.')}</p>${accountCharts || `<p>${t('Plan windows were not returned (API-key accounts and unsupported providers may have none).', 'Ograničenja plana nisu vraćena (API računi i nepodržani pružatelji možda ih nemaju).')}</p>`}${elevenAccount}
-      <details><summary>${t('Agent turns and original provider counters', 'Koraci agenta i izvorni brojači pružatelja')}</summary><table><thead><tr><th>${t('Step', 'Korak')}</th><th>Model</th><th>Tokens</th><th>API USD</th></tr></thead><tbody>${usage.map((u) => `<tr><td>${escapeHtml(u.step)}</td><td>${escapeHtml(Object.keys(u.models).join(', '))}</td><td>${number(usageTokenCount(u))}</td><td>${u.costKnown === false ? t('Not reported', 'Nije prijavljeno') : number(Object.values(u.models).reduce((n, v) => n + v.costUSD, 0))}</td></tr>`).join('')}</tbody></table><pre>${escapeHtml(JSON.stringify({ usage, voice, accountSnapshots: m.accounts }, null, 2))}</pre></details>`
+      <details><summary>${t('Agent turns and original provider counters', 'Koraci agenta i izvorni brojači pružatelja')}</summary><table><thead><tr><th>${t('Step', 'Korak')}</th><th>Model</th><th>Tokens</th>${usage.some((entry) => apiEstimateOf([entry]) !== null) ? '<th>API USD</th>' : ''}</tr></thead><tbody>${usage.map((u) => `<tr><td>${escapeHtml(u.step)}</td><td>${escapeHtml(Object.keys(u.models).join(', '))}</td><td>${number(usageTokenCount(u))}</td>${usage.some((entry) => apiEstimateOf([entry]) !== null) ? `<td>${apiEstimateOf([u]) === null ? '—' : number(apiEstimateOf([u])!)}</td>` : ''}</tr>`).join('')}</tbody></table><pre>${escapeHtml(JSON.stringify({ usage: usage.map((entry) => apiEstimateOf([entry]) !== null ? entry : { ...entry, models: Object.fromEntries(Object.entries(entry.models).map(([model, tokens]) => [model, { ...tokens, costUSD: undefined }])), cumulative: entry.cumulative && Object.fromEntries(Object.entries(entry.cumulative).map(([model, tokens]) => [model, { ...tokens, costUSD: undefined }])) }), voice, accountSnapshots: m.accounts }, null, 2))}</pre></details>`
           : ''
       }
       ${

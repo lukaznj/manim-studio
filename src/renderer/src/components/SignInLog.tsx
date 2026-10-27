@@ -1,8 +1,9 @@
 import { t } from '../lib/i18n'
-import { errorText, toast } from '../store'
+import { errorText, toast, useStore } from '../store'
 
 export function SignInLog({ lines }: { lines: string[] }) {
-  if (!lines.length) return null
+  const developer = useStore((s) => !!s.settings?.developerMode)
+  if (!developer || !lines.length) return null
   return (
     <details className="sign-in-log" open>
       <summary>{t('Sign-in log')}</summary>
