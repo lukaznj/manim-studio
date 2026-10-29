@@ -233,6 +233,7 @@ async function prepare(project: string, instructions: string): Promise<string> {
     // Not its whole folder, which holds its sign-in.
     `read_file(${real(join(cliDir(home), 'brain'))})`,
     `read_file(${real(join(cliDir(home), 'mcp'))})`,
+    'read_url(*)', // read-only web research; commands and browser actuation stay unapproved
     ...Object.keys(sceneTools).map((t) => `mcp(studio/${t})`),
   ]
   const settings = { trustedWorkspaces: [dir], permissions: { allow }, ...(apiKey() ? { modelProvider: 'gemini' } : {}) }

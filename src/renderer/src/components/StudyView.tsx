@@ -41,7 +41,7 @@ export function StudyView() {
     else await updateSettings(side === 'library' ? { studyLibraryCollapsed: collapsed } : { studyAssistantCollapsed: collapsed })
     requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(fullscreen && collapsed ? '.study-fullscreen-chat' : `.study-${side}-${collapsed ? 'show' : 'hide'}`)?.focus())
   }
-  const activeRun = useStore((s) => s.series)
+  const activeRun = useStore((s) => s.seriesRuns.find((run) => run.folder === s.watchSeries?.folder))
   const overview = useStore((s) => s.studyProduction)
   const production = series && (activeRun?.folder === series.folder ? activeRun : series.production)
   const showProduction = !!production && productionVisible(production, !!settings?.developerMode)

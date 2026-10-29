@@ -170,7 +170,7 @@ export function CodePane() {
 
   return (
     <div className="code-pane">
-      <div className="pane-head">
+      <div className="pane-head code-tabs-head">
         <div className="pane-tabs" role="tablist">
           <button role="tab" aria-label={uiText('scene.py')} aria-selected={tab === 'code'} className="file-tab" onClick={() => setTab('code')} title={uiText('scene.py')}>
             <FileCode2 />
@@ -212,11 +212,14 @@ export function CodePane() {
             <span className="tab-label">{uiText('Sources')}</span>
           </button>
         </div>
-        <div className={`pane-actions ${tab !== 'code' ? 'hidden' : ''}`}>
+      </div>
+      <div className={`code-actions-head ${tab !== 'code' ? 'hidden' : ''}`}>
+        <span className="code-file-status"><FileCode2 /><span>scene.py</span>{dirty && <span className="dirty-dot" />}</span>
+        <div className="pane-actions">
           <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title={uiText('Save without rendering')}>
             <Save /> <span className="btn-label">{uiText('Save')}</span>
           </button>
-          <button className="btn small" onClick={() => void saveScene({ render: true })} title={format('Save and render ({0})', [shortcut('S')])}>
+          <button className="btn small primary" onClick={() => void saveScene({ render: true })} title={format('Save and render ({0})', [shortcut('S')])}>
             <Play /> <span className="render-label">{uiText('Render')}</span> <span className="kbd">{shortcut('S')}</span>
           </button>
         </div>

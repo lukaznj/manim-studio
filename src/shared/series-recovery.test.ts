@@ -25,10 +25,10 @@ test('restart recovers every production stage without rerunning done work or for
   assert.equal(original.episodes[0].activity, 'Working')
 })
 
-test('paused runs require Continue; completed runs remain completed; invalid agent counts are bounded', () => {
+test('paused runs require Continue; completed runs remain completed; legacy agent ceilings are discarded', () => {
   assert.equal(recoverSeries(run('paused')).state, 'stopped')
   assert.equal(recoverSeries(run('done')).state, 'done')
-  assert.equal(recoverSeries({ ...run(), agents: -1 }).agents, 1)
+  assert.equal(recoverSeries({ ...run(), agents: -1 }).agents, undefined)
 })
 
 test('corrupt run files cannot masquerade as a resumable series', () => {
@@ -36,4 +36,13 @@ test('corrupt run files cannot masquerade as a resumable series', () => {
   assert.equal(isSeriesCheckpoint(checkpoint), true)
   for (const value of [null, {}, { run: run() }, { ...checkpoint, run: { ...run(), episodes: [{}] } }, { ...checkpoint, run: { ...run(), state: 'unknown' } }])
     assert.equal(isSeriesCheckpoint(value), false)
+})
+
+test('queued courses retain their place and full plan-bound episode checkpoints after restart', () => {
+  const queued = { ...run('queued'), queuedAt: 1234 }
+  assert.equal(isSeriesCheckpoint({ run: queued, exportOptions: { themes: ['dark'], languages: [] } }), true)
+  const restored = recoverSeries(queued)
+  assert.equal(restored.state, 'queued')
+  assert.equal(restored.queuedAt, 1234)
+  assert.deepEqual(restored.episodes.map((ep) => ep.state), stages)
 })

@@ -46,7 +46,7 @@ export function Home() {
   }, [])
 
   const homeSeries = useStore((s) => s.homeSeries)
-  const production = useStore((s) => s.series)
+  const production = useStore((s) => s.seriesRuns.find((run) => run.folder === s.homeSeries))
   const items = homeItems(projects)
   const inSeries =
     (homeSeries && items.find((i): i is { folder: string; episodes: ProjectSummary[] } => 'episodes' in i && i.folder === homeSeries)?.episodes) || []
@@ -55,33 +55,28 @@ export function Home() {
     <div className="home">
       <div className="home-inner">
         <header className="home-head">
-          <div>
-            {both ? (
-              <div data-tour="home-tabs">
+          <div className="home-heading">
+            {both && (
+              <div className="home-mode-switch" data-tour="home-tabs">
                 <Tabs
+                  label={uiText('Create') + ' / ' + uiText('Learn')}
                   value={editing ? 'create' : 'learn'}
                   onChange={(tab) => {
                     useStore.setState({ homeSeries: null })
                     void updateSettings({ homeTab: tab })
                   }}
                   items={[
-                    { value: 'create', label: 'Create' },
-                    { value: 'learn', label: 'Learn' },
+                    { value: 'create', label: <><Clapperboard />{uiText('Create')}</> },
+                    { value: 'learn', label: <><GraduationCap />{uiText('Learn')}</> },
                   ]}
                 />
               </div>
-            ) : (
-              <h1>{editing ? uiText('Projects') : uiText('Library')}</h1>
             )}
-            <p className="muted">
-              {editing
-                ? uiText('Each project is one video: a scene in code, its voice and its subtitles.')
-                : uiText('Your courses, exercises and videos, to watch and ask about.')}
-            </p>
+            <h1>{editing ? uiText('Projects') : uiText('Library')}</h1>
           </div>
           <div className="home-actions">
             <button className="btn primary" data-tour="home-add" aria-label={uiText('Add video, course or exercises')} onClick={() => setAdding(true)}>
-              <Plus />
+              <Plus /><span>{uiText(editing ? 'Create' : 'Add')}</span>
             </button>
           </div>
         </header>
@@ -249,8 +244,7 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
 
 /** A series on Home: its first episodes' pictures stacked, the title and how many episodes it has. */
 function SeriesCard({ folder, episodes, exercises, index }: { folder: string; episodes: ProjectSummary[]; exercises: number; index: number }) {
-  const active = useStore((s) => s.series)
-  const run = active?.folder === folder ? active : undefined
+  const run = useStore((s) => s.seriesRuns.find((run) => run.folder === folder))
   const made = run?.episodes.filter((ep) => ep.state === 'done').length ?? 0
   const first = episodes[0]
   const cover = episodes.find((e) => e.thumbnail) ?? first
@@ -291,7 +285,8 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
 
 function ProjectCard({ project: p, index }: { project: ProjectSummary; index: number }) {
   const [menu, setMenu] = useState(false)
-  const production = useStore((s) => s.series)
+  const quick = useStore((s) => s.quickRuns.find((run) => run.project === p.path))
+  const production = useStore((s) => s.seriesRuns.find((run) => run.folder === p.series?.folder))
   const unfinished = production?.folder === p.series?.folder && production?.episodes.some((ep) => ep.dir === p.path && ep.state !== 'done')
   const open = () => void (p.missing ? locateProject(p.path) : unfinished && p.series ? openWatch(p.series.folder, p.path) : openProject(p.path))
   return (
@@ -305,6 +300,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
       <div className={`thumb ${p.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${p.theme}`}>
         {p.thumbnail ? <img src={api.mediaUrl(p.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
         {p.duration !== undefined && <span className="thumb-time mono">{timecode(p.duration, false)}</span>}
+        {quick && quick.state !== 'done' && <span className="series-card-status">{quick.state === 'working' ? <span className="spinner" /> : <Zap />}{uiText(quick.state === 'working' ? 'Video in progress' : 'Continue video')}</span>}
       </div>
       <div className="project-meta">
         <div className="project-name">{p.name}</div>

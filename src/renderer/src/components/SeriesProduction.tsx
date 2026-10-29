@@ -9,6 +9,8 @@ import { revealLabel } from '../lib/platform'
 import { canEdit, errorText, selectStudied, showSeriesProduction, toast, useStore } from '../store'
 import { AccountPlanUsage } from './AccountPlanUsage'
 import { configuredAuth, LimitSwitch } from './LimitSwitch'
+import { ProductionStages, useProductionProgress } from './ProductionStages'
+import { phasePercent } from '../../../shared/production-progress'
 
 const dollars = (n: number) => `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`
 const perform = (action: () => Promise<unknown>) => { void action().catch((error) => toast(errorText(error), 'error')) }
@@ -22,7 +24,9 @@ export function ProductionIcon({ run, episode }: { run: SeriesRun; episode: Epis
 export function EpisodeStatus({ run, episode, activity = false }: { run: SeriesRun; episode: EpisodeRun; activity?: boolean }) {
   const job = useStore((s) => s.exports.find((j) => j.id === episode.exportJob))
   const view = episodePresentation(run, episode, job)
-  return <>{view.prefix && <>{t(view.prefix)} · </>}{t(view.label)}{view.percent !== undefined && <> · {view.percent}%</>}
+  const progress = useProductionProgress(episode.dir, view.active && !episode.limitedUntil, view.stage)
+  const writing = episode.state === 'script' || episode.state === 'scene' ? phasePercent(progress[episode.state]) : undefined
+  return <>{view.prefix && <>{t(view.prefix)} · </>}{t(view.label)}{view.percent !== undefined ? <> · {view.percent}%</> : writing !== undefined && <> · {writing}% {t('Estimated').toLocaleLowerCase()}</>}
     {activity && view.active && episode.activity && episode.state !== 'export' && <> · {t(episode.activity)}</>}</>
 }
 
@@ -40,7 +44,7 @@ export function ProductionNavigation({ run, selected, onClick }: { run: SeriesRu
 }
 
 function SeriesActions({ run }: { run: SeriesRun }) {
-  const current = useStore((s) => s.series?.folder === run.folder)
+  const current = useStore((s) => s.seriesRuns.some((active) => active.folder === run.folder))
   const developer = useStore((s) => s.settings?.developerMode)
   const [busy, setBusy] = useState(false)
   const resume = async () => {
@@ -49,31 +53,31 @@ function SeriesActions({ run }: { run: SeriesRun }) {
   }
   return (
     <div className="production-actions">
-      {current && run.state === 'working' && <button className="btn" onClick={() => perform(() => api.pauseSeries(true))}><Pause />{t('Pause the series')}</button>}
-      {current && run.state === 'paused' && <button className="btn primary" onClick={() => perform(() => api.pauseSeries(false))}><Play />{t('Resume')}</button>}
-      {(run.state === 'stopped' || (run.state === 'done' && run.episodes.some((ep) => ep.state === 'failed'))) &&
-        <button className="btn primary" disabled={busy} onClick={() => void resume()}>{busy ? <span className="spinner" /> : <Play />}{t(run.state === 'done' ? 'Try again' : 'Continue')}</button>}
-      {current && (run.state === 'working' || run.state === 'paused') && <button className="btn" onClick={() => perform(() => api.stopSeries())}><Square />{t('Stop')}</button>}
+      {current && run.state === 'working' && <button className="btn" onClick={() => perform(() => api.pauseSeries(true, run.folder))}><Pause />{t('Pause the series')}</button>}
+      {current && run.state === 'paused' && <button className="btn primary" onClick={() => perform(() => api.pauseSeries(false, run.folder))}><Play />{t('Resume')}</button>}
+      {(run.state === 'queued' || run.state === 'stopped' || (run.state === 'done' && run.episodes.some((ep) => ep.state === 'failed'))) &&
+        <button className="btn primary" disabled={busy} onClick={() => void resume()}>{busy ? <span className="spinner" /> : <Play />}{t(run.state === 'queued' ? 'Start now' : run.state === 'done' ? 'Try again' : 'Continue')}</button>}
+      {current && (run.state === 'working' || run.state === 'paused') && <button className="btn" onClick={() => perform(() => api.stopSeries(run.folder))}><Square />{t('Stop')}</button>}
       <button className="icon-btn" title={revealLabel} aria-label={revealLabel} onClick={() => perform(() => api.reveal(run.folder))}><FolderOpen /></button>
       {developer && run.report && <button className="btn small" onClick={() => perform(() => api.openEpisodeReport(run.folder))}><FileText />{t('Open series report')}</button>}
-      {current && (run.state === 'done' || run.state === 'stopped') && <button className="icon-btn" title={t('Dismiss')} aria-label={t('Dismiss')} onClick={() => perform(async () => { await api.dismissSeries() })}><X /></button>}
+      {current && (run.state === 'done' || run.state === 'stopped' || run.state === 'queued') && <button className="icon-btn" title={t('Dismiss')} aria-label={t('Dismiss')} onClick={() => perform(async () => { await api.dismissSeries(run.folder) })}><X /></button>}
     </div>
   )
 }
 
 export function SeriesLimit({ run }: { run: SeriesRun }) {
   const settings = useStore((s) => s.settings)
-  const current = useStore((s) => s.series?.folder === run.folder)
+  const current = useStore((s) => s.seriesRuns.some((active) => active.folder === run.folder))
   const waiting = run.episodes.filter((ep) => ep.limitedUntil && !ep.held && ['script', 'scene', 'check'].includes(ep.state))
   if (!current || run.state !== 'working' || !waiting.length) return null
   const ep = waiting[0]
   const agent = ep.assignment?.agent ?? run.agent ?? settings?.agent ?? 'claude'
   const auth = ep.assignment ? ep.assignmentAuth ?? configuredAuth(settings, agent) : run.auth ?? configuredAuth(settings, agent)
-  return <LimitSwitch until={Math.min(...waiting.map((episode) => episode.limitedUntil!))} current={{ agent, auth }} onSwitch={(route) => api.switchSeriesAgent(route)} />
+  return <LimitSwitch until={Math.min(...waiting.map((episode) => episode.limitedUntil!))} current={{ agent, auth }} onSwitch={(route) => api.switchSeriesAgent(route, run.folder)} />
 }
 
 function EpisodeActions({ run, episode }: { run: SeriesRun; episode: EpisodeRun }) {
-  const current = useStore((s) => s.series?.folder === run.folder)
+  const current = useStore((s) => s.seriesRuns.some((active) => active.folder === run.folder))
   const developer = useStore((s) => s.settings?.developerMode)
   const remote = useStore((s) => !!s.exports.find((job) => job.id === episode.exportJob && job.state === 'running' && job.options.server))
   const [retrying, setRetrying] = useState(false)
@@ -162,11 +166,8 @@ export function EpisodeProduction({ run, episode, number }: { run: SeriesRun; ep
       </div>
       {view.percent !== undefined && <progress value={view.percent} max={100} aria-label={t(view.label)} />}
     </div>
-    <ol className="production-stages" aria-label={t('Production')}>
-      {['Script', 'Video', 'Checking the render', 'Export'].map((label, index) => <li key={label} className={view.stage > index ? 'complete' : view.stage === index ? 'current' : ''} aria-current={view.stage === index ? 'step' : undefined}>
-        <span>{view.stage > index ? <Check /> : index + 1}</span><strong>{t(label)}</strong>
-      </li>)}
-    </ol>
+    <ProductionStages project={episode.dir} stage={view.stage} active={view.active} job={job} />
+    <p className="hint">{t('Writing progress estimates completed sections, not time remaining. Rendering and assembly report their own progress.')}</p>
     <SeriesActions run={run} />
     {editing && (episode.state === 'failed' || run.state === 'stopped') && <button className="btn ghost production-editor" onClick={() => useStore.setState({ screen: 'editor' })}><Code2 />{t('Open in editor')}</button>}
   </section>
@@ -179,6 +180,7 @@ export function LessonProduction({ episode, followUp, dir }: { episode: WatchEpi
   return <section className="production-page episode-production">
     <header className="production-head"><div><span className="eyebrow">{format('Lesson {0}', [episode.number])}</span><h1>{followUp?.request ?? episode.title}</h1></div></header>
     <div className={`production-task ${failed ? 'failed' : ''}`}><span className="production-task-icon">{failed ? <CircleAlert /> : <span className="spinner" />}</span><div role="status"><h2>{t(failed ? 'Didn’t finish' : 'Making the video')}</h2><p>{followUp?.error ?? episode.error ?? followUp?.activity ?? episode.activity ?? t('Your lesson is being made. You can keep studying while it finishes.')}</p></div></div>
+    <ProductionStages project={dir} active={!failed} />
     <div className="production-actions">
       {failed && <button className="btn primary" onClick={() => perform(() => followUp ? api.retryFollowUp(dir) : api.retryCourseLesson(dir))}><RotateCcw />{t('Try again')}</button>}
       {editing && failed && <button className="btn" onClick={() => useStore.setState({ screen: 'editor' })}><Code2 />{t('Open in editor')}</button>}

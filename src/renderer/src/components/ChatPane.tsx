@@ -38,7 +38,7 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
   const follow = (value: boolean) => { following.current = value; setAtLatest(value) }
   const scrollToLatest = () => {
     const el = list.current
-    if (el && following.current) el.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
+    if (el && following.current) el.scrollTo({ top: el.querySelector('.msg') ? el.scrollHeight : 0, behavior: 'instant' })
   }
   useEffect(() => {
     void refreshUsage()
@@ -292,17 +292,16 @@ function Intro() {
   const agent = useStore((s) => s.settings?.agent ?? 'claude')
   const name = agent === 'codex' ? 'Codex' : agent === 'antigravity' ? 'Antigravity' : 'Claude'
   return (
-    <div className="chat-intro">
+    <div className="chat-intro creator-chat-empty">
+      <div className="study-chat-orbit"><Sparkles /><span /><span /></div>
+      <h3>{uiText('What should the video show?')}</h3>
       <p className="muted">
         {uiText('Describe what the video should show. ')}
         {name} {uiText(' edits ')}
         <span className="mono">{uiText('scene.py')}</span>
         {uiText(', renders it and looks at the frames before it says it’s done.')}
       </p>
-      <p className="hint">
-        {uiText('Select clips on the timeline so ')}
-        {name} {uiText(' knows which part you mean.')}
-      </p>
+      <div className="creator-chat-context"><Film /><span>{uiText('Select clips on the timeline so ')}{name}{uiText(' knows which part you mean.')}</span></div>
     </div>
   )
 }

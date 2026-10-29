@@ -3,6 +3,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { reportDependencyFailure, spawnPython, type EnvName } from './env'
 import { dependencyFailure, REPAIR_MESSAGE } from './dependency-health'
+import { WorkSlots } from '../shared/work-slots'
 
 const PREFIX = '@@studio '
 
@@ -20,10 +21,13 @@ const paused = new Set<string>()
 const children = new Map<ChildProcess, Promise<unknown>>()
 const starting = new Set<Promise<ChildProcess>>()
 let stopping = false
+const renderSlots = new WorkSlots(1)
+const shutdown = new AbortController()
 
 /** Cancel and reap every Python job, including a child whose environment was still starting. */
 export async function stopRunners(): Promise<void> {
   stopping = true
+  shutdown.abort()
   resumeAll()
   for (const child of children.keys()) killJob(child)
   await Promise.allSettled([...starting])
@@ -88,10 +92,16 @@ export async function runRunner<T = RunnerEvent>(
   opts: { extraEnv?: Record<string, string>; onEvent?: (e: RunnerEvent) => void; cwd?: string; signal?: AbortSignal; tag?: string } = {},
 ): Promise<RunnerJob<T>> {
   if (stopping) throw Object.assign(new Error('cancelled'), { cancelled: true })
+  const signal = opts.signal ? AbortSignal.any([opts.signal, shutdown.signal]) : shutdown.signal
+  // Every local drawing process shares one queue, including export slices. PDF indexing,
+  // narration, authentication and light inspection commands remain independent.
+  const release = args[0] === 'render' && !args.includes('--voice-only') ? await renderSlots.acquire(signal) : () => {}
+  if (signal.aborted) { release(); throw Object.assign(new Error('cancelled'), { cancelled: true }) }
+  opts = { ...opts, signal }
   const spawn = spawnPython(env, args, opts.extraEnv, opts.cwd)
   starting.add(spawn)
   let child: ChildProcess
-  try { child = await spawn } finally { starting.delete(spawn) }
+  try { child = await spawn } catch (error) { release(); throw error } finally { starting.delete(spawn) }
   const log: string[] = []
   let final: RunnerEvent | null = null
   let pending = ''
@@ -142,7 +152,7 @@ export async function runRunner<T = RunnerEvent>(
     })
   })
   children.set(child, done)
-  void done.finally(() => children.delete(child)).catch(() => undefined)
+  void done.finally(() => { children.delete(child); release() }).catch(() => undefined)
   if (stopping) stop()
   return { child, done, log: () => log.join('\n') }
 }

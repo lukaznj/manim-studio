@@ -362,43 +362,41 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 30px;
+  margin-bottom: 28px;
 }
+.home-heading { min-width: 0; display: grid; gap: 22px; }
 .home-head h1 {
-  margin: 0 0 6px;
-  font: 900 40px/1 var(--font-display);
-  letter-spacing: -0.025em;
-}
-.home-head p {
   margin: 0;
-  font-size: 14px;
-}
-/* Both modes (ADR 0029): Home's title is the two tabs, Create and Learn. */
-.home-tabs {
-  display: flex;
-  gap: 22px;
-  margin-bottom: 6px;
-}
-.home-tab {
-  padding: 0 0 4px;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  background: none;
-  color: var(--text-3);
-  font: 900 40px/1 var(--font-display);
+  font: 850 36px/1.15 var(--font-display);
   letter-spacing: -0.025em;
-  cursor: pointer;
 }
-.home-tab:hover {
-  color: var(--text-2);
-}
-.home-tab.on {
-  color: var(--text);
-  border-bottom-color: var(--sun);
-}
+.home-mode-switch { width: max-content; max-width: 100%; }
+.home-mode-switch .tabs { gap: 4px; padding: 4px; border-radius: 14px; background: var(--panel); }
+.home-mode-switch .tabs button { flex: none; gap: 9px; min-width: 118px; min-height: 36px; padding: 7px 18px; font-size: 13px; }
+.home-mode-switch .tabs button svg { width: 16px; height: 16px; }
+.home-mode-switch .tabs-indicator { border-radius: 10px; background: var(--sun-soft); box-shadow: none; }
+.home-mode-switch .tabs button[aria-selected='true'] { color: var(--sun-text); }
 .home-actions {
   display: flex;
   gap: 8px;
+  flex: none;
+}
+.home-actions .btn { gap: 8px; min-height: 38px; padding-inline: 16px; border-radius: 12px; }
+.quick-jobs-menu { margin: 0; width: min(340px, calc(100vw - 24px)); max-height: 60vh; overflow: auto; padding: 12px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--panel); color: var(--text); box-shadow: var(--shadow-pop); }
+.quick-jobs-menu > strong { display: block; padding: 4px 8px 12px; font-size: 12px; color: var(--text-3); }
+.quick-jobs-menu > button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--text); text-align: left; }
+.quick-jobs-menu > button:hover { background: var(--raised); }
+.quick-jobs-menu > button > svg { width: 18px; height: 18px; flex: none; color: var(--sun-text); }
+.quick-jobs-menu > button > span:last-child { display: grid; gap: 5px; min-width: 0; }
+.quick-jobs-menu strong { overflow: hidden; text-overflow: ellipsis; }
+.quick-jobs-menu small { color: var(--text-3); }
+.series-dialog .modal-foot { flex-wrap: wrap; }
+.agent-capacity-toggle { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 13px; }
+.agent-capacity-input { width: 80px; }
+@media (max-width: 700px) {
+  .home-inner { padding: 26px 20px 40px; }
+  .home-head { gap: 14px; }
+  .home-mode-switch .tabs button { min-width: 92px; padding-inline: 12px; }
 }
 
 .setup {
@@ -495,8 +493,8 @@
 }
 .project-card:hover,
 .project-card:focus-visible {
-  transform: translateY(-3px);
-  border-color: rgb(255 209 102 / 0.55);
+  transform: translateY(-2px);
+  border-color: var(--sun);
   box-shadow: 0 16px 36px -18px light-dark(rgb(15 30 55 / 0.3), rgb(0 0 0 / 0.8));
 }
 .project-card.missing .thumb,
@@ -521,10 +519,7 @@
   height: 150px;
   display: grid;
   place-items: center;
-  background:
-    linear-gradient(transparent 23px, light-dark(rgb(15 30 55 / 0.045), rgb(255 255 255 / 0.025)) 24px) 0 0 / 24px 24px,
-    linear-gradient(90deg, transparent 23px, light-dark(rgb(15 30 55 / 0.045), rgb(255 255 255 / 0.025)) 24px) 0 0 / 24px 24px,
-    light-dark(#e1e6ee, #0a1424);
+  background: var(--raised);
   border-bottom: 1px solid var(--line);
 }
 .thumb img,
@@ -2192,3 +2187,55 @@
 .app-language-option > span > span { font-size: 11px; color: var(--text-2); }
 .app-language-option svg { width: 16px; height: 16px; color: var(--sun-text); flex: none; }
 .app-language-empty { padding: 16px 11px; margin: 0; }
+
+/* A shared production vocabulary for single videos and course lessons. */
+.quick-card.creation-page { width: min(820px, 100%); gap: 22px; }
+.quick-card .production-head { align-items: flex-start; gap: 20px; }
+.quick-card .production-head > div { min-width: 0; display: grid; gap: 10px; }
+.quick-card h1 { overflow-wrap: anywhere; }
+.creation-status { display: flex; align-items: flex-start; gap: 16px; padding: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.creation-status > span { display: grid; place-items: center; width: 40px; height: 40px; flex: none; background: var(--sun-soft); border-radius: 50%; color: var(--sun-text); }
+.creation-status .creation-ready { background: var(--mint-soft); color: var(--mint); }
+.creation-status > div { min-width: 0; display: grid; gap: 7px; }
+.creation-status p { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
+.creation-status small { color: var(--text-3); }
+.creation-stages { list-style: none; margin: 16px 0 8px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; }
+.creation-stages li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 8px 5px; min-width: 0; text-align: center; }
+.creation-stages li:not(:last-child)::after { content: ''; position: absolute; height: 2px; top: 39px; left: calc(50% + 36px); width: calc(100% - 72px); background: var(--line-strong); }
+.creation-stages li.complete::after { background: var(--mint); opacity: .5; }
+.creation-dial { position: relative; width: 64px; height: 64px; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--text-3); background: var(--panel); }
+.creation-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); fill: none; stroke-width: 3px; }
+.creation-dial .dial-track { stroke: var(--line-strong); }
+.creation-dial .dial-value { stroke: currentColor; stroke-linecap: round; transition: stroke-dashoffset .3s var(--ease-out); }
+.creation-dial > span { display: inline-flex; align-items: baseline; gap: 1px; font-size: 17px; }
+.creation-dial > span small { font-size: 9px; }
+.creation-stages .current .creation-dial { background: var(--sun-soft); color: var(--sun-text); box-shadow: 0 0 0 5px var(--sun-soft); }
+.creation-stages .complete .creation-dial { color: var(--mint); background: var(--mint-soft); }
+.creation-stage-copy { display: grid; justify-items: center; align-content: start; gap: 6px; min-width: 0; max-width: 19ch; }
+.creation-stage-copy strong { font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.creation-stage-copy small { font-size: 10px; color: var(--text-3); overflow-wrap: anywhere; }
+.creation-stages .pending .creation-stage-copy { color: var(--text-3); }
+.creation-stages .current .creation-stage-copy strong { color: var(--sun-text); }
+.creation-dial.indeterminate .dial-value { stroke-dasharray: 24 76; stroke-dashoffset: 0; animation: creation-dial-spin 2s linear infinite; transform-origin: center; }
+@keyframes creation-dial-spin { to { transform: rotate(360deg); } }
+.saved-series-plans { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; }
+.saved-series-plans summary { cursor: pointer; color: var(--text-2); }
+.saved-series-plans button { display: flex; width: 100%; justify-content: flex-start; white-space: normal; text-align: left; margin-top: 6px; }
+.creation-estimate { max-width: 65ch; }
+.quick-intro { display: flex; gap: 16px; align-items: flex-start; }
+.quick-intro > span { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 13px; background: var(--sun-soft); color: var(--sun-text); }
+.quick-intro h2 { margin: 0 0 8px; font: 750 21px/1.2 var(--font-display); }
+.quick-intro p { margin: 0; color: var(--text-2); line-height: 1.6; }
+.quick-config { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 14px; background: var(--raised); border-radius: var(--r-md); color: var(--text-2); font-size: 11px; }
+.quick-config > span, .quick-config > button { display: inline-flex; align-items: center; gap: 6px; }
+.quick-config svg { width: 14px; height: 14px; flex: none; }
+.quick-config > button { margin-left: auto; }
+.quick-form .quick-prompt { min-height: 130px; resize: vertical; line-height: 1.65; }
+.quick-delivery { padding: 12px 0; border-top: 1px solid var(--line); }
+.quick-delivery summary { cursor: pointer; font-weight: 600; font-size: 12px; margin-bottom: 12px; }
+@media (prefers-reduced-motion: reduce) { .creation-dial .dial-value { transition: none; animation: none; } }
+@media (max-width: 700px) {
+  .quick-view { padding: 24px 16px; }
+  .quick-card .production-head { flex-wrap: wrap; }
+  .creation-stages li { gap: 12px; }
+}

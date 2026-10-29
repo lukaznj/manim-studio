@@ -17,7 +17,7 @@ import { languageName, mediaNote } from './claude'
 import { createProject, listProjects, project, readScene, readScript, requireProject, saveScene, saveScript } from './projects'
 import { agentProjects } from './agent-projects'
 import { getSettings } from './settings'
-import { calculate, getTimeline, readSource, renderPreview, textResult, viewFrames, viewSourcePages } from './scene-tools'
+import { calculate, getTimeline, readSource, renderPreview, reportAuthoringProgress, textResult, viewFrames, viewSourcePages } from './scene-tools'
 import { slugify } from './slug'
 import { sourcesNote } from './sources'
 import { scriptBrief, scriptStatus } from '../shared/script'
@@ -305,6 +305,8 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
     }
     case 'render_preview':
       return renderPreview(projectFor(req), MAX_WAIT_MS)
+    case 'report_progress':
+      return reportAuthoringProgress(projectFor(req), args.phase as 'script' | 'scene', Number(args.completed), Number(args.total), args.detail as string | undefined)
     case 'get_timeline':
       return getTimeline(projectFor(req))
     case 'view_frames':

@@ -48,7 +48,9 @@ import { importSources, listSources, removeSource, sourcePages } from './sources
 import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint, desktopVideosBusy, stopDesktopVideos } from './mcp'
 import { watchMemory } from './memory'
-import { quickRun, setupQuick, startQuick, stopQuick } from './quick'
+import { quickRun, quickRuns, resumeQuick, settleQuick, setupQuick, startQuick, stopQuick } from './quick'
+import { updateAgentCapacity } from './agent-slots'
+import { productionProgress } from './production-progress'
 import {
   continueSeries,
   retrySeriesEpisode,
@@ -59,6 +61,8 @@ import {
   renameSeries,
   switchSeriesAgent,
   seriesRun,
+  seriesRuns,
+  stopAllSeries,
   setupSeries,
   settleSeries,
   startSeries,
@@ -90,7 +94,7 @@ import * as projects from './projects'
 import { cancel, frame, onRenderEvent, render, rendersBusy } from './render'
 import { pauseTag, runningJobs, stopRunners } from './runner'
 import { criticalWork, QuitCoordinator, settleCriticalWork, shutdownRequested } from './work-lifecycle'
-import { saveSeriesDraft, seriesDraft } from './series-draft'
+import { saveSeriesDraft, saveSeriesPlan, savedSeriesPlans, seriesDraft } from './series-draft'
 import { translateUi } from '../shared/i18n'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
@@ -285,6 +289,7 @@ function registerIpc(): void {
   handle('getSettings', () => getSettings())
   handle('setSettings', (patch: Parameters<typeof setSettings>[0]) => {
     const settings = setSettings(patch)
+    if ('agentConcurrency' in patch) updateAgentCapacity()
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
     if ('interfaceSize' in patch) win?.webContents.setZoomFactor((settings.interfaceSize ?? 100) / 100)
@@ -414,8 +419,11 @@ function registerIpc(): void {
   handle('pauseExport', (id: string, on: boolean) => pauseExport(id, on))
   handle('frame', async (t: number, width?: number) => frame(t, width))
   handle('startQuick', async (req: QuickRequest) => (await startQuick(req)).run)
-  handle('quickRun', () => quickRun())
-  handle('stopQuick', () => stopQuick())
+  handle('quickRun', (project?: string) => quickRun(project))
+  handle('quickRuns', () => quickRuns())
+  handle('stopQuick', (project?: string) => stopQuick(project))
+  handle('resumeQuick', (project?: string) => resumeQuick(project))
+  handle('productionProgress', (dir: string) => productionProgress(dir))
   handle('planSeries', async (req: Parameters<typeof planSeries>[0]) => {
     if (shutdownRequested()) throw new Error('The app is closing. Try again after reopening it.')
     planning?.abort()
@@ -434,16 +442,19 @@ function registerIpc(): void {
     }
   })
   handle('seriesDraft', () => seriesDraft())
+  handle('savedSeriesPlans', () => savedSeriesPlans())
+  handle('saveSeriesPlan', (draft: import('../shared/types').SeriesDraft) => saveSeriesPlan(draft))
   handle('saveSeriesDraft', (draft: Parameters<typeof saveSeriesDraft>[0]) => saveSeriesDraft(draft))
   handle('cancelSeriesPlan', () => planning?.abort())
   handle('renameSeries', (folder: string, title: string) => renameSeries(folder, title))
   handle('agentRoutes', () => agentRoutes())
   handle('fallbackModels', () => fallbackModels())
   handle('chatSelectModel', (route: import('../shared/types').ModelRoute) => chatSelectModel(route))
-  handle('switchSeriesAgent', (route: AgentRoute) => switchSeriesAgent(route))
+  handle('switchSeriesAgent', (route: AgentRoute, folder?: string) => switchSeriesAgent(route, folder))
   handle('switchExercisesAgent', (folder: string, route: AgentRoute) => ex.switchExercisesAgent(folder, route))
   handle('startSeries', (start: SeriesStart) => startSeries(start, openInWindow))
   handle('seriesRun', () => seriesRun())
+  handle('seriesRuns', () => seriesRuns())
   handle('openEpisodeReport', async (dir: string) => {
     const root = resolve(dir)
     const report = existsSync(join(root, 'project.json'))
@@ -455,11 +466,11 @@ function registerIpc(): void {
     const error = await shell.openPath(refreshMetricsReport(root))
     if (error) throw new Error(error)
   })
-  handle('stopSeries', () => stopSeries())
-  handle('dismissSeries', () => dismissSeries())
+  handle('stopSeries', (folder?: string) => stopSeries(folder))
+  handle('dismissSeries', (folder?: string) => dismissSeries(folder))
   handle('continueSeries', (folder?: string) => continueSeries(folder))
   handle('retrySeriesEpisode', (dir: string) => retrySeriesEpisode(dir))
-  handle('pauseSeries', (paused: boolean) => pauseSeries(paused))
+  handle('pauseSeries', (paused: boolean, folder?: string) => pauseSeries(paused, folder))
   handle('pauseEpisode', (dir: string, paused: boolean) => pauseEpisode(dir, paused))
   handle('projectUsage', () => projectUsage())
   handle('createExerciseSet', (req: NewExerciseSet) => ex.createExerciseSet(req))
@@ -579,8 +590,6 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(permissionAllowed(wc, permission)))
   setupMenu(
     (action, extra) => void showWindow().then(() => send('menu', { action, ...extra })),
-    () => void installClaudeExtension().catch((e: Error) => dialog.showErrorBox('Claude Desktop', e.message)),
-    canUninstall() ? () => void removeDownloadedTools(true, () => productionBusy() || rendersBusy() || !!agentBusy.size || agentRuntimeBusy() || ex.exercisesBusy(), () => app.quit()).catch((e: Error) => dialog.showErrorBox('Manim Studio', e.message)) : undefined,
   )
 
   nativeTheme.themeSource = getSettings().appearance
@@ -593,7 +602,7 @@ app.whenReady().then(async () => {
   onRenderEvent((e) => send('render', e))
   onExportsChanged((jobs) => send('exports', jobs))
   setupQuick({ send: (run) => send('quick', run), openInWindow })
-  await setupSeries((run) => send('series', run)).catch((error: Error) => {
+  await setupSeries((run) => { send('series', run); send('series-runs', seriesRuns()) }).catch((error: Error) => {
     dialog.showErrorBox('Manim Studio', `Couldn’t recover the series: ${error.message}`)
   })
   ex.setupExercises((set) => send('exercises', set))
@@ -606,7 +615,7 @@ app.whenReady().then(async () => {
     send('usage-limit', e)
     return true
   }, () => { void showWindow() })
-  projects.onSceneChangedOnDisk((source) => send('file-changed', { source, external: true }))
+  projects.onSceneChangedOnDisk((source) => send('file-changed', { source, external: true, agent: !!projects.project() && agentBusy.has(projects.project()!.path) }))
   projects.onScriptChangedOnDisk((text) => send('script', { text }))
   setupUpdater((e) => send('update', e))
   startDesktopEndpoint({
@@ -626,9 +635,9 @@ app.whenReady().then(async () => {
   // Keep production running while the display sleeps; never prevent display sleep or a lid close.
   let powerBlock: number | null = null
   const updatePower = () => {
-    const run = seriesRun()
     const active = criticalWork() || !!planning || exportJobs().some((job) => ['waiting', 'running'].includes(job.state) && !job.paused)
-      || (run?.state === 'working' && run.episodes.some((ep) => !ep.held && !ep.limitedUntil && ['script', 'scene', 'check'].includes(ep.state)))
+      || quickRuns().some((run) => run.state === 'working' && !run.limitedUntil)
+      || seriesRuns().some((run) => run.state === 'working' && run.episodes.some((ep) => !ep.held && !ep.limitedUntil && ['script', 'scene', 'check'].includes(ep.state)))
     if (active && powerBlock === null) powerBlock = powerSaveBlocker.start('prevent-app-suspension')
     else if (!active && powerBlock !== null) { powerSaveBlocker.stop(powerBlock); powerBlock = null }
   }
@@ -664,9 +673,8 @@ const planningTasks = new Set<Promise<unknown>>()
 let installOnExit = false
 
 function productionBusy(): boolean {
-  const run = seriesRun()
-  return !!planning || (run?.state === 'working' || run?.state === 'paused') || exportsBusy()
-    || desktopVideosBusy() || watchVideosBusy() || quickRun()?.state === 'working'
+  return !!planning || seriesRuns().some((run) => run.state === 'working' || run.state === 'paused') || exportsBusy()
+    || desktopVideosBusy() || watchVideosBusy() || quickRuns().some((run) => run.state === 'working')
 }
 
 const quit = new QuitCoordinator({
@@ -687,13 +695,13 @@ const quit = new QuitCoordinator({
   },
   prepare: async () => {
     planning?.abort()
-    stopSeries()
+    stopAllSeries()
     stopQuick()
     stopDesktopVideos()
     stopWatchVideos()
     closeChat()
     // Cancellation finishes before exit: narration is copied back and agent chats/checkpoints flush.
-    await Promise.all([stopExports(), stopRunners(), settleSeries(), Promise.allSettled([...planningTasks])])
+    await Promise.all([stopExports(), stopRunners(), settleSeries(), settleQuick(), Promise.allSettled([...planningTasks])])
     stopTtsWorker()
   },
   exit: () => { if (installOnExit) installUpdate(); else app.quit() },

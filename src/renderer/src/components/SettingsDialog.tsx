@@ -210,7 +210,6 @@ function AgentTab() {
   const models = useStore((s) => s.models)
   const status = useStore((s) => s.claude)
   const signedIn = !!status?.loggedIn
-  const seriesAgents = useStore((s) => s.settings!.seriesAgents)
   const [available, setAvailable] = useState<Partial<Record<Agent, boolean>>>({})
   useEffect(() => {
     let active = true
@@ -302,18 +301,9 @@ function AgentTab() {
         </details>
       </>}
       <FallbackSettings />
-      <Row
-        title={uiText('Agents at once')}
-        text={uiText(
-          'How many agents an unattended series or an exercise set runs at once: for a series, one writes the scripts in order and the others make each video as soon as its script is ready. More is faster, but uses your plan’s limits faster and renders more at once on this computer.',
-        )}
-      >
-        <Tabs
-          radio="Agents at once"
-          value={String(seriesAgents || 3)}
-          onChange={(v) => void updateSettings({ seriesAgents: Number(v) })}
-          items={['1', '2', '3', '4'].map((n) => ({ value: n, label: n }))}
-        />
+      <Row title={uiText('Agents at once')} text={uiText('Shared across all videos. Finishes active work first; chat stays available.')}>
+        <label className="agent-capacity-toggle"><input type="checkbox" checked={!settings.agentConcurrency} onChange={(e) => void updateSettings({ agentConcurrency: e.target.checked ? 0 : 3 })} />{uiText('Unlimited')}</label>
+        {!!settings.agentConcurrency && <input className="input agent-capacity-input" type="number" min={1} step={1} value={settings.agentConcurrency} aria-label={uiText('Agents at once')} onChange={(e) => { if (e.currentTarget.value && e.currentTarget.validity.valid) void updateSettings({ agentConcurrency: Number(e.currentTarget.value) }) }} />}
       </Row>
       {agent === 'codex' && signedIn && (
         <Row

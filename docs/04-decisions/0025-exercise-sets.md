@@ -24,6 +24,6 @@ Students mostly don't need a 10-minute explainer: they need one exercise solved,
 ## Consequences
 
 - An exercise's answer is readable within a minute or two; its video follows. Pausing, removing and revising are states the loop reads, and opening a set carries on with what's unfinished, also after a restart.
-- Several agents at once (Settings → Agent's `seriesAgents`) use the plan's limits as many times faster.
+- Exercises start independent agents without a default application count ceiling, as series do (ADR 0023). The optional shared background-agent budget applies (ADR 0058). Pause/Stop and provider usage limits still apply; exports remain queued per render machine.
 - Exercises live outside Home's project list: a set is one card. Moving a set's folder by hand loses it until it's in the projects folder again.
 - The lecture needs every video exported with the same size and codec; a mismatch is refused with what to export again.

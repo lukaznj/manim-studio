@@ -9,6 +9,12 @@ import { cleanEnv, pythonExe } from './env'
 import { readTimeline } from './projects'
 import { currentOrNewRender, framesBase64, type RenderOutcome } from './render'
 import { requireSource, sourcePageCount, sourcePages, sourceText } from './sources'
+import { reportProgress } from './production-progress'
+
+export function reportAuthoringProgress(dir: string, phase: 'script' | 'scene', completed: number, total: number, detail?: string): CallToolResult {
+  try { reportProgress(dir, phase, completed, total, detail); return textResult(`Recorded ${completed}/${total} sections (${phase}).`) }
+  catch (error) { return textResult((error as Error).message, true) }
+}
 
 export const textResult = (text: string, isError = false): CallToolResult => ({ content: [{ type: 'text', text }], ...(isError ? { isError } : {}) })
 

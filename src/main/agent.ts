@@ -19,9 +19,12 @@ import { codexSession, codexUsesKey } from './codex'
 import { agentProjects } from './agent-projects'
 import { fakeAgent, fakeAgents } from './agent-fake'
 import { commitAll } from './git'
-import { readChat, readMeta, updateMetaAt, writeChat } from './projects'
+import { readChat, readMeta, readScript, updateMetaAt, writeChat } from './projects'
+import { scriptStatus } from '../shared/script'
 import { getSecret, getSettings } from './settings'
 import { appendUsage, recordTurn } from './usage'
+import { beginProductionPhase, finishProductionPhase } from './production-progress'
+import { agentSlot } from './agent-slots'
 
 export interface EpisodeAgent {
   /** One turn: sends `text` and waits for Claude to finish. `step` labels its usage ("Script", "Video"…). */
@@ -57,7 +60,7 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
   const chosen = defaultAgentSelection(settings, opts.agent ?? settings.agent)
   const base = normalizeModelOrder([{ ...chosen, ...opts, auth: opts.auth ?? configuredAuth(chosen.agent) }])[0]
   const selected = fallbackEnabled() && !opts.strictModel && !opts.preferSelected ? await availableFallback() ?? base : base
-  return routedAgent(selected, {
+  const routed = await routedAgent(selected, {
     open: (route) => createEpisodeAgent(dir, { ...opts, ...route }),
     enabled: fallbackEnabled,
     preferred: availableFallback,
@@ -71,6 +74,23 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
     followPriority: !!opts.followPriority,
     withHistory: !!opts.withHistory,
   })
+  const stop = new AbortController()
+  return {
+    close: () => { stop.abort(); routed.close() },
+    async turn(text, step) {
+      const release = opts.autopilot === false ? () => {} : await agentSlot(stop.signal, step, () => opts.onTool('Waiting for an agent slot'))
+      try {
+        if (stop.signal.aborted) return { ok: false, error: 'Stopped' }
+        const phase = step === 'Script' ? 'script' : step === 'Video' ? 'scene' : undefined
+        if (phase) beginProductionPhase(dir, phase)
+        const result = await routed.turn(text, step)
+        if (result.ok && phase === 'script' && scriptStatus(readScript(dir) ?? '') !== 'approved')
+          return { ok: false, error: 'The agent did not finish approving the script. Continue to finish it.' }
+        if (result.ok && phase) finishProductionPhase(dir, phase)
+        return result
+      } finally { release() }
+    },
+  }
 }
 
 async function createEpisodeAgent(dir: string, opts: AgentOptions): Promise<EpisodeAgent> {

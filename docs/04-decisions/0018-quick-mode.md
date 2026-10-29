@@ -11,13 +11,13 @@ Making a video in the editor means steering Claude turn by turn. Often you just 
 
 ## Decision
 
-- **Quick video** (Home, File → Quick Video…, ⇧⌘N) asks for a description, optional PDFs, format, language, tone, theme and whether to export both themes. The voice is Settings → Voice's default; the dialog warns when that would leave the narration silent.
-- **`src/main/quick.ts` runs it:** it creates the project (script first on), opens it, adds the PDFs as sources, and sends Claude the request on **autopilot**: the brief says nobody is watching, so Claude approves its own script ([[0016-script-first]]), never stops to ask, and finishes with a clean render.
-- **Studio checks for itself.** After Claude's turn it renders, and sends Claude back with the error or the layout warnings, up to three times. Warnings left after that are reported; an error that remains fails the run. Then it queues the export ([[0017-background-export-queue]]).
-- **The window shows progress instead of the editor** (`QuickView.tsx`): the steps, what Claude is doing, the latest preview, Stop, and when it's done, the files. The editor is a click away and the chat holds the whole conversation, so a quick video can be fixed by hand like any other.
-- One quick run at a time. It uses the open project's chat, so it runs in the foreground; the export then runs in the background like any other.
+- **Quick video** uses the current creation model, narration, aspect, tone and output defaults from Settings. Its brief and optional PDFs are the main inputs. Export variants and render-server selection are secondary options.
+- **`src/main/quick.ts` runs a project-bound background agent**, shared with series production. Script approval and video implementation are separate turns; Studio independently renders, repairs and exports. All three providers, ordered fallback and returning to a higher-priority available model apply. Its conversation is saved in the project.
+- **Navigation never owns the job.** The initial progress page opens once; users can go to the library, study other lessons, work in another project or plan a course. A persistent title-bar button returns to the quick job. Background edits do not trigger a second automatic preview render in the open editor.
+- **Independent concurrent quick jobs**, each with its own checkpoint and controls, alongside any series ([[0058-independent-production-jobs]]). Work and export remain bound to their project even when another project is open. The production page offers Stop, Continue, completed files and Watch; editing is available after stopping or completing production.
+- **Checkpoint each transition atomically** with the request and copied-source state. Stop cancels the agent, preview and queued export. After restart an interrupted job is stopped, never silently spending usage. Continue keeps its project and approved script, resumes checking/export at their saved stages and recognizes a completed export receipt. Quit waits for quick work to settle. Initial project creation is a protected transaction.
+- **Progress is shared with course production** (see [[0057-creation-progress-and-research]]), using section estimates for writing and actual renderer/export counters when available.
 
 ## Consequences
 
-- Needs a signed-in Claude and an installed environment; it says so up front instead of failing halfway.
-- The quality bar is Claude's self-review plus Studio's checks (errors, layout warnings). Nobody looks at the video before it's exported, which is the point.
+Quick videos use the same agent routing and shutdown protections as other production work. Files and conversations stay editable afterward. Forced termination may repeat the unfinished turn or export, while completed stages and source copies survive.

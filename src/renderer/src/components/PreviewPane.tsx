@@ -1,5 +1,5 @@
 import { t as uiText, format } from '../lib/i18n'
-import { Captions, ChevronDown, CircleAlert, Code2, Pause, Sparkles, TriangleAlert, Wrench } from 'lucide-react'
+import { Captions, ChevronDown, CircleAlert, Code2, Pause, Sparkles, TriangleAlert, Video, Wrench } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { captionBand } from '../../../shared/caption'
 import type { Aspect } from '../../../shared/types'
@@ -15,6 +15,8 @@ export function PreviewPane() {
   const env = useStore((s) => s.setup?.env)
   const dirty = useStore((s) => s.dirty)
   const stale = useStore((s) => s.stale)
+  const agent = useStore((s) => s.chatRoute?.agent ?? s.settings?.agent ?? 'claude')
+  const agentName = agent === 'codex' ? 'Codex' : agent === 'antigravity' ? 'Antigravity' : 'Claude'
   const aspect = useStore((s) => s.project?.meta.aspect ?? '16:9')
   const captionBand = useStore((s) => !!s.project?.meta.captionBand)
   const stage = useRef<HTMLDivElement>(null)
@@ -35,6 +37,7 @@ export function PreviewPane() {
 
   return (
     <div className="preview-pane">
+      <div className="pane-head editor-preview-head"><span className="editor-pane-title"><Video />{uiText('Preview')}</span><span className="badge">{aspect}</span></div>
       <div className="stage" ref={stage}>
         <div className={`frame ${render.status === 'rendering' ? 'rendering' : ''}`} style={{ width: box.w, height: box.h }}>
           {src ? (
@@ -119,7 +122,7 @@ export function PreviewPane() {
                       )
                     }}
                   >
-                    <Sparkles /> {uiText(" Ask Claude to fix the layout")}
+                    <Sparkles /> {uiText('Ask Claude to fix the layout').replace('Claude', agentName)}
                   </button>
                 </div>
               )}
@@ -169,6 +172,7 @@ function CaptionOverlay() {
 function ErrorCard() {
   const error = useStore((s) => s.render.error)!
   const chatBusy = useStore((s) => s.chatBusy)
+  const agent = useStore((s) => s.chatRoute?.agent ?? s.settings?.agent ?? 'claude')
   const [details, setDetails] = useState(false)
   return (
     <div className="error-card">
@@ -194,7 +198,7 @@ function ErrorCard() {
             void sendChat(`The render failed${error.line ? ` on line ${error.line}` : ''}:\n${error.message}\n\nFix it and check the render.`, false)
           }
         >
-          <Sparkles /> {uiText(" Fix with Claude")}
+          <Sparkles /> {uiText('Fix with Claude').replace('Claude', agent === 'codex' ? 'Codex' : agent === 'antigravity' ? 'Antigravity' : 'Claude')}
         </button>
         <button className="btn ghost small" onClick={() => void renderNow()}>
           {uiText('Retry')}

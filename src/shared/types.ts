@@ -278,7 +278,7 @@ export interface EpisodeRun {
 export interface SeriesRun {
   title: string
   folder: string
-  agents: number
+  agents?: number // legacy checkpoint field; ignored by scheduling and removed on recovery
   agent?: Agent // captured at creation; changing Settings does not reroute a running series
   metrics?: DeveloperMetricsOptions // measured episodes run serially, including export
   report?: string // combined developer report
@@ -287,7 +287,8 @@ export interface SeriesRun {
   auth?: ClaudeAuth // how its agent signs in; another agent or the key can take over at a limit (ADR 0048)
   // paused: its agents stop until resumed; stopped: also its exports, and it carries on with Continue,
   // even after a restart (the app keeps the run in the series folder)
-  state: 'working' | 'paused' | 'stopped' | 'done'
+  state: 'working' | 'paused' | 'stopped' | 'done' | 'queued'
+  queuedAt?: number
   episodes: EpisodeRun[]
   planningCostUSD?: number
   planningApiEstimateUSD?: number | null
@@ -303,11 +304,14 @@ export interface SeriesPlan {
 }
 
 export interface SeriesDraft {
+  id?: string
+  savedAt?: number
   request: { pdfs: string[]; topic?: string; instructions?: string; language: string; tone: Tone }
   plan?: SeriesPlan
 }
 
 export interface SeriesStart {
+  schedule?: 'queue' | 'now'
   plan: SeriesPlan
   pdfs: string[] // paths on this computer; episodes refer to them by file name
   aspect: Aspect
@@ -584,6 +588,10 @@ export interface QuickRun {
   result?: ExportResult
   error?: string
   warnings: string[] // what couldn't be fixed (e.g. a voice problem); the video was still made
+  route?: ModelRoute
+  limitedUntil?: number
+  sources?: number
+  startedAt?: number
   series?: { title: string; episode: number; of: number; episodes?: { title: string; state: 'done' | 'failed' | 'now' | 'todo' }[] }
 }
 
@@ -723,7 +731,8 @@ export interface Settings {
   exerciseSets?: string[] // exercise set folders (Home lists them; search looks in them)
   seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed
   modelFallback?: { enabled: boolean; order: ModelRoute[] }
-  seriesAgents: number // episodes a series makes at once, one Claude agent each (ADR 0023)
+  seriesAgents?: number // legacy setting; ignored and removed on load
+  agentConcurrency?: number // optional app-wide background agent budget; 0/unset: unlimited
   seriesModels?: Partial<Record<Agent, Partial<Record<SeriesRole, { model: string; effort: Effort }>>>> // per agent; unset make inherits the creation model, plan uses SERIES_PLANNERS (ADR 0045)
   autoRender: boolean
   sounds?: boolean // app sounds (ADR 0046); unset: on
@@ -888,6 +897,7 @@ export type EventChannel =
   | 'quick'
   | 'series-plan'
   | 'series'
+  | 'series-runs'
   | 'exercises'
   | 'watch'
   | 'open-project'
@@ -956,8 +966,11 @@ export interface StudioApi {
   frame(t: number, width?: number): Promise<string>
   /** Starts quick mode: creates the project, opens it, and Claude makes and exports the video. */
   startQuick(request: QuickRequest): Promise<QuickRun>
-  quickRun(): Promise<QuickRun | null>
-  stopQuick(): Promise<void>
+  quickRun(project?: string): Promise<QuickRun | null>
+  quickRuns(): Promise<QuickRun[]>
+  stopQuick(project?: string): Promise<void>
+  resumeQuick(project?: string): Promise<QuickRun>
+  productionProgress(project: string): Promise<import('./production-progress').ProductionProgress>
   /** Reads the PDFs and asks Claude for a series plan (a minute or two). */
   /** Plans a series from PDFs, or from `topic` (what the user wants to learn) when there are none. */
   planSeries(request: { pdfs: string[]; topic?: string; instructions?: string; language: string; tone: Tone }): Promise<SeriesPlan>
@@ -970,25 +983,28 @@ export interface StudioApi {
   fallbackModels(): Promise<FallbackModelOption[]>
   chatSelectModel(route: ModelRoute): Promise<void>
   /** The running series carries on with this agent; episodes waiting on a limit start again at once. */
-  switchSeriesAgent(route: AgentRoute): Promise<void>
+  switchSeriesAgent(route: AgentRoute, folder?: string): Promise<void>
   /** The same for an exercise set's agents. */
   switchExercisesAgent(folder: string, route: AgentRoute): Promise<void>
   /** Renames a series on Home (its episodes' project.json and series.json); folders keep their names. */
   renameSeries(folder: string, title: string): Promise<void>
   /** Creates the series' projects; unattended, makes them one after another in quick mode. */
-  startSeries(start: SeriesStart): Promise<void>
+  startSeries(start: SeriesStart): Promise<string>
   /** The series being made unattended, or the last one until it's dismissed. */
   seriesRun(): Promise<SeriesRun | null>
+  seriesRuns(): Promise<SeriesRun[]>
+  savedSeriesPlans(): Promise<SeriesDraft[]>
+  saveSeriesPlan(draft: SeriesDraft): Promise<SeriesDraft>
   /** Stops the agents and exports; Continue (continueSeries) carries on later, even after a restart. */
-  stopSeries(): Promise<void>
+  stopSeries(folder?: string): Promise<void>
   continueSeries(folder?: string): Promise<void>
   retrySeriesEpisode(dir: string): Promise<void>
   /** Pauses or resumes the whole series (its agents), or one episode. */
-  pauseSeries(paused: boolean): Promise<void>
+  pauseSeries(paused: boolean, folder?: string): Promise<void>
   pauseEpisode(dir: string, paused: boolean): Promise<void>
   /** What the open project's agent turns used, one entry per turn. */
   projectUsage(): Promise<UsageEntry[]>
-  dismissSeries(): Promise<void>
+  dismissSeries(folder?: string): Promise<void>
 
   /** Creates an exercise set from the first exercises and starts solving them; returns its folder. */
   createExerciseSet(request: NewExerciseSet): Promise<string>
@@ -1109,6 +1125,7 @@ export interface StudioApi {
   on(channel: 'quick', cb: (run: QuickRun | null) => void): () => void
   on(channel: 'series-plan', cb: (p: SeriesPlanProgress) => void): () => void
   on(channel: 'series', cb: (run: SeriesRun | null) => void): () => void
+  on(channel: 'series-runs', cb: (runs: SeriesRun[]) => void): () => void
   on(channel: 'exercises', cb: (set: ExerciseSet) => void): () => void
   on(channel: 'watch', cb: (series: WatchSeries) => void): () => void
   /** script.md changed on disk (Claude wrote it), or was removed (null). */

@@ -85,3 +85,11 @@ The Claude extension and Codex/compatible ChatGPT desktop plugin share the stdio
 ## Course evidence in study chat
 
 `study-context.ts` builds a read-only catalog and evidence index from the course plan, scripts, rendered transcripts and complete PDF indices. A provider-independent bounded retrieval loop selects local chunks or page images through opaque ids, then the tutor answers with validated citations. The typed `studyReference` IPC resolves a reference saved in the current episode’s chat, revalidates its course membership and freshness, and returns a video target or PDF page image. The renderer keeps fullscreen and offers returning to the original lesson. See [[../04-decisions/0055-course-aware-study-evidence|ADR 0055]].
+
+## Background quick videos and creation progress
+
+Quick videos now run the same project-bound agent factory as series episodes, with separate scripting, implementation, check and export checkpoints. The foreground project can change freely. `production-progress.ts` persists authoring estimates from the shared `report_progress` scene tool and derives fallback section coverage from saved files. A read-only IPC method supplies the shared production stages; preview/export counters keep their own measured phases. Native provider web tools are enabled for research without expanding file-write permissions. See [[../04-decisions/0057-creation-progress-and-research|ADR 0057]].
+
+## Independent production
+
+`series.ts` owns one controller per course; `quick.ts` owns one controller per quick video. Atomic local registries/checkpoints preserve every job, and saved plans survive rejected starts. Renderer state tracks all jobs and targets controls by folder. `agent-slots.ts` applies the optional global background-turn budget; `runner.ts` queues local drawing independently. Shutdown settles every controller. See [[../04-decisions/0058-independent-production-jobs|ADR 0058]].

@@ -1,4 +1,6 @@
-import { useEffect, useRef, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { Sparkles } from 'lucide-react'
+import { t } from '../lib/i18n'
 import { editorBridge } from '../lib/editor-bridge'
 import { playback } from '../lib/playback'
 import { openDialog, renderNow, saveScene, selectClips, updateSettings, useStore } from '../store'
@@ -11,6 +13,20 @@ export function Editor() {
   const settings = useStore((s) => s.settings)!
   const timeline = useStore((s) => s.timeline)
   const ref = useRef<HTMLDivElement>(null)
+  const [bounds, setBounds] = useState({ width: 1400, height: 900 })
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new ResizeObserver(() => setBounds({ width: el.clientWidth, height: el.clientHeight }))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  // Shrink panes for smaller windows without overwriting the user's preferred sizes.
+  const room = Math.max(440, bounds.width - 282)
+  const desired = settings.sidebarWidth + settings.chatWidth
+  const codeWidth = Math.max(200, Math.min(settings.sidebarWidth, room * settings.sidebarWidth / desired))
+  const chatWidth = Math.max(240, Math.min(settings.chatWidth, room - codeWidth))
+  const timelineHeight = Math.min(settings.timelineHeight, Math.max(150, bounds.height * .45))
 
   useShortcuts()
   useCodeFollow()
@@ -23,9 +39,9 @@ export function Editor() {
   useEffect(() => editorBridge.showWarnings(timeline?.warnings ?? []), [timeline])
 
   const style = {
-    '--code-w': `${settings.sidebarWidth}px`,
-    '--chat-w': `${settings.chatWidth}px`,
-    '--tl-h': `${settings.timelineHeight}px`,
+    '--code-w': `${codeWidth}px`,
+    '--chat-w': `${chatWidth}px`,
+    '--tl-h': `${timelineHeight}px`,
   } as CSSProperties
 
   return (
@@ -33,15 +49,15 @@ export function Editor() {
       <section className="pane pane-code" data-tour="code">
         <CodePane />
       </section>
-      <Resizer axis="x" containerRef={ref} prop="--code-w" min={300} max={900} onDone={(v) => void updateSettings({ sidebarWidth: v })} />
+      <Resizer axis="x" containerRef={ref} prop="--code-w" min={200} max={Math.max(200, bounds.width - chatWidth - 282)} onDone={(v) => void updateSettings({ sidebarWidth: v })} />
       <section className="pane pane-preview" data-tour="preview">
         <PreviewPane />
       </section>
-      <Resizer axis="x" containerRef={ref} prop="--chat-w" min={300} max={640} invert onDone={(v) => void updateSettings({ chatWidth: v })} />
+      <Resizer axis="x" containerRef={ref} prop="--chat-w" min={240} max={Math.max(240, bounds.width - codeWidth - 282)} invert onDone={(v) => void updateSettings({ chatWidth: v })} />
       <section className="pane pane-chat" data-tour="chat">
-        <ChatPane />
+        <ChatPane head={<span className="editor-pane-title"><Sparkles />{t('Chat')}</span>} />
       </section>
-      <Resizer axis="y" containerRef={ref} prop="--tl-h" min={170} max={520} invert onDone={(v) => void updateSettings({ timelineHeight: v })} />
+      <Resizer axis="y" containerRef={ref} prop="--tl-h" min={150} max={Math.max(150, bounds.height - 260)} invert onDone={(v) => void updateSettings({ timelineHeight: v })} />
       <section className="pane pane-timeline" data-tour="timeline">
         <Timeline />
       </section>
@@ -74,13 +90,30 @@ function Resizer(props: {
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
       document.body.classList.remove('resizing-x', 'resizing-y')
       props.onDone(value)
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
   }
-  return <div className={`resizer resizer-${props.axis} resizer${props.prop}`} onPointerDown={onPointerDown} role="separator" />
+  return <div className={`resizer resizer-${props.axis} resizer${props.prop}`} onPointerDown={onPointerDown} role="separator" tabIndex={0}
+    aria-label={props.prop === '--code-w' ? 'scene.py' : props.prop === '--chat-w' ? t('Resize assistant') : t('Timeline zoom')}
+    aria-orientation={props.axis === 'x' ? 'vertical' : 'horizontal'}
+    onKeyDown={(e) => {
+      const keys = props.axis === 'x' ? ['ArrowLeft', 'ArrowRight'] : ['ArrowUp', 'ArrowDown']
+      if (!keys.includes(e.key)) return
+      e.preventDefault()
+      e.stopPropagation()
+      const el = props.containerRef.current
+      if (!el) return
+      const current = parseFloat(getComputedStyle(el).getPropertyValue(props.prop))
+      const delta = (e.key === keys[0] ? -20 : 20) * (props.invert ? -1 : 1)
+      const value = Math.min(props.max, Math.max(props.min, current + delta))
+      el.style.setProperty(props.prop, `${value}px`)
+      props.onDone(value)
+    }} />
 }
 
 function isTyping(e: KeyboardEvent): boolean {

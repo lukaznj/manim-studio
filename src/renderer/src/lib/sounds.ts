@@ -246,13 +246,18 @@ export function cuesFor(s: State, p: State, focused: boolean): Sound[] {
     if (was && was.state !== job.state && job.state === 'done') cues.push('export')
     if (was && was.state !== job.state && job.state === 'failed') cues.push('error')
   }
-  if (s.series && p.series?.folder === s.series.folder) {
-    if (s.series.state === 'done' && p.series.state !== 'done') cues.push('series')
-    cues.push(...items(episodes(p.series), episodes(s.series), 'episode'))
+  for (const run of s.seriesRuns) {
+    const before = p.seriesRuns.find((previous) => previous.folder === run.folder)
+    if (!before) continue
+    if (run.state === 'done' && before.state !== 'done') cues.push('series')
+    cues.push(...items(episodes(before), episodes(run), 'episode'))
   }
   cues.push(...items(exercises(p.exerciseSets), exercises(s.exerciseSets), 'episode'))
-  if (s.quick && p.quick?.id === s.quick.id && p.quick.state !== s.quick.state)
-    cues.push(...(s.quick.state === 'done' ? ['episode' as const] : s.quick.state === 'failed' ? ['error' as const] : []))
+  for (const run of s.quickRuns) {
+    const before = p.quickRuns.find((previous) => previous.id === run.id)
+    if (before && before.state !== run.state)
+      cues.push(...(run.state === 'done' ? ['episode' as const] : run.state === 'failed' ? ['error' as const] : []))
+  }
   // A render you waited for; the agent's own renders while it works stay quiet.
   if (p.render.status === 'rendering' && s.render.status === 'idle' && !s.chatBusy && Date.now() - (p.render.startedAt ?? Date.now()) >= 4000)
     cues.push('render')
