@@ -1,6 +1,7 @@
 // The macOS menu bar: every command lives here, the standard Mac way (Settings… is ⌘, in the app
 // menu). Commands that need the window are sent to it as `menu` events and run the same code as
 // the buttons. Rebuilt whenever what it shows changes: the open project, recents, appearance.
+// Native menu labels and custom commands stay English regardless of the interface language.
 // Windows and Linux have no menu bar (the title bar is drawn by the page) and keep their buttons.
 import { app, Menu, shell, type MenuItemConstructorOptions } from 'electron'
 import { mkdirSync } from 'node:fs'
@@ -8,7 +9,6 @@ import type { MenuAction } from '../shared/types'
 import { checkForUpdates, RELEASES_URL } from './updater'
 import { listProjects, project } from './projects'
 import { getSettings } from './settings'
-import { translateUi } from '../shared/i18n'
 
 const REPO_URL = 'https://github.com/lukaznj/manim-studio'
 
@@ -20,13 +20,9 @@ function showLogs(): void {
 }
 
 let send: (action: MenuAction, extra?: { path?: string; value?: string }) => void = () => {}
-let installExtension: () => void = () => {}
-let uninstall: (() => void) | undefined
 
-export function setupMenu(fn: typeof send, onInstallExtension: () => void, onUninstall?: () => void): void {
+export function setupMenu(fn: typeof send): void {
   send = fn
-  installExtension = onInstallExtension
-  uninstall = onUninstall
   // Without a menu of our own, Electron keeps its default one: hidden by the page-drawn title bar,
   // but its accelerators still fire, so Ctrl+Shift+R (Record voice) force-reloaded the window.
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
@@ -35,12 +31,11 @@ export function setupMenu(fn: typeof send, onInstallExtension: () => void, onUni
 
 export function refreshMenu(): void {
   if (process.platform !== 'darwin') return
-  const t = (text: string) => translateUi(getSettings().uiLanguage ?? 'en', text)
   const open = !!project()
   const appearance = getSettings().appearance
   const learn = getSettings().mode === 'learn'
   const item = (label: string, action: MenuAction, accelerator?: string, extra: Partial<MenuItemConstructorOptions> = {}): MenuItemConstructorOptions => ({
-    label: t(label),
+    label,
     accelerator,
     click: () => send(action),
     ...extra,
@@ -55,10 +50,9 @@ export function refreshMenu(): void {
       label: app.name,
       submenu: [
         { role: 'about' },
-        { label: t('Check for Updates…'), click: () => void checkForUpdates() },
+        { label: 'Check for Updates…', click: () => void checkForUpdates() },
         { type: 'separator' },
         item('Settings…', 'settings', 'Cmd+,'),
-        ...(uninstall ? [{ label: t('Uninstall Manim Studio…'), click: uninstall }] : []),
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -70,7 +64,7 @@ export function refreshMenu(): void {
       ],
     },
     {
-      label: t('File'),
+      label: 'File',
       submenu: [
         // Learn mode has no editor (ADR 0029): only what makes something to watch.
         ...(learn ? [] : [item('New Project…', 'new-project', 'Cmd+N')]),
@@ -79,7 +73,7 @@ export function refreshMenu(): void {
         item('New Exercise Set…', 'exercises'),
         ...(learn ? [] : [item('Open Project…', 'open-project', 'Cmd+O')]),
         {
-          label: t('Open Recent'),
+          label: 'Open Recent',
           enabled: recent.length > 0,
           submenu: recent.map((p) => ({ label: p.name, click: () => send('open-recent', { path: p.path }) })),
         },
@@ -91,16 +85,16 @@ export function refreshMenu(): void {
               item('Export Video…', 'export', 'Cmd+E', { enabled: open }),
             ] as MenuItemConstructorOptions[])),
         { type: 'separator' },
-        { label: t('Show in Finder'), enabled: open, click: () => open && shell.showItemInFolder(project()!.path) },
+        { label: 'Show in Finder', enabled: open, click: () => open && shell.showItemInFolder(project()!.path) },
         item('Close Project', 'close-project', 'Shift+Cmd+W', { enabled: open }),
       ],
     },
-    { role: 'editMenu' },
+    { label: 'Edit', role: 'editMenu' },
     ...(learn
       ? []
       : ([
           {
-            label: t('Video'),
+            label: 'Video',
             submenu: [
               item('Play / Pause', 'play', undefined, { enabled: open }),
               item('Render Preview', 'render', undefined, { enabled: open }),
@@ -111,23 +105,16 @@ export function refreshMenu(): void {
           },
         ] as MenuItemConstructorOptions[])),
     {
-      label: t('Claude'),
-      submenu: [
-        item('Account, Model and Usage…', 'claude-settings'),
-        { label: t('Add to Claude Desktop…'), click: installExtension },
-      ],
-    },
-    {
-      label: t('View'),
+      label: 'View',
       submenu: [
         item('Increase interface size', 'zoom-in'),
         item('Decrease interface size', 'zoom-out'),
         item('Reset interface size', 'zoom-reset'),
         { type: 'separator' },
         {
-          label: t('Appearance'),
+          label: 'Appearance',
           submenu: (['system', 'light', 'dark'] as const).map((value) => ({
-            label: t(value === 'system' ? 'System' : value === 'light' ? 'Light' : 'Dark'),
+            label: value === 'system' ? 'System' : value === 'light' ? 'Light' : 'Dark',
             type: 'radio' as const,
             checked: appearance === value,
             click: () => send('appearance', { value }),
@@ -138,18 +125,19 @@ export function refreshMenu(): void {
         { role: 'togglefullscreen' },
       ],
     },
-    { role: 'windowMenu' },
+    { label: 'Window', role: 'windowMenu' },
     {
+      label: 'Help',
       role: 'help',
       submenu: [
         item('Show Tutorial', 'tutorial'),
         { type: 'separator' },
-        { label: t('Manim Studio Help'), click: () => void shell.openExternal(`${REPO_URL}#readme`) },
-        { label: t('Manim Documentation'), click: () => void shell.openExternal('https://docs.manim.community') },
+        { label: 'Manim Studio Help', click: () => void shell.openExternal(`${REPO_URL}#readme`) },
+        { label: 'Manim Documentation', click: () => void shell.openExternal('https://docs.manim.community') },
         { type: 'separator' },
-        { label: t('Releases'), click: () => void shell.openExternal(RELEASES_URL) },
-        { label: t('Report an Issue'), click: () => void shell.openExternal(`${REPO_URL}/issues`) },
-        { label: t('Show Logs'), click: showLogs },
+        { label: 'Releases', click: () => void shell.openExternal(RELEASES_URL) },
+        { label: 'Report an Issue', click: () => void shell.openExternal(`${REPO_URL}/issues`) },
+        { label: 'Show Logs', click: showLogs },
       ],
     },
   ]

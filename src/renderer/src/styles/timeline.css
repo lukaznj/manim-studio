@@ -1,7 +1,7 @@
 .timeline {
   height: 100%;
   display: grid;
-  grid-template-rows: 44px 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   /* An implicit column is content-sized: the wide track would stretch the scroller. */
   grid-template-columns: minmax(0, 1fr);
   background: var(--panel);
@@ -15,6 +15,9 @@
   gap: 14px;
   padding: 0 10px;
   border-bottom: 1px solid var(--line);
+  min-height: 48px;
+  flex-wrap: wrap;
+  padding-block: 6px;
 }
 .transport {
   display: flex;
@@ -70,6 +73,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
 }
 .zoom {
   display: flex;

@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { SCRIPT_FILE, scriptStatus } from '../shared/script'
+import { nextQueuedSeries, nextSeriesTask } from '../shared/series-scheduling'
 import { TONES } from '../shared/tone'
 import { seriesAgentSelection, seriesSelection, switchSeriesSelection } from '../shared/agent-selection'
 import type {
@@ -28,7 +29,7 @@ import { configuredAuth, episodeAgent, sameRoute, turnPastLimits, type EpisodeAg
 import { askClaude, chatModels, claudeStatus, languageName } from './claude'
 import { fakeAgents, fakeSeriesPlan } from './agent-fake'
 import { beginEpisodeMetrics, episodeMetricsPhase, episodeMetricsSelection, finishEpisodeMetrics } from './episode-metrics'
-import { cancelExport, completedExport, pauseExport, queueExport } from './exports'
+import { cancelExport, completedExport, exportJobs, queueExport } from './exports'
 import { cancel } from './render'
 import { createProject, readMeta, readScript, updateMetaAt } from './projects'
 import { parsePlan, titlesSoFar } from '../shared/series-plan'
@@ -41,7 +42,7 @@ import { apiEstimateOf, costOf, type UsageEntry } from '../shared/usage'
 import { isSeriesCheckpoint, recoverSeries } from '../shared/series-recovery'
 import { readAtomicJson, writeAtomicJson } from './atomic-json'
 import { protectWork, shutdownRequested } from './work-lifecycle'
-import { saveSeriesDraft } from './series-draft'
+import { saveSeriesDraft, saveSeriesPlan } from './series-draft'
 import { paths } from './paths'
 
 /** Per PDF, at most this much text goes into the planning request. */
@@ -122,11 +123,11 @@ const two = (n: number) => String(n).padStart(2, '0')
  * The running series carries on with another agent or sign-in (ADR 0048): new steps use it, and
  * episodes waiting on a usage limit start again with it at once, including comparison episodes.
  */
-export function switchSeriesAgent(to: AgentRoute): void {
-  if (!series || series.state === 'done') throw new Error('No series is being made.')
-  const maker = seriesSelection(getSettings(), 'make', to.agent)
-  switchSeriesSelection(series, to, maker)
-  save()
+export function switchSeriesAgent(to: AgentRoute, folder?: string): void {
+  const controller = controllerFor(folder)
+  if (controller.series.state === 'done') throw new Error('No series is being made.')
+  switchSeriesSelection(controller.series, to, seriesSelection(getSettings(), 'make', to.agent))
+  controller.save()
 }
 
 /** Renames a series everywhere it's shown: each episode's project.json, series.json and a run on Home. Folders keep their names. */
@@ -145,22 +146,22 @@ export function renameSeries(folder: string, title: string): void {
     saved.plan.title = name
     writeFileSync(file, JSON.stringify(saved, null, 2))
   }
-  if (series?.folder === folder) {
-    series.title = name
-    save()
-  }
+  const controller = controllers.get(folder)
+  if (controller) { controller.series.title = name; controller.save() }
 }
 
 /** Creates the series folder and one project per episode; unattended, makes them all in quick mode. */
-export async function startSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>): Promise<void> {
-  if (creating) throw new Error('A series is already being created.')
+export async function startSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>): Promise<string> {
+  saveSeriesPlan({ request: { pdfs: start.pdfs, language: start.language, tone: start.tone, topic: !start.pdfs.length ? start.plan.instructions ?? start.plan.title : undefined, instructions: start.plan.instructions }, plan: start.plan })
+  if (creating) throw new Error('A series is already being created. Your plan is saved; try again in a moment.')
   creating = true
   try {
     const pending = pendingCreation()
     const retry = pending && JSON.stringify(pending.start.plan) === JSON.stringify(start.plan) ? pending.folder : undefined
-    await protectWork(() => createSeries(start, openInWindow, retry))
+    return await protectWork(() => createSeries(start, openInWindow, retry))
   } finally {
     creating = false
+    void pumpSeriesQueue()
   }
 }
 
@@ -172,12 +173,10 @@ const pendingCreation = () => readAtomicJson(creationFile(), (value): value is S
   return !!item?.start?.plan && Array.isArray(item.start.plan.episodes) && typeof item.folder === 'string'
 })
 
-async function createSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>, recovering?: string): Promise<void> {
+async function createSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>, recovering?: string): Promise<string> {
   if (!start.plan.episodes.length) throw new Error('The series needs at least one episode.')
   if (!recovering) {
     if (start.unattended) await ensureQuickReady(start.plan.episodes[0]?.assignment?.agent)
-    if (start.unattended && series && series.state !== 'done')
-      throw new Error('Another series is still on Home. Let it finish, or stop and dismiss it there, before starting a new one.')
     const { plan } = start
     const settings = getSettings()
     const assignments = plan.episodes.flatMap((ep) => (ep.assignment ? [ep.assignment] : []))
@@ -248,11 +247,12 @@ async function createSeries(start: SeriesStart, openInWindow: (dir: string) => P
     writeEpisodeBible(dirs[0])
     if (!recovering) await openInWindow(dirs[0])
     clearCreation()
-    return
+    return folder
   }
   if (plan.usage && !readUsage(folder).some((entry) => entry.at === plan.usage!.at && entry.step === plan.usage!.step)) appendUsage(folder, plan.usage)
   startRun(plan.title, folder, dirs, start, plan.usage && costOf(plan.usage.models), !!recovering)
   clearCreation()
+  return folder
 }
 
 function clearCreation(): void {
@@ -268,55 +268,123 @@ function clearCreation(): void {
 // pausing (the series or one episode), stopping and continuing later are only states: the loop
 // skips what's held, and Continue starts it again on the saved run, also after a restart.
 
-let series: SeriesRun | null = null
-let exportOptions: ExportOptions = { themes: [], languages: [], languageVideos: false }
-const agents = new Map<string, EpisodeAgent>() // by episode folder
-const steps = new Map<string, 'script' | 'video'>() // episodes whose agent step is running
-const exporting = new Set<string>()
-const reporting = new Map<string, Promise<void>>()
-const tasks = new Set<Promise<void>>()
-const generations = new Map<string, number>()
-let driving: Promise<void> | null = null
-let continuing = false
+const controllers = new Map<string, SeriesController>()
+let selectedFolder: string | undefined
 let sendSeries: (run: SeriesRun | null) => void = () => {}
-
+let queueEnabled = false
+let pumping = false
 const runFile = (folder: string) => join(folder, '.studio', 'series-run.json')
+const registryFile = () => join(paths.userData(), 'series-jobs.json')
+const unrecovered = new Set<string>()
+const saveRegistry = () => writeAtomicJson(registryFile(), [...new Set([...controllers.keys(), ...unrecovered])])
 
-/** Loads the series Home last showed: a run the app was making when it quit can continue. */
+export const seriesRuns = (): SeriesRun[] => [...controllers.values()].map((controller) => structuredClone(controller.series))
+export const seriesRun = (): SeriesRun | null => selectedFolder ? seriesRunFor(selectedFolder) : null
+export function seriesRunFor(folder: string): SeriesRun | null {
+  const controller = controllers.get(folder)
+  if (controller) return structuredClone(controller.series)
+  const saved = readAtomicJson(runFile(folder), isSeriesCheckpoint)
+  return saved ? recoveredRun(saved.run) : null
+}
+function controllerFor(folder = selectedFolder): SeriesController {
+  if (!folder) throw new Error('No series is being made.')
+  let controller = controllers.get(folder)
+  if (!controller) {
+    const saved = readAtomicJson(runFile(folder), isSeriesCheckpoint)
+    if (!saved) throw new Error('The series checkpoint could not be read.')
+    controller = new SeriesController(recoveredRun(saved.run), saved.exportOptions)
+    controllers.set(folder, controller)
+    unrecovered.delete(folder)
+    saveRegistry()
+  }
+  return controller
+}
 export async function setupSeries(send: typeof sendSeries): Promise<void> {
   sendSeries = send
   const creation = pendingCreation()
-  const folder = creation && readAtomicJson(runFile(creation.folder), isSeriesCheckpoint) ? creation.folder : getSettings().seriesRun
-  const saved = folder && readAtomicJson(runFile(folder), isSeriesCheckpoint)
-  if (folder && !saved && existsSync(runFile(folder)) && !creation)
-    throw new Error(`The series checkpoint and its backup could not be read. The episode projects are still in ${folder}.`)
-  if (saved) {
-    series = recoveredRun(saved.run)
-    exportOptions = saved.exportOptions
-    save()
-    if (creation?.folder === folder) setSettings({ seriesRun: folder })
+  selectedFolder = getSettings().seriesRun
+  const folders = readAtomicJson(registryFile(), (v): v is string[] => Array.isArray(v) && v.every((p) => typeof p === 'string')) ?? []
+  if (selectedFolder) folders.push(selectedFolder)
+  if (creation) folders.push(creation.folder)
+  for (const folder of new Set(folders)) {
+    const saved = readAtomicJson(runFile(folder), isSeriesCheckpoint)
+    if (!saved) {
+      unrecovered.add(folder)
+      if (existsSync(runFile(folder))) console.error('[series recovery]', `Could not recover ${folder}; checkpoint retained.`)
+      continue
+    }
+    const controller = new SeriesController(recoveredRun(saved.run), saved.exportOptions)
+    controllers.set(folder, controller)
+    controller.save()
   }
   if (creation) {
-    if (series?.folder === creation.folder) clearCreation() // run committed before the last journal cleanup
-    else {
-      try {
-        await protectWork(() => createSeries(creation.start, async () => {}, creation.folder))
-      } catch (error) {
-        console.error('[series recovery]', error)
-        saveSeriesDraft({ request: { pdfs: creation.start.pdfs, instructions: creation.start.plan.instructions, language: creation.start.language, tone: creation.start.tone }, plan: creation.start.plan })
-        throw error
-      }
-    }
+    saveSeriesPlan({ request: { pdfs: creation.start.pdfs, language: creation.start.language, tone: creation.start.tone, topic: !creation.start.pdfs.length ? creation.start.plan.title : undefined }, plan: creation.start.plan })
+    if (controllers.has(creation.folder)) clearCreation()
+    else await protectWork(() => createSeries(creation.start, async () => {}, creation.folder))
   }
+  saveRegistry()
+  // Restoring never starts paid work. Continue/Start now explicitly enables queue processing.
 }
-
-export const seriesRun = (): SeriesRun | null => (series ? structuredClone(series) : null)
-
-/** A course owns its production history after Home's active run is dismissed or replaced. */
-export function seriesRunFor(folder: string): SeriesRun | null {
-  if (series?.folder === folder) return seriesRun()
-  const saved = readAtomicJson(runFile(folder), isSeriesCheckpoint)
-  return saved ? recoveredRun(saved.run) : null
+function startRun(title: string, folder: string, dirs: string[], start: SeriesStart, planningCostUSD?: number, recovered = false): void {
+  const selection = seriesSelection(getSettings(), 'make')
+  const settings = getSettings()
+  const flags = { usage: !!settings.developerUsageMetrics, timing: !!settings.developerTimingMetrics, resources: !!settings.developerResourceMetrics }
+  const queued = start.schedule === 'queue' && [...controllers.values()].some((c) => c.series.state === 'working')
+  const run: SeriesRun = {
+    title, folder, metrics: settings.developerMode && Object.values(flags).some(Boolean) ? flags : undefined,
+    ...selection, auth: configuredAuth(selection.agent),
+    state: recovered || shutdownRequested() ? 'stopped' : queued ? 'queued' : 'working',
+    queuedAt: queued ? Date.now() : undefined,
+    episodes: dirs.map((dir, i) => ({ dir, title: readMeta(dir).name, assignment: start.plan.episodes[i].assignment, state: 'waiting', warnings: [] })),
+    planningCostUSD, planningApiEstimateUSD: apiEstimateOf(readUsage(folder)),
+  }
+  const controller = new SeriesController(run, start.export)
+  controllers.set(folder, controller)
+  selectedFolder = folder
+  controller.save()
+  saveRegistry()
+  setSettings({ seriesRun: folder })
+  if (!recovered) queueEnabled = true
+  if (run.state === 'working') void controller.drive()
+  else void pumpSeriesQueue()
+}
+async function pumpSeriesQueue(): Promise<void> {
+  if (!queueEnabled || pumping || creating || shutdownRequested() || [...controllers.values()].some((c) => c.series.state === 'working')) return
+  if ([...controllers.values()].some((c) => c.continuing)) return
+  const queued = nextQueuedSeries(seriesRuns(), queueEnabled)
+  const next = queued && controllers.get(queued.folder)
+  if (!next) return
+  pumping = true
+  try { selectedFolder = next.series.folder; setSettings({ seriesRun: selectedFolder }); await next.continueSeries() }
+  catch (error) { next.series.state = 'stopped'; next.save(); console.error('[series queue]', error) }
+  finally { pumping = false; void pumpSeriesQueue() }
+}
+export function pauseSeries(paused: boolean, folder?: string): void { controllerFor(folder).pauseSeries(paused); void pumpSeriesQueue() }
+export function pauseEpisode(dir: string, paused: boolean): void { controllerFor(readMeta(dir).series?.folder).pauseEpisode(dir, paused) }
+export function stopSeries(folder?: string): void { controllerFor(folder).stopSeries(); void pumpSeriesQueue() }
+export function stopAllSeries(): void {
+  queueEnabled = false
+  for (const controller of controllers.values()) if (controller.series.state !== 'queued') controller.stopSeries()
+}
+export async function continueSeries(folder?: string): Promise<void> {
+  const controller = controllerFor(folder)
+  queueEnabled = true
+  selectedFolder = controller.series.folder
+  setSettings({ seriesRun: selectedFolder })
+  await controller.continueSeries()
+}
+export async function retrySeriesEpisode(dir: string): Promise<void> { await controllerFor(readMeta(dir).series?.folder).retrySeriesEpisode(dir) }
+export async function settleSeries(): Promise<void> { await Promise.all([...controllers.values()].map((c) => c.settleSeries())) }
+export async function dismissSeries(folder = selectedFolder): Promise<void> {
+  if (!folder) return
+  const controller = controllerFor(folder)
+  if (controller.series.state === 'working') return
+  controller.stopSeries()
+  await controller.settleSeries()
+  controllers.delete(folder)
+  saveRegistry()
+  if (selectedFolder === folder) { selectedFolder = [...controllers.keys()].at(-1); setSettings({ seriesRun: selectedFolder }) }
+  sendSeries(null)
 }
 
 function recoveredRun(saved: SeriesRun): SeriesRun {
@@ -334,401 +402,349 @@ function recoveredRun(saved: SeriesRun): SeriesRun {
   return run
 }
 
-/** Saves the run in its folder (for Continue after a restart) and tells the window. */
-function save(): void {
-  if (!series) return
-  mkdirSync(join(series.folder, '.studio'), { recursive: true })
-  writeAtomicJson(runFile(series.folder), { run: series, exportOptions })
-  sendSeries(seriesRun())
-}
-
-const update = (ep: EpisodeRun, patch: Partial<EpisodeRun>) => {
-  if (!series?.episodes.includes(ep)) return // a dismissed run's late callback cannot touch its replacement
-  if (patch.state) {
-    const phase = (
-      { script: 'Script', scripted: 'Waiting for video', scene: 'Implementation', check: 'Render check', export: 'Export' } as Record<string, string>
-    )[patch.state]
-    if (phase) episodeMetricsPhase(ep.dir, phase)
+/** Each course owns its scheduler, cancellations and export handles. No mutable run state is shared. */
+class SeriesController {
+  agents = new Map<string, EpisodeAgent>()
+  steps = new Map<string, 'script' | 'video'>()
+  exporting = new Set<string>()
+  reporting = new Map<string, Promise<void>>()
+  tasks = new Set<Promise<void>>()
+  generations = new Map<string, number>()
+  driving: Promise<void> | null = null
+  continuing = false
+  constructor(public series: SeriesRun, public exportOptions: ExportOptions) {}
+  save = (): void => {
+    if (!this.series) return
+    mkdirSync(join(this.series.folder, '.studio'), { recursive: true })
+    writeAtomicJson(runFile(this.series.folder), { run: this.series, exportOptions: this.exportOptions })
+    sendSeries(structuredClone(this.series))
   }
-  Object.assign(ep, patch)
-  save()
-}
 
-const halted = (ep: EpisodeRun) => series?.state !== 'working' || !!ep.held
-
-/** Stops an episode's agent and its render; its state stays, so it carries on from there later. */
-function halt(ep: EpisodeRun): void {
-  generations.set(ep.dir, (generations.get(ep.dir) ?? 0) + 1)
-  agents.get(ep.dir)?.close()
-  cancel('preview', ep.dir)
-}
-
-export function pauseSeries(paused: boolean): void {
-  if (!series || (paused ? series.state !== 'working' : series.state !== 'paused')) return
-  series.state = paused ? 'paused' : 'working'
-  if (paused) series.episodes.forEach(halt)
-  for (const ep of series.episodes) if (ep.exportJob) pauseExport(ep.exportJob, paused || !!ep.held)
-  if (paused) series.episodes.filter((ep) => ep.state !== 'export').forEach((ep) => episodeMetricsPhase(ep.dir, 'Paused'))
-  save()
-  if (!paused) void drive()
-}
-
-export function pauseEpisode(dir: string, paused: boolean): void {
-  const ep = series?.episodes.find((e) => e.dir === dir)
-  if (!ep) return
-  update(ep, { held: paused })
-  if (paused && ep.state !== 'export') episodeMetricsPhase(ep.dir, 'Paused')
-  if (paused) halt(ep)
-  if (ep.exportJob) pauseExport(ep.exportJob, paused || series?.state === 'paused')
-  if (!paused) void drive()
-}
-
-/** Stops the agents and the exports; Continue picks the run up again. */
-export function stopSeries(): void {
-  if (!series || series.state === 'stopped' || series.state === 'done') return
-  series.state = 'stopped'
-  for (const ep of series.episodes) {
-    halt(ep)
-    if (ep.exportJob && exporting.has(ep.dir)) cancelExport(ep.exportJob)
-    if (ep.state !== 'done' && ep.state !== 'failed') void finishMetrics(ep, series, 'stopped')
-  }
-  save()
-}
-
-/** Carries on with a stopped run: what didn't finish, including what failed, gets another go. */
-function adoptSeries(folder?: string): void {
-  if (folder && folder !== series?.folder) {
-    if (series && series.state !== 'done') throw new Error('Another series is still being made. Stop and dismiss it before continuing this one.')
-    const saved = readAtomicJson(runFile(folder), isSeriesCheckpoint)
-    if (!saved) throw new Error('The series checkpoint could not be read.')
-    series = recoveredRun(saved.run)
-    exportOptions = saved.exportOptions
-    setSettings({ seriesRun: folder })
-    save()
-  }
-}
-
-function retryState(ep: EpisodeRun): void {
-  const approved = scriptStatus(readScript(ep.dir) ?? '') === 'approved'
-  ep.state = ep.failedAt === 'export' ? 'export' : ep.failedAt === 'check' ? 'check' : approved ? 'scripted' : 'waiting'
-  ep.error = undefined
-  ep.failedAt = undefined
-}
-
-/** Retry one failed lesson without restarting completed lessons or other agents. */
-export async function retrySeriesEpisode(dir: string): Promise<void> {
-  if (shutdownRequested()) return
-  const folder = readMeta(dir).series?.folder
-  if (!folder) throw new Error('That video does not belong to a series.')
-  adoptSeries(folder)
-  const run = series
-  const ep = run?.episodes.find((episode) => episode.dir === dir)
-  if (!run || !ep || ep.state !== 'failed') return
-  await ensureQuickReady(seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')).agent)
-  if (series !== run || ep.state !== 'failed' || shutdownRequested()) return
-  retryState(ep)
-  ep.held = false
-  if (run.state === 'done' || run.state === 'stopped') run.state = 'working'
-  save()
-  void drive()
-}
-
-export async function continueSeries(folder?: string): Promise<void> {
-  if (continuing || shutdownRequested()) return
-  adoptSeries(folder)
-  if (series?.state === 'done' && series.episodes.some((ep) => ep.state === 'failed')) series.state = 'stopped'
-  if (series?.state !== 'stopped') return
-  continuing = true
-  try {
-    await settleSeries()
-    if (series?.state !== 'stopped' || shutdownRequested()) return
-    for (const agent of new Set(
-      series.episodes.filter((ep) => ep.state !== 'done').map((ep) => seriesAgentSelection(series!, ep, seriesSelection(getSettings(), 'make')).agent),
-    ))
-      await ensureQuickReady(agent)
-    for (const ep of series.episodes) {
-      if (ep.state !== 'failed' && ep.state !== 'stopped') continue
-      retryState(ep)
+  update = (ep: EpisodeRun, patch: Partial<EpisodeRun>) => {
+    if (!this.series?.episodes.includes(ep)) return // a dismissed run's late callback cannot touch its replacement
+    if (patch.state) {
+      const phase = (
+        { script: 'Script', scripted: 'Waiting for video', scene: 'Implementation', check: 'Render check', export: 'Export' } as Record<string, string>
+      )[patch.state]
+      if (phase) episodeMetricsPhase(ep.dir, phase)
     }
-    series.state = 'working'
-    save()
-    void drive()
-  } finally { continuing = false }
-}
-
-/** All agent turns, cancelled exports and report writes have settled before the process exits. */
-export async function settleSeries(): Promise<void> {
-  while (tasks.size || reporting.size) await Promise.allSettled([...tasks, ...reporting.values()])
-}
-
-export function dismissSeries(): void {
-  if (!series || series.state === 'working') return
-  series.episodes.forEach(halt)
-  series = null
-  setSettings({ seriesRun: undefined })
-  sendSeries(null)
-}
-
-function startRun(title: string, folder: string, dirs: string[], start: SeriesStart, planningCostUSD?: number, recovered = false): void {
-  const selection = seriesSelection(getSettings(), 'make')
-  const settings = getSettings()
-  const flags = { usage: !!settings.developerUsageMetrics, timing: !!settings.developerTimingMetrics, resources: !!settings.developerResourceMetrics }
-  const metrics = settings.developerMode && Object.values(flags).some(Boolean) ? flags : undefined
-  exportOptions = start.export
-  series = {
-    title,
-    folder,
-    agents: metrics ? 1 : Math.max(1, getSettings().seriesAgents || 3),
-    metrics,
-    agent: selection.agent,
-    model: selection.model,
-    effort: selection.effort,
-    auth: configuredAuth(selection.agent),
-    state: recovered || shutdownRequested() ? 'stopped' : 'working',
-    episodes: dirs.map((dir, i) => ({ dir, title: readMeta(dir).name, assignment: start.plan.episodes[i].assignment, state: 'waiting', warnings: [] })),
-    planningCostUSD,
-    planningApiEstimateUSD: apiEstimateOf(readUsage(folder)),
+    Object.assign(ep, patch)
+    this.save()
   }
-  save()
-  setSettings({ seriesRun: folder })
-  if (series.state === 'working') void drive()
-}
 
-/** Hands out the work while the series is being made: scripts in order, videos and exports as they're ready. */
-function drive(): Promise<void> {
-  if (driving) return driving
-  driving = driveLoop().catch((error) => {
-    console.error('[series scheduler]', error)
-    stopSeries()
-  }).finally(() => {
-    driving = null
-    if (series?.state === 'working') void drive()
-  })
-  return driving
-}
+  halted = (ep: EpisodeRun) => this.series?.state !== 'working' || !!ep.held
 
-async function driveLoop(): Promise<void> {
-  const run = series
-  while (run && series === run && run.state === 'working') {
-    if (run.metrics) {
-      const episode = run.episodes.find((ep) => ep.state !== 'done' && ep.state !== 'failed')
-      if (!episode && !steps.size && !exporting.size && !reporting.size) {
+  halt = (ep: EpisodeRun): void => {
+    this.generations.set(ep.dir, (this.generations.get(ep.dir) ?? 0) + 1)
+    this.agents.get(ep.dir)?.close()
+    cancel('preview', ep.dir)
+  }
+
+  pauseSeries = (paused: boolean): void => {
+    if (!this.series || (paused ? this.series.state !== 'working' : this.series.state !== 'paused')) return
+    this.series.state = paused ? 'paused' : 'working'
+    if (paused) this.series.episodes.forEach(this.halt)
+    for (const ep of this.series.episodes) if (paused && ep.exportJob && !exportJobs().find((job) => job.id === ep.exportJob)?.options.server) cancelExport(ep.exportJob)
+    if (paused) this.series.episodes.filter((ep) => ep.state !== 'export').forEach((ep) => episodeMetricsPhase(ep.dir, 'Paused'))
+    this.save()
+    if (!paused) void this.drive()
+  }
+
+  pauseEpisode = (dir: string, paused: boolean): void => {
+    const ep = this.series?.episodes.find((e) => e.dir === dir)
+    if (!ep) return
+    this.update(ep, { held: paused })
+    if (paused && ep.state !== 'export') episodeMetricsPhase(ep.dir, 'Paused')
+    if (paused) this.halt(ep)
+    if (paused && ep.exportJob && !exportJobs().find((job) => job.id === ep.exportJob)?.options.server) cancelExport(ep.exportJob)
+    if (!paused) void this.drive()
+  }
+
+  stopSeries = (): void => {
+    if (!this.series || this.series.state === 'stopped' || this.series.state === 'done') return
+    this.series.state = 'stopped'
+    for (const ep of this.series.episodes) {
+      this.halt(ep)
+      if (ep.exportJob && this.exporting.has(ep.dir)) cancelExport(ep.exportJob)
+      if (ep.state !== 'done' && ep.state !== 'failed') void this.finishMetrics(ep, this.series, 'stopped')
+    }
+    this.save()
+  }
+
+  retryState = (ep: EpisodeRun): void => {
+    const approved = scriptStatus(readScript(ep.dir) ?? '') === 'approved'
+    ep.state = ep.failedAt === 'export' ? 'export' : ep.failedAt === 'check' ? 'check' : approved ? 'scripted' : 'waiting'
+    ep.error = undefined
+    ep.failedAt = undefined
+  }
+
+  retrySeriesEpisode = async (dir: string): Promise<void> => {
+    if (shutdownRequested()) return
+    const folder = readMeta(dir).series?.folder
+    if (!folder) throw new Error('That video does not belong to a series.')
+    const run = this.series
+    const ep = run?.episodes.find((episode) => episode.dir === dir)
+    if (!run || !ep || ep.state !== 'failed') return
+    await ensureQuickReady(seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')).agent)
+    if (this.series !== run || ep.state !== 'failed' || shutdownRequested()) return
+    this.retryState(ep)
+    ep.held = false
+    if (run.state === 'done' || run.state === 'stopped') run.state = 'working'
+    this.save()
+    void this.drive()
+  }
+
+  continueSeries = async (): Promise<void> => {
+    if (this.continuing || shutdownRequested()) return
+    if (this.series?.state === 'done' && this.series.episodes.some((ep) => ep.state === 'failed')) this.series.state = 'stopped'
+    if (this.series?.state !== 'stopped' && this.series?.state !== 'queued' && this.series?.state !== 'paused') return
+    this.continuing = true
+    try {
+      await this.settleSeries()
+      if (!['stopped', 'queued', 'paused'].includes(this.series.state) || shutdownRequested()) return
+      for (const agent of new Set(
+        this.series.episodes.filter((ep) => ep.state !== 'done').map((ep) => seriesAgentSelection(this.series!, ep, seriesSelection(getSettings(), 'make')).agent),
+      ))
+        await ensureQuickReady(agent)
+      if (shutdownRequested()) return
+      for (const ep of this.series.episodes) {
+        if (ep.state !== 'failed' && ep.state !== 'stopped') continue
+        this.retryState(ep)
+      }
+      this.series.state = 'working'
+      this.save()
+      void this.drive()
+    } finally { this.continuing = false }
+  }
+
+  settleSeries = async (): Promise<void> => {
+    while (this.tasks.size || this.reporting.size) await Promise.allSettled([...this.tasks, ...this.reporting.values()])
+  }
+
+  drive = (): Promise<void> => {
+    if (this.driving) return this.driving
+    this.driving = this.driveLoop().catch((error) => {
+      console.error('[series scheduler]', error)
+      this.stopSeries()
+    }).finally(() => {
+      this.driving = null
+      if (this.series?.state === 'working') void this.drive()
+      else void pumpSeriesQueue()
+    })
+    return this.driving
+  }
+
+  driveLoop = async (): Promise<void> => {
+    const run = this.series
+    while (run && this.series === run && run.state === 'working') {
+      if (run.metrics) {
+        const episode = run.episodes.find((ep) => ep.state !== 'done' && ep.state !== 'failed')
+        if (!episode && !this.steps.size && !this.exporting.size && !this.reporting.size) {
+          run.state = 'done'
+          this.save()
+          return
+        }
+        if (episode && !episode.held && !this.steps.size && !this.exporting.size && !this.reporting.size) {
+          if (episode.state === 'waiting' || episode.state === 'script') this.launch(episode, 'script')
+          else if (['scripted', 'scene', 'check'].includes(episode.state)) this.launch(episode, 'video')
+          else if (episode.state === 'export') this.exportEpisode(episode, run)
+        }
+        await new Promise((r) => setTimeout(r, 500))
+        continue
+      }
+      for (const ep of run.episodes) if (ep.state === 'export' && !ep.held && !this.exporting.has(ep.dir)) this.exportEpisode(ep, run)
+
+      const next = nextSeriesTask(run.episodes, this.steps)
+      if (next) {
+        this.launch(next.episode, next.kind)
+        await new Promise<void>((resolve) => setImmediate(resolve)) // keep navigation responsive for large restored runs
+        continue
+      }
+      if (run.episodes.every((ep) => ep.state === 'done' || ep.state === 'failed') && !this.steps.size && !this.exporting.size) {
         run.state = 'done'
-        save()
+        this.save()
         return
       }
-      if (episode && !episode.held && !steps.size && !exporting.size && !reporting.size) {
-        if (episode.state === 'waiting' || episode.state === 'script') launch(episode, 'script')
-        else if (['scripted', 'scene', 'check'].includes(episode.state)) launch(episode, 'video')
-        else if (episode.state === 'export') exportEpisode(episode, run)
-      }
-      await new Promise((r) => setTimeout(r, 500))
-      continue
+      await new Promise((r) => setTimeout(r, 500)) // ponytail: polls; a wake-up signal would save nothing you'd notice
     }
-    for (const ep of run.episodes) if (ep.state === 'export' && !ep.held && !exporting.has(ep.dir)) exportEpisode(ep, run)
-
-    // A paused episode's script waits; the writer goes on with the next one.
-    const nextScript = run.episodes.find((ep) => (ep.state === 'waiting' || ep.state === 'script') && !ep.held && !steps.has(ep.dir))
-    if (nextScript && ![...steps.values()].includes('script')) {
-      launch(nextScript, 'script')
-      continue
-    }
-    // While scripts are still to be written, the writer keeps one of the agents.
-    const slots = nextScript ? run.agents - 1 : run.agents
-    const videos = [...steps.values()].filter((k) => k === 'video').length
-    const nextVideo = run.episodes.find((ep) => ['scripted', 'scene', 'check'].includes(ep.state) && !ep.held && !steps.has(ep.dir))
-    if (nextVideo && videos < slots) {
-      launch(nextVideo, 'video')
-      continue
-    }
-    if (run.episodes.every((ep) => ep.state === 'done' || ep.state === 'failed') && !steps.size && !exporting.size) {
-      run.state = 'done'
-      save()
-      return
-    }
-    await new Promise((r) => setTimeout(r, 500)) // ponytail: polls; a wake-up signal would save nothing you'd notice
   }
-}
 
-function launch(ep: EpisodeRun, kind: 'script' | 'video'): void {
-  steps.set(ep.dir, kind)
-  const step = kind === 'script' ? writeScript(ep) : episodeVideo(ep)
-  track(step.finally(() => steps.delete(ep.dir)))
-}
+  launch = (ep: EpisodeRun, kind: 'script' | 'video'): void => {
+    this.steps.set(ep.dir, kind)
+    const step = kind === 'script' ? this.writeScript(ep) : this.episodeVideo(ep)
+    this.track(step.finally(() => this.steps.delete(ep.dir)))
+  }
 
-function track(task: Promise<void>): void {
-  tasks.add(task)
-  void task.catch((error) => console.error('[series task]', error)).finally(() => tasks.delete(task))
-}
+  track = (task: Promise<void>): void => {
+    this.tasks.add(task)
+    void task.catch((error) => console.error('[series task]', error)).finally(() => this.tasks.delete(task))
+  }
 
-async function writeScript(ep: EpisodeRun): Promise<void> {
-  await episodeStep(ep, 'script', async (turn) => {
-    await turn(
-      `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: you’ll make the video in the next step.`,
-      'Script',
-    )
-    update(ep, { state: 'scripted', activity: undefined, tried: false })
-  })
-}
-
-async function episodeVideo(ep: EpisodeRun): Promise<void> {
-  const checking = ep.state === 'check'
-  await episodeStep(ep, checking ? 'check' : 'scene', async (turn, check) => {
-    if (!checking) {
+  writeScript = async (ep: EpisodeRun): Promise<void> => {
+    await this.episodeStep(ep, 'script', async (turn) => {
       await turn(
-        'Your script.md is approved, and series.md lists the episodes with what the ones scripted so far cover. Make this episode’s video from your script: write scene.py, render it and look at the frames.',
-        'Video',
+        `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: you’ll make the video in the next step.`,
+        'Script',
       )
-    }
-    check()
-    update(ep, { state: 'check', activity: 'Checking the render' })
-    const warnings = await checkAndFix(
-      ep.dir,
-      (text) => turn(text, 'Fixing the render'),
-      check,
-    )
-    check()
-    update(ep, { warnings, state: 'export', activity: undefined, tried: false })
-  })
-}
+      this.update(ep, { state: 'scripted', activity: undefined, tried: false })
+    })
+  }
 
-function exportEpisode(ep: EpisodeRun, run: SeriesRun): void {
-  exporting.add(ep.dir)
-  track((async () => {
+  episodeVideo = async (ep: EpisodeRun): Promise<void> => {
+    const checking = ep.state === 'check'
+    await this.episodeStep(ep, checking ? 'check' : 'scene', async (turn, check) => {
+      if (!checking) {
+        await turn(
+          'Your script.md is approved, and series.md lists the episodes with what the ones scripted so far cover. Make this episode’s video from your script: write scene.py, render it and look at the frames.',
+          'Video',
+        )
+      }
+      check()
+      this.update(ep, { state: 'check', activity: 'Checking the render' })
+      const warnings = await checkAndFix(
+        ep.dir,
+        (text) => turn(text, 'Fixing the render'),
+        check,
+      )
+      check()
+      this.update(ep, { warnings, state: 'export', activity: undefined, tried: false })
+    })
+  }
+
+  exportEpisode = (ep: EpisodeRun, run: SeriesRun): void => {
+    this.exporting.add(ep.dir)
+    this.track((async () => {
+      const generation = this.generations.get(ep.dir) ?? 0
+      try {
+        await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
+        this.stopIf(ep)
+        episodeMetricsPhase(ep.dir, 'Export')
+        const { job, finished } = queueExport(ep.dir, this.exportOptions)
+        this.update(ep, { exportJob: job.id })
+        await finished
+        await this.finishMetrics(ep, run, 'done')
+        this.update(ep, { state: 'done' })
+      } catch (e) {
+        if (run.state === 'working' && !ep.held && (this.generations.get(ep.dir) ?? 0) === generation) {
+          await this.finishMetrics(ep, run, 'failed')
+          this.update(ep, { state: 'failed', failedAt: 'export', error: (e as Error).message })
+        }
+      } finally {
+        this.exporting.delete(ep.dir)
+      }
+    })())
+  }
+
+  stopIf = (ep: EpisodeRun): void => {
+    if (this.halted(ep)) throw new Error('Stopped')
+  }
+
+  episodeStep = async (
+    ep: EpisodeRun,
+    state: EpisodeRun['state'],
+    work: (turn: (text: string, step: string) => Promise<void>, check: () => void) => Promise<void>,): Promise<void> => {
+    const run = this.series!
+    const generation = this.generations.get(ep.dir) ?? 0
+    const interrupted = () => this.series !== run || this.halted(ep) || (this.generations.get(ep.dir) ?? 0) !== generation
+    const check = () => { if (interrupted()) throw new Error('Stopped') }
+    let again = !!ep.tried
+    let agent: EpisodeAgent | null = null
+    // The agent and sign-in this episode runs on: the series' (switchable at a limit), or its fixed assignment.
+    const route = (): AgentRoute => {
+      const selection = seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make'))
+      return { agent: selection.agent, auth: ep.assignment ? ep.assignmentAuth ?? configuredAuth(selection.agent) : (run.auth ?? configuredAuth(selection.agent)) }
+    }
+    const open = async () => {
+      let opened = route()
+      episodeMetricsSelection(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')))
+      const a = await episodeAgent(ep.dir, {
+        onTool: (summary) => { if (!interrupted()) this.update(ep, { activity: summary }) },
+        onUsage: (e) => this.update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models), apiEstimateUSD: apiEstimateOf(readUsage(ep.dir)) }),
+        ...seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')),
+        auth: opened.auth,
+        allowFallback: !ep.assignment,
+        strictModel: !!ep.assignment,
+        followPriority: true,
+        onSelection: (actual) => {
+          if (interrupted()) return
+          const { auth, ...assignment } = actual
+          if (fallbackEnabled()) {
+            this.update(ep, { assignment, assignmentAuth: auth })
+            episodeMetricsSelection(ep.dir, assignment)
+            opened = route()
+          }
+        },
+      })
+      this.agents.set(ep.dir, a)
+      return { a, opened }
+    }
     try {
       await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
-      stopIf(ep)
-      episodeMetricsPhase(ep.dir, 'Export')
-      const { job, finished } = queueExport(ep.dir, exportOptions)
-      update(ep, { exportJob: job.id })
-      await finished
-      await finishMetrics(ep, run, 'done')
-      update(ep, { state: 'done' })
-    } catch (e) {
-      if (run.state === 'working') {
-        await finishMetrics(ep, run, 'failed')
-        update(ep, { state: 'failed', failedAt: 'export', error: (e as Error).message })
-      }
-    } finally {
-      exporting.delete(ep.dir)
-    }
-  })())
-}
-
-function stopIf(ep: EpisodeRun): void {
-  if (halted(ep)) throw new Error('Stopped')
-}
-
-/**
- * One agent session on an episode: `work` gets its turn (past usage limits). An episode that was
- * interrupted in this step before carries on from where it stopped; a pause leaves its state as it
- * is, and a failure marks it.
- */
-async function episodeStep(
-  ep: EpisodeRun,
-  state: EpisodeRun['state'],
-  work: (turn: (text: string, step: string) => Promise<void>, check: () => void) => Promise<void>,
-): Promise<void> {
-  const run = series!
-  const generation = generations.get(ep.dir) ?? 0
-  const interrupted = () => series !== run || halted(ep) || (generations.get(ep.dir) ?? 0) !== generation
-  const check = () => { if (interrupted()) throw new Error('Stopped') }
-  let again = !!ep.tried
-  let agent: EpisodeAgent | null = null
-  // The agent and sign-in this episode runs on: the series' (switchable at a limit), or its fixed assignment.
-  const route = (): AgentRoute => {
-    const selection = seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make'))
-    return { agent: selection.agent, auth: ep.assignment ? ep.assignmentAuth ?? configuredAuth(selection.agent) : (run.auth ?? configuredAuth(selection.agent)) }
-  }
-  const open = async () => {
-    let opened = route()
-    episodeMetricsSelection(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')))
-    const a = await episodeAgent(ep.dir, {
-      onTool: (summary) => { if (!interrupted()) update(ep, { activity: summary }) },
-      onUsage: (e) => update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models), apiEstimateUSD: apiEstimateOf(readUsage(ep.dir)) }),
-      ...seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')),
-      auth: opened.auth,
-      allowFallback: !ep.assignment,
-      strictModel: !!ep.assignment,
-      followPriority: true,
-      onSelection: (actual) => {
-        if (interrupted()) return
-        const { auth, ...assignment } = actual
-        if (fallbackEnabled()) {
-          update(ep, { assignment, assignmentAuth: auth })
-          episodeMetricsSelection(ep.dir, assignment)
-          opened = route()
-        }
-      },
-    })
-    agents.set(ep.dir, a)
-    return { a, opened }
-  }
-  try {
-    await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
-    check()
-    update(ep, { state, activity: 'Starting', tried: true })
-    writeEpisodeBible(ep.dir)
-    let current = await open()
-    agent = current.a
-    check()
-    await work(async (text, step) => {
-      episodeMetricsPhase(ep.dir, step === 'Script' ? 'Script' : step === 'Fixing the render' ? 'Fixing render' : 'Implementation')
       check()
-      let ask = again ? `You were interrupted. Carry on where you stopped, with this task:\n\n${text}` : text
-      again = false
-      for (;;) {
-        const { a, opened } = current
-        const result = await turnPastLimits(
-          (t) => a.turn(t, step),
-          ask,
-          (note, until) => { if (!interrupted()) update(ep, { activity: note, limitedUntil: until }) },
-          check,
-          () => !sameRoute(route(), opened),
-        )
+      this.update(ep, { state, activity: 'Starting', tried: true })
+      writeEpisodeBible(ep.dir)
+      let current = await open()
+      agent = current.a
+      check()
+      await work(async (text, step) => {
+        episodeMetricsPhase(ep.dir, step === 'Script' ? 'Script' : step === 'Fixing the render' ? 'Fixing render' : 'Implementation')
         check()
-        if (result.switched) {
-          // Another agent takes over (ADR 0048): it reads where things stand from the project's files.
-          a.close()
-          current = await open()
-          agent = current.a
-          ask = `Another agent was working on this and was interrupted. Carry on where it stopped, with this task:\n\n${text}`
-          continue
+        let ask = again ? `You were interrupted. Carry on where you stopped, with this task:\n\n${text}` : text
+        again = false
+        for (;;) {
+          const { a, opened } = current
+          const result = await turnPastLimits(
+            (t) => a.turn(t, step),
+            ask,
+            (note, until) => { if (!interrupted()) this.update(ep, { activity: note, limitedUntil: until }) },
+            check,
+            () => !sameRoute(route(), opened),
+          )
+          check()
+          if (result.switched) {
+            // Another agent takes over (ADR 0048): it reads where things stand from the project's files.
+            a.close()
+            current = await open()
+            agent = current.a
+            ask = `Another agent was working on this and was interrupted. Carry on where it stopped, with this task:\n\n${text}`
+            continue
+          }
+          if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
+          return
         }
-        if (!result.ok) throw new Error(result.error ?? 'Claude stopped with an error')
-        return
+      }, check)
+      this.update(ep, { tried: false })
+    } catch (e) {
+      if (!interrupted()) await this.finishMetrics(ep, run, 'failed')
+      this.update(ep, interrupted() ? { activity: undefined } : { state: 'failed', failedAt: state === 'script' ? 'script' : ep.state === 'check' ? 'check' : 'scene', error: (e as Error).message, activity: undefined, tried: false })
+    } finally {
+      if (agent) {
+        if (this.agents.get(ep.dir) === agent) this.agents.delete(ep.dir)
+        agent.close()
       }
-    }, check)
-    update(ep, { tried: false })
-  } catch (e) {
-    if (!interrupted()) await finishMetrics(ep, run, 'failed')
-    update(ep, interrupted() ? { activity: undefined } : { state: 'failed', failedAt: state === 'script' ? 'script' : ep.state === 'check' ? 'check' : 'scene', error: (e as Error).message, activity: undefined, tried: false })
-  } finally {
-    if (agent) {
-      if (agents.get(ep.dir) === agent) agents.delete(ep.dir)
-      agent.close()
     }
   }
-}
 
-function finishMetrics(ep: EpisodeRun, run: SeriesRun, outcome: string): Promise<void> {
-  if (reporting.has(ep.dir)) return reporting.get(ep.dir)!
-  const pending = finishEpisodeMetrics(ep.dir, outcome, { title: run.title, folder: run.folder, dirs: run.episodes.map((e) => e.dir) })
-    .then((result) => {
-      if (result) {
-        ep.report = result.report
-        ep.elapsedMs = result.elapsedMs
-        run.report = result.seriesReport
-        if (series === run) save()
-      }
-    })
-    .catch((error) => {
-      ep.warnings.push(`Developer report: ${(error as Error).message}`)
-      if (series === run) save()
-    })
-    .finally(() => reporting.delete(ep.dir))
-  reporting.set(ep.dir, pending)
-  return pending
+  finishMetrics = (ep: EpisodeRun, run: SeriesRun, outcome: string): Promise<void> => {
+    if (this.reporting.has(ep.dir)) return this.reporting.get(ep.dir)!
+    const pending = finishEpisodeMetrics(ep.dir, outcome, { title: run.title, folder: run.folder, dirs: run.episodes.map((e) => e.dir) })
+      .then((result) => {
+        if (result) {
+          ep.report = result.report
+          ep.elapsedMs = result.elapsedMs
+          run.report = result.seriesReport
+          if (this.series === run) this.save()
+        }
+      })
+      .catch((error) => {
+        ep.warnings.push(`Developer report: ${(error as Error).message}`)
+        if (this.series === run) this.save()
+      })
+      .finally(() => this.reporting.delete(ep.dir))
+    this.reporting.set(ep.dir, pending)
+    return pending
+  }
+
 }
 
 /** The name importSources would give a PDF: "Lecture 1.PDF" → lecture-1.pdf. */

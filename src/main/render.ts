@@ -13,6 +13,7 @@ import { killJob, pauseTag, runRunner } from './runner'
 import { getSettings } from './settings'
 import { voiceEnv } from './voice'
 import { projectCache } from './render-cache'
+import { previewProgress } from './production-progress'
 
 export type RenderOutcome = { timeline: Timeline } | { error: RenderError } | { cancelled: true }
 
@@ -52,18 +53,22 @@ export function render(quality: Quality, variant: RenderVariant = {}, dir = requ
   const k = key(dir, quality)
   running.get(k)?.cancel()
   const open = project()?.path === dir
-  const send: typeof sendEvent = open ? sendEvent : () => {} // only the window's project shows its renders
+  // The user may leave a project during this render. Never deliver its timeline into a new one.
+  const send: typeof sendEvent = (event) => { if (project()?.path === dir) sendEvent(event) }
   if (quality === 'preview' && open) pauseTag('preview', false) // asking for a render means you want it to run
   const meta = open ? project()!.meta : readMeta(dir)
   const id = nextId++
   const expectedClips = readTimeline(dir, quality)?.clips.length ?? readTimeline(dir)?.clips.length ?? 0
+  if (quality === 'preview') previewProgress(dir, 0, expectedClips)
   send({ id, quality, type: 'start', expectedClips })
 
   let cancelled = false
+  const abort = new AbortController()
   let child: ChildProcess | null = null
   const entry: Running = {
     cancel: () => {
       cancelled = true
+      abort.abort()
       if (child) killJob(child)
     },
     outcome: Promise.resolve({ cancelled: true }),
@@ -84,10 +89,14 @@ export function render(quality: Quality, variant: RenderVariant = {}, dir = requ
               ...(variant.fps ? ['--fps', String(variant.fps)] : []),
             ]
       const job = await runRunner<{ result: Timeline }>('default', ['render', dir, '--quality', quality, ...options], {
+        signal: abort.signal,
         extraEnv: { ...(await voiceEnv(meta, dir)), STUDIO_CACHE_DIR: projectCache(dir) },
         tag: quality === 'preview' && open ? 'preview' : undefined,
         onEvent: (e) => {
-          if (e.type === 'progress') send({ id, quality, type: 'progress', clips: Number(e.clips), t: Number(e.t) })
+          if (e.type === 'progress') {
+            if (quality === 'preview') previewProgress(dir, Number(e.clips), expectedClips)
+            send({ id, quality, type: 'progress', clips: Number(e.clips), t: Number(e.t) })
+          }
         },
       })
       child = job.child

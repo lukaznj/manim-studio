@@ -313,6 +313,8 @@ async function openThread(dir: string, instructions: string, threadId: string | 
     skipGitRepoCheck: true,
     sandboxMode: withTools ? ('workspace-write' as const) : ('read-only' as const),
     approvalPolicy: 'never' as const, // nobody to ask: the sandbox keeps writes inside the project
+    webSearchMode: withTools ? ('live' as const) : ('disabled' as const),
+    networkAccessEnabled: false, // hosted web search can read public pages without opening command networking
     model: model || undefined,
     modelReasoningEffort:
       selection.strictModel && !selection.effort
@@ -467,6 +469,7 @@ function toPart(item: ThreadItem, done: boolean): ChatPart | null {
 }
 
 const TOOL_SUMMARY: Record<string, string> = {
+  report_progress: 'Production',
   render_preview: 'Rendering the preview',
   get_timeline: 'Reading the timeline',
   view_frames: 'Looking at frames',

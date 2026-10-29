@@ -5,6 +5,15 @@
 import { z } from 'zod'
 
 export const sceneTools = {
+  report_progress: {
+    description: 'Report authoring progress after saving work. Count complete sections, not tokens or guessed time. Call after outlining all sections and after finishing each section in script.md or scene.py. Use the same total as the approved script. This is an estimate; Studio checks and completes each phase itself.',
+    shape: {
+      phase: z.enum(['script', 'scene']),
+      completed: z.number().int().min(0).max(1000),
+      total: z.number().int().min(1).max(1000),
+      detail: z.string().max(180).optional().describe('The section just completed'),
+    },
+  },
   render_preview: {
     description:
       'Render the low-resolution preview of scene.py and report what happened: duration, sections, layout warnings (things off screen, overlapping text), voice problems, or the error with its scene.py line. Call it after every change to scene.py.',

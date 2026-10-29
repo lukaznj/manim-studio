@@ -8,6 +8,7 @@ import { resolveUiLanguage } from '../shared/ui-languages'
 import { narrationLanguageForUi } from '../shared/narration-languages'
 import { interfaceSize, chatTextSize } from '../shared/text-size'
 import { normalizeModelOrder } from '../shared/model-fallback'
+import { agentConcurrency } from '../shared/work-slots'
 import { paths } from './paths'
 import { readAtomicJson, writeAtomicJson } from './atomic-json'
 
@@ -33,7 +34,6 @@ const defaults = (): Settings => {
     codexEffort: 'high',
     antigravityModel: '',
     antigravityEffort: 'medium', // Antigravity's own default for Argon
-    seriesAgents: 3,
     autoRender: true,
     hasElevenLabsKey: false,
     hasAnthropicKey: false,
@@ -66,6 +66,8 @@ export function getSettings(): Settings {
     cache = normalizeCodexSettings({ ...base, ...stored, uiLanguage: resolveUiLanguage(stored.uiLanguage ?? base.uiLanguage), ...secretFlags() })
   }
   if (cache.modelFallback) cache.modelFallback = { enabled: cache.modelFallback.enabled === true, order: normalizeModelOrder(cache.modelFallback.order) }
+  delete cache.seriesAgents // legacy setting: production no longer caps the number of agents
+  cache.agentConcurrency = agentConcurrency(cache.agentConcurrency)
   cache.interfaceSize = interfaceSize(cache.interfaceSize)
   cache.chatTextSize = chatTextSize(cache.chatTextSize)
   return cache
@@ -73,6 +75,8 @@ export function getSettings(): Settings {
 
 export function setSettings(patch: Partial<Settings>): Settings {
   cache = normalizeCodexSettings({ ...getSettings(), ...patch, ...secretFlags() })
+  delete cache.seriesAgents
+  cache.agentConcurrency = agentConcurrency(cache.agentConcurrency)
   if (cache.modelFallback) cache.modelFallback = { enabled: cache.modelFallback.enabled === true, order: normalizeModelOrder(cache.modelFallback.order) }
   cache.interfaceSize = interfaceSize(cache.interfaceSize)
   cache.chatTextSize = chatTextSize(cache.chatTextSize)

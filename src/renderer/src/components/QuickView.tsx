@@ -1,140 +1,48 @@
-import { t as uiText, format } from '../lib/i18n'
-import { Check, Circle, CircleAlert, FolderOpen, Play, Square, Zap } from 'lucide-react'
-import type { QuickStep } from '../../../shared/types'
+import { Check, CircleAlert, FolderOpen, Play, RotateCcw, Square, Zap, ArrowLeft, Globe } from 'lucide-react'
+import { modelName } from '../../../shared/usage'
 import { api } from '../lib/api'
+import { t, format } from '../lib/i18n'
 import { revealLabel } from '../lib/platform'
-import { canEdit, closeProject, openDialog, openWatch, useStore } from '../store'
-import { ProgressLine } from './ui'
+import { canEdit, closeProject, errorText, openDialog, openWatch, toast, useStore } from '../store'
+import { ProductionStages } from './ProductionStages'
+import { AccountPlanUsage } from './AccountPlanUsage'
 
-const ORDER: QuickStep[] = ['setup', 'sources', 'script', 'scene', 'check', 'export', 'done']
-const STEPS: { step: QuickStep; label: string }[] = [
-  { step: 'sources', label: 'Reading the sources' },
-  { step: 'script', label: 'Writing the script' },
-  { step: 'scene', label: 'Making the scenes' },
-  { step: 'check', label: 'Checking the render' },
-  { step: 'export', label: 'Exporting' },
-]
-
-/** Quick mode's progress, in place of the editor while Studio makes the video on its own. */
+/** A production page, never the owner of the agent's lifetime or current project. */
 export function QuickView() {
-  const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
+  const editing = useStore((s) => canEdit(s))
   const run = useStore((s) => s.quick)!
-  const timeline = useStore((s) => s.timeline)
   const job = useStore((s) => s.exports.find((j) => j.id === run.exportJob))
-  const at = ORDER.indexOf(run.step)
   const working = run.state === 'working'
-  const steps = STEPS.filter((s) => s.step !== 'sources' || at >= ORDER.indexOf('sources'))
-
-  return (
-    <div className="quick-view">
-      <div className="quick-card">
-        <div className="eyebrow">
-          <Zap /> {run.series ? format('{0} · episode {1} of {2}', [run.series.title, run.series.episode, run.series.of]) : uiText('Quick mode')}
-        </div>
-        <h1>{run.name}</h1>
-        <p className="muted">
-          {working
-            ? uiText('Claude is making this video and will export it when it’s done. You can leave it running; a notification says when it’s ready.')
-            : run.state === 'done'
-              ? uiText('Your video is ready.')
-              : run.state === 'stopped'
-                ? uiText('Stopped. The project keeps what was made so far.')
-                : uiText('It didn’t finish.')}
-        </p>
-
-        <ol className="quick-steps">
-          {steps.map(({ step, label }) => {
-            const i = ORDER.indexOf(step)
-            const state = run.state === 'done' || i < at ? 'done' : i === at && working ? 'now' : 'todo'
-            return (
-              <li key={step} className={state}>
-                {state === 'done' ? <Check /> : state === 'now' ? <span className="spinner" /> : <Circle />}
-                <span>{uiText(step === 'export' && state === 'now' && job?.phase === 'rendering' ? 'Rendering' : step === 'export' && state === 'now' && job?.phase === 'assembling' ? 'Assembling' : label)}</span>
-                {step === 'export' && state === 'now' && job?.percent !== undefined && <span className="mono faint">{Math.round(job.percent * 100)}%</span>}
-              </li>
-            )
-          })}
-        </ol>
-        {working && run.step === 'export' && <ProgressLine value={job?.percent} />}
-        {working && run.activity && <div className="quick-activity faint">{run.activity}</div>}
-        {run.series?.episodes && (
-          <details className="quick-series" open>
-            <summary>
-              {uiText("Episode ")}
-              {run.series.episode} {uiText(" of ")}
-              {run.series.of} · {run.series.episodes.filter((e) => e.state === 'done').length} {uiText(" made")}
-            </summary>
-            <ol className="quick-steps">
-              {run.series.episodes.map((ep, i) => {
-                const state = ep.state === 'now' && run.state !== 'working' ? (run.state === 'done' ? 'done' : 'failed') : ep.state
-                return (
-                  <li key={i} className={state}>
-                    {state === 'done' ? <Check /> : state === 'now' ? <span className="spinner" /> : state === 'failed' ? <CircleAlert /> : <Circle />}
-                    <span className="mono faint">{i + 1}</span>
-                    <span>{ep.title}</span>
-                  </li>
-                )
-              })}
-            </ol>
-          </details>
-        )}
-        {run.error && (
-          <div className="quick-error">
-            <CircleAlert /> {run.error}
-          </div>
-        )}
-        {run.warnings.length > 0 && (
-          <ul className="quick-warnings">
-            {run.warnings.map((w) => (
-              <li key={w}>
-                <CircleAlert /> {w}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {timeline && <video className="quick-preview" src={api.mediaUrl(timeline.video)} controls preload="metadata" />}
-
-        <div className="quick-actions">
-          {working ? (
-            <>
-              {editing && (
-                <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>
-                  {uiText('Watch in the editor')}
-                </button>
-              )}
-              <button className="btn" onClick={() => void api.stopQuick()}>
-                <Square /> {uiText(" Stop")}
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="btn ghost" onClick={() => void closeProject()}>
-                {uiText('Back to projects')}
-              </button>
-              {editing ? (
-                <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>
-                  {uiText('Open in the editor')}
-                </button>
-              ) : (
-                run.state === 'done' && (
-                  <button className="btn" onClick={() => void openWatch(run.project)}>
-                    <Play /> {uiText(" Watch it")}
-                  </button>
-                )
-              )}
-              {run.result && (
-                <button className="btn" onClick={() => void api.reveal(run.result!.files[0] ?? run.result!.folder)}>
-                  <FolderOpen /> {revealLabel}
-                </button>
-              )}
-              <button className="btn primary" onClick={() => openDialog({ kind: 'quick' })}>
-                <Zap /> {uiText(" Make another")}
-              </button>
-            </>
-          )}
+  const stage = { setup: 0, sources: 0, script: 0, scene: 1, check: 2, export: 3, done: 4 }[run.step]
+  const resume = () => { void api.resumeQuick(run.project).catch((e) => toast(errorText(e), 'error')) }
+  return <section className="quick-view">
+    <div className="quick-card creation-page">
+      <header className="production-head">
+        <div><span className="eyebrow"><Zap />{t('Quick video')}</span><h1>{run.name}</h1></div>
+        <button className="btn ghost" onClick={() => void closeProject()}><ArrowLeft />{t('Back to projects')}</button>
+      </header>
+      <p className="muted">{t(working ? 'Your video is being made in the background. Keep studying or work on another project; Studio will notify you when it is ready.' : run.state === 'done' ? 'Your video is ready.' : 'The project keeps what was made so far. Continue from the unfinished step.')}</p>
+      <div className="creation-status">
+        <span className={run.state === 'done' ? 'creation-ready' : ''}>{run.state === 'done' ? <Check /> : working ? <span className="spinner" /> : <CircleAlert />}</span>
+        <div role="status"><strong>{t(run.state === 'done' ? 'Ready to watch' : run.state === 'stopped' ? 'Stopped' : run.state === 'failed' ? 'Didn’t finish' : run.step === 'sources' ? 'Reading the sources' : 'Making the video')}</strong>
+          {working && run.activity && <p>{t(run.activity)}</p>}
+          {run.route && <small>{run.route.agent === 'claude' ? 'Claude' : run.route.agent === 'codex' ? 'Codex' : 'Antigravity'} · {modelName(run.route.model || 'default')}</small>}
         </div>
       </div>
+      <ProductionStages project={run.project} stage={stage} active={working} job={job} />
+      <p className="hint creation-estimate">{t('Writing progress estimates completed sections, not time remaining. Rendering and assembly report their own progress.')}</p>
+      {run.error && <div className="quick-error"><CircleAlert />{run.error}</div>}
+      {!!run.warnings.length && <ul className="quick-warnings">{run.warnings.map((warning) => <li key={warning}><CircleAlert />{warning}</li>)}</ul>}
+      <div className="quick-actions">
+        {working ? <button className="btn" onClick={() => void api.stopQuick(run.project)}><Square />{t('Stop')}</button> : <>
+          {run.state !== 'done' && <button className="btn primary" onClick={resume}><RotateCcw />{t('Continue')}</button>}
+          {run.state === 'done' && <button className="btn primary" onClick={() => void openWatch(run.project)}><Play />{t('Watch it')}</button>}
+          {editing && <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>{t('Open in the editor')}</button>}
+          {run.result && <button className="btn" onClick={() => void api.reveal(run.result!.files[0] ?? run.result!.folder)}><FolderOpen />{revealLabel}</button>}
+          <button className="btn ghost" onClick={() => openDialog({ kind: 'quick' })}><Zap />{t('Make another')}</button>
+        </>}
+      </div>
+      <details className="production-usage"><summary><Globe />{t('Creation settings')}</summary><p className="hint">{format('{0} PDF sources', [run.sources ?? 0])} · {t('Web research available')}</p>{run.route && <AccountPlanUsage agent={run.route.agent} auth={run.route.auth} />}</details>
     </div>
-  )
+  </section>
 }

@@ -1,8 +1,8 @@
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowDown, ArrowUp, ArrowRight, Check, Circle, FileText, Library, Plus, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowRight, Check, Circle, FileText, Library, Plus, Save, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_TONE } from '../../../shared/tone'
-import type { Agent, AgentSelection, Aspect, ModelOption, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
+import type { Agent, AgentSelection, Aspect, ModelOption, SeriesDraft, SeriesPlan, SeriesPlanProgress, Theme, Tone, VoiceSettings } from '../../../shared/types'
 import { seriesSelection } from '../../../shared/agent-selection'
 import { api } from '../lib/api'
 import { studying, closeDialog, errorText, openWatch, refreshProjects, toast, useStore } from '../store'
@@ -21,7 +21,6 @@ export function SeriesDialog() {
   const defaults = useStore((s) => s.settings)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
   const omnivoice = useStore((s) => s.setup?.omnivoice)
-  const agents = useStore((s) => s.settings?.seriesAgents || 3)
   const [pdfs, setPdfs] = useState<string[]>([])
   const [step, setStep] = useState<'material' | 'details'>('material')
   const [noPdfs, setNoPdfs] = useState(false)
@@ -41,14 +40,18 @@ export function SeriesDialog() {
   const settings = useStore((s) => s.settings)
   const [server, setServer] = useState<string | undefined>()
   const [plan, setPlan] = useState<SeriesPlan | null>(null)
-  const [busy, setBusy] = useState<'planning' | 'starting' | null>(null)
+  const [busy, setBusy] = useState<'planning' | 'starting' | 'saving' | null>(null)
   const [dragging, setDragging] = useState(false)
   const [progress, setProgress] = useState<SeriesPlanProgress | null>(null)
   const cancelled = useRef(false)
   const [draftReady, setDraftReady] = useState(false)
+  const loaded = useRef(false)
+  const [savedPlans, setSavedPlans] = useState<SeriesDraft[]>([])
+  const othersWorking = useStore((s) => s.seriesRuns.some((run) => run.state === 'working'))
+  useEffect(() => { if (open) void api.savedSeriesPlans().then(setSavedPlans) }, [open])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || busy === 'planning' || plan) return
     setPdfs([])
     setStep('material')
     setNoPdfs(false)
@@ -57,6 +60,7 @@ export function SeriesDialog() {
     setPlan(null)
     setBusy(null)
     setDraftReady(false)
+    loaded.current = false
     let active = true
     void api.seriesDraft().then((draft) => {
       if (!active) return
@@ -68,6 +72,7 @@ export function SeriesDialog() {
         setPlan(draft.plan ?? null)
         setStep(draft.request.pdfs.length || draft.request.topic ? 'details' : 'material')
       }
+      loaded.current = true
       setDraftReady(true)
     }).catch((error) => { if (active) { toast(errorText(error), 'error'); setDraftReady(true) } })
     return () => { active = false }
@@ -128,7 +133,7 @@ export function SeriesDialog() {
 
   const language = voice.language
   useEffect(() => {
-    if (!open || !draftReady || busy) return
+    if (!open || !draftReady || !loaded.current || busy) return
     const request = { pdfs: noPdfs ? [] : pdfs, topic: noPdfs ? topic : undefined, instructions, language, tone }
     void api.saveSeriesDraft(pdfs.length || topic.trim() || plan ? { request, plan: plan ?? undefined } : null).catch((error) => toast(errorText(error), 'error'))
   }, [open, draftReady, busy, pdfs, noPdfs, topic, instructions, language, tone, plan])
@@ -147,20 +152,23 @@ export function SeriesDialog() {
 
   const makePlan = async () => {
     setBusy('planning')
+    useStore.setState({ seriesPlanning: 'working' })
     setProgress(null)
     cancelled.current = false
     const off = api.on('series-plan', setProgress)
     try {
-      setPlan(
-        await api.planSeries({
+      const next = await api.planSeries({
           pdfs: noPdfs ? [] : pdfs,
           topic: noPdfs ? topic.trim() : undefined,
           instructions: noPdfs ? undefined : instructions.trim() || undefined,
           language,
           tone,
-        }),
-      )
+        })
+      setPlan(next)
+      useStore.setState({ seriesPlanning: 'ready' })
+      if (useStore.getState().dialog?.kind !== 'series') toast(uiText('Your series plan is ready to review.'), 'ok')
     } catch (e) {
+      useStore.setState({ seriesPlanning: null })
       if (!cancelled.current) toast(errorText(e), 'error')
     } finally {
       off()
@@ -172,11 +180,39 @@ export function SeriesDialog() {
     void api.cancelSeriesPlan()
   }
 
-  const start = async () => {
+  const draft = (): SeriesDraft => ({ request: { pdfs: noPdfs ? [] : pdfs, topic: noPdfs ? topic : undefined, instructions, language, tone }, plan: plan ?? undefined })
+  const savePlan = async () => {
+    if (!plan) return
+    setBusy('saving')
+    try {
+      await api.saveSeriesPlan(draft())
+      await api.saveSeriesDraft(null)
+      loaded.current = false
+      setPlan(null)
+      useStore.setState({ seriesPlanning: null })
+      closeDialog()
+      toast(uiText('Plan saved'), 'ok')
+    } catch (error) { toast(errorText(error), 'error') }
+    finally { setBusy(null) }
+  }
+  const restorePlan = (saved: SeriesDraft) => {
+    loaded.current = true
+    setPdfs(saved.request.pdfs)
+    setNoPdfs(!saved.request.pdfs.length)
+    setTopic(saved.request.topic ?? saved.plan?.title ?? '')
+    setInstructions(saved.request.instructions ?? '')
+    setPlan(saved.plan ?? null)
+    setStep('details')
+    setDraftReady(true)
+    useStore.setState({ seriesPlanning: 'ready' })
+  }
+  const start = async (schedule?: 'queue' | 'now') => {
     if (!plan || voiceIssue) return
     setBusy('starting')
     try {
-      await api.startSeries({
+      await api.saveSeriesDraft(draft())
+      const folder = await api.startSeries({
+        schedule,
         plan: {
           ...plan,
           instructions: (noPdfs ? topic : instructions).trim() || undefined,
@@ -191,18 +227,16 @@ export function SeriesDialog() {
         export: { themes: [theme], languages: [], languageVideos: false, server },
         unattended: unattended || !editing,
       })
+      loaded.current = false
       closeDialog()
+      setPlan(null)
+      useStore.setState({ seriesPlanning: null })
       if (unattended || !editing) {
         await refreshProjects()
-        const run = await api.seriesRun()
-        if (run) await openWatch(run.folder)
+        await openWatch(folder)
       }
-      toast(
-        unattended
-          ? `Making ${plan.episodes.length} episodes. Home shows how each one is going.`
-          : `Created ${plan.episodes.length} episodes. Here's the first.`,
-        'ok',
-      )
+      const run = await api.watchSeries(folder)
+      toast(uiText(run.production?.state === 'queued' ? 'Series queued' : 'Series created'), 'ok')
     } catch (e) {
       toast(errorText(e), 'error')
       setBusy(null)
@@ -215,16 +249,19 @@ export function SeriesDialog() {
   return (
     <Modal
       open={open}
-      onClose={() => { if (busy === 'starting') return; if (busy === 'planning') cancelPlan(); else closeDialog() }}
+      onClose={() => { if (busy !== 'starting') closeDialog() }}
       title={plan ? uiText('The series plan') : uiText('New series')}
       icon={<Library className="head-icon" />}
       width={760}
+      className="series-dialog"
       footer={
         plan ? (
           <>
-            <button className="btn ghost" disabled={!!busy} onClick={() => setPlan(null)}>
+            <button className="btn ghost" disabled={!!busy} onClick={() => { setPlan(null); useStore.setState({ seriesPlanning: null }) }}>
               {uiText('Back')}
             </button>
+            <button className="btn ghost" disabled={!!busy} onClick={() => void savePlan()}><Save />{uiText('Save plan')}</button>
+            {(unattended || !editing) && othersWorking && <button className="btn" disabled={!!busy || !!voiceIssue || !assignmentsReady} onClick={() => void start('queue')}>{uiText('Queue series')}</button>}
             <button
               className="btn primary"
               disabled={!!busy || !plan.episodes.length || !!voiceIssue || !assignmentsReady}
@@ -238,9 +275,10 @@ export function SeriesDialog() {
         ) : (
           <>
             {busy === 'planning' ? (
-              <button className="btn ghost" onClick={cancelPlan}>
-                {uiText('Stop planning')}
-              </button>
+              <>
+                <button className="btn ghost" onClick={cancelPlan}>{uiText('Stop planning')}</button>
+                <button className="btn" onClick={closeDialog}>{uiText('Keep working in background')}</button>
+              </>
             ) : step === 'details' ? (
               <button className="btn ghost" onClick={() => setStep('material')}>
                 {uiText('Back')}
@@ -272,6 +310,7 @@ export function SeriesDialog() {
         <PlanProgress pdfs={noPdfs ? [] : pdfs.map(name)} progress={progress} />
       ) : !plan && step === 'material' ? (
         <div className="modal-body quick-form">
+          {!!savedPlans.length && <details className="saved-series-plans"><summary>{uiText('Saved plans')} · {savedPlans.length}</summary>{savedPlans.map((saved) => <button className="btn ghost" key={saved.id} onClick={() => restorePlan(saved)}><Library />{saved.plan?.title}</button>)}</details>}
           <p className="hint">
             {uiText(
               "Add a course's material, one PDF per lecture for example. Your selected agent reads it all and proposes the episodes: usually one per PDF, merged or split where that makes better videos. You review the plan before anything is made.",
@@ -379,10 +418,7 @@ export function SeriesDialog() {
               <span>
                 {uiText('Make every episode now, unattended')}{' '}
                 <span className="hint">
-                  {format(
-                    'The scripts are written in order, and each video starts as soon as its script is ready, {0} agents at a time (Settings → Agent); each is exported when it’s done.',
-                    [agents],
-                  )}{' '}
+                  {uiText('Each video starts as soon as its script is ready.')} {' '}
                   {uiText('Off: the episodes are created, and you make each in the editor.')}
                 </span>
               </span>

@@ -1,6 +1,9 @@
 import { t as uiText, format } from '../lib/i18n'
-import { FileText, Plus, X, Zap } from 'lucide-react'
+import { FileText, Plus, X, Zap, Settings, Globe, Film, Volume2, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { modelName } from '../../../shared/usage'
+import { defaultAgentSelection } from '../../../shared/agent-selection'
+import { languageName } from '../lib/languages'
 import { DEFAULT_TONE } from '../../../shared/tone'
 import type { Aspect, Theme, Tone } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -20,6 +23,7 @@ export function QuickDialog() {
   const defaults = useStore((s) => s.settings)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
   const omnivoice = useStore((s) => s.setup?.omnivoice)
+  const selected = defaults && defaultAgentSelection(defaults)
   const [prompt, setPrompt] = useState('')
   const [pdfs, setPdfs] = useState<string[]>([])
   const aspect: Aspect = defaults?.defaultAspect ?? '16:9'
@@ -34,10 +38,8 @@ export function QuickDialog() {
 
   useEffect(() => {
     if (!open) return
-    setPrompt('')
-    setPdfs([])
     setBusy(false)
-  }, [open]) // a fresh form each time
+  }, [open]) // Preserve the brief when visiting Settings; clear it only after starting a job.
 
   const add = (paths: string[]) => setPdfs((p) => [...p, ...paths.filter((x) => /\.pdf$/i.test(x) && !p.includes(x))])
 
@@ -55,6 +57,10 @@ export function QuickDialog() {
         voice,
         export: { themes: both ? ['dark', 'light'] : [theme], languages: [], languageVideos: false, server },
       })
+      setPrompt('')
+      setPdfs([])
+      setBoth(false)
+      setServer(undefined)
       closeDialog()
     } catch (e) {
       toast(errorText(e), 'error')
@@ -73,13 +79,13 @@ export function QuickDialog() {
   return (
     <Modal
       open={open}
-      onClose={closeDialog}
+      onClose={() => { if (!busy) closeDialog() }}
       title={uiText('Quick video')}
       icon={<Zap className="head-icon" />}
       width={680}
       footer={
         <>
-          <button className="btn ghost" onClick={closeDialog}>
+          <button className="btn ghost" disabled={busy} onClick={closeDialog}>
             {uiText('Cancel')}
           </button>
           <button className="btn primary" disabled={!prompt.trim() || busy || !!voiceIssue} title={voiceIssue ?? undefined} onClick={() => void start()}>
@@ -89,11 +95,12 @@ export function QuickDialog() {
       }
     >
       <div className="modal-body quick-form">
-        <p className="hint">
-          {uiText(
-            "Describe it, attach the material, and Studio does the rest: Claude writes the script and the scenes, checks the render and exports the video. You don't need the editor; it's there if you want to look.",
-          )}
-        </p>
+        <div className="quick-intro"><span><Sparkles /></span><div><h2>{uiText('One idea, a complete video')}</h2><p>{uiText('Describe what you want to understand. Your agent researches, writes, checks and exports it while you keep working.')}</p></div></div>
+        <div className="quick-config">
+          <span><Zap />{selected?.agent === 'codex' ? 'Codex' : selected?.agent === 'antigravity' ? 'Antigravity' : 'Claude'} · {modelName(selected?.model || 'default')}</span>
+          <span><Volume2 />{languageName.of(language) ?? language}</span><span><Film />{aspect}</span><span><Globe />{uiText('Web research available')}</span>
+          <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'account' })}><Settings />{uiText('Settings')}</button>
+        </div>
         <div className="field">
           <label htmlFor="quick-prompt">{uiText('What should the video show?')}</label>
           <textarea
@@ -134,10 +141,12 @@ export function QuickDialog() {
           {!pdfs.length && <span className="hint">{uiText('or drop them here: lecture notes, a textbook chapter, a worksheet. Optional.')}</span>}
         </div>
 
+        <details className="quick-delivery"><summary>{uiText('Export options')}</summary>
         <label className="export-check">
           <input type="checkbox" checked={both} onChange={(e) => setBoth(e.target.checked)} /> {uiText(" Export both a light and a dark version")}
         </label>
         <ExportOn value={server} onChange={setServer} />
+        </details>
         {voiceIssue && (
           <div className="quick-warning">
             {voiceIssue}{' '}

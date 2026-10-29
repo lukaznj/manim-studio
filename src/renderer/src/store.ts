@@ -120,8 +120,11 @@ export interface State {
   finalRender: RenderState
   exports: ExportJob[] // the export queue, newest last (src/main/exports.ts)
   script: string | null // the open project's script.md (ScriptPane.tsx)
+  seriesPlanning: 'working' | 'ready' | null
   quick: QuickRun | null // quick mode's run (QuickView.tsx)
+  quickRuns: QuickRun[]
   quickEditor: boolean // show the editor instead of quick mode's progress
+  seriesRuns: SeriesRun[]
   series: SeriesRun | null // the active production run; the course viewer owns its detailed UI
   homeSeries: string | null // the series folder Home has open, or null for all projects
   exerciseSets: ExerciseSet[] // Home's cards
@@ -179,8 +182,11 @@ export const useStore = create<State>(() => ({
   finalRender: { status: 'idle' },
   exports: [],
   script: null,
+  seriesPlanning: null,
   quick: null,
+  quickRuns: [],
   quickEditor: false,
+  seriesRuns: [],
   series: null,
   homeSeries: null,
   exerciseSets: [],
@@ -235,10 +241,11 @@ async function guard<T>(p: Promise<T>): Promise<T | undefined> {
   }
 }
 
-function withTransition(update: () => void): void {
-  const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown }
-  if (doc.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) doc.startViewTransition(update)
-  else update()
+function withTransition(update: () => void): Promise<void> {
+  if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+    return document.startViewTransition(update).updateCallbackDone
+  update()
+  return Promise.resolve()
 }
 
 export const openDialog = (dialog: Dialog) => {
@@ -275,13 +282,20 @@ export async function boot(): Promise<void> {
   api.on('open-project', ({ path }) => {
     if (get().project?.path === path) return
     // Quick mode opens its project the same way, with its own screen; only Claude Desktop needs saying.
-    void openProject(path).then(() => get().quick?.project !== path && toast('Claude Desktop opened this project'))
+    void openProject(path).then(() => !get().quickRuns.some((run) => run.project === path) && toast('Claude Desktop opened this project'))
   })
   api.on('exports', (exports) => set({ exports }))
   api.on('projects-changed', () => void refreshProjects())
-  api.on('quick', (quick) => set((s) => ({ quick, quickEditor: quick?.id === s.quick?.id ? s.quickEditor : false })))
-  void api.quickRun().then((quick) => set({ quick }))
+  api.on('quick', (quick) => {
+    if (!quick) return
+    set((s) => ({
+      quickRuns: [...s.quickRuns.filter((run) => run.project !== quick.project), quick],
+      ...(s.project?.path === quick.project ? { quick, quickEditor: quick.id === s.quick?.id ? s.quickEditor : false } : {}),
+    }))
+  })
+  void api.quickRuns().then((quickRuns) => set((s) => ({ quickRuns, quick: quickRuns.find((run) => run.project === s.project?.path) ?? null })))
   api.on('series', receiveSeries)
+  api.on('series-runs', receiveSeriesRuns)
   api.on('watch', (w) => set((st) => (st.watchSeries?.folder === w.folder ? { watchSeries: w } : {})))
   api.on('exercises', (s) => {
     set((st) => ({
@@ -294,6 +308,7 @@ export async function boot(): Promise<void> {
     if (st.screen === 'study' && !st.watchSeries && st.exerciseSet?.folder === s.folder && s.items.length && st.project?.meta.exercise?.set !== s.folder)
       void selectStudied(s.items[0].dir)
   })
+  void api.seriesRuns().then(receiveSeriesRuns)
   void api.seriesRun().then(receiveSeries)
   // An interrupted planning request or edited plan reopens without starting paid work automatically.
   void api.seriesDraft().then((draft) => {
@@ -306,18 +321,26 @@ export async function boot(): Promise<void> {
 }
 
 function receiveSeries(series: SeriesRun | null): void {
-  const previous = get().series
-  set((s) => ({ series, watchSeries: s.watchSeries && series?.folder === s.watchSeries.folder ? { ...s.watchSeries, title: series.title, production: series } : s.watchSeries }))
+  if (!series) return // collection events identify exactly which course was dismissed
+  const previous = get().seriesRuns.find((run) => run.folder === series.folder)
+  set((s) => ({ series: s.series?.folder === series.folder || !s.series ? series : s.series, seriesRuns: [...s.seriesRuns.filter((run) => run.folder !== series.folder), series], watchSeries: s.watchSeries && series?.folder === s.watchSeries.folder ? { ...s.watchSeries, title: series.title, production: series } : s.watchSeries }))
   const changed = previous?.folder !== series?.folder || previous?.episodes.filter((ep) => ep.state === 'done').length !== series?.episodes.filter((ep) => ep.state === 'done').length
   if (!changed) return
   void refreshProjects()
   if (series && get().watchSeries?.folder === series.folder) {
     void api.watchSeries(series.folder).then((fresh) => {
       if (get().watchSeries?.folder !== fresh.folder) return
-      const current = get().series
+      const current = get().seriesRuns.find((run) => run.folder === fresh.folder)
       set({ watchSeries: current?.folder === fresh.folder ? { ...fresh, production: current } : fresh })
     }).catch(() => undefined)
   }
+}
+
+function receiveSeriesRuns(seriesRuns: SeriesRun[]): void {
+  const changed = seriesRuns.length !== get().seriesRuns.length || seriesRuns.some((run) => !get().seriesRuns.some((before) => before.folder === run.folder))
+  set((s) => ({ seriesRuns, series: seriesRuns.find((run) => run.folder === s.series?.folder) ?? seriesRuns.at(-1) ?? null,
+    watchSeries: s.watchSeries ? { ...s.watchSeries, production: seriesRuns.find((run) => run.folder === s.watchSeries!.folder) ?? s.watchSeries.production } : null }))
+  if (changed) void refreshProjects()
 }
 
 export function showSeriesProduction(): void {
@@ -348,7 +371,7 @@ export async function openWatch(folder: string, dir?: string, startAt?: number):
   const watchSeries = await guard(api.watchSeries(folder))
   if (!watchSeries) return
   const exerciseSet = watchSeries.exercises ? await api.exerciseSet(watchSeries.exercises).catch(() => null) : null
-  const production = get().series?.folder === folder ? get().series : watchSeries.production
+  const production = get().seriesRuns.find((run) => run.folder === folder) ?? watchSeries.production
   const remembered = validStudySelection(watchSeries, exerciseSet, readStudySelection(folder))
   const overview = !dir && !!production && productionVisible(production, !!get().settings?.developerMode) && (remembered?.production || (!remembered?.dir && (production.state !== 'done' || production.episodes.some((ep) => ep.state === 'failed'))))
   if (get().dirty) await saveScene()
@@ -619,13 +642,14 @@ export const studying = (s: Pick<State, 'settings'> = get()): boolean =>
 
 export async function openProject(path: string): Promise<void> {
   // Quick mode's progress screen isn't the editor: it opens the same way, and its video is watched after.
-  if (studying() && get().quick?.project !== path) return studyProject(path)
+  if (studying() && !get().quickRuns.some((run) => run.project === path)) return studyProject(path)
+  if (get().dirty) await saveScene({ render: false })
   const opened = await guard(api.openProject(path))
   if (!opened) return
-  withTransition(() => applyOpened(opened))
+  await withTransition(() => applyOpened(opened))
   firstRunTour()
   playback.restore(0)
-  if (!opened.timeline && get().setup?.env === 'ready') void renderNow()
+  if (!opened.timeline && get().setup?.env === 'ready' && get().quick?.project !== path) void renderNow()
 }
 
 /** Switches Learn and Create; leaving Create from the editor moves to the study screen of what's open. */
@@ -674,6 +698,8 @@ function applyOpened(o: OpenProject, screen: State['screen'] = 'editor', autopla
     studyReturn: null,
     studyAutoplayPath: autoplay ? o.path : null,
     project: { path: o.path, meta: o.meta },
+    quick: get().quickRuns.find((run) => run.project === o.path) ?? null,
+    quickEditor: false,
     savedSource: o.source,
     // An episode made by hand starts with its request ready in the chat; Claude's brief has the rest.
     ...(screen === 'editor' && o.meta.series && !o.meta.extra && !o.chat.length && get().quick?.project !== o.path ? { chatDraft: 'Make this episode.' } : {}),

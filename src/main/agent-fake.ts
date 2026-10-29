@@ -11,6 +11,7 @@ import { readMeta } from './projects'
 import { currentOrNewRender } from './render'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { SeriesDraft, SeriesPlan, SeriesPlanProgress } from '../shared/types'
+import { reportProgress } from './production-progress'
 
 /** Only in a driven test profile (with STUDIO_USER_DATA), never in a real install. */
 export const fakeAgents = (): boolean => !!(process.env.STUDIO_FAKE_AGENT && process.env.STUDIO_USER_DATA)
@@ -71,6 +72,7 @@ export function fakeAgent(dir: string, opts: AgentOptions): EpisodeAgent {
   return {
     async turn(text, step) {
       await sleep(1000)
+      if (closed) return { ok: false, error: 'Stopped' }
       if (/^Solve the exercise/.test(text)) {
         onTool('Checking a calculation')
         await sleep(1200)
@@ -83,12 +85,15 @@ export function fakeAgent(dir: string, opts: AgentOptions): EpisodeAgent {
       }
       if (/only the script/.test(text)) {
         onTool('Writing script.md')
+        reportProgress(dir, 'script', 0, 1)
         await sleep(1500)
+        if (closed) return { ok: false, error: 'Stopped' }
         used(step, { Read: 3, mcp__studio__read_source: 2, Write: 1 }, 1)
         writeFileSync(
           join(dir, 'script.md'),
           `---\nstatus: approved\n---\n# ${meta.name}\n\n**The idea:** what episode ${n} is about.\n\n## Opening\n**Narration:**\n> Hello.\n`,
         )
+        reportProgress(dir, 'script', 1, 1)
         return { ok: true }
       }
       if (process.env.STUDIO_FAKE_AGENT === 'limit' && n === 2 && !limitedOnce) {
@@ -96,10 +101,12 @@ export function fakeAgent(dir: string, opts: AgentOptions): EpisodeAgent {
         return { ok: false, error: 'limit', limitedUntil: Date.now() + Number(process.env.STUDIO_FAKE_LIMIT_MS ?? 5_000) }
       }
       onTool('Writing scene.py')
+      reportProgress(dir, 'scene', 0, 1)
       writeFileSync(
         join(dir, 'scene.py'),
         `from manim import *\nfrom studio import *\n\n\nclass Video(StudioScene):\n    def construct(self):\n        self.next_section("${meta.exercise ? 'Exercise' : 'Opening'}")\n        t = Text("${meta.exercise ? `Exercise ${meta.exercise.number}` : `Episode ${n}`}", font_size=56)\n        self.play(Write(t))\n        for i in range(14):\n            ${meta.exercise ? 'if i % 4 == 3:\n                self.next_section(["Factor", "Zero product", "Answer"][i // 4])\n            ' : ''}self.play(t.animate.shift(UP * 0.2 if i % 2 else DOWN * 0.2), run_time=0.5)\n        self.wait(1)\n`,
       )
+      reportProgress(dir, 'scene', 1, 1)
       onTool('Rendering the preview')
       await currentOrNewRender(dir)
       onTool('Looking at frames 1.0s, 4.0s')
@@ -107,7 +114,7 @@ export function fakeAgent(dir: string, opts: AgentOptions): EpisodeAgent {
       used(step, { Write: 1, Edit: 4, mcp__studio__render_preview: 3, mcp__studio__view_frames: 5 }, 3)
       return { ok: true }
     },
-    close() {},
+    close() { closed = true },
   }
 }
 

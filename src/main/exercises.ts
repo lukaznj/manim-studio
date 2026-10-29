@@ -509,12 +509,12 @@ async function drive(set: ExerciseSet): Promise<void> {
   try {
     while (sets.get(set.folder) === set && !set.paused) {
       for (const it of set.items) if (it.state === 'export' && !exporting.has(it.dir)) exportItem(set, it)
-      const free = busy.size < Math.max(1, getSettings().seriesAgents || 3)
       const idle = (it: ExerciseItem) => !busy.has(it.dir)
       const next = set.items.find((it) => it.state === 'waiting' && idle(it)) ?? set.items.find((it) => it.state === 'solved' && idle(it))
-      if (free && next) {
+      if (next) {
         busy.set(next.dir, next.state === 'waiting' ? 'solve' : 'video')
         void (next.state === 'waiting' ? solve(set, next) : video(set, next)).finally(() => busy.delete(next.dir))
+        await new Promise<void>((resolve) => setImmediate(resolve))
         continue
       }
       const pending = set.items.some((it) => busy.has(it.dir) || exporting.has(it.dir) || ['waiting', 'solved', 'export'].includes(it.state))

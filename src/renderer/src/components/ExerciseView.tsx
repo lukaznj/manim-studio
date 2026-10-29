@@ -10,6 +10,7 @@ import { Markdown } from './Markdown'
 import { StudyPlayer } from './StudyPlayer'
 import { WatchedToggle } from './LessonView'
 import { StudyRowProgress } from './StudyRowProgress'
+import { ProductionStages } from './ProductionStages'
 
 // The study screen's exercises (StudyView.tsx, src/main/exercises.ts, ADR 0025).
 
@@ -201,6 +202,8 @@ export function ExerciseEmpty({ set }: { set: ExerciseSet }) {
 /** The selected exercise: what's asked, the video, and the written solution step by step. */
 export function ExerciseMain({ item }: { item: ExerciseItem }) {
   const editing = useStore((s) => canEdit(s)) // Learn mode has no editor (ADR 0029)
+  const exportJob = useStore((s) => s.exports.find((job) => job.project === item.dir && (job.state === 'running' || job.state === 'waiting')))
+  const paused = useStore((s) => !!s.exerciseSet?.paused)
   const [detail, setDetail] = useState<ExerciseDetail | null>(null)
   const video = useRef<HTMLVideoElement>(null)
   useEffect(() => {
@@ -222,6 +225,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
 
   return (
     <div className="ex-detail">
+      {['video', 'export'].includes(item.state) && <ProductionStages project={item.dir} stage={item.state === 'export' ? 3 : undefined} active={!paused} job={exportJob} />}
       <header className="ex-detail-head">
         <div>
           <span className="eyebrow">

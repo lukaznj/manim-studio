@@ -63,8 +63,8 @@ function friendly(e: Error & { log?: string }, name: string): string {
   return `Couldn’t read ${name}: ${e.message.replace(/^\w+Error: /, '')}`
 }
 
-export async function listSources(): Promise<SourceItem[]> {
-  const dir = folder()
+export async function listSources(projectDir = requireProject().path): Promise<SourceItem[]> {
+  const dir = folder(projectDir)
   if (!existsSync(dir)) return []
   const items: SourceItem[] = []
   for (const name of readdirSync(dir)
@@ -72,8 +72,8 @@ export async function listSources(): Promise<SourceItem[]> {
     .sort()) {
     const item: SourceItem = { name, size: statSync(join(dir, name)).size }
     try {
-      const i = await info(name)
-      Object.assign(item, { pages: i.pages, title: i.title || undefined, noText: i.noText, thumb: join(cache(name), 'thumb.png') })
+      const i = await info(name, projectDir)
+      Object.assign(item, { pages: i.pages, title: i.title || undefined, noText: i.noText, thumb: join(cache(name, projectDir), 'thumb.png') })
     } catch (e) {
       item.error = (e as Error).message // still listed, so it can be removed
     }
@@ -84,7 +84,7 @@ export async function listSources(): Promise<SourceItem[]> {
 
 /** Copies PDFs into sources/ under tidy names and indexes them. With no paths, asks with a dialog.
  *  A file already there under its tidy name with the same size is the same PDF: it isn't copied again. */
-export async function importSources(paths: string[]): Promise<SourceImport> {
+export async function importSources(paths: string[], projectDir = requireProject().path): Promise<SourceImport> {
   if (!paths.length) {
     const picked = await dialog.showOpenDialog({
       title: 'Add PDFs',
@@ -94,8 +94,8 @@ export async function importSources(paths: string[]): Promise<SourceImport> {
     paths = picked.filePaths
   }
   paths = paths.filter(Boolean) // a drop of something that isn't a file on disk has no path
-  if (!paths.length) return { items: await listSources(), added: [] }
-  const dir = folder()
+  if (!paths.length) return { items: await listSources(projectDir), added: [] }
+  const dir = folder(projectDir)
   mkdirSync(dir, { recursive: true })
   const skipped = paths.filter((p) => !PDF.test(p)).map((p) => basename(p))
   const added: string[] = []
@@ -109,10 +109,10 @@ export async function importSources(paths: string[]): Promise<SourceImport> {
     for (let i = 2; existsSync(join(dir, name)); i++) name = `${stem}-${i}.pdf`
     copyFileSync(src, join(dir, name))
     added.push(name)
-    ignorePdfs()
+    ignorePdfs(projectDir)
   }
   if (skipped.length) throw new Error(`Only PDFs can be added here; skipped ${skipped.join(', ')}. Pictures and videos go in Media.`)
-  return { items: await listSources(), added }
+  return { items: await listSources(projectDir), added }
 }
 
 /** To the Trash, not deleted: a scene may still show its pages. */
@@ -208,8 +208,8 @@ export function sourcesNote(dir: string): string {
 }
 
 /** PDFs stay out of the version history (like videos, they can be big); added on first import. */
-function ignorePdfs(): void {
-  const file = join(requireProject().path, '.gitignore')
+function ignorePdfs(projectDir: string): void {
+  const file = join(projectDir, '.gitignore')
   const rules = existsSync(file) ? readFileSync(file, 'utf8') : ''
   if (rules.includes('sources/*.pdf')) return
   appendFileSync(file, '\n# PDF sources can be big; the history keeps scene.py, not the material it came from.\nsources/*.pdf\n')

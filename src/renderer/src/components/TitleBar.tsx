@@ -1,9 +1,9 @@
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowDownToLine, ChevronLeft, History, Pause, Play, RefreshCw, Settings, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowDownToLine, Check, Zap, ChevronLeft, History, Pause, Play, RefreshCw, Settings, X } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { shortcut } from '../lib/platform'
-import { closeProject, openDialog, openExerciseSet, pausePreview, renderProgress, useStore } from '../store'
+import { closeProject, openDialog, openProject, openExerciseSet, pausePreview, renderProgress, useStore } from '../store'
 import { ExportsMenu } from './ExportsMenu'
 import { HistoryPopover } from './HistoryPopover'
 import { ProgressLine, Ring, Wordmark } from './ui'
@@ -89,6 +89,7 @@ export function TitleBar() {
             </button>
           </span>
         )}
+        <PlanningPill />
         <QuickPill />
         <ExportsMenu />
         <UpdatePill />
@@ -112,15 +113,36 @@ export function TitleBar() {
   )
 }
 
-/** Back to quick mode's progress, when you went to look at the editor meanwhile. */
+/** Persistent access while a background task is out of sight. */
+function PlanningPill() {
+  const state = useStore((s) => s.seriesPlanning)
+  const open = useStore((s) => s.dialog?.kind === 'series')
+  if (!state || open) return null
+  return <button className="exports-pill busy" onClick={() => openDialog({ kind: 'series' })}>
+    {state === 'working' ? <span className="spinner" /> : <Check />} {uiText(state === 'working' ? 'Planning the series' : 'Review the series plan')}
+  </button>
+}
 function QuickPill() {
-  const show = useStore((s) => s.quickEditor && s.quick?.state === 'working' && s.quick.project === s.project?.path)
-  if (!show) return null
-  return (
-    <button className="exports-pill busy" onClick={() => useStore.setState({ quickEditor: false })}>
-      <span className="spinner" /> {uiText(' Quick mode · Show progress')}
-    </button>
-  )
+  const runs = useStore((s) => s.quickRuns)
+  const current = useStore((s) => s.screen === 'editor' && !s.quickEditor ? s.project?.path : null)
+  const menu = useRef<HTMLDivElement>(null)
+  const id = useId()
+  const visible = runs.filter((run) => run.project !== current && run.state !== 'done')
+  if (!visible.length) return null
+  const working = visible.filter((run) => run.state === 'working').length
+  const open = (project: string) => { menu.current?.hidePopover(); void openProject(project) }
+  return <>
+    <button className={`exports-pill ${working ? 'busy' : ''}`} popoverTarget={id} onClick={(event) => {
+      const box = event.currentTarget.getBoundingClientRect()
+      if (menu.current) { menu.current.style.top = `${box.bottom + 8}px`; menu.current.style.left = `${Math.max(12, Math.min(box.right - 340, window.innerWidth - 352))}px` }
+    }}>{working ? <span className="spinner" /> : <Zap />}{uiText('Quick video')}<span className="badge">{visible.length}</span></button>
+    <div id={id} ref={menu} popover="auto" className="quick-jobs-menu">
+      <strong>{uiText('Quick video')}</strong>
+      {[...visible].reverse().map((run) => <button key={run.id} onClick={() => open(run.project)}>
+        {run.state === 'working' ? <span className="spinner" /> : <Zap />}<span><strong>{run.name}</strong><small>{uiText(run.state === 'working' ? 'Video in progress' : 'Continue video')}</small></span>
+      </button>)}
+    </div>
+  </>
 }
 
 function UpdatePill() {
