@@ -1,15 +1,16 @@
 import { t as uiText, format } from '../lib/i18n'
 import { Captions, ChevronDown, CircleAlert, Code2, Pause, Sparkles, TriangleAlert, Video, Wrench } from 'lucide-react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { captionBand } from '../../../shared/caption'
 import type { Aspect } from '../../../shared/types'
 import { api } from '../lib/api'
 import { editorBridge } from '../lib/editor-bridge'
 import { playback } from '../lib/playback'
 import { shortcut } from '../lib/platform'
-import { openDialog, renderNow, renderProgress, saveScene, sendChat, useStore } from '../store'
+import { openDialog, renderNow, renderProgress, saveScene, sendChat, updateSettings, useStore } from '../store'
 import { NarrationRecovery } from './NarrationRecovery'
 import { narrationStatus } from '../../../shared/narration'
+import { subtitleStyle, subtitleVariables } from '../../../shared/subtitle-style'
 
 export function PreviewPane() {
   const timeline = useStore((s) => s.timeline)
@@ -24,7 +25,7 @@ export function PreviewPane() {
   const captionBand = useStore((s) => !!s.project?.meta.captionBand)
   const stage = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
-  const [captions, setCaptions] = useState(true)
+  const captions = useStore((s) => s.settings?.studyCaptions ?? true)
   const [warningsOpen, setWarningsOpen] = useState(false)
 
   const ratio = timeline ? timeline.width / timeline.height : aspect === '9:16' ? 9 / 16 : 16 / 9
@@ -140,7 +141,7 @@ export function PreviewPane() {
               {timeline.renderSeconds.toFixed(1)} s
             </span>
           )}
-          <button className={`icon-btn ${captions ? 'on' : ''}`} onClick={() => setCaptions((c) => !c)} title={uiText('Show subtitles in the preview')}>
+          <button className={`icon-btn ${captions ? 'on' : ''}`} onClick={() => void updateSettings({ studyCaptions: !captions })} title={uiText('Show subtitles in the preview')}>
             <Captions />
           </button>
         </div>
@@ -168,9 +169,10 @@ function CaptionBand({ aspect }: { aspect: Aspect }) {
 
 function CaptionOverlay() {
   const subtitles = useStore((s) => s.timeline?.subtitles ?? [])
+  const style = subtitleStyle(useStore((s) => s.settings?.subtitleStyle))
   const [text, setText] = useState('')
   useEffect(() => playback.subscribe((t) => setText(subtitles.find((s) => t >= s.start && t <= s.end)?.text ?? '')), [subtitles])
-  return <div className={`captions ${text ? 'on' : ''}`}>{text && <span>{text}</span>}</div>
+  return <div className={`captions ${text ? 'on' : ''}`} style={{ ...subtitleVariables(style), ...(style.position === 'top' ? { top: '6%', bottom: 'auto' } : {}) } as CSSProperties}>{text && <span>{text}</span>}</div>
 }
 
 function ErrorCard() {

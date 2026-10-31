@@ -936,6 +936,19 @@
   gap: 14px;
   animation: fade-up 0.25s var(--ease-out);
 }
+.subtitle-settings { display: grid; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.subtitle-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.subtitle-settings-head h3 { margin: 0; font-size: 14px; }
+.subtitle-preview { height: 145px; position: relative; overflow: hidden; border-radius: 12px; background: #0b1828; border: 1px solid var(--line-strong); display: grid; place-items: center; }
+.subtitle-preview-formula { color: #c0cee0; font: italic 30px Georgia, serif; }
+.subtitle-preview-caption { position: absolute; left: 6%; right: 6%; text-align: center; pointer-events: none; font-size: calc(16px * var(--subtitle-scale)); }
+.subtitle-preview-caption.bottom { bottom: 12px; }
+.subtitle-preview-caption.top { top: 12px; }
+.subtitle-preview-caption > span { color: var(--subtitle-color); background: var(--subtitle-background); text-shadow: var(--subtitle-shadow); padding: .15em .4em; border-radius: 3px; line-height: 1.4; }
+.subtitle-slider { display: flex; align-items: center; gap: 10px; width: 210px; max-width: 100%; }
+.subtitle-slider input { min-width: 0; flex: 1; accent-color: var(--sun); }
+.subtitle-slider output { min-width: 42px; color: var(--text-2); font: 11px var(--font-mono); text-align: right; }
+.subtitle-color { width: 44px; height: 30px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 3px; background: var(--panel); cursor: pointer; }
 .settings-advanced, .sign-in-log {
   min-width: 0;
   width: 100%;
