@@ -86,7 +86,7 @@ export function NewExerciseSetDialog() {
   const [input, setInput] = useState(empty)
   const [title, setTitle] = useState('')
   const [level, setLevel] = useState('')
-  const aspect: Aspect = defaults?.defaultAspect ?? '16:9'
+  const aspect: Aspect = '16:9'
   const theme: Theme = defaults?.defaultTheme ?? 'dark'
   const tone: Tone = defaults?.defaultTone ?? DEFAULT_TONE
   const language = defaultVoice?.language ?? 'en'

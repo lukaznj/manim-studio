@@ -20,7 +20,7 @@ import {
 } from '../store'
 import { Modal, Tabs } from './ui'
 import { SeriesTitle } from './SeriesTitle'
-import { seriesStatus } from '../../../shared/series-presentation'
+import { productionVisible, seriesStatus } from '../../../shared/series-presentation'
 
 export function Home() {
   const [adding, setAdding] = useState(false)
@@ -245,6 +245,7 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
 /** A series on Home: its first episodes' pictures stacked, the title and how many episodes it has. */
 function SeriesCard({ folder, episodes, exercises, index }: { folder: string; episodes: ProjectSummary[]; exercises: number; index: number }) {
   const run = useStore((s) => s.seriesRuns.find((run) => run.folder === folder))
+  const statusRun = run && productionVisible(run) ? run : undefined
   const made = run?.episodes.filter((ep) => ep.state === 'done').length ?? 0
   const first = episodes[0]
   const cover = episodes.find((e) => e.thumbnail) ?? first
@@ -262,7 +263,7 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
     >
       <div className={`thumb stack ${cover.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${cover.theme}`}>
         {cover.thumbnail ? <img src={api.mediaUrl(cover.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
-        {run && <span className={`series-card-status ${run.state}`}><Clapperboard />{uiText(seriesStatus(run))}<span className="series-card-count">{made}/{run.episodes.length}</span></span>}
+        {statusRun && <span className={`series-card-status ${statusRun.state}`}><Clapperboard />{uiText(seriesStatus(statusRun))}<span className="series-card-count">{made}/{statusRun.episodes.length}</span></span>}
       </div>
       <div className="project-meta">
         <div className="project-name">{first.series!.title}</div>
@@ -278,7 +279,7 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
           )}
         </div>
       </div>
-      {run && <progress className="series-card-progress" value={made} max={run.episodes.length} aria-label={uiText('Production')} />}
+      {statusRun && <progress className="series-card-progress" value={made} max={statusRun.episodes.length} aria-label={uiText('Production')} />}
     </article>
   )
 }

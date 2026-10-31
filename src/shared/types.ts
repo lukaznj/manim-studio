@@ -535,6 +535,7 @@ export type ExportSize = 720 | 1080 | 1440
 export type ExportFps = 30 | 60
 
 export interface ExportOptions {
+  aspect?: Aspect // output shape; fit the whole source frame without changing its scene layout
   narrationVoice?: VoiceSettings // explicit recovery export; keep the original selection and video
   themes: Theme[] // render a version per theme
   languages: string[] // extra narration languages (ISO 639-1), voiced and subtitled

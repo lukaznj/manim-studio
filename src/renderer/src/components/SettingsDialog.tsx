@@ -910,17 +910,6 @@ function VideoTab() {
         </Row>
       }
 
-      <Row title={uiText('Aspect ratio')} text={uiText('Used for new videos. Existing videos keep their layout.')}>
-        <Tabs
-          radio="Aspect ratio"
-          value={settings.defaultAspect ?? '16:9'}
-          onChange={(defaultAspect) => void updateSettings({ defaultAspect })}
-          items={[
-            { value: '16:9', label: '16:9 landscape' },
-            { value: '9:16', label: '9:16 portrait' },
-          ]}
-        />
-      </Row>
       <Row title={uiText('Video theme')}>
         <Tabs
           radio="Video theme"

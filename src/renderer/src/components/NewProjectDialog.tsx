@@ -13,7 +13,7 @@ export function NewProjectDialog() {
   const defaultVoice = useStore((s) => s.settings?.defaultVoice)
   const [name, setName] = useState('')
   const settings = useStore((s) => s.settings)
-  const aspect: Aspect = settings?.defaultAspect ?? '16:9'
+  const aspect: Aspect = '16:9'
   const theme: Theme = settings?.defaultTheme ?? 'dark'
   const tone: Tone = settings?.defaultTone ?? DEFAULT_TONE
   const [voice, setVoice] = useState<VoiceSettings>({
