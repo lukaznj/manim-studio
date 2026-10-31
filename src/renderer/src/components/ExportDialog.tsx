@@ -1,10 +1,10 @@
 import { t as uiText, format } from '../lib/i18n'
 import { AudioLines, Captions, Download, FileVideo, FolderOpen, Image, Languages, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { ExportFps, ExportOptions, ExportSize, Theme } from '../../../shared/types'
+import type { Aspect, ExportFps, ExportOptions, ExportSize, Theme } from '../../../shared/types'
 import { api } from '../lib/api'
 import { LANGUAGES, languageName } from '../lib/languages'
-import { closeDialog, errorText, toast, updateMeta, useStore } from '../store'
+import { closeDialog, errorText, studying, toast, updateMeta, useStore } from '../store'
 import { Modal, Tabs } from './ui'
 
 const PROVIDER_NAMES = {
@@ -44,6 +44,7 @@ export function ExportDialog() {
   const project = useStore((s) => s.project)
   const timeline = useStore((s) => s.timeline)
   const settings = useStore((s) => s.settings)
+  const editing = useStore((s) => !studying(s))
   const [options, setOptions] = useState<ExportOptions>({
     themes: ['dark'],
     languages: [],
@@ -80,8 +81,9 @@ export function ExportDialog() {
   const start = async () => {
     setRunning(true)
     try {
-      await updateMeta({ export: options })
-      const job = await api.queueExport(options)
+      const selected = editing ? options : { ...options, aspect: undefined }
+      await updateMeta({ export: selected })
+      const job = await api.queueExport(selected)
       closeDialog()
       const ahead = useStore.getState().exports.filter((j) => j.id !== job.id && (j.state === 'running' || j.state === 'waiting')).length
       toast(
@@ -97,7 +99,8 @@ export function ExportDialog() {
     }
   }
 
-  const portrait = meta?.aspect === '9:16'
+  const aspect = editing ? options.aspect ?? meta?.aspect ?? '16:9' : meta?.aspect ?? '16:9'
+  const portrait = aspect === '9:16'
   const size = options.size ?? 1080
   const fps = options.fps ?? 30
   const long = Math.round((size * 16) / 9 / 2) * 2 // as the runner computes it
@@ -149,6 +152,14 @@ export function ExportDialog() {
       }
     >
       <div className="modal-body export">
+        {editing && <div className="export-option">
+          <div>
+            <strong>{uiText('Aspect ratio')}</strong>
+            <div className="hint">{uiText('Keeps the whole frame; adds padding when the shape changes.')}</div>
+          </div>
+          <Tabs radio="Aspect ratio" value={aspect} onChange={(value) => setOptions((o) => ({ ...o, aspect: value as Aspect }))}
+            items={[{ value: '16:9', label: '16:9 landscape' }, { value: '9:16', label: '9:16 portrait' }]} />
+        </div>}
         <div className="export-option">
           <div>
             <strong>{uiText('Versions')}</strong>

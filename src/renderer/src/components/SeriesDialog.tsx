@@ -26,7 +26,7 @@ export function SeriesDialog() {
   const [noPdfs, setNoPdfs] = useState(false)
   const [topic, setTopic] = useState('') // what to learn, when there are no PDFs
   const [instructions, setInstructions] = useState('')
-  const aspect: Aspect = defaults?.defaultAspect ?? '16:9'
+  const aspect: Aspect = '16:9'
   const theme: Theme = defaults?.defaultTheme ?? 'dark'
   const tone: Tone = defaults?.defaultTone ?? DEFAULT_TONE
   const voice: VoiceSettings = defaultVoice ?? { provider: 'elevenlabs', language: 'en' }

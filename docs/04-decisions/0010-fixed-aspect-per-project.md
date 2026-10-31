@@ -11,7 +11,8 @@ Study apps and short-video platforms want full-screen portrait video, but the sa
 
 ## Decision
 
-- **Chosen per project.** The new-project dialog asks for the format, "Landscape 16:9" or "Portrait 9:16". It can't be changed later.
+- **Fixed source geometry.** New videos from the interface use landscape 16:9. Existing projects and explicit integration requests retain their source format. Settings no longer offers an aspect-ratio default. Source geometry is not changed when exporting.
+- **Delivery shape (2026-10-31 amendment).** Create users choose landscape 16:9 or portrait 9:16 in Export. Both follows its active workspace. Learn exposes no ratio selector. The export fits the whole rendered frame and adds padding sampled from its background when necessary, keeping diagrams, narration and timings intact. The choice is remembered per project as `export.aspect`. Local and remote renders share this final local delivery step; thumbnails and dubbed video versions use its result.
 - **Frame geometry.**
   - Landscape is 14.2 × 8 units (manim's default).
   - Portrait mirrors it at 8 × 14.2, so default text sizes stay sensible.
@@ -20,5 +21,5 @@ Study apps and short-video platforms want full-screen portrait video, but the sa
 
 ## Consequences
 
-- A video in both formats is two projects. Claude can port one to the other.
+- A video can be exported in either shape without rewriting it. A composition redesigned for another source frame still needs a separate project; fitting adds padding rather than rearranging diagrams.
 - The layout checker always uses the project's real frame size.

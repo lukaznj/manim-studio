@@ -26,7 +26,7 @@ export function QuickDialog() {
   const selected = defaults && defaultAgentSelection(defaults)
   const [prompt, setPrompt] = useState('')
   const [pdfs, setPdfs] = useState<string[]>([])
-  const aspect: Aspect = defaults?.defaultAspect ?? '16:9'
+  const aspect: Aspect = '16:9'
   const theme: Theme = defaults?.defaultTheme ?? 'dark'
   const [server, setServer] = useState<string | undefined>()
   const tone: Tone = defaults?.defaultTone ?? DEFAULT_TONE

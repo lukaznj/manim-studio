@@ -13,7 +13,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0007-history-is-git]] | Version history is git, committed automatically | accepted |
 | [[0008-ink-at-night-design]] | "Ink at night" design language with a light twin (System by default), rounded M mark and Liquid Glass icon on plain navy | accepted |
 | [[0009-mcp-server-later]] | Claude Desktop drives Studio through an extension (.mcpb) and a local endpoint | accepted |
-| [[0010-fixed-aspect-per-project]] | 16:9 or 9:16 chosen per project, fixed | accepted |
+| [[0010-fixed-aspect-per-project]] | Fixed source geometry, with Create-only fitted landscape/portrait delivery choices in Export | accepted |
 | [[0011-open-source-english]] | Open source, English, platform integrations in forks; MIT licensing superseded by 0054 | accepted (licensing superseded) |
 | [[0012-own-media-in-scenes]] | Your own pictures and videos go into the scene through studio helpers, not a separate track | accepted |
 | [[0013-export-versions-and-languages]] | Export light and dark versions, dubbed audio tracks and subtitles; preserve project look metadata without Settings controls | accepted |

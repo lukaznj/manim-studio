@@ -15,7 +15,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync,
 import { availableParallelism, totalmem } from 'node:os'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { dirname, join, relative, sep } from 'node:path'
+import { basename, dirname, join, relative, sep } from 'node:path'
 import type { ExportOptions, ExportResult, ExportSize, ProjectMeta, Timeline } from '../shared/types'
 import { languageName, translateNarration } from './claude'
 import { readMeta, readTimeline, slugify, updateMetaAt } from './projects'
@@ -182,6 +182,21 @@ export async function exportVideo(
       }
     }
     files.push(join(folder, `${slug}.${original}.srt`), join(folder, `${slug}.${original}.vtt`))
+
+    // Delivery shape is independent of the scene's layout, for local and remote renders alike.
+    const aspect = options.aspect ?? meta.export?.aspect ?? meta.aspect
+    if (aspect !== meta.aspect) {
+      progress({ stage: 'Saving the video', phase: 'assembling' })
+      for (const card of cards) {
+        const fitted = `${card.base}.fit.mp4`
+        const dimensions = await (await runRunner<{ width: number; height: number }>('default', ['fit-video', `${card.base}.mp4`, fitted, '--aspect', aspect], { signal, tag })).done
+        renameSync(fitted, `${card.base}.mp4`)
+        const rendered = JSON.parse(readFileSync(card.timeline, 'utf8')) as Timeline
+        card.timeline = join(snap, '.studio', `delivery-${basename(card.base)}`, 'timeline.json')
+        writeAtomicJson(card.timeline, { ...rendered, video: `${card.base}.mp4`, width: dimensions.width, height: dimensions.height })
+      }
+      timelinePath = cards[0].timeline
+    }
 
     // The thumbnail made for publishing (card.py): the key picture, its hook, number and series.
     progress({ stage: 'Making the thumbnail' })
