@@ -50,7 +50,7 @@ export async function importMedia(paths: string[]): Promise<MediaItem[]> {
     let name = `${stem}${ext}`
     for (let i = 2; existsSync(join(dir, name)); i++) name = `${stem}-${i}${ext}`
     copyFileSync(src, join(dir, name))
-    if (VIDEO.test(name)) ignoreVideos()
+    if (VIDEO.test(name)) ignoreMediaVideos()
   }
   if (skipped.length)
     throw new Error(`Only pictures and videos can be added; skipped ${skipped.join(', ')}.${skipped.some((n) => /\.pdf$/i.test(n)) ? ' PDFs go in Sources.' : ''}`)
@@ -78,8 +78,8 @@ async function videoThumb(name: string): Promise<string | undefined> {
 }
 
 /** Videos stay out of the version history (pictures go in); older projects get the rule on first import. */
-function ignoreVideos(): void {
-  const file = join(requireProject().path, '.gitignore')
+export function ignoreMediaVideos(dir = requireProject().path): void {
+  const file = join(dir, '.gitignore')
   const rules = existsSync(file) ? readFileSync(file, 'utf8') : ''
   if (rules.includes('media/*.mp4')) return
   appendFileSync(file, '\n# Your videos in media/ are usually big; pictures are kept in the history.\n' + ['mp4', 'mov', 'm4v', 'webm', 'mkv'].map((e) => `media/*.${e}`).join('\n') + '\n')

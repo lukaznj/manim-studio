@@ -24,6 +24,11 @@ let stopping = false
 const renderSlots = new WorkSlots(1)
 const shutdown = new AbortController()
 
+/** Browser inserts and manim share the same local drawing queue. */
+export function acquireDrawingSlot(signal?: AbortSignal): Promise<() => void> {
+  return renderSlots.acquire(signal ? AbortSignal.any([signal, shutdown.signal]) : shutdown.signal)
+}
+
 /** Cancel and reap every Python job, including a child whose environment was still starting. */
 export async function stopRunners(): Promise<void> {
   stopping = true
@@ -95,7 +100,7 @@ export async function runRunner<T = RunnerEvent>(
   const signal = opts.signal ? AbortSignal.any([opts.signal, shutdown.signal]) : shutdown.signal
   // Every local drawing process shares one queue, including export slices. PDF indexing,
   // narration, authentication and light inspection commands remain independent.
-  const release = args[0] === 'render' && !args.includes('--voice-only') ? await renderSlots.acquire(signal) : () => {}
+  const release = args[0] === 'render' && !args.includes('--voice-only') ? await acquireDrawingSlot(signal) : () => {}
   if (signal.aborted) { release(); throw Object.assign(new Error('cancelled'), { cancelled: true }) }
   opts = { ...opts, signal }
   const spawn = spawnPython(env, args, opts.extraEnv, opts.cwd)

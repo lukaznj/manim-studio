@@ -252,9 +252,13 @@ assert(Math.abs((await evaluate(() => document.querySelector('video').currentTim
 await command('mouse button[aria-label="Full screen"]')
 await sleep(200)
 assert.equal(await evaluate(() => !!document.fullscreenElement), true)
+// Browser automation bypasses Electron's native drag hit testing. Check the region
+// as well as the tabs: the hidden window titlebar must not intercept fullscreen clicks.
+assert.equal(await evaluate(() => getComputedStyle(document.querySelector('.titlebar')).getPropertyValue('-webkit-app-region')), 'no-drag')
 await command('press Escape')
 await sleep(200)
 assert.equal(await evaluate(() => !!document.fullscreenElement), false)
+assert.equal(await evaluate(() => getComputedStyle(document.querySelector('.titlebar')).getPropertyValue('-webkit-app-region')), 'drag')
 await evaluate(() => {
   document.querySelector('.study-player').focus()
   return true

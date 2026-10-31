@@ -10,6 +10,7 @@ import { readTimeline } from './projects'
 import { currentOrNewRender, framesBase64, type RenderOutcome } from './render'
 import { requireSource, sourcePageCount, sourcePages, sourceText } from './sources'
 import { reportProgress } from './production-progress'
+export { renderMotion } from './motion'
 
 export function reportAuthoringProgress(dir: string, phase: 'script' | 'scene', completed: number, total: number, detail?: string): CallToolResult {
   try { reportProgress(dir, phase, completed, total, detail); return textResult(`Recorded ${completed}/${total} sections (${phase}).`) }

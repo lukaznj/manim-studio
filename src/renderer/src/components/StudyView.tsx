@@ -1,6 +1,6 @@
 import { StudyNotes } from './StudyNotes'
 import { t as uiText, format } from '../lib/i18n'
-import { BookOpen, Captions, ListChecks, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Sparkles } from 'lucide-react'
+import { BookOpen, FileText, ListChecks, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Sparkles } from 'lucide-react'
 import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import { addCourseExercises, offerTour, openDialog, selectStudied, updateSettings, useStore } from '../store'
 import { ChatPane } from './ChatPane'
@@ -253,7 +253,7 @@ export function StudyView() {
                   value: 'transcript',
                   label: (
                     <>
-                      <Captions />
+                      <FileText />
                       {uiText('Transcript')}
                     </>
                   ),

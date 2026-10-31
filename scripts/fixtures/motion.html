@@ -1,0 +1,9 @@
+<!doctype html><html><meta charset="utf-8"><style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1724;color:#e3e9f2;font-family:Arial,sans-serif}svg{width:100%;height:100%}.label{font-size:34px;fill:#e3e9f2}.muted{font-size:24px;fill:#94a4bb}.shaft{stroke:#ffd261;stroke-width:3;fill:#102136}
+</style><svg viewBox="0 0 1920 1080"><rect x="60" y="80" width="1800" height="860" rx="48" fill="#102136" stroke="#263d58" stroke-width="2"/><text x="140" y="175" class="label">One motion, two speeds</text><text x="140" y="220" class="muted">A 2:1 gear ratio turns speed into torque.</text><g id="small"></g><g id="large"></g><circle cx="680" cy="520" r="20" class="shaft"/><circle cx="1130" cy="520" r="20" class="shaft"/><text x="520" y="900" class="label">20 teeth · 10 rpm</text><text x="970" y="900" class="label">40 teeth · 5 rpm</text></svg><script>
+// Security checks run in the actual isolated renderer.
+if(typeof require !== 'undefined' || typeof window.studio !== 'undefined') throw Error('Host access exposed');
+function gear(id,x,y,r,n,color){let d='';for(let k=0;k<n*4;k++){let a=k*Math.PI*2/(n*4);let q=(k%4===0||k%4===3)?r*.89:r;d+=(k?'L':'M')+Math.cos(a)*q+','+Math.sin(a)*q}document.getElementById(id).innerHTML='<path d="'+d+'Z" fill="'+color+'" stroke="#ffd261" stroke-width="3"/><circle r="'+r*.5+'" fill="#0b1724"/><path d="M0,0 L'+r*.72+',0" stroke="#ffd261" stroke-width="9"/>';return {id,x,y}}
+const a=gear('small',680,520,160,20,'#36475b'),b=gear('large',1130,520,310,40,'#243950');
+window.renderFrame=t=>{document.getElementById(a.id).setAttribute('transform',`translate(${a.x} ${a.y}) rotate(${t*60})`);document.getElementById(b.id).setAttribute('transform',`translate(${b.x} ${b.y}) rotate(${-t*30+4.5})`)};
+</script></html>
