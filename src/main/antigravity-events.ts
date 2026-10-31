@@ -34,6 +34,7 @@ export interface AgyHandlers {
 }
 
 const STUDIO_TOOL: Record<string, string> = {
+  render_motion: 'Making the scenes',
   report_progress: 'Production',
   render_preview: 'Rendering the preview',
   get_timeline: 'Reading the timeline',

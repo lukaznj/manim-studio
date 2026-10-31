@@ -94,6 +94,7 @@ import * as projects from './projects'
 import { cancel, frame, onRenderEvent, render, rendersBusy } from './render'
 import { pauseTag, runningJobs, stopRunners } from './runner'
 import { criticalWork, QuitCoordinator, settleCriticalWork, shutdownRequested } from './work-lifecycle'
+import { motionsBusy, stopMotions } from './motion'
 import { saveSeriesDraft, saveSeriesPlan, savedSeriesPlans, seriesDraft } from './series-draft'
 import { translateUi } from '../shared/i18n'
 import { getSettings, setSecret, setSettings } from './settings'
@@ -683,7 +684,7 @@ let installOnExit = false
 
 function productionBusy(): boolean {
   return !!planning || seriesRuns().some((run) => run.state === 'working' || run.state === 'paused') || exportsBusy()
-    || desktopVideosBusy() || watchVideosBusy() || quickRuns().some((run) => run.state === 'working')
+    || desktopVideosBusy() || watchVideosBusy() || quickRuns().some((run) => run.state === 'working') || motionsBusy()
 }
 
 const quit = new QuitCoordinator({
@@ -710,7 +711,7 @@ const quit = new QuitCoordinator({
     stopWatchVideos()
     closeChat()
     // Cancellation finishes before exit: narration is copied back and agent chats/checkpoints flush.
-    await Promise.all([stopExports(), stopRunners(), settleSeries(), settleQuick(), Promise.allSettled([...planningTasks])])
+    await Promise.all([stopMotions(), stopExports(), stopRunners(), settleSeries(), settleQuick(), Promise.allSettled([...planningTasks])])
     stopTtsWorker()
   },
   exit: () => { if (installOnExit) installUpdate(); else app.quit() },

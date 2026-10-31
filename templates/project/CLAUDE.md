@@ -54,3 +54,13 @@ One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studi
 After every change, call `render_preview`. If it reports an error, fix it. If it reports layout warnings (off screen, overlapping text), fix those too.
 
 Then call `view_frames` at the moments you changed. Don't call something done before you have looked at it.
+
+## Complex animation inserts
+
+Keep equations, ordinary diagrams, narration and the lesson timeline in manim. For a complex mechanism, particle diagram or interface demonstration that is materially easier in SVG/Canvas, `render_motion` can make a short local insert. Do not use it for decoration or an entire lesson. Use the current agent and reuse its result; generating/reviewing code still uses the normal account allowance.
+
+1. Call `render_motion` with a short lowercase `name`, self-contained `html`, and `seconds` (0.5–12). It previews first/middle/last frames; inspect all three. HTML must define `window.renderFrame(t)` to draw the absolute time in seconds, with backward seeks supported. Use inline SVG/Canvas/CSS and embedded data images only; no network, imports, external fonts, audio, timers, randomness or animation loops. CSS animations are paused and sought automatically.
+2. Call with the same `name` and `mode: "render"`, without resending HTML. Poll `mode: "status"` until ready. Rendering is local, queued with manim, 1080p/30 fps, bounded and cached. If it fails or is slow, simplify it or use manim.
+3. Use the exact media name returned by the tool: `clip = VideoClip("motion-example-<hash>.mp4")`; `self.add(clip)`; `clip.start()`; `self.wait(clip.duration)`; `self.remove(clip)`. Keep voiceover in `StudioScene`, match narration length, and check the final manim render and frames as usual. The source is saved in `media/motion-<name>.json`. A 1440p export may upscale this insert.
+
+Match the project's palette, narration language and subtitle-safe area. Rendering the clip does not automatically make the lesson complete or narrated.

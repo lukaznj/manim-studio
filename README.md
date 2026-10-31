@@ -48,6 +48,7 @@ On first launch Manim Studio asks how you'll use it, and you can change it any t
 ### Exports
 
 - **For YouTube:** a 1080p or 1440p mp4 at 30 or 60 fps, in the dark theme, the light one or both, with subtitles and a thumbnail card (the scene's key picture, a hook, the episode number and the series name).
+- **Complex visuals:** Claude, Codex and Antigravity can use short HTML/SVG/Canvas motion inserts when they materially improve on manim. Three preview frames come first; local rendering is queued, cached and bounded to 12 seconds at 1080p/30 fps. Inserts become ordinary video media inside the manim scene, with narration and subtitles still handled by Studio. This uses the selected agent's normal allowance, not a separate Claude Motion service. See [the motion-insert decision](docs/04-decisions/0061-browser-motion-inserts.md).
 - **In other languages:** the agent translates the narration and your voice speaks it over the same video, as an audio track or a dubbed video per language.
 - **Faster:** an export is split into parts rendered at once, and the video is encoded on the GPU when there is one (Apple VideoToolbox, NVIDIA NVENC, or AMD on Windows through Media Foundation), with the CPU as the fallback.
 - **In the background:** start the next video while exports run. Or send them to a render server on another computer ([manim-studio-renderer](https://github.com/lukaznj/manim-studio-renderer)): pair it with the code it prints and your computer stays free.

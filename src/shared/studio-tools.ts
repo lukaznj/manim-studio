@@ -3,8 +3,13 @@
 // - Claude Desktop, through the extension in mcpb/ and the app's local endpoint (src/main/mcp.ts)
 // Handlers live in the main process; this file holds only names, descriptions and inputs.
 import { z } from 'zod'
+import { motionInput } from './motion.ts'
 
 export const sceneTools = {
+  render_motion: {
+    description: 'Create a short reusable HTML/SVG/Canvas animation insert only when it materially improves on manim. Uses the current agent and local rendering, not a separate design service. Supply name, self-contained html defining window.renderFrame(seconds), and seconds (0.5–12). Default mode preview returns first/middle/last images to inspect. Then mode render (name only) queues a 1080p 30fps MP4; poll mode status until ready and use the exact returned VideoClip media name. Sources and successful output persist; identical work is cached. No network/imports/audio/Node or app access; timers and uncontrolled animation loops are unsupported. Keep narration and the lesson in StudioScene. Do not use for ordinary equations or decoration.',
+    shape: motionInput,
+  },
   report_progress: {
     description: 'Report authoring progress after saving work. Count complete sections, not tokens or guessed time. Call after outlining all sections and after finishing each section in script.md or scene.py. Use the same total as the approved script. This is an estimate; Studio checks and completes each phase itself.',
     shape: {

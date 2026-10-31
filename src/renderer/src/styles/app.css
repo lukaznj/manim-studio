@@ -25,6 +25,10 @@
   /* Above the screen's own stacking context, so title-bar popovers aren't painted over. */
   z-index: 20;
 }
+/* Electron keeps the hidden titlebar's native hit region in HTML fullscreen. */
+.app:has(:fullscreen) .titlebar {
+  -webkit-app-region: no-drag;
+}
 .titlebar.mac {
   padding-left: 84px;
 }

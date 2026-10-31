@@ -215,15 +215,28 @@ export function StudyPlayer(props: {
       aria-label={uiText('Video player')}
       onPointerMove={revealControls}
       onPointerDown={revealControls}
+      onClickCapture={(e) => {
+        // Mouse-down's native focus default can undo an earlier focus() on macOS.
+        // Restore playback focus on click, without changing keyboard activation.
+        if (e.detail > 0 && !selecting && !(e.target as HTMLElement).closest('input,select,textarea,summary,[contenteditable],dialog,[popover]')) {
+          root.current?.focus({ preventScroll: true })
+        }
+      }}
       onFocusCapture={revealControls}
       onKeyDown={(e) => {
         revealControls()
-        if (selecting) return
-        if ((e.target as HTMLElement).closest('button,input,select,textarea,summary,[contenteditable=true]') || e.altKey || e.ctrlKey || e.metaKey) return
+        if (e.defaultPrevented || selecting || e.altKey || e.ctrlKey || e.metaKey) return
+        if (root.current?.querySelector('dialog[open], :popover-open')) return
+        const target = e.target as HTMLElement
+        if (target.closest('select,textarea,summary,[contenteditable],dialog,[popover],[role=menu],[role=listbox]')) return
+        const arrow = e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+        // Volume keeps native range keys; the timeline always seeks in five-second steps.
+        if (target.closest('input') && !(arrow && target.matches('.study-seek input'))) return
+        if (target.closest('button') && !arrow) return
         if ([' ', 'k', 'ArrowLeft', 'ArrowRight', 'm', 'f', 'c'].includes(e.key)) e.preventDefault()
         if (e.key === ' ' || e.key === 'k') toggle()
-        else if (e.key === 'ArrowLeft') seek(now - 5)
-        else if (e.key === 'ArrowRight') seek(now + 5)
+        else if (e.key === 'ArrowLeft') seek((video.current?.currentTime ?? now) - 5)
+        else if (e.key === 'ArrowRight') seek((video.current?.currentTime ?? now) + 5)
         else if (e.key === 'm') mute()
         else if (e.key === 'f') expand()
         else if (e.key === 'c' && vtt) toggleCaptions()

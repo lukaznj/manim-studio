@@ -414,7 +414,7 @@ function Part({ part, reference }: { part: ChatPart; reference?: (id: string) =>
   return (
     <div className={`tool-chip ${part.status}`}>
       {part.status === 'running' ? <Loader className="spin" /> : part.status === 'ok' ? <Check /> : <X />}
-      <span>{part.summary}</span>
+      <span>{part.name === 'mcp__studio__render_motion' ? uiText(part.summary) : part.summary}</span>
     </div>
   )
 }

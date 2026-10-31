@@ -28,6 +28,10 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--voice-only", action="store_true", help="make the narration, draw nothing (before a remote export)")
     r.add_argument("--encoder", help="a GPU video encoder for the partial movies (encoder.py), instead of libx264")
     sub.add_parser("encoders", help="which GPU video encoder works on this computer")
+    motion = sub.add_parser("motion-encode", help="encode a short browser animation insert")
+    motion.add_argument("frames", type=Path)
+    motion.add_argument("output", type=Path)
+    motion.add_argument("--fps", type=int, default=24)
 
     f = sub.add_parser("frame")
     f.add_argument("video")
@@ -125,6 +129,15 @@ def main(argv: list[str] | None = None) -> int:
 
         emit("done", **detect())
         return 0
+
+    if args.cmd == "motion-encode":
+        from .motion import encode
+        try:
+            emit("done", **encode(args.frames, args.output, args.fps))
+            return 0
+        except Exception as error:
+            emit("error", message=f"{type(error).__name__}: {error}")
+            return 1
 
     if args.cmd == "dub":
         from .dub import dub

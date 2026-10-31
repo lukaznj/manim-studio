@@ -135,10 +135,11 @@ await assertFullscreenControls()
 await command('press Space')
 assert.equal(await evaluate(() => document.querySelector('video').paused), true)
 assert.equal(await evaluate(() => document.querySelector('.study-player').classList.contains('controls-hidden')), false, 'Paused controls must stay visible')
+const beforeSeek = await evaluate(() => document.querySelector('video').currentTime)
 await command('press ArrowRight')
-assert((await evaluate(() => document.querySelector('video').currentTime)) > 8)
+assert(Math.abs((await evaluate(() => document.querySelector('video').currentTime)) - beforeSeek - 5) < 0.1)
 await command('press ArrowLeft')
-assert((await evaluate(() => document.querySelector('video').currentTime)) < 0.1)
+assert(Math.abs((await evaluate(() => document.querySelector('video').currentTime)) - beforeSeek) < 0.1)
 await command('mouse .study-controls button[aria-label="Play video"]')
 await main(async () => {
   const target = BrowserWindow.getAllWindows()[0].webContents
