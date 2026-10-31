@@ -108,5 +108,53 @@ class VoiceUsageTest(unittest.TestCase):
             self.assertFalse(entries[3]["success"])
 
 
+class CreditRecoveryTest(unittest.TestCase):
+    def test_local_fallback_uses_a_separate_cache_without_paid_requests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            speech = voice.StudioSpeech(Path(directory), {"provider": "omnivoice", "language": "hr"})
+            def synthesize(req, **kwargs):
+                body = json.loads(req.data)
+                # Match the local worker's contract: it writes audio at the requested path.
+                with voice.wave.open(body["out"], "wb") as audio:
+                    audio.setnchannels(1)
+                    audio.setsampwidth(2)
+                    audio.setframerate(22050)
+                    audio.writeframes(b"\0\0" * 22050)
+                return io.BytesIO(b'{}')
+            with mock.patch.dict(os.environ, {"STUDIO_TTS_URL": "http://127.0.0.1:1234", "STUDIO_VOICE_OFFLINE": ""}), mock.patch.object(voice.urllib.request, "urlopen", side_effect=synthesize) as local, mock.patch.object(voice, "_elevenlabs_post") as paid:
+                file, _, source = speech._audio_for("Napon i struja", "first")
+                self.assertEqual(source, "omnivoice")
+                self.assertTrue((Path(directory) / file).exists())
+                speech._audio_for("Napon i struja", "first")
+                self.assertEqual(local.call_count, 1)
+                paid.assert_not_called()
+
+    def test_quota_does_not_repeat_requests_and_cached_voice_still_plays(self):
+        with tempfile.TemporaryDirectory() as directory:
+            speech = voice.StudioSpeech(Path(directory), {"provider": "elevenlabs", "elevenlabs": {"voiceId": "v", "modelId": "v4"}})
+            error = voice._HTTPError(401, "Not enough credits", "quota_exceeded")
+            with mock.patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test", "STUDIO_VOICE_OFFLINE": ""}), mock.patch.object(voice, "_elevenlabs_post", side_effect=error) as post:
+                self.assertEqual(speech._audio_for("First sentence", "first")[2], "silence")
+                self.assertEqual(speech._audio_for("Second sentence", "second")[2], "silence")
+                self.assertEqual(post.call_count, 1)
+                rel, path, _ = speech._cached("Cached", "cached", ".mp3", "elevenlabs", "v", "v4")
+                path.write_bytes(b"existing audio")
+                self.assertEqual(speech._audio_for("Cached", "cached")[2], "elevenlabs")
+                self.assertEqual(post.call_count, 1)
+            # A new render retries the paid provider; silence is not its narration cache.
+            retried = voice.StudioSpeech(Path(directory), speech.settings)
+            with mock.patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test", "STUDIO_VOICE_OFFLINE": ""}), mock.patch.object(voice, "_elevenlabs_post", return_value={"audio_base64": base64.b64encode(b"mp3").decode()}) as post:
+                self.assertEqual(retried._audio_for("First sentence", "first")[2], "elevenlabs")
+                self.assertEqual(post.call_count, 1)
+
+    def test_provider_error_code_distinguishes_quota_from_auth_and_rate_limits(self):
+        for status, credits in [("quota_exceeded", True), ("insufficient_credits", True), ("invalid_api_key", False), ("too_many_requests", False)]:
+            error = voice.urllib.error.HTTPError("https://example.test", 401, "error", {}, io.BytesIO(json.dumps({"detail": {"status": status, "message": "Provider explanation"}}).encode()))
+            with mock.patch.object(voice.urllib.request, "urlopen", side_effect=error):
+                with self.assertRaises(voice._HTTPError) as caught:
+                    voice._elevenlabs_post("v", "never logged", {"text": "Private words"})
+                self.assertEqual(caught.exception.credits, credits)
+
+
 if __name__ == "__main__":
     unittest.main()

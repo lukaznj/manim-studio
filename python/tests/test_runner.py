@@ -55,6 +55,7 @@ class RenderTimeline(unittest.TestCase):
 
     def test_voice_and_subtitles(self):
         self.assertEqual(self.result["voiceSettings"], {"provider": "none"})
+        self.assertEqual(self.result["voiceIssues"], [])
         [v] = self.result["voice"]
         self.assertEqual(v["text"], "Let's look at the derivative.")
         self.assertEqual(v["source"], "silence")
@@ -64,6 +65,30 @@ class RenderTimeline(unittest.TestCase):
     def test_offscreen_warning(self):
         kinds = {w["kind"] for w in self.result["warnings"]}
         self.assertIn("offscreen", kinds)
+
+
+class CreditFailureRender(unittest.TestCase):
+    def test_quota_failure_keeps_a_playable_video_and_recovery_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            shutil.copytree(HERE / "fixture", project)
+            # A test-only provider replacement; no network request or credential is used.
+            scene = project / "scene.py"
+            scene.write_text(scene.read_text() + '''
+import studio.voice as _test_voice
+def _exhausted(*args):
+    raise _test_voice._HTTPError(401, "Not enough credits", "quota_exceeded")
+_test_voice._elevenlabs_post = _exhausted
+''')
+            env = {**os.environ, "PYTHONPATH": str(PYTHON_DIR), "ELEVENLABS_API_KEY": "test-only", "STUDIO_VOICE": json.dumps({"provider": "elevenlabs", "language": "hr", "elevenlabs": {"voiceId": "test-only"}})}
+            proc = subprocess.run([sys.executable, "-m", "studio_runner", "render", str(project)], capture_output=True, text=True, env=env, timeout=600)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            timeline = json.loads((project / ".studio" / "preview" / "timeline.json").read_text())
+            self.assertTrue(Path(timeline["video"]).exists())
+            self.assertGreater(Path(timeline["video"]).stat().st_size, 0)
+            self.assertEqual(timeline["voice"][0]["source"], "silence")
+            self.assertEqual(timeline["voiceIssues"][0]["kind"], "credits")
+            self.assertEqual(timeline["voiceWarnings"], ["ElevenLabs credits exhausted"])
 
 
 if __name__ == "__main__":

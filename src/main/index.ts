@@ -496,6 +496,15 @@ function registerIpc(): void {
   handle('watchSeries', (folder: string) => watchSeries(folder))
   handle('courseExercises', (series: string) => ex.courseExercises(series))
   handle('watchDetail', (dir: string) => watchDetail(dir))
+  handle('recoverNarration', (dir: string, provider: 'elevenlabs' | 'omnivoice') => {
+    if (shutdownRequested()) throw new Error('The app is closing. Try again after reopening it.')
+    if (!['elevenlabs', 'omnivoice'].includes(provider)) throw new Error('Choose a voice provider.')
+    if (agentBusy.has(dir) || rendersBusy(dir) || exportJobs().some((job) => job.project === dir && ['waiting', 'running'].includes(job.state))) throw new Error('Wait for the current video job to finish.')
+    if (provider === 'omnivoice' && setupStatus().omnivoice !== 'ready') throw new Error('Install the OmniVoice model for the narration.')
+    const meta = projects.readMeta(dir)
+    if (provider === 'elevenlabs' && !meta.voice.elevenlabs?.voiceId) throw new Error('Choose an ElevenLabs voice for the narration.')
+    return queueExport(dir, { themes: [meta.theme], languages: [], languageVideos: false, folder: join(dir, 'exports'), narrationVoice: { ...meta.voice, provider } }).job
+  })
   handle('studyReference', (messageId: string, referenceId: string) => studyReference(messageId, referenceId))
   handle('studyNotes', (dir: string) => studyNotes(dir))
   handle('saveStudyNotes', (dir: string, text: string) => saveStudyNotes(dir, text))

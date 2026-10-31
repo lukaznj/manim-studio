@@ -220,7 +220,7 @@ def render(project: Path, quality: str, **options) -> int:
         emit("error", **_error_info(e, scene_file))
         return 1
 
-    from studio.voice import WARNINGS
+    from studio.voice import WARNINGS, ISSUES
 
     from . import source as source_map
 
@@ -247,6 +247,7 @@ def render(project: Path, quality: str, **options) -> int:
         ],
         "warnings": recorder.layout.results(),
         "voiceWarnings": WARNINGS,
+        "voiceIssues": ISSUES,
         # The voice this render spoke with; the app offers to re-voice when the project's differs.
         "voiceSettings": json.loads(os.environ.get("STUDIO_VOICE") or "{}"),
     }

@@ -527,7 +527,7 @@ body.resizing-y .code-host {
 .preview-pane {
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   grid-template-columns: minmax(0, 1fr);
 }
 .stage {

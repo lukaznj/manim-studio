@@ -21,7 +21,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0015-tone-and-pacing]] | Tone per project (professional, warm, playful); pacing by clarity, no target length | accepted |
 | [[0016-script-first]] | Every agent plans in script.md before scene.py; scripting is always enabled and series share a series.md | accepted |
 | [[0017-background-export-queue]] | Exports run in a background queue, one at a time, each on a copy of its project | accepted |
-| [[0018-quick-mode]] | Quick video uses resumable project-bound background agents, current defaults and shared production progress | accepted |
+| [[0018-quick-mode]] | Quick video uses resumable project-bound background agents, the configured export theme and shared production progress | accepted |
 | [[0019-series-mode]] | Series mode: Claude plans episodes and a series bible from a course's PDFs; episodes refer back through series.md | accepted |
 | [[0020-parallel-exports]] | Exports draw slices of the animations in parallel into the shared cache, then render once | accepted |
 | [[0021-render-servers]] | Exports can render on a paired worker (Docker, pairing code with a token); narration stays local | accepted |
@@ -44,7 +44,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
 | [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI availability for GPT-6 Astra and GPT-6.1 Sol, with opt-in OpenAI capacity fallback | accepted |
 | [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
-| [[0041-focused-study-workspace]] | Focused study page, collapsible sidebars and resizable assistant, separate lesson/exercise tabs, compact video controls and adding lessons to existing courses | accepted |
+| [[0041-focused-study-workspace]] | Focused study page with navigation only when needed for standalone videos, collapsible sidebars and resizable assistant, compact video controls and expandable courses | accepted |
 | [[0042-study-playback-preferences]] | Per-video resume and sidebar progress, per-course selected view, continuous playback preserving fullscreen with the assistant, and remembered playback preferences | accepted |
 | [[0043-projects-folder-and-render-cache]] | Render cache in a local, unsynced cache folder (20 GB, LRU); new installs keep projects out of iCloud/OneDrive; onboarding asks where projects go and finds a returning user's folder | accepted |
 | [[0044-full-window-onboarding]] | Full-window first launch that explains the app, installs the engine and LaTeX in the background from the mode choice, and waits for them before the app opens | accepted |
@@ -62,3 +62,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0056-private-runtime-cleanup]] | App-owned runtime caches and protected tool cleanup; Settings-only macOS/AppImage uninstall and Windows uninstall hook, retaining projects and sign-ins | accepted |
 | [[0057-creation-progress-and-research]] | Shared section-based authoring estimates, provider web research and nonblocking series planning | accepted |
 | [[0058-independent-production-jobs]] | Independent concurrent courses and quick videos, reusable saved plans, optional shared agent capacity and queued local drawing | accepted |
+| [[0059-narration-credit-recovery]] | Playable silent fallback, credit-specific recovery notices and explicit retry/OmniVoice exports preserving the original video and voice choice | accepted |

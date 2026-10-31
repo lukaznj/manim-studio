@@ -262,7 +262,7 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
     >
       <div className={`thumb stack ${cover.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${cover.theme}`}>
         {cover.thumbnail ? <img src={api.mediaUrl(cover.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
-        {run && <span className={`series-card-status ${run.state}`}><Clapperboard />{uiText(seriesStatus(run))}<span>{made}/{run.episodes.length}</span></span>}
+        {run && <span className={`series-card-status ${run.state}`}><Clapperboard />{uiText(seriesStatus(run))}<span className="series-card-count">{made}/{run.episodes.length}</span></span>}
       </div>
       <div className="project-meta">
         <div className="project-name">{first.series!.title}</div>
@@ -300,7 +300,7 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
       <div className={`thumb ${p.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${p.theme}`}>
         {p.thumbnail ? <img src={api.mediaUrl(p.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
         {p.duration !== undefined && <span className="thumb-time mono">{timecode(p.duration, false)}</span>}
-        {quick && quick.state !== 'done' && <span className="series-card-status">{quick.state === 'working' ? <span className="spinner" /> : <Zap />}{uiText(quick.state === 'working' ? 'Video in progress' : 'Continue video')}</span>}
+        {quick && quick.state !== 'done' && <span className="series-card-status quick-card-status">{quick.state === 'working' ? <span className="spinner" /> : <Zap />}{uiText(quick.state === 'working' ? 'Video in progress' : 'Continue video')}</span>}
       </div>
       <div className="project-meta">
         <div className="project-name">{p.name}</div>

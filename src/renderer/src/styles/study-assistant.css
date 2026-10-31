@@ -214,3 +214,11 @@
 .study-answer-context > summary > span { margin-left: auto; font-size: 9px; }
 .study-answer-context[open] > summary { margin-bottom: 9px; }
 .study-answer-context > p { line-height: 1.6; }
+.narration-recovery { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 16px 18px; margin: 4px 0 20px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--sun-soft); }
+.narration-recovery > svg { width: 20px; height: 20px; color: var(--sun-text); margin-top: 1px; }
+.narration-recovery strong { font-size: 13px; }
+.narration-recovery p { color: var(--text-2); font-size: 12px; line-height: 1.65; margin: 6px 0 12px; }
+.narration-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.narration-recovery.using-fallback { background: var(--raised); }
+.narration-recovery .narration-recovery-error { color: var(--coral); }
+.preview-pane > .narration-recovery { margin: 8px 10px; padding: 12px; max-height: 210px; overflow: auto; }

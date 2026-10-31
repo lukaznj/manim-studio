@@ -236,6 +236,7 @@ export interface WatchDetail {
   preview?: string
   chapters: Section[]
   subtitles: Subtitle[]
+  narration?: NarrationStatus
 }
 
 /** What series planning is doing, step by step (src/main/series.ts planSeries). */
@@ -368,6 +369,9 @@ export interface Section {
 
 export type VoiceSource = 'recording' | 'elevenlabs' | 'omnivoice' | 'silence' | 'unknown'
 
+export interface VoiceIssue { provider: VoiceProvider; kind: 'credits' | 'provider'; message: string }
+export interface NarrationStatus { silentBlocks: number; totalBlocks: number; issues: VoiceIssue[]; fallback?: VoiceProvider }
+
 export interface VoiceBlock {
   start: number
   end: number
@@ -434,6 +438,7 @@ export interface Timeline {
   subtitles: Subtitle[]
   warnings: LayoutWarning[]
   voiceWarnings: string[]
+  voiceIssues?: VoiceIssue[]
   /** The voice the render spoke with (project.json's at the time); unset in timelines from before 0.2. */
   voiceSettings?: VoiceSettings
 }
@@ -530,6 +535,7 @@ export type ExportSize = 720 | 1080 | 1440
 export type ExportFps = 30 | 60
 
 export interface ExportOptions {
+  narrationVoice?: VoiceSettings // explicit recovery export; keep the original selection and video
   themes: Theme[] // render a version per theme
   languages: string[] // extra narration languages (ISO 639-1), voiced and subtitled
   languageVideos: boolean // also a full video per extra language, for sites without audio tracks
@@ -1033,6 +1039,7 @@ export interface StudioApi {
   /** The series' own exercise set, made on first use: returns its folder (ADR 0030). */
   courseExercises(series: string): Promise<string>
   watchDetail(dir: string): Promise<WatchDetail>
+  recoverNarration(dir: string, provider: VoiceProvider): Promise<ExportJob>
   /** Per-video notes and a reviewed, read-only AI revision. */
   studyReference(messageId: string, referenceId: string): Promise<StudyReferenceTarget>
   studyNotes(dir: string): Promise<string>

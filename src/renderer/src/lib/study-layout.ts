@@ -3,7 +3,7 @@ import type { Settings } from '../../../shared/types'
 import { updateSettings } from '../store'
 
 /** Keep the preferred width across smaller windows without squeezing the video. */
-export function useStudyLayout(settings: Settings | null, fullscreen = false) {
+export function useStudyLayout(settings: Settings | null, fullscreen = false, libraryNeeded = true) {
   const ref = useRef<HTMLDivElement>(null)
   const [bounds, setBounds] = useState({ min: 350, max: 640 })
   const [draft, setDraft] = useState<number | null>(null)
@@ -14,14 +14,14 @@ export function useStudyLayout(settings: Settings | null, fullscreen = false) {
     const measure = () => {
       const css = getComputedStyle(root)
       const min = parseFloat(css.getPropertyValue('--study-assistant-min'))
-      const library = fullscreen ? 0 : settings?.studyLibraryCollapsed ? 40 : parseFloat(css.getPropertyValue('--study-library-width'))
+      const library = fullscreen || !libraryNeeded ? 0 : settings?.studyLibraryCollapsed ? 40 : parseFloat(css.getPropertyValue('--study-library-width'))
       setBounds({ min, max: Math.max(min, Math.min(640, root.clientWidth - library - 362)) })
     }
     const observer = new ResizeObserver(measure)
     observer.observe(root)
     measure()
     return () => observer.disconnect()
-  }, [settings?.studyLibraryCollapsed, fullscreen])
+  }, [settings?.studyLibraryCollapsed, fullscreen, libraryNeeded])
   useEffect(() => () => document.body.classList.remove('resizing-x'), [])
   const clamp = (value: number) => Math.round(Math.max(bounds.min, Math.min(bounds.max, value)))
   const width = clamp(draft ?? settings?.studyAssistantWidth ?? bounds.min)

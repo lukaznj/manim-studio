@@ -17,6 +17,7 @@ import { showSeriesProduction } from '../store'
 import { SeriesTitle } from './SeriesTitle'
 import { useStudyFullscreen } from '../lib/study-fullscreen'
 import { useStudyLayout } from '../lib/study-layout'
+import { studyLibraryNeeded } from '../../../shared/study-navigation'
 
 /** Video first, with one library section and one assistant panel visible at a time. */
 export function StudyView() {
@@ -33,8 +34,9 @@ export function StudyView() {
   const settings = useStore((s) => s.settings)
   const fullscreen = useStudyFullscreen()
   const fullscreenChat = useStore((s) => s.studyFullscreenChat)
-  const layout = useStudyLayout(settings, fullscreen)
-  const leftCollapsed = !!settings?.studyLibraryCollapsed
+  const libraryNeeded = studyLibraryNeeded(series, set)
+  const layout = useStudyLayout(settings, fullscreen, libraryNeeded)
+  const leftCollapsed = libraryNeeded && !!settings?.studyLibraryCollapsed
   const rightCollapsed = fullscreen ? !fullscreenChat : !!settings?.studyAssistantCollapsed
   const togglePanel = async (side: 'library' | 'assistant', collapsed: boolean) => {
     if (side === 'assistant' && fullscreen) useStore.setState({ studyFullscreenChat: !collapsed })
@@ -92,10 +94,10 @@ export function StudyView() {
     []
 
   return (
-    <div ref={layout.ref} className={`ex-view study-view ${productionView ? 'production-view' : ''} ${leftCollapsed ? 'library-collapsed' : ''} ${rightCollapsed ? 'assistant-collapsed' : ''}`}
+    <div ref={layout.ref} className={`ex-view study-view ${productionView ? 'production-view' : ''} ${!libraryNeeded ? 'library-unneeded' : ''} ${leftCollapsed ? 'library-collapsed' : ''} ${rightCollapsed ? 'assistant-collapsed' : ''}`}
       style={{ '--study-assistant-width': `${layout.width}px` } as CSSProperties}>
       {leftCollapsed && !fullscreen && <button className="icon-btn study-panel-restore study-library-show" title={uiText('Show library')} aria-label={uiText('Show library')} aria-expanded={false} aria-controls="study-library" onClick={() => void togglePanel('library', false)}><PanelLeftOpen /></button>}
-      <aside className="ex-side" data-tour="study-library" id="study-library" inert={leftCollapsed || fullscreen} aria-hidden={leftCollapsed || fullscreen}>
+      <aside className="ex-side" data-tour="study-library" id="study-library" inert={!libraryNeeded || leftCollapsed || fullscreen} aria-hidden={!libraryNeeded || leftCollapsed || fullscreen}>
         <div className="study-library-inner">
           <div className="ex-side-head">
             <div className="study-library-heading"><span className="eyebrow">{series && !single ? uiText('Your course') : uiText('Your library')}</span><button className="icon-btn study-library-hide" title={uiText('Hide library')} aria-label={uiText('Hide library')} aria-expanded={true} aria-controls="study-library" onClick={() => void togglePanel('library', true)}><PanelLeftClose /></button></div>
@@ -118,7 +120,7 @@ export function StudyView() {
               <p className="faint">{format('{0} exercises', [set!.items.length])}</p>
             )}
             {production && showProduction && <ProductionNavigation run={production} selected={!!overview} onClick={() => { setLibrary('lessons'); showSeriesProduction() }} />}
-            {series && !single ? (
+            {series && (!single || !!series.exercises || !!set) ? (
               <Tabs
                 label={uiText('Course library')}
                 value={library}

@@ -8,9 +8,12 @@ import { editorBridge } from '../lib/editor-bridge'
 import { playback } from '../lib/playback'
 import { shortcut } from '../lib/platform'
 import { openDialog, renderNow, renderProgress, saveScene, sendChat, useStore } from '../store'
+import { NarrationRecovery } from './NarrationRecovery'
+import { narrationStatus } from '../../../shared/narration'
 
 export function PreviewPane() {
   const timeline = useStore((s) => s.timeline)
+  const project = useStore((s) => s.project?.path)
   const render = useStore((s) => s.render)
   const env = useStore((s) => s.setup?.env)
   const dirty = useStore((s) => s.dirty)
@@ -83,6 +86,7 @@ export function PreviewPane() {
         {render.status === 'error' && render.error && <ErrorCard />}
       </div>
 
+      {project && <NarrationRecovery dir={project} status={narrationStatus(timeline)} preview />}
       <div className="preview-foot">
         <div className="preview-flags">
           {(dirty || stale) && render.status !== 'rendering' && (

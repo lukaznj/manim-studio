@@ -18,7 +18,8 @@ import { createHash } from 'node:crypto'
 import { dirname, join, relative, sep } from 'node:path'
 import type { ExportOptions, ExportResult, ExportSize, ProjectMeta, Timeline } from '../shared/types'
 import { languageName, translateNarration } from './claude'
-import { readMeta, readTimeline, slugify } from './projects'
+import { readMeta, readTimeline, slugify, updateMetaAt } from './projects'
+import { narrationStatus } from '../shared/narration'
 import { exportEncoder, partialFolder } from './encoder'
 import { renderFinal, type RenderVariant } from './render'
 import { renderRemote } from './remote'
@@ -61,9 +62,17 @@ export async function exportVideo(
   const snap = join(work, 'project')
   snapshotProject(project, snap)
   const meta = readMeta(snap)
+  const requestedProvider = meta.voice.provider
+  if (options.narrationVoice) {
+    meta.voice = options.narrationVoice
+    updateMetaAt(snap, { voice: meta.voice })
+  }
   const slug = slugify(meta.name)
-  const folder = join(options.folder ?? meta.export?.folder ?? join(project, 'exports'), slug)
+  const folder = join(options.folder ?? meta.export?.folder ?? join(project, 'exports'), options.narrationVoice ? `${slug}-voice-${Date.now()}` : slug)
   mkdirSync(folder, { recursive: true })
+  // Recovery creates a new version. Publish it only after every file is complete.
+  const unpublished = options.narrationVoice ? join(folder, '.incomplete') : undefined
+  if (unpublished) writeFileSync(unpublished, '')
   const original = meta.voice.language
   const themes = options.themes.length ? options.themes : [meta.theme]
   // Claude Desktop's export_video passes no choices: it gets the project's last ones.
@@ -189,12 +198,17 @@ export async function exportVideo(
 
     // Keep evidence tied to the exported video, even after its editable preview changes.
     const studyTimeline = JSON.parse(readFileSync(timelinePath, 'utf8')) as Timeline
-    writeAtomicJson(join(folder, 'study-context.json'), { duration: studyTimeline.duration, chapters: studyTimeline.sections, subtitles: studyTimeline.subtitles })
-    const narration = [...new Set((JSON.parse(readFileSync(timelinePath, 'utf8')) as Timeline).voice.map((v) => v.text))]
+    let previousIssues = narrationStatus(readTimeline(project))?.issues ?? []
+    const voiceOnly = join(snap, '.studio', 'voice-only', 'timeline.json')
+    if (existsSync(voiceOnly)) previousIssues = [...previousIssues, ...((JSON.parse(readFileSync(voiceOnly, 'utf8')) as Timeline).voiceIssues ?? [])]
+    const narration = narrationStatus(studyTimeline, previousIssues, requestedProvider)
+    if (narration?.silentBlocks) warnings.push(...new Set(studyTimeline.voiceWarnings))
+    writeAtomicJson(join(folder, 'study-context.json'), { duration: studyTimeline.duration, chapters: studyTimeline.sections, subtitles: studyTimeline.subtitles, narration: narration ?? null })
+    const narrationText = [...new Set(studyTimeline.voice.map((v) => v.text))]
     for (const lang of options.languages.filter((l) => l !== original)) {
       const name = languageName(lang)
       progress({ stage: `Translating the narration into ${name}` })
-      const translations = await translationFile(project, narration, original, lang)
+      const translations = await translationFile(project, narrationText, original, lang)
       progress({ stage: `Voicing ${name}` })
       const env = await voiceEnv({ ...meta, voice: { ...meta.voice, language: lang } }, snap)
       const args = ['dub', timelinePath, translations, lang, join(folder, slug), ...(options.languageVideos ? videos.flatMap((v) => ['--video', v]) : [])]
@@ -218,6 +232,7 @@ export async function exportVideo(
       // the cache is only a cache
     }
   }
+  if (unpublished) rmSync(unpublished)
   return { folder, files, warnings }
 }
 

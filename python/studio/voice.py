@@ -38,6 +38,7 @@ DEFAULT_ELEVENLABS_MODEL = "eleven_v4"
 # Read by the runner after the render: which source each block used, and problems.
 USED: dict[str, str] = {}
 WARNINGS: list[str] = []
+ISSUES: list[dict] = []
 
 
 def spoken(text: str) -> str:
@@ -58,6 +59,7 @@ class StudioSpeech(SpeechService):
         self.cache_dir = str(voice_dir)
         self.global_speed = 1.0
         self.settings = settings
+        self.credit_error = None
         (voice_dir / "tts").mkdir(parents=True, exist_ok=True)
         (voice_dir / "recordings").mkdir(parents=True, exist_ok=True)
 
@@ -96,7 +98,12 @@ class StudioSpeech(SpeechService):
             if provider == "omnivoice":
                 return (*self._omnivoice(words, key), "omnivoice")
         except Exception as e:  # noqa: BLE001 - any provider failure degrades to silence
-            WARNINGS.append(f"{provider}: {e}")
+            issue = {"provider": provider, "kind": "credits" if isinstance(e, _HTTPError) and e.credits else "provider", "message": str(e)}
+            if issue not in ISSUES:
+                ISSUES.append(issue)
+            warning = "ElevenLabs credits exhausted" if issue["kind"] == "credits" else f"{provider}: {e}"
+            if warning not in WARNINGS:
+                WARNINGS.append(warning)
         return (*self._silence(words, key), "silence")
 
     # --- providers -------------------------------------------------------------------
@@ -132,6 +139,8 @@ class StudioSpeech(SpeechService):
             _usage(words, model_id, cached=True)
             return rel, starts
         _offline()
+        if self.credit_error:
+            raise self.credit_error
         if not api_key:
             raise RuntimeError("no ElevenLabs API key (Settings → Voice)")
 
@@ -140,11 +149,19 @@ class StudioSpeech(SpeechService):
         try:
             data = _elevenlabs_post(voice_id, api_key, body)
         except _HTTPError as e:
+            if e.credits:
+                self.credit_error = e
+                raise
             if e.code not in (400, 422) or "language_code" not in body:
                 raise
             # A model that doesn't know the field or the language: speak without pinning it.
             body.pop("language_code")
-            data = _elevenlabs_post(voice_id, api_key, body)
+            try:
+                data = _elevenlabs_post(voice_id, api_key, body)
+            except _HTTPError as retry_error:
+                if retry_error.credits:
+                    self.credit_error = retry_error
+                raise
 
         path.write_bytes(base64.b64decode(data["audio_base64"]))
         starts = None
@@ -187,9 +204,10 @@ def _offline() -> None:
 
 
 class _HTTPError(RuntimeError):
-    def __init__(self, code: int, detail: str):
+    def __init__(self, code: int, detail: str, status: str = ""):
         super().__init__(f"HTTP {code}: {detail}")
         self.code = code
+        self.credits = status in ("quota_exceeded", "insufficient_credits", "payment_required")
 
 
 def _elevenlabs_post(voice_id: str, api_key: str, body: dict) -> dict:
@@ -205,11 +223,15 @@ def _elevenlabs_post(voice_id: str, api_key: str, body: dict) -> dict:
     except urllib.error.HTTPError as e:
         _usage(body["text"], body.get("model_id", ""), success=False)
         text = e.read().decode("utf-8", "replace")
-        try:  # ElevenLabs explains failures in detail.message (e.g. a missing key permission)
-            detail = json.loads(text)["detail"]["message"]
+        status = ""
+        try:  # Preserve the provider code: HTTP 401 alone does not mean exhausted credits.
+            body = json.loads(text)
+            error = body.get("detail") or body.get("error") or {}
+            detail = error["message"]
+            status = error.get("status") or error.get("code") or ""
         except (ValueError, KeyError, TypeError):
             detail = text[:300]
-        raise _HTTPError(e.code, detail) from None
+        raise _HTTPError(e.code, detail, status) from None
     except (urllib.error.URLError, TimeoutError):
         _usage(body["text"], body.get("model_id", ""), success=False)
         raise
