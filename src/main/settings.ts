@@ -9,6 +9,7 @@ import { narrationLanguageForUi } from '../shared/narration-languages'
 import { interfaceSize, chatTextSize } from '../shared/text-size'
 import { normalizeModelOrder } from '../shared/model-fallback'
 import { agentConcurrency } from '../shared/work-slots'
+import { subtitleStyle } from '../shared/subtitle-style'
 import { paths } from './paths'
 import { readAtomicJson, writeAtomicJson } from './atomic-json'
 
@@ -70,6 +71,7 @@ export function getSettings(): Settings {
   cache.agentConcurrency = agentConcurrency(cache.agentConcurrency)
   cache.interfaceSize = interfaceSize(cache.interfaceSize)
   cache.chatTextSize = chatTextSize(cache.chatTextSize)
+  cache.subtitleStyle = subtitleStyle(cache.subtitleStyle)
   return cache
 }
 
@@ -80,6 +82,7 @@ export function setSettings(patch: Partial<Settings>): Settings {
   if (cache.modelFallback) cache.modelFallback = { enabled: cache.modelFallback.enabled === true, order: normalizeModelOrder(cache.modelFallback.order) }
   cache.interfaceSize = interfaceSize(cache.interfaceSize)
   cache.chatTextSize = chatTextSize(cache.chatTextSize)
+  cache.subtitleStyle = subtitleStyle(cache.subtitleStyle)
   cache.uiLanguage = resolveUiLanguage(cache.uiLanguage)
   writeAtomicJson(paths.settingsFile(), cache)
   return cache

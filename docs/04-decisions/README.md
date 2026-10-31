@@ -63,3 +63,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0057-creation-progress-and-research]] | Shared section-based authoring estimates, provider web research and nonblocking series planning | accepted |
 | [[0058-independent-production-jobs]] | Independent concurrent courses and quick videos, reusable saved plans, optional shared agent capacity and queued local drawing | accepted |
 | [[0059-narration-credit-recovery]] | Playable silent fallback, credit-specific recovery notices and explicit retry/OmniVoice exports preserving the original video and voice choice | accepted |
+| [[0060-playback-subtitle-style]] | Persistent playback subtitle size, colors, opacity, position and outline, with live preview, native fullscreen cues and matching editor overlays | accepted |

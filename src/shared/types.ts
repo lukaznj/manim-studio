@@ -697,6 +697,15 @@ export type Appearance = 'system' | 'light' | 'dark'
 /** Who the app is for (ADR 0029): Learn hides the editor everywhere; Create is the full studio; Both has a tab for each on Home. */
 export type AppMode = 'learn' | 'create' | 'both'
 
+export interface SubtitleStyle {
+  size: number // percentage, 75–200
+  color: string // #rrggbb
+  background: string // #rrggbb
+  opacity: number // percentage, 0–100
+  position: 'top' | 'bottom'
+  outline: boolean
+}
+
 export interface Settings {
   studyModels?: Partial<Record<Agent, { model: string; effort: Effort }>> // tutor chat and notes, independent of video creation
   studyAutoplay?: boolean // advance to the next ready course lesson; unset: off
@@ -704,6 +713,7 @@ export interface Settings {
   studyVolume?: number // preferred study player volume, 0–1; unset: 1
   studyMuted?: boolean // mute independently of the preferred volume; unset: off
   studyCaptions?: boolean // show subtitles when available; unset: on
+  subtitleStyle?: SubtitleStyle // viewer preference, independent of exported subtitle files
   developerMode?: boolean
   developerEpisodeModels?: boolean
   developerUsageMetrics?: boolean

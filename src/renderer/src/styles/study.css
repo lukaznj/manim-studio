@@ -374,6 +374,14 @@
   max-height: 62vh;
   border-radius: 0;
   cursor: pointer;
+  object-fit: contain;
+}
+.subtitle-video::cue {
+  color: var(--subtitle-color, #fff);
+  background-color: var(--subtitle-background, rgb(0 0 0 / .7));
+  text-shadow: var(--subtitle-shadow, none);
+  font-size: var(--subtitle-font-size, 20px);
+  font-family: sans-serif;
 }
 .study-play-overlay {
   position: absolute;

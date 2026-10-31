@@ -23,7 +23,9 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { DEFAULT_SUBTITLE_STYLE, subtitleStyle, subtitleVariables } from '../../../shared/subtitle-style'
+import type { SubtitleStyle } from '../../../shared/types'
 import type {
   Agent,
   ClaudeAuth,
@@ -889,12 +891,33 @@ const PROVIDERS: { value: VoiceProvider; title: string; text: string; icon: Reac
 ]
 
 /** Video defaults and rendering controls. */
+function SubtitleSettings() {
+  const settings = useStore((s) => s.settings)!
+  const style = subtitleStyle(settings.subtitleStyle)
+  const change = (patch: Partial<SubtitleStyle>) => void updateSettings({ subtitleStyle: { ...style, ...patch } })
+  return <section className="subtitle-settings" aria-label={uiText('Playback')}>
+    <div className="subtitle-settings-head"><h3>{uiText('Playback')}</h3><button className="btn small ghost" onClick={() => void updateSettings({ subtitleStyle: { ...DEFAULT_SUBTITLE_STYLE } })}><RefreshCw />{uiText('Reset')}</button></div>
+    <div className="subtitle-preview" style={subtitleVariables(style) as CSSProperties} role="img" aria-label={uiText('Preview')}>
+      <span className="subtitle-preview-formula" aria-hidden="true">x² + y² = r²</span>
+      <div className={`subtitle-preview-caption ${style.position}`}><span>{uiText('Subtitles')}</span></div>
+    </div>
+    <Row title={uiText('Subtitles')}><label className="switch"><input type="checkbox" aria-label={uiText('Subtitles')} checked={settings.studyCaptions ?? true} onChange={(e) => void updateSettings({ studyCaptions: e.target.checked })} /><span /></label></Row>
+    <Row title={uiText('Subtitle size')}><div className="subtitle-slider"><input type="range" aria-label={uiText('Subtitle size')} min="75" max="200" step="25" value={style.size} onChange={(e) => change({ size: Number(e.target.value) })} /><output>{style.size}%</output></div></Row>
+    <Row title={uiText('Subtitle text color')}><input type="color" className="subtitle-color" aria-label={uiText('Subtitle text color')} value={style.color} onChange={(e) => change({ color: e.target.value })} /></Row>
+    <Row title={uiText('Subtitle background')}><input type="color" className="subtitle-color" aria-label={uiText('Subtitle background')} value={style.background} onChange={(e) => change({ background: e.target.value })} /></Row>
+    <Row title={uiText('Background opacity')}><div className="subtitle-slider"><input type="range" aria-label={uiText('Background opacity')} min="0" max="100" step="5" value={style.opacity} onChange={(e) => change({ opacity: Number(e.target.value) })} /><output>{style.opacity}%</output></div></Row>
+    <Row title={uiText('Subtitle position')}><Tabs radio={uiText('Subtitle position')} value={style.position} onChange={(position) => change({ position })} items={[{ value: 'bottom', label: uiText('Bottom') }, { value: 'top', label: uiText('Top') }]} /></Row>
+    <Row title={uiText('Text outline')}><label className="switch"><input type="checkbox" aria-label={uiText('Text outline')} checked={style.outline} onChange={(e) => change({ outline: e.target.checked })} /><span /></label></Row>
+  </section>
+}
+
 function VideoTab() {
   const settings = useStore((s) => s.settings)!
   const project = useStore((s) => s.project)
   const editing = useStore((s) => !studying(s))
   return (
     <div className="set-group">
+      <SubtitleSettings />
       {
         <Row title={uiText('Export quality')} text={uiText('1080p is the default. Choose 720p for faster rendering or 1440p for more detail.')}>
           <Tabs

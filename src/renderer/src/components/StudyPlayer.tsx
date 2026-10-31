@@ -9,6 +9,7 @@ import { errorText, toast, updateSettings, useStore } from '../store'
 import { Modal } from './ui'
 import { PlaybackSpeed, PLAYBACK_RATES } from './PlaybackSpeed'
 import { StudyFrameSelection } from './StudyFrameSelection'
+import { positionSubtitles, useSubtitleStyle } from '../lib/subtitle-style'
 
 const clock = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`
 function saved(key: string, src: string, duration: number): number {
@@ -53,6 +54,7 @@ export function StudyPlayer(props: {
   const volume = Number.isFinite(preferredVolume) ? Math.max(0, Math.min(1, preferredVolume)) : 1
   const muted = useStore((s) => s.settings?.studyMuted ?? false)
   const captions = useStore((s) => s.settings?.studyCaptions ?? true)
+  useSubtitleStyle(video, src)
   // Keep the old source's last observed position: detached video elements can reset to zero.
   const session = useMemo(() => ({ key: projectPath, position: 0, duration: 0, completed: false, ready: false, lastSaved: 0 }), [src, projectPath])
   const root = useRef<HTMLElement>(null)
@@ -63,6 +65,7 @@ export function StudyPlayer(props: {
   const [fullscreen, setFullscreen] = useState(false)
   const [chaptersOpen, setChaptersOpen] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [intrinsicAspect, setIntrinsicAspect] = useState<{ src: string; ratio: string } | null>(null)
   const [controlsVisible, setControlsVisible] = useState(true)
   const toolbar = useRef<HTMLDivElement>(null)
   const hideTimer = useRef<number | undefined>(undefined)
@@ -231,8 +234,8 @@ export function StudyPlayer(props: {
           ref={video}
           crossOrigin="anonymous"
           key={src}
-          className="ex-video"
-          style={{ aspectRatio: aspect.replace(':', ' / ') }}
+          className="ex-video subtitle-video"
+          style={{ aspectRatio: intrinsicAspect?.src === src ? intrinsicAspect.ratio : aspect.replace(':', ' / ') }}
           src={api.mediaUrl(src)}
           preload="metadata"
           playsInline
@@ -270,6 +273,7 @@ export function StudyPlayer(props: {
           }}
           onLoadedMetadata={(e) => {
             const el = e.currentTarget
+            if (el.videoWidth && el.videoHeight) setIntrinsicAspect({ src, ratio: `${el.videoWidth} / ${el.videoHeight}` })
             setDuration(Number.isFinite(el.duration) ? el.duration : 0)
             el.playbackRate = rate
             el.volume = volume
@@ -298,6 +302,7 @@ export function StudyPlayer(props: {
               onLoad={() => {
                 const track = video.current?.textTracks[0]
                 if (track) track.mode = captions ? 'showing' : 'hidden'
+                positionSubtitles(video.current)
               }}
             />
           )}
