@@ -11,7 +11,7 @@ Making a video in the editor means steering Claude turn by turn. Often you just 
 
 ## Decision
 
-- **Quick video** uses the current creation model, narration, aspect, tone and output defaults from Settings. Its brief and optional PDFs are the main inputs. Export variants and render-server selection are secondary options.
+- **Quick video** uses the current creation model, narration, aspect, tone and output defaults from Settings. Its brief and optional PDFs are the main inputs. It exports only the configured video theme; the creation dialog has no light-and-dark variant option. Render-server selection is available when servers are configured.
 - **`src/main/quick.ts` runs a project-bound background agent**, shared with series production. Script approval and video implementation are separate turns; Studio independently renders, repairs and exports. All three providers, ordered fallback and returning to a higher-priority available model apply. Its conversation is saved in the project.
 - **Navigation never owns the job.** The initial progress page opens once; users can go to the library, study other lessons, work in another project or plan a course. A persistent title-bar button returns to the quick job. Background edits do not trigger a second automatic preview render in the open editor.
 - **Independent concurrent quick jobs**, each with its own checkpoint and controls, alongside any series ([[0058-independent-production-jobs]]). Work and export remain bound to their project even when another project is open. The production page offers Stop, Continue, completed files and Watch; editing is available after stopping or completing production.

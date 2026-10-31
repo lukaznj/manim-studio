@@ -1,7 +1,7 @@
 {
   "name": "manim-studio",
   "productName": "Manim Studio",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Desktop app for maths explainer videos made with manim: learn from them or make them, with Claude, Codex or Antigravity writing the scenes",
   "author": "Luka Ražem",
   "license": "AGPL-3.0-only",

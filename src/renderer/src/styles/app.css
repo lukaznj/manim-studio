@@ -2231,8 +2231,6 @@
 .quick-config svg { width: 14px; height: 14px; flex: none; }
 .quick-config > button { margin-left: auto; }
 .quick-form .quick-prompt { min-height: 130px; resize: vertical; line-height: 1.65; }
-.quick-delivery { padding: 12px 0; border-top: 1px solid var(--line); }
-.quick-delivery summary { cursor: pointer; font-weight: 600; font-size: 12px; margin-bottom: 12px; }
 @media (prefers-reduced-motion: reduce) { .creation-dial .dial-value { transition: none; animation: none; } }
 @media (max-width: 700px) {
   .quick-view { padding: 24px 16px; }

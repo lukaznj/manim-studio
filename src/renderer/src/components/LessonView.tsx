@@ -10,6 +10,8 @@ import { StudyNotes } from './StudyNotes'
 import { nearbyFollowUps } from '../../../shared/study-assistant'
 import { EpisodeStatus, ProductionIcon } from './SeriesProduction'
 import { StudyRowProgress } from './StudyRowProgress'
+import { NarrationRecovery } from './NarrationRecovery'
+import { narrationStatus } from '../../../shared/narration'
 
 // The study screen's lessons (StudyView.tsx): a series' episodes and follow-ups, or a single video
 // (src/main/watch.ts, ADR 0028).
@@ -31,7 +33,7 @@ export function EpisodeRow({ episode: e, selected, run }: { episode: WatchEpisod
           title={e.title}
           onClick={() => void selectStudied(e.dir)}
         >
-          <span className="ex-num mono">{e.number}</span>
+          <span className="ex-num mono" title={format('Lesson {0}', [e.number])}>{e.number}</span>
           <span className="ex-row-body">
             <span className="ex-row-title">{e.title}</span>
             <StudyRowProgress dir={e.dir} available={(!producing || producing.state === 'done') && e.state !== 'making' && e.state !== 'failed'}>
@@ -92,6 +94,7 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
   const startPlaying = useStore((s) => s.studyAutoplayPath === dir)
   const startAt = useStore((s) => s.studyStartAt)
   const returning = useStore((s) => s.studyReturn)
+  const exportRevision = useStore((s) => s.exports.findLast((job) => job.project === dir && job.state === 'done')?.id)
   // openProject already returned this lesson's timeline. Keep the player in place while
   // watchDetail discovers its export/subtitles instead of briefly showing a smaller empty card.
   const seed = (): WatchDetail => {
@@ -102,6 +105,7 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
       preview: current?.video,
       chapters: current?.sections.filter((s) => s.end > s.start) ?? [],
       subtitles: current?.subtitles ?? [],
+      narration: narrationStatus(current),
     }
   }
   const [loaded, setLoaded] = useState<{ dir: string; detail: WatchDetail } | null>(null)
@@ -116,7 +120,7 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
     return () => {
       active = false
     }
-  }, [dir, followUp?.state, episode.video])
+  }, [dir, followUp?.state, episode.video, exportRevision])
   const src = detail?.video ?? detail?.preview
   const state = followUp?.state ?? episode.state
   const error = followUp?.error ?? episode.error
@@ -151,6 +155,7 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
           )}
         </div>
       </header>
+      {src && <NarrationRecovery dir={dir} status={detail.narration} />}
       {state === 'failed' && error && <p className="ex-error">{error}</p>}
 
       {src ? (

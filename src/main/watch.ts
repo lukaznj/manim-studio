@@ -3,7 +3,9 @@
 // extras/, carrying meta.extra (which episode, where in it, what was asked); a background agent
 // makes and exports it like a series episode, with the episode's script and the series bible.
 import { accessSync, constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
+import { narrationStatus } from '../shared/narration'
+import type { NarrationStatus } from '../shared/types'
 import { SCRIPT_FILE } from '../shared/script'
 import { momentNote } from '../shared/moment'
 import { defaultAgentSelection } from '../shared/agent-selection'
@@ -47,7 +49,7 @@ function exported(dir: string): string | undefined {
   if (!existsSync(root)) return undefined
   const videos = readdirSync(root)
     .flatMap((sub) =>
-      existsSync(join(root, sub)) && statSync(join(root, sub)).isDirectory() ? readdirSync(join(root, sub)).map((f) => join(root, sub, f)) : [],
+      existsSync(join(root, sub)) && statSync(join(root, sub)).isDirectory() && !existsSync(join(root, sub, '.incomplete')) ? readdirSync(join(root, sub)).map((f) => join(root, sub, f)) : [],
     )
     .filter((f) => f.endsWith('.mp4') && !/\.[a-z]{2,3}(-[A-Za-z]{2,4})?\.mp4$/.test(f.replace(/\.(dark|light)\.mp4$/, '.mp4')))
   return videos.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0]
@@ -139,12 +141,17 @@ export function watchDetail(dir: string): WatchDetail {
   const video = exported(dir)
   const vtt = video && join(video, '..', `${basename(video).replace(/(\.(dark|light))?\.mp4$/, '')}.${meta.voice.language}.vtt`)
   const timeline = readTimeline(dir)
+  let context: { chapters?: WatchDetail['chapters']; subtitles?: WatchDetail['subtitles']; narration?: NarrationStatus | null } | undefined
+  if (video) {
+    try { context = JSON.parse(readFileSync(join(dirname(video), 'study-context.json'), 'utf8')) } catch { /* Older exports use their preview's narration evidence. */ }
+  }
   return {
     video,
     vtt: vtt && existsSync(vtt) ? vtt : undefined,
     preview: timeline?.video,
-    chapters: timeline?.sections.filter((s) => s.end > s.start) ?? [],
-    subtitles: timeline?.subtitles ?? [],
+    chapters: context?.chapters ?? timeline?.sections.filter((s) => s.end > s.start) ?? [],
+    subtitles: context?.subtitles ?? timeline?.subtitles ?? [],
+    narration: context && 'narration' in context ? context.narration ?? undefined : narrationStatus(timeline),
   }
 }
 

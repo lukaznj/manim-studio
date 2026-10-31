@@ -94,6 +94,7 @@ const methods = [
   'watchSeries',
   'courseExercises',
   'watchDetail',
+  'recoverNarration',
   'studyReference',
   'studyNotes',
   'saveStudyNotes',

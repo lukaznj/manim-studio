@@ -28,7 +28,6 @@ export function QuickDialog() {
   const [pdfs, setPdfs] = useState<string[]>([])
   const aspect: Aspect = defaults?.defaultAspect ?? '16:9'
   const theme: Theme = defaults?.defaultTheme ?? 'dark'
-  const [both, setBoth] = useState(false)
   const [server, setServer] = useState<string | undefined>()
   const tone: Tone = defaults?.defaultTone ?? DEFAULT_TONE
   const language = defaultVoice?.language ?? 'en'
@@ -55,11 +54,10 @@ export function QuickDialog() {
         tone,
         language,
         voice,
-        export: { themes: both ? ['dark', 'light'] : [theme], languages: [], languageVideos: false, server },
+        export: { themes: [theme], languages: [], languageVideos: false, server },
       })
       setPrompt('')
       setPdfs([])
-      setBoth(false)
       setServer(undefined)
       closeDialog()
     } catch (e) {
@@ -141,12 +139,7 @@ export function QuickDialog() {
           {!pdfs.length && <span className="hint">{uiText('or drop them here: lecture notes, a textbook chapter, a worksheet. Optional.')}</span>}
         </div>
 
-        <details className="quick-delivery"><summary>{uiText('Export options')}</summary>
-        <label className="export-check">
-          <input type="checkbox" checked={both} onChange={(e) => setBoth(e.target.checked)} /> {uiText(" Export both a light and a dark version")}
-        </label>
         <ExportOn value={server} onChange={setServer} />
-        </details>
         {voiceIssue && (
           <div className="quick-warning">
             {voiceIssue}{' '}

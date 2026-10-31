@@ -6,6 +6,7 @@ import { revealLabel } from '../lib/platform'
 import { canEdit, closeProject, errorText, openDialog, openWatch, toast, useStore } from '../store'
 import { ProductionStages } from './ProductionStages'
 import { AccountPlanUsage } from './AccountPlanUsage'
+import { NarrationRecovery } from './NarrationRecovery'
 
 /** A production page, never the owner of the agent's lifetime or current project. */
 export function QuickView() {
@@ -30,6 +31,7 @@ export function QuickView() {
         </div>
       </div>
       <ProductionStages project={run.project} stage={stage} active={working} job={job} />
+      {run.state === 'done' && <NarrationRecovery dir={run.project} />}
       <p className="hint creation-estimate">{t('Writing progress estimates completed sections, not time remaining. Rendering and assembly report their own progress.')}</p>
       {run.error && <div className="quick-error"><CircleAlert />{run.error}</div>}
       {!!run.warnings.length && <ul className="quick-warnings">{run.warnings.map((warning) => <li key={warning}><CircleAlert />{warning}</li>)}</ul>}
