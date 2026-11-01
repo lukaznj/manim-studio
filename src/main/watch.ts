@@ -44,7 +44,7 @@ const lessonFile = (dir: string) => join(dir, '.studio', 'lesson.json')
 const adding = new Set<string>()
 
 /** The newest exported video in the project's exports/, not a dubbed one (<name>.<lang>.mp4). */
-function exported(dir: string): string | undefined {
+export function exported(dir: string): string | undefined {
   const root = join(dir, 'exports')
   if (!existsSync(root)) return undefined
   const videos = readdirSync(root)

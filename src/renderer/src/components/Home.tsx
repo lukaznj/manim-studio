@@ -1,5 +1,5 @@
 import { t as uiText, localize, format } from '../lib/i18n'
-import { ChevronLeft, Clapperboard, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Trash2, Zap } from 'lucide-react'
+import { ChevronLeft, Clapperboard, Download, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Trash2, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ExerciseSet, ProjectSummary } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -356,6 +356,14 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
             <div className="menu" onMouseLeave={() => setMenu(false)} onClick={(e) => e.stopPropagation()}>
               <button onClick={() => void api.reveal(p.path)}>
                 <FolderOpen /> {uiText(' Show in folder')}
+              </button>
+              <button
+                onClick={() => {
+                  setMenu(false)
+                  openDialog({ kind: 'save-video', project: p.path })
+                }}
+              >
+                <Download /> {uiText('Save video')}
               </button>
               <button
                 onClick={async () => {

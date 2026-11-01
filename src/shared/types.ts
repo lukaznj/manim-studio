@@ -697,6 +697,18 @@ export type Appearance = 'system' | 'light' | 'dark'
 /** Who the app is for (ADR 0029): Learn hides the editor everywhere; Create is the full studio; Both has a tab for each on Home. */
 export type AppMode = 'learn' | 'create' | 'both'
 
+/** Save video (ADR 0062): the subtitles as a file beside the copy, drawn into it, or left out. */
+export type SubtitleCopy = 'file' | 'burn' | 'none'
+
+/** What Save video would copy: the project's newest export, if it has one. */
+export interface VideoCopyInfo {
+  name: string
+  video?: string
+  subtitles: boolean // the export has subtitles in the narration's language
+  folder: string // where the last copy went, else Downloads
+  mode: SubtitleCopy // the last choice, else a separate file
+}
+
 export interface SubtitleStyle {
   size: number // percentage, 75–200
   color: string // #rrggbb
@@ -714,6 +726,7 @@ export interface Settings {
   studyMuted?: boolean // mute independently of the preferred volume; unset: off
   studyCaptions?: boolean // show subtitles when available; unset: on
   subtitleStyle?: SubtitleStyle // viewer preference, independent of exported subtitle files
+  saveCopy?: { folder?: string; subtitles?: SubtitleCopy } // Save video's last choices (ADR 0062)
   developerMode?: boolean
   developerEpisodeModels?: boolean
   developerUsageMetrics?: boolean
@@ -919,6 +932,7 @@ export type EventChannel =
   | 'watch'
   | 'open-project'
   | 'menu'
+  | 'save-copy'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -964,6 +978,10 @@ export interface StudioApi {
   pickProject(): Promise<string | null>
   /** A folder from the system dialog, or null if cancelled. */
   pickFolder(title?: string, defaultPath?: string): Promise<string | null>
+  /** The video Save video would copy from this project, and the last choices (ADR 0062). */
+  videoCopyInfo(project: string): Promise<VideoCopyInfo>
+  /** Copies the project's newest export into `folder`, with its subtitles as a file, burned in, or none; returns the saved files. */
+  saveVideoCopy(project: string, options: { folder: string; subtitles: SubtitleCopy }): Promise<string[]>
   /** Opens the configured projects directory in the system file manager. */
   openProjectsFolder(): Promise<void>
   /** PDFs from the system dialog; empty if cancelled. */
@@ -1148,4 +1166,6 @@ export interface StudioApi {
   on(channel: 'watch', cb: (series: WatchSeries) => void): () => void
   /** script.md changed on disk (Claude wrote it), or was removed (null). */
   on(channel: 'script', cb: (e: { text: string | null }) => void): () => void
+  /** Burning subtitles into a saved copy: how far it is (0–1). */
+  on(channel: 'save-copy', cb: (e: { project: string; percent: number }) => void): () => void
 }
