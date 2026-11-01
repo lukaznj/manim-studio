@@ -91,6 +91,7 @@ export type Dialog =
   | { kind: 'exercises' } // a new exercise set
   | { kind: 'add-exercises' } // more exercises for the open set
   | { kind: 'lecture' }
+  | { kind: 'save-video'; project: string } // Save video (ADR 0062)
   | null
 
 export interface State {

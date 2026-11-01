@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ExportJob } from '../../../shared/types'
 import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
-import { useStore } from '../store'
+import { openDialog, useStore } from '../store'
 import { ProgressLine, Ring } from './ui'
 
 const active = (j: ExportJob) => j.state === 'running' || j.state === 'waiting'
@@ -82,6 +82,16 @@ function ExportsPopover({ jobs, onClose }: { jobs: ExportJob[]; onClose: () => v
                   aria-label={j.paused ? uiText('Resume this export') : uiText('Pause this export')}
                 >
                   {j.paused ? <Play /> : <Pause />}
+                </button>
+              )}
+              {j.state === 'done' && (
+                <button
+                  className="icon-btn"
+                  onClick={() => openDialog({ kind: 'save-video', project: j.project })}
+                  title={uiText('Save video')}
+                  aria-label={uiText('Save video')}
+                >
+                  <Download />
                 </button>
               )}
               {j.result && (
