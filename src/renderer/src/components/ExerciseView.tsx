@@ -1,5 +1,5 @@
 import { t as uiText, format } from '../lib/i18n'
-import { Check, CircleAlert, Code2, Eye, Film, FolderOpen, MessageCircleQuestion, Pause, Play, RotateCcw, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { Check, CircleAlert, Code2, Download, Eye, Film, FolderOpen, MessageCircleQuestion, Pause, Play, RotateCcw, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ExerciseDetail, ExerciseHit, ExerciseItem, ExerciseSet, Section } from '../../../shared/types'
 import { fold } from '../../../shared/exercise'
@@ -239,6 +239,11 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
           {item.state === 'failed' && (
             <button className="btn small" onClick={() => void api.retryExercise(item.dir).catch((e) => toast(errorText(e), 'error'))}>
               <RotateCcw /> {uiText(' Try again')}
+            </button>
+          )}
+          {item.video && (
+            <button className="btn small ghost" title={uiText('Save a copy of this video, to keep or share')} onClick={() => openDialog({ kind: 'save-video', project: item.dir })}>
+              <Download /> {uiText('Save video')}
             </button>
           )}
           {editing && (

@@ -37,6 +37,8 @@ const methods = [
   'openProject',
   'pickProject',
   'pickFolder',
+  'videoCopyInfo',
+  'saveVideoCopy',
   'openProjectsFolder',
   'pickPdfs',
   'closeProject',
