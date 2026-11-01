@@ -49,6 +49,13 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("timeline", type=Path)
     e.add_argument("dest", type=Path)
 
+    burn = sub.add_parser("burn-subtitles", help="a copy of a video with its subtitles drawn in")
+    burn.add_argument("video", type=Path)
+    burn.add_argument("srt", type=Path)
+    burn.add_argument("out", type=Path)
+    burn.add_argument("--style", default="{}", help="the viewer's subtitle style, as JSON")
+    burn.add_argument("--band", action="store_true", help="the project keeps a band clear for subtitles (ADR 0027)")
+
     fit = sub.add_parser("fit-video", help="fit the whole frame into a delivery shape")
     fit.add_argument("video", type=Path)
     fit.add_argument("out", type=Path)
@@ -175,6 +182,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "export":
         return export(args.timeline, args.dest)
+
+    if args.cmd == "burn-subtitles":
+        import json
+
+        from .burn import burn
+
+        try:
+            emit("done", **burn(args.video, args.srt, args.out, json.loads(args.style), args.band))
+            return 0
+        except Exception as error:
+            emit("error", message=str(error))
+            return 1
 
     if args.cmd == "fit-video":
         from .delivery import fit_video

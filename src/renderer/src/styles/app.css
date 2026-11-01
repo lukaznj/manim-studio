@@ -2254,3 +2254,32 @@
   .quick-card .production-head { flex-wrap: wrap; }
   .creation-stages li { gap: 12px; }
 }
+
+/* Save video (SaveVideoDialog.tsx, ADR 0062). */
+.save-video-name {
+  margin: 0;
+  font: 700 16px var(--font-display);
+}
+.save-video-folder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.save-video-folder .mono {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.save-video-done {
+  display: grid;
+  gap: 4px;
+}
+.save-video-progress {
+  display: grid;
+  gap: 6px;
+}

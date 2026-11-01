@@ -1,10 +1,10 @@
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowLeft, Check, ChevronDown, CircleAlert, Code2, CornerDownRight, Eye, EyeOff, Play, RotateCcw, Video } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, CircleAlert, Code2, CornerDownRight, Download, Eye, EyeOff, Play, RotateCcw, Video } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, SeriesRun, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { nextStudyEpisode } from '../../../shared/study-playback'
 import { api } from '../lib/api'
-import { canEdit, errorText, returnToStudyVideo, selectStudied, toast, useStore, watchAdditionalVideo } from '../store'
+import { canEdit, errorText, openDialog, returnToStudyVideo, selectStudied, toast, useStore, watchAdditionalVideo } from '../store'
 import { StudyPlayer } from './StudyPlayer'
 import { StudyNotes } from './StudyNotes'
 import { nearbyFollowUps } from '../../../shared/study-assistant'
@@ -142,6 +142,11 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
               onClick={() => void (followUp ? api.retryFollowUp(dir) : api.retryCourseLesson(dir)).catch((e) => toast(errorText(e), 'error'))}
             >
               <RotateCcw /> {uiText(' Try again')}
+            </button>
+          )}
+          {detail?.video && (
+            <button className="btn small ghost" title={uiText('Save a copy of this video, to keep or share')} onClick={() => openDialog({ kind: 'save-video', project: dir })}>
+              <Download /> {uiText('Save video')}
             </button>
           )}
           {editing && (

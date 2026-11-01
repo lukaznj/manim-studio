@@ -12,6 +12,7 @@ import { QuickDialog } from './components/QuickDialog'
 import { QuickView } from './components/QuickView'
 import { SeriesDialog } from './components/SeriesDialog'
 import { SettingsDialog } from './components/SettingsDialog'
+import { SaveVideoDialog } from './components/SaveVideoDialog'
 import { TitleBar } from './components/TitleBar'
 import { UsageDialog } from './components/UsageDialog'
 import { Tour } from './components/Tour'
@@ -66,6 +67,7 @@ export function App() {
       </main>
       <NewProjectDialog />
       <SettingsDialog />
+      <SaveVideoDialog />
       <BoothDialog />
       <ExportDialog />
       <QuickDialog />

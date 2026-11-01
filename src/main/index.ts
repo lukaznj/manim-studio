@@ -16,8 +16,7 @@ import type {
   ProjectMeta,
   Quality,
   QuickRequest,
-  SeriesStart,
-} from '../shared/types'
+  SeriesStart, SubtitleCopy } from '../shared/types'
 import {
   applyChatSettings,
   agentRuntimeBusy,
@@ -72,6 +71,7 @@ import {
 import { addServer, checkServer, listServers, removeServer } from './remote'
 import { movedSeriesFolder, relocate } from './relocate'
 import * as ex from './exercises'
+import { saveVideoCopy, videoCopyInfo } from './save-copy'
 import { agentRoutes } from './agent'
 import { videoEncoder } from './encoder'
 import { inspectFolder, projectsFolders, useProjectsFolder } from './folders'
@@ -408,6 +408,10 @@ function registerIpc(): void {
     if (error) throw new Error(error)
   })
   handle('reveal', (path: string) => shell.showItemInFolder(normalize(path))) // the renderer joins with /
+  handle('videoCopyInfo', (project: string) => videoCopyInfo(project))
+  handle('saveVideoCopy', (project: string, options: { folder: string; subtitles: SubtitleCopy }) =>
+    saveVideoCopy(project, options, (percent) => send('save-copy', { project, percent })),
+  )
   handle('saveScene', (source: string) => projects.saveScene(source))
   handle('updateMeta', (patch: Partial<ProjectMeta>) => projects.updateMeta(patch))
   handle('saveScript', (text: string) => projects.saveScript(text))

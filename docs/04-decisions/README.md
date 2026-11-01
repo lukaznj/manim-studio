@@ -65,3 +65,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0059-narration-credit-recovery]] | Playable silent fallback, credit-specific recovery notices and explicit retry/OmniVoice exports preserving the original video and voice choice | accepted |
 | [[0060-playback-subtitle-style]] | Persistent playback subtitle size, colors, opacity, position and outline, with live preview, native fullscreen cues and matching editor overlays | accepted |
 | [[0061-browser-motion-inserts]] | Preview-first, cached HTML/SVG/Canvas inserts through every agent, isolated locally and bounded to short 1080p clips | accepted |
+| [[0062-save-video-copy]] | Save video: copy the newest export to a chosen folder (Downloads by default), with subtitles as a same-named .srt, burned in with the viewer’s style inside the subtitle band, or none | accepted |
