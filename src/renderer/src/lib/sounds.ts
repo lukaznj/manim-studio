@@ -253,6 +253,12 @@ export function cuesFor(s: State, p: State, focused: boolean): Sound[] {
     cues.push(...items(episodes(before), episodes(run), 'episode'))
   }
   cues.push(...items(exercises(p.exerciseSets), exercises(s.exerciseSets), 'episode'))
+  for (const set of s.exerciseSets) {
+    const was = p.exerciseSets.find((x) => x.folder === set.folder)
+    if (!was) continue
+    if (set.intake?.state === 'failed' && was.intake?.state !== 'failed') cues.push('error')
+    if (set.lecture?.state !== was.lecture?.state) cues.push(...(set.lecture?.state === 'done' ? ['export' as const] : set.lecture?.state === 'failed' ? ['error' as const] : []))
+  }
   for (const run of s.quickRuns) {
     const before = p.quickRuns.find((previous) => previous.id === run.id)
     if (before && before.state !== run.state)
@@ -261,6 +267,10 @@ export function cuesFor(s: State, p: State, focused: boolean): Sound[] {
   // A render you waited for; the agent's own renders while it works stay quiet.
   if (p.render.status === 'rendering' && s.render.status === 'idle' && !s.chatBusy && Date.now() - (p.render.startedAt ?? Date.now()) >= 4000)
     cues.push('render')
+  // The agent stopped with an error. (Editor render errors stay silent: the editor shows them.)
+  if (s.chat.length > p.chat.length && s.chat.at(-1)?.role === 'error') cues.push('error')
+  // Any error message, from any part of the app.
+  if (s.toasts.some((t) => t.kind === 'error' && !p.toasts.some((x) => x.id === t.id))) cues.push('error')
   // The agent answered while you were in another window.
   if (p.chatBusy && !s.chatBusy && !focused) cues.push('attention')
   if (!requiredReady(p.setup) && requiredReady(s.setup) && installing(p.setup)) cues.push('setup')

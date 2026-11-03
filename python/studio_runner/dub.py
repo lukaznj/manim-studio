@@ -62,7 +62,8 @@ def dub(timeline_path: Path, translations_path: Path, lang: str, out_base: Path,
         start = int(at * RATE)
         end = min(len(track), start + len(audio))
         track[start:end] += audio[: end - start]
-        cues += _cues(text, at, end / RATE)
+        # Its subtitle in that language, maths kept as written, when the block has one (ADR 0063).
+        cues += _cues(translations.get(block.get("subtitle") or "", "").strip() or text, at, end / RATE)
         cursor = end / RATE + GAP
         emit("progress", done=i + 1, total=len(blocks), source=source)
 
@@ -147,7 +148,7 @@ def _mux(video: Path, samples: np.ndarray, target: str) -> None:
 def _cues(text: str, start: float, end: float) -> list[dict]:
     """The text in subtitle-sized pieces, each shown for its share of the speech."""
     pieces: list[str] = []
-    for word in re.findall(r"\S+", text):
+    for word in re.findall(r"\S*\$[^$\n]+\$\S*|\S+", text):  # a formula stays in one cue
         if pieces and len(pieces[-1]) + 1 + len(word) <= CUE_CHARS:
             pieces[-1] += " " + word
         else:

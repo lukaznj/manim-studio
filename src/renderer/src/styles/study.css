@@ -383,6 +383,28 @@
   font-size: var(--subtitle-font-size, 20px);
   font-family: sans-serif;
 }
+/* Subtitles with maths (ADR 0063): drawn over the picture where native cues sit, in the same style. */
+.study-math-cue {
+  position: absolute;
+  inset: auto 5% 8%;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  text-align: center;
+  font-family: sans-serif;
+  font-size: var(--subtitle-font-size, 20px);
+  line-height: 1.35;
+}
+.study-math-cue.top { inset: 6% 5% auto; }
+.study-math-cue > span {
+  padding: 0.08em 0.3em;
+  color: var(--subtitle-color, #fff);
+  background: var(--subtitle-background, rgb(0 0 0 / .7));
+  text-shadow: var(--subtitle-shadow, none);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.study-math-cue .katex { font-size: 1.08em; }
 .study-play-overlay {
   position: absolute;
   display: grid;
@@ -853,15 +875,7 @@
 .production-task p { margin: 8px 0 0; color: var(--text-2); font-size: 12.5px; line-height: 1.7; overflow-wrap: anywhere; }
 .production-task .production-error { color: var(--coral); white-space: pre-wrap; }
 .production-task > progress { grid-column: 1 / -1; }
-.production-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; margin: 4px 0 8px; padding: 0; gap: 12px; }
-.production-stages li { position: relative; display: grid; justify-items: center; gap: 12px; text-align: center; color: var(--text-3); font-size: 11px; }
-.production-stages li::after { content: ''; position: absolute; top: 16px; left: calc(50% + 22px); right: calc(-50% + 10px); height: 1px; background: var(--line-strong); }
-.production-stages li:last-child::after { display: none; }
-.production-stages li > span { width: 33px; height: 33px; border: 1px solid var(--line-strong); border-radius: 50%; display: grid; place-items: center; font: 11px var(--font-mono); background: var(--bg); }
-.production-stages li > span > svg { width: 15px; height: 15px; }
-.production-stages li.current { color: var(--text); }
-.production-stages li.current > span { border-color: var(--sun-text); color: var(--sun-text); background: var(--sun-soft); }
-.production-stages li.complete > span { color: var(--mint); border-color: var(--mint); }
+
 .series-card-status { position: absolute; z-index: 1; left: 12px; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--line-strong); border-radius: var(--r-md); padding: 9px 10px; background: var(--panel); color: var(--text); font-size: 11px; }
 .series-card-status > svg { width: 14px; height: 14px; color: var(--sun-text); flex: none; }
 .series-card-count { margin-left: auto; font: 10px var(--font-mono); color: var(--text-2); }

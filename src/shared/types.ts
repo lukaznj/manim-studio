@@ -377,6 +377,7 @@ export interface VoiceBlock {
   end: number
   line: number | null
   text: string
+  subtitle?: string // the written form when it differs from the spoken text, with $…$ LaTeX (ADR 0063)
   key: string
   source: VoiceSource
   audio: string
@@ -933,6 +934,7 @@ export type EventChannel =
   | 'open-project'
   | 'menu'
   | 'save-copy'
+  | 'app-error'
 
 export interface StudioApi {
   appInfo(): Promise<AppInfo>
@@ -1074,7 +1076,7 @@ export interface StudioApi {
   studyNotes(dir: string): Promise<string>
   saveStudyNotes(dir: string, text: string): Promise<void>
   refineStudyNotes(dir: string, text: string): Promise<string>
-  addCourseLesson(folder: string, request: { title: string; prompt: string; sources: string[] }): Promise<string>
+  addCourseLesson(folder: string, request: { prompt: string; sources: string[] }): Promise<string>
   retryCourseLesson(dir: string): Promise<void>
   retryFollowUp(dir: string): Promise<void>
   /** Marks a video (an episode, follow-up or exercise) watched or not; its list updates. */
@@ -1168,4 +1170,5 @@ export interface StudioApi {
   on(channel: 'script', cb: (e: { text: string | null }) => void): () => void
   /** Burning subtitles into a saved copy: how far it is (0–1). */
   on(channel: 'save-copy', cb: (e: { project: string; percent: number }) => void): () => void
+  on(channel: 'app-error', cb: (e: { title: string; message: string }) => void): () => void
 }

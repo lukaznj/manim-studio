@@ -23,12 +23,14 @@ export function useSubtitleStyle(video: RefObject<HTMLVideoElement | null>, sour
   useLayoutEffect(() => {
     const element = video.current
     if (!element) return
-    for (const [key, value] of Object.entries(subtitleVariables(style))) element.style.setProperty(key, value)
+    // On the stage too: subtitles with maths are drawn over the picture, not as native cues (ADR 0063).
+    const targets = [element, element.parentElement].filter((x): x is HTMLElement => !!x)
+    for (const [key, value] of Object.entries(subtitleVariables(style))) for (const target of targets) target.style.setProperty(key, value)
     const resize = () => {
       const box = element.getBoundingClientRect()
       const scale = element.videoWidth && element.videoHeight ? Math.min(box.width / element.videoWidth, box.height / element.videoHeight) : 1
       const short = element.videoWidth && element.videoHeight ? Math.min(element.videoWidth, element.videoHeight) * scale : Math.min(box.width, box.height)
-      element.style.setProperty('--subtitle-font-size', `${Math.max(12, Math.min(56, short * .05)) * style.size / 100}px`)
+      for (const target of targets) target.style.setProperty('--subtitle-font-size', `${Math.max(12, Math.min(56, short * .05)) * style.size / 100}px`)
       positionSubtitles(element)
     }
     const observer = new ResizeObserver(resize)

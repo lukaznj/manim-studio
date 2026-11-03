@@ -77,7 +77,7 @@ export function Tabs<T extends string>(props: {
   disabled?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [position, setPosition] = useState({ left: 3, width: 0, animate: false })
+  const [position, setPosition] = useState({ left: 3, width: 0, top: 3, height: 28, animate: false })
   const measuredValue = useRef(props.value)
   useLayoutEffect(() => {
     const measure = () => {
@@ -86,9 +86,9 @@ export function Tabs<T extends string>(props: {
         const changed = measuredValue.current !== props.value
         measuredValue.current = props.value
         setPosition((before) =>
-          before.left === selected.offsetLeft && before.width === selected.offsetWidth
+          before.left === selected.offsetLeft && before.width === selected.offsetWidth && before.top === selected.offsetTop && before.height === selected.offsetHeight
             ? before
-            : { left: selected.offsetLeft, width: selected.offsetWidth, animate: changed && before.width > 0 },
+            : { left: selected.offsetLeft, width: selected.offsetWidth, top: selected.offsetTop, height: selected.offsetHeight, animate: changed && before.width > 0 },
         )
       }
     }
@@ -123,7 +123,7 @@ export function Tabs<T extends string>(props: {
       <span
         aria-hidden
         className="tabs-indicator"
-        style={{ transform: `translateX(${position.left}px)`, width: position.width, ...(!position.animate ? { transition: 'none' } : {}) }}
+        style={{ transform: `translateX(${position.left}px)`, width: position.width, top: position.top, height: position.height, ...(!position.animate ? { transition: 'none' } : {}) }}
       />
       {props.items.map((it) => (
         <button

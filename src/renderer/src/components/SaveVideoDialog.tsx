@@ -73,7 +73,7 @@ export function SaveVideoDialog() {
         state === 'saved' ? (
           <>
             <button className="btn ghost" onClick={() => void api.reveal(saved[0])}>
-              <FolderOpen /> {uiText(revealLabel)}
+              <FolderOpen /> {revealLabel()}
             </button>
             <button className="btn primary" data-autofocus onClick={closeDialog}>
               {uiText('Done')}

@@ -11,7 +11,6 @@ import { stopTtsWorkerAndWait } from './voice'
 const target = () => uninstallTarget(app.isPackaged, process.platform, app.getPath('exe'), process.env.APPIMAGE)
 export const canUninstall = () => !!target()
 let pending = false
-export const cleanupPending = () => pending
 
 /** Every destructive action is confirmed in main, with a fresh preflight after the dialog. */
 export async function removeDownloadedTools(uninstall: boolean, busy: () => boolean, quit: () => void): Promise<boolean> {

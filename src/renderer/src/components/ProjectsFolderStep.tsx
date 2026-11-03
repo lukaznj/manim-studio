@@ -2,7 +2,7 @@ import { Check, FolderOpen, HardDrive, Cloud } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FolderInfo, ProjectsFolders } from '../../../shared/types'
 import { api } from '../lib/api'
-import { currentLanguage, format, t } from '../lib/i18n'
+import { currentLanguage, format } from '../lib/i18n'
 import { uiLocale } from '../../../shared/ui-languages'
 
 type Say = (en: string, croatian: string) => string

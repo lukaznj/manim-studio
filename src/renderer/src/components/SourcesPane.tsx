@@ -143,7 +143,7 @@ export function SourcesPane() {
                   <button className="btn small ghost" disabled={!item.pages} onClick={() => setOpen(item.name)} title={uiText('Look through the pages')}>
                     <FileText /> {uiText(" Pages")}
                   </button>
-                  <button className="icon-btn" onClick={() => project && void api.reveal(`${project.path}/sources/${item.name}`)} title={revealLabel}>
+                  <button className="icon-btn" onClick={() => project && void api.reveal(`${project.path}/sources/${item.name}`)} title={revealLabel()}>
                     <FolderOpen />
                   </button>
                   <button className="icon-btn" onClick={() => void remove(item)} title={uiText('Move to the Trash')}>
