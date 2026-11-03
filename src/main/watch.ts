@@ -22,6 +22,7 @@ import { seriesRunFor, writeEpisodeBible } from './series'
 import { getSettings, setSettings } from './settings'
 import { slugify } from './slug'
 import { isWatched, writeWatched } from './watched'
+import { titleFrom } from './title'
 
 let send: (series: WatchSeries) => void = () => {}
 const running = new Map<string, { activity?: string; agent?: EpisodeAgent; stopping?: boolean; exportJob?: string }>()
@@ -198,9 +199,9 @@ export async function retryFollowUp(dir: string): Promise<void> {
 }
 
 /** Append a lesson using the course's notation and media settings. Existing lessons stay in order. */
-export async function addCourseLesson(folder: string, request: { title: string; prompt: string; sources: string[] }): Promise<string> {
+export async function addCourseLesson(folder: string, request: { prompt: string; sources: string[] }): Promise<string> {
   await ensureReady()
-  if (!request.title.trim() || (!request.prompt.trim() && !request.sources.length)) throw new Error('Give the lesson a title and a topic or PDF.')
+  if (!request.prompt.trim() && !request.sources.length) throw new Error('Describe the lesson or add a PDF.')
   for (const source of request.sources) {
     if (!/\.pdf$/i.test(source) || !statSync(source).isFile()) throw new Error('Lesson sources must be readable PDFs.')
     accessSync(source, constants.R_OK)
@@ -215,7 +216,8 @@ export async function addCourseLesson(folder: string, request: { title: string; 
     if (!existing.length) throw new Error('This course has no lesson to take its settings from.')
     const first = readMeta(existing[0])
     const number = Math.max(course.episodes.length, ...existing.map((dir) => readMeta(dir).series?.episode ?? 0)) + 1
-    const title = request.title.trim()
+    // Named from what was asked, like a quick video, or from its first PDF.
+    const title = (request.prompt.trim() ? titleFrom(request.prompt) : basename(request.sources[0]).replace(/\.pdf$/i, ''))
     const made = await createProject({
       name: title,
       aspect: first.aspect,

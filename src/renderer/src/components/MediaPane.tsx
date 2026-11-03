@@ -111,7 +111,7 @@ export function MediaPane() {
                 >
                   <Sparkles /> {uiText(" Ask Claude")}
                 </button>
-                <button className="icon-btn" onClick={() => project && void api.reveal(`${project.path}/media/${item.name}`)} title={revealLabel}>
+                <button className="icon-btn" onClick={() => project && void api.reveal(`${project.path}/media/${item.name}`)} title={revealLabel()}>
                   <FolderOpen />
                 </button>
                 <button className="icon-btn" onClick={() => void remove(item)} title={uiText('Move to the Trash')}>

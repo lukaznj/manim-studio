@@ -80,30 +80,33 @@
 .study-frame-selector-tools > span { display: flex; align-items: center; gap: 6px; font-size: 11px; padding-inline: 4px; }
 .study-frame-selector-tools svg { width: 14px; height: 14px; }
 .study-notes { border: 1px solid var(--line); border-radius: 16px; background: var(--panel); margin-top: 24px; overflow: hidden; }
-.study-exercise-notes { padding: 0 30px 30px; }
-.study-notes > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 18px 20px 10px; }
-.study-notes > header > span { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.study-notes > header svg { width: 15px; height: 15px; color: var(--text-3); }
-.study-notes > header small { display: flex; align-items: center; gap: 4px; color: var(--text-3); font-size: 10px; }
-.study-notes > header small svg { width: 11px; height: 11px; }
-.study-notes-toolbar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 2px 14px 10px; border-bottom: 1px solid var(--line); }
-.study-notes-toolbar > span { flex: 1; }
-.study-notes-toolbar .btn { font-size: 10.5px; }
-.study-notes-toolbar .active { background: var(--raised); color: var(--text); }
-.study-notes-input { display: block; width: 100%; min-height: 160px; max-height: 600px; resize: vertical; padding: 18px 20px; border: 0; outline: none; background: transparent; color: var(--text); font: 12px/1.8 var(--font-ui); user-select: text; }
-.study-notes-input::placeholder { color: var(--text-3); }
-.study-notes-input:focus { box-shadow: inset 0 0 0 2px var(--sun-soft); }
-.study-notes-preview { padding: 14px 20px 20px; min-height: 160px; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; user-select: text; }
+.study-notes > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 12px 0 20px; }
+.study-notes > header > strong { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.study-notes > header > strong > svg { width: 15px; height: 15px; color: var(--text-3); }
+.study-notes-actions { display: flex; gap: 2px; }
+/* Read and edit share one box, so switching never moves the text. */
+.study-notes-body { display: block; box-sizing: border-box; width: 100%; min-height: 132px; margin: 0; padding: 10px 20px 20px; border: 0; border-radius: 0; outline: none; background: transparent; color: var(--text); font: 12px/1.8 var(--font-ui); overflow-wrap: anywhere; text-align: start; user-select: text; }
+div.study-notes-body { cursor: text; }
+div.study-notes-body:hover { background: color-mix(in srgb, var(--raised) 45%, transparent); }
+div.study-notes-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sun-soft); }
+.study-notes-body.empty > p, .study-notes-input::placeholder { color: var(--text-3); }
+.study-notes-body > :first-child { margin-top: 0; }
+.study-notes-body > :last-child { margin-bottom: 0; }
+.study-notes-input { resize: none; overflow: hidden; }
 .study-notes .md-math { overflow-x: auto; max-width: 100%; }
-.study-note-time { display: inline-flex; padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--raised); color: var(--sun-text); font: 11px var(--font-mono); cursor: pointer; }
-.study-notes-proposal { padding: 20px; border-top: 1px solid var(--line); background: var(--raised); }
+.study-moment-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 12px 0 20px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--raised); }
+.study-moment-picker select { flex: 1 1 200px; min-width: 0; }
+.study-moment-picker input { width: 76px; text-align: center; }
+.study-moment-picker input[aria-invalid='true'] { border-color: var(--coral); }
+.study-moment-picker .btn { align-self: stretch; }
+.study-notes-proposal { padding: 16px 20px; border-top: 1px solid var(--line); background: var(--raised); }
 .study-notes-proposal > .md { font-size: 12px; line-height: 1.8; user-select: text; }
 .study-notes-proposal > div:last-child { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 12px; }
 .study-notes > .link-btn { display: inline-flex; align-items: center; gap: 6px; margin: 0 20px 14px; font-size: 11px; }
 .study-notes > .link-btn > svg { width: 13px; height: 13px; }
+.study-exercise-notes { padding: 0 30px 30px; }
 @media (prefers-reduced-motion: reduce) { .study-chat .chat-list { scroll-behavior: auto; } .study-follow-toggle svg { transition: none; } }
-.study-chat-provider { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-3); }
-.study-chat-provider > svg { width: 13px; height: 13px; color: var(--sun-text); }
+
 /* Fullscreen controls overlay the image, so keep interactive context above their hit area. */
 .study-player.is-fullscreen .study-detour-cue { bottom: 100px; z-index: 2; }
 .study-player.is-fullscreen .study-frame-selector-tools { bottom: 80px; }
@@ -208,12 +211,6 @@
 .study-reference-link > svg { flex: none; width: 13px; height: 13px; }
 .study-reference-link > span { overflow-wrap: anywhere; }
 .study-reference-link:hover { border-color: var(--sun-text); background: var(--raised); }
-.study-answer-context { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--text-3); font-size: 10px; }
-.study-answer-context > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; }
-.study-answer-context > summary > svg { width: 12px; height: 12px; }
-.study-answer-context > summary > span { margin-left: auto; font-size: 9px; }
-.study-answer-context[open] > summary { margin-bottom: 9px; }
-.study-answer-context > p { line-height: 1.6; }
 .narration-recovery { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 16px 18px; margin: 4px 0 20px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--sun-soft); }
 .narration-recovery > svg { width: 20px; height: 20px; color: var(--sun-text); margin-top: 1px; }
 .narration-recovery strong { font-size: 13px; }

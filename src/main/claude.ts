@@ -217,30 +217,11 @@ let readOnlyRequests = 0
 export const agentRuntimeBusy = () => readOnlyRequests > 0 || !!turn || !!foreground || !!studyAbort || codexLoginBusy() || antigravityLoginBusy()
   || !!loginChild && loginChild.exitCode === null && loginChild.signalCode === null
 
-const observers = new Set<(e: ChatEvent) => void>()
 
 export function onChatEvent(fn: (e: ChatEvent) => void): void {
-  emit = (e) => {
-    fn(e)
-    observers.forEach((o) => o(e))
-  }
+  emit = fn
 }
 
-/** Also tells `fn` what the chat does (quick mode follows Claude's progress); returns the unsubscribe. */
-export function observeChat(fn: (e: ChatEvent) => void): () => void {
-  observers.add(fn)
-  return () => observers.delete(fn)
-}
-
-// Quick and series mode: Claude works unattended, approves its own script and never stops to ask.
-let autopilot = false
-export function setAutopilot(on: boolean): void {
-  if (autopilot === on) return
-  autopilot = on
-  closeChat() // the next turn starts a session with the matching brief
-}
-
-let turnDone: ((r: TurnResult) => void) | null = null
 export type TurnResult = { ok: boolean; error?: string; limitedUntil?: number; limitKind?: string; switched?: boolean }
 
 /** The plan's usage limit while Claude refuses for it (claude.ai sign-in only; API keys have none). */
@@ -250,14 +231,6 @@ const activeLimit = () => (limit && (!limit.until || limit.until > Date.now()) ?
 function noteLimit(msg: SDKMessage): void {
   if (msg.type === 'rate_limit_event') limit = limitFrom(msg.rate_limit_info)
   else if (msg.type === 'result' && msg.subtype === 'success' && msg.is_error) limit = limitFromText(msg.result) ?? limit
-}
-
-/** Sends a message as the user and waits until Claude's turn ends. */
-/** Sends a message and waits for Claude's turn to end. `limitedUntil` says a usage limit ended it. */
-export async function chatAndWait(text: string, step = 'Chat'): Promise<TurnResult> {
-  const done = new Promise<TurnResult>((resolve) => (turnDone = resolve))
-  await chatSend({ text }, step)
-  return done
 }
 
 export function loadChat(dir: string): void {
@@ -308,7 +281,7 @@ async function routedChat(dir: string, text: string, displayText: string, step: 
     }
     const saved = readMeta(dir).chatRoute
     const a = await episodeAgent(dir, {
-      ...saved, preferSelected: !!saved, withHistory: true, autopilot, images, frame, displayText,
+      ...saved, preferSelected: !!saved, withHistory: true, autopilot: false, images, frame, displayText,
       onTool: () => {}, onUsage: () => {},
       onSelection: (route) => {
         if (foreground !== active || active.stopped) return
@@ -323,14 +296,10 @@ async function routedChat(dir: string, text: string, displayText: string, step: 
     if (foreground !== active || active.stopped) return
     messages = readChat(dir)
     emit({ type: 'done', ...result })
-    turnDone?.(result)
-    turnDone = null
   } catch (error) {
     if (foreground === active && !active.stopped) {
       const result = { ok: false, error: (error as Error).message }
       emit({ type: 'done', ...result })
-      turnDone?.(result)
-      turnDone = null
     }
   } finally {
     active.agent?.close()
@@ -352,8 +321,6 @@ export function closeChat(): void {
     active.stopped = true
     foreground = null
     messages = readChat(active.dir)
-    turnDone?.({ ok: false, error: 'Stopped' })
-    turnDone = null
   }
   if (turn && chatDir) {
     for (const part of turn.message.parts) if (part.kind === 'tool' && part.status === 'running') part.status = 'error'
@@ -486,6 +453,7 @@ async function codexChat(dir: string, text: string, frame?: string): Promise<voi
       reply.parts.push(part)
       emit({ type: 'part', messageId: reply.id, part })
     },
+    delta: (text: string) => emit({ type: 'delta', messageId: reply.id, text }), // Antigravity's; Codex sends whole messages
     status: (id: string, status: 'ok' | 'error') => {
       const part = reply.parts.find((x) => x.kind === 'tool' && x.id === id)
       if (part && part.kind === 'tool') part.status = status
@@ -493,11 +461,11 @@ async function codexChat(dir: string, text: string, frame?: string): Promise<voi
     },
   }
   const result = antigravityChosen()
-    ? await antigravityTurn(dir, studioPrompt(dir, 'antigravity', autopilot), text, images, meta.antigravityConversationId, {
+    ? await antigravityTurn(dir, studioPrompt(dir, 'antigravity', false), text, images, meta.antigravityConversationId, {
         ...on,
         conversation: (id) => project() && project()!.meta.antigravityConversationId !== id && updateMeta({ antigravityConversationId: id }),
       })
-    : await codexTurn(dir, studioPrompt(dir, 'codex', autopilot), text, images, meta.codexThreadId, {
+    : await codexTurn(dir, studioPrompt(dir, 'codex', false), text, images, meta.codexThreadId, {
         ...on,
         thread: (id) => project() && project()!.meta.codexThreadId !== id && updateMeta({ codexThreadId: id }),
       })
@@ -672,11 +640,13 @@ async function askWithAgent(
  * Translates narration sentences for dubbing (export.ts). A one-off request with no tools, on the
  * same sign-in and model as the chat. Returns one translation per sentence, in order.
  */
-export async function translateNarration(sentences: string[], from: string, to: string): Promise<string[]> {
+export async function translateNarration(sentences: string[], from: string, to: string, subtitles = false): Promise<string[]> {
   if (!sentences.length) return []
   const prompt = [
-    `Translate this narration of a maths explainer video from ${languageName(from)} to ${languageName(to)}.`,
-    `It will be spoken by a text-to-speech voice over the same animation, so keep each sentence about as long as the original, keep the maths exact, and write maths the way a teacher says it aloud in ${languageName(to)}.`,
+    `Translate this ${subtitles ? 'on-screen subtitle text' : 'narration'} of a maths explainer video from ${languageName(from)} to ${languageName(to)}.`,
+    subtitles
+      ? 'It is read, not spoken: keep every formula between $…$ exactly as written (LaTeX), and keep each piece about as long as the original.' // ADR 0063
+      : `It will be spoken by a text-to-speech voice over the same animation, so keep each sentence about as long as the original, keep the maths exact, and write maths the way a teacher says it aloud in ${languageName(to)}.`,
     `Answer with only a JSON array of ${sentences.length} strings, one per sentence, in order.`,
     '',
     JSON.stringify(sentences, null, 1),
@@ -849,7 +819,7 @@ export async function studioOptions(dir: string, opts: { autopilot: boolean; mod
 async function startSession(dir: string): Promise<void> {
   const { query } = await sdk()
   const inbox = new Inbox()
-  const options = await studioOptions(dir, { autopilot })
+  const options = await studioOptions(dir, { autopilot: false })
   const q = query({ prompt: inbox, options })
   session = { dir, query: q, inbox }
   void pump(session)
@@ -932,9 +902,6 @@ function finishTurn(ok: boolean, error?: string, costUsd?: number): void {
   }
   emit({ type: 'busy', busy: false })
   emit({ type: 'done', ok, error, costUsd })
-  const waiter = turnDone
-  turnDone = null
-  waiter?.({ ok, error, limitedUntil: limited?.until })
 }
 
 // --- prompt and tool text --------------------------------------------------------------------

@@ -1,7 +1,8 @@
 import { t as uiText } from '../lib/i18n'
 import { Captions, Check, ChevronDown, FolderOpen, ListVideo, Maximize, MessageCircle, Minimize, Pause, Play, RotateCcw, RotateCw, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import type { Section, Settings } from '../../../shared/types'
+import type { Section, Settings, Subtitle } from '../../../shared/types'
+import { subtitleStyle } from '../../../shared/subtitle-style'
 import { readStudyProgress, resumePosition } from '../../../shared/study-playback'
 import { saveStudyProgress as save } from '../lib/study-progress'
 import { api } from '../lib/api'
@@ -10,6 +11,7 @@ import { Modal } from './ui'
 import { PlaybackSpeed, PLAYBACK_RATES } from './PlaybackSpeed'
 import { StudyFrameSelection } from './StudyFrameSelection'
 import { positionSubtitles, useSubtitleStyle } from '../lib/subtitle-style'
+import { inline } from './Markdown'
 
 const clock = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`
 function saved(key: string, src: string, duration: number): number {
@@ -32,6 +34,7 @@ export function seekStudy(t: number, play = false): void {
 export function StudyPlayer(props: {
   src: string
   vtt?: string
+  cues?: Subtitle[] // the subtitles as written, with $…$ maths: drawn here when they have any
   chapters: Section[]
   video: RefObject<HTMLVideoElement | null>
   resume?: boolean
@@ -54,6 +57,9 @@ export function StudyPlayer(props: {
   const volume = Number.isFinite(preferredVolume) ? Math.max(0, Math.min(1, preferredVolume)) : 1
   const muted = useStore((s) => s.settings?.studyMuted ?? false)
   const captions = useStore((s) => s.settings?.studyCaptions ?? true)
+  const subtitlesOnTop = useStore((s) => subtitleStyle(s.settings?.subtitleStyle).position === 'top')
+  // Native cues can't typeset maths, so a video whose subtitles have any is captioned here (ADR 0063).
+  const mathCues = useMemo(() => (vtt && props.cues?.some((c) => /\$[^$\n]+\$/.test(c.text)) ? props.cues : undefined), [vtt, props.cues])
   useSubtitleStyle(video, src)
   // Keep the old source's last observed position: detached video elements can reset to zero.
   const session = useMemo(() => ({ key: projectPath, position: 0, duration: 0, completed: false, ready: false, lastSaved: 0 }), [src, projectPath])
@@ -142,8 +148,8 @@ export function StudyPlayer(props: {
   }, [volume, muted, src])
   useEffect(() => {
     const tracks = video.current?.textTracks
-    if (tracks) for (const track of tracks) track.mode = captions ? 'showing' : 'hidden'
-  }, [captions, vtt, src])
+    if (tracks) for (const track of tracks) track.mode = captions && !mathCues ? 'showing' : 'hidden'
+  }, [captions, vtt, src, mathCues])
   useEffect(() => {
     revealControls()
     // Capture mouse input as well as React's pointer events so the fullscreen toolbar can wake.
@@ -314,12 +320,13 @@ export function StudyPlayer(props: {
               label={uiText('Subtitles')}
               onLoad={() => {
                 const track = video.current?.textTracks[0]
-                if (track) track.mode = captions ? 'showing' : 'hidden'
+                if (track) track.mode = captions && !mathCues ? 'showing' : 'hidden'
                 positionSubtitles(video.current)
               }}
             />
           )}
         </video>
+        {mathCues && captions && <MathCue cues={mathCues} now={now} top={subtitlesOnTop} />}
         {paused && now < 0.1 && !failed && !selecting && (
           <button className="study-play-overlay" aria-label={uiText('Play video')} onClick={toggle}>
             <Play />
@@ -469,4 +476,11 @@ export function StudyPlayer(props: {
       </Modal>
     </section>
   )
+}
+
+/** The subtitle at `now`, typeset like the chat's maths, in the viewer's subtitle style. */
+function MathCue({ cues, now, top }: { cues: Subtitle[]; now: number; top: boolean }) {
+  const cue = cues.find((c) => now >= c.start && now < c.end)
+  if (!cue) return null
+  return <div className={`study-math-cue ${top ? 'top' : ''}`} aria-live="off"><span>{inline(cue.text)}</span></div>
 }

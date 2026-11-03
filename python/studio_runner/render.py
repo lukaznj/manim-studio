@@ -155,6 +155,8 @@ class Recorder:
                     "end": tracker.end_t,
                     "line": line,
                     "text": spoken(text),
+                    # The written form, when it differs from what's said: "$T_P$" for "te pe" (ADR 0063).
+                    **({"subtitle": " ".join(kwargs["subcaption"].split())} if (kwargs.get("subcaption") or "").strip() else {}),
                     "key": key,
                     "source": USED.get(key, "unknown"),
                     "audio": str(Path(tracker.cache_dir) / tracker.data["final_audio"]),

@@ -114,6 +114,7 @@ import {
   stopTtsWorker,
   stopTtsWorkerAndWait,
 } from './voice'
+import { reportError, showErrorsWith } from './report'
 
 // Isolated data for automated runs (scripts/drive.mjs); never set in normal use.
 if (process.env.STUDIO_USER_DATA) app.setPath('userData', process.env.STUDIO_USER_DATA)
@@ -136,6 +137,7 @@ protocol.registerSchemesAsPrivileged([
 
 let win: BrowserWindow | null = null
 const send = (channel: EventChannel, payload: unknown) => win?.webContents.send(channel, payload)
+showErrorsWith((e) => send('app-error', e))
 
 // The window behind the page (and the Windows/Linux title-bar buttons) in the title bar's --bg.
 // nativeTheme.themeSource follows Settings → Appearance and drives prefers-color-scheme too.
@@ -276,7 +278,7 @@ function registerIpc(): void {
 
   handle('setupStatus', (check?: boolean) => {
     if (check === true) return checkSetup(true)
-    void checkSetup().catch((error) => console.error('[environment check]', error))
+    void checkSetup().catch((error) => reportError('Couldn’t check the video tools.', error))
     return setupStatus()
   })
   const toolsBusy = () => productionBusy() || rendersBusy() || !!agentBusy.size || agentRuntimeBusy() || ex.exercisesBusy()
@@ -451,7 +453,8 @@ function registerIpc(): void {
   handle('saveSeriesPlan', (draft: import('../shared/types').SeriesDraft) => saveSeriesPlan(draft))
   handle('saveSeriesDraft', (draft: Parameters<typeof saveSeriesDraft>[0]) => saveSeriesDraft(draft))
   handle('cancelSeriesPlan', () => planning?.abort())
-  handle('renameSeries', (folder: string, title: string) => renameSeries(folder, title))
+  // Exercise sets rename through the same field as series.
+  handle('renameSeries', (folder: string, title: string) => (existsSync(join(folder, 'exercises.json')) ? ex.renameExerciseSet(folder, title.trim()) : renameSeries(folder, title)))
   handle('agentRoutes', () => agentRoutes())
   handle('fallbackModels', () => fallbackModels())
   handle('chatSelectModel', (route: import('../shared/types').ModelRoute) => chatSelectModel(route))
@@ -514,7 +517,7 @@ function registerIpc(): void {
   handle('studyNotes', (dir: string) => studyNotes(dir))
   handle('saveStudyNotes', (dir: string, text: string) => saveStudyNotes(dir, text))
   handle('refineStudyNotes', (dir: string, text: string) => refineStudyNotes(dir, text))
-  handle('addCourseLesson', (folder: string, request: { title: string; prompt: string; sources: string[] }) => addCourseLesson(folder, request))
+  handle('addCourseLesson', (folder: string, request: { prompt: string; sources: string[] }) => addCourseLesson(folder, request))
   handle('retryCourseLesson', (dir: string) => retryCourseLesson(dir))
   handle('retryFollowUp', (dir: string) => retryFollowUp(dir))
   handle('setWatched', (dir: string, watched: boolean) => setWatched(dir, watched, ex.watchedChanged))

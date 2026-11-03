@@ -478,6 +478,7 @@ export interface AntigravityTurnHandlers {
   part(part: ChatPart): void
   status(id: string, status: 'ok' | 'error'): void
   conversation(id: string): void
+  delta?(text: string): void
   usage?(usage: Record<string, number>, model: string): void
 }
 
@@ -584,10 +585,11 @@ export async function askAntigravity(
   prompt: string,
   what: string,
   images: { name: string; mediaType: string; data: string }[] = [],
-  selection: { model?: string; effort?: Effort; signal?: AbortSignal; onUsage?: (entry: UsageEntry) => void } = {},
+  selection: { model?: string; effort?: Effort; signal?: AbortSignal; onUsage?: (entry: UsageEntry) => void; onText?: (soFar: string) => void } = {},
 ): Promise<string> {
   const started = Date.now()
   const dir = join(tmpdir(), 'manim-studio-antigravity', randomUUID())
+  let soFar = ''
   mkdirSync(dir, { recursive: true })
   let home = ''
   let child: ChildProcess | null = null
@@ -603,7 +605,7 @@ export async function askAntigravity(
     const named = images.length ? `${prompt}\n\nThe pictures, in order: ${images.map((img, i) => `${files[i]} is "${img.name}"`).join('; ')}.` : prompt
     home = await prepare(dir, system)
     if (selection.signal?.aborted) throw new Error('Stopped')
-    const out = await runTurn(home, dir, withImages(named, files), undefined, { part: () => {}, status: () => {}, conversation: () => {} }, (process) => {
+    const out = await runTurn(home, dir, withImages(named, files), undefined, { part: () => {}, status: () => {}, conversation: () => {}, delta: (text) => selection.onText?.((soFar += text)) }, (process) => {
       child = process
       if (selection.signal?.aborted) stop()
     }, selection)

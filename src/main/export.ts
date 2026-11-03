@@ -89,7 +89,7 @@ export async function exportVideo(
 
   /** A theme's rendered video in `base`: keep it, and one set of subtitles named by language. */
   const cards: { base: string; timeline: string }[] = []
-  const keep = (theme: string, base: string, timeline: string) => {
+  const keep = (base: string, timeline: string) => {
     cards.push({ base, timeline })
     videos.push(`${base}.mp4`)
     files.push(`${base}.mp4`, `${base}.jpg`)
@@ -129,7 +129,7 @@ export async function exportVideo(
         const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
         mkdirSync(dirname(timeline), { recursive: true })
         renameSync(join(folder, `timeline.${theme}.json`), timeline)
-        keep(theme, join(folder, themes.length > 1 ? `${slug}.${theme}` : slug), timeline)
+        keep(join(folder, themes.length > 1 ? `${slug}.${theme}` : slug), timeline)
       }
     } else {
       // The GPU's video encoder when one works here (ADR 0034); if it fails, the CPU's, for the rest of the export.
@@ -178,7 +178,7 @@ export async function exportVideo(
         await (
           await runRunner('default', ['export', timeline, base], { signal, tag })
         ).done
-        keep(theme, base, timeline)
+        keep(base, timeline)
       }
     }
     files.push(join(folder, `${slug}.${original}.srt`), join(folder, `${slug}.${original}.vtt`))
@@ -220,10 +220,11 @@ export async function exportVideo(
     if (narration?.silentBlocks) warnings.push(...new Set(studyTimeline.voiceWarnings))
     writeAtomicJson(join(folder, 'study-context.json'), { duration: studyTimeline.duration, chapters: studyTimeline.sections, subtitles: studyTimeline.subtitles, narration: narration ?? null })
     const narrationText = [...new Set(studyTimeline.voice.map((v) => v.text))]
+    const subtitleText = [...new Set(studyTimeline.voice.flatMap((v) => (v.subtitle ? [v.subtitle] : [])))]
     for (const lang of options.languages.filter((l) => l !== original)) {
       const name = languageName(lang)
       progress({ stage: `Translating the narration into ${name}` })
-      const translations = await translationFile(project, narrationText, original, lang)
+      const translations = await translationFile(project, narrationText, original, lang, subtitleText)
       progress({ stage: `Voicing ${name}` })
       const env = await voiceEnv({ ...meta, voice: { ...meta.voice, language: lang } }, snap)
       const args = ['dub', timelinePath, translations, lang, join(folder, slug), ...(options.languageVideos ? videos.flatMap((v) => ['--video', v]) : [])]
@@ -333,12 +334,15 @@ function keepNarration(snap: string, project: string): void {
  * translation) so it is translated once, travels with the project, and can be corrected by hand.
  * Only sentences it doesn't have yet go to Claude. Returns the file's path.
  */
-async function translationFile(dir: string, narration: string[], from: string, to: string): Promise<string> {
+async function translationFile(dir: string, narration: string[], from: string, to: string, subtitles: string[] = []): Promise<string> {
   const file = join(dir, 'voice', 'translations', `${to}.json`)
   const known: Record<string, string> = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
-  const missing = narration.filter((s) => !known[s])
-  const done = await translateNarration(missing, from, to)
-  missing.forEach((s, i) => (known[s] = done[i]))
+  // Spoken sentences and written subtitles (ADR 0063) translate differently: maths said vs. kept as LaTeX.
+  for (const [texts, written] of [[narration, false], [subtitles, true]] as const) {
+    const missing = texts.filter((s) => !known[s])
+    const done = await translateNarration(missing, from, to, written)
+    missing.forEach((s, i) => (known[s] = done[i]))
+  }
   mkdirSync(join(dir, 'voice', 'translations'), { recursive: true })
   writeFileSync(file, JSON.stringify(known, null, 2))
   return file

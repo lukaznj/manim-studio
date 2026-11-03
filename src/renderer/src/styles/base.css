@@ -231,11 +231,6 @@ button {
   padding: 0 9px;
   font-size: 12px;
 }
-.btn.large {
-  height: 38px;
-  padding: 0 18px;
-  font-size: 14px;
-}
 
 .icon-btn {
   display: inline-grid;
@@ -429,10 +424,6 @@ dialog.modal::backdrop {
 .badge.blue {
   background: var(--blue-soft);
   color: var(--blue);
-}
-.badge.sea {
-  background: var(--sea-soft);
-  color: var(--sea);
 }
 
 .kbd {

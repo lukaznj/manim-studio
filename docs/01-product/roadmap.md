@@ -8,6 +8,7 @@ Background export queue ([[../04-decisions/0017-background-export-queue|ADR 0017
 
 ## Next
 
+- **A simplifying pass through the whole app.** Many features landed quickly, and some screens and dialogs now carry more text, fields and buttons than they need. Go screen by screen, from first principles: what is this for, what is the one action, and which labels, hints, toggles and settings can go or move behind a default. The study notes and Add lesson dialog (0.18.0) are the pattern: one surface that edits in place, titles generated rather than asked for, no explanatory paragraphs.
 - **Run quick and series mode on many real courses** and fix what they get wrong: the quality bar is a series at the level of 3Blue1Brown's *Essence of linear algebra*.
 - **Quick and series mode in the background**, so a whole series doesn't keep the app on its progress screen: the agent's turns would need to work on a project that isn't the open one.
 - **Mass production, ready to publish.** The exported thumbnail card ([[../04-decisions/0026-thumbnail-card|ADR 0026]]) is a first step. Next could be: thumbnail variants to choose from; the agent writing each video's YouTube title, description, chapters and tags; a series-wide thumbnail style; uploading a whole series straight to a channel on a schedule.

@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import { askInChat, showStudyAssistant, useStore } from '../store'
 import { useStudyFullscreen } from '../lib/study-fullscreen'
 import { seekStudy } from './StudyPlayer'
+import { inline } from './Markdown'
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
@@ -214,7 +215,7 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
 
 /** A line with its matches marked; the chosen match stands out. */
 function Marked({ text, hits, chosen }: { text: string; hits: TranscriptHit[]; chosen?: TranscriptHit }) {
-  if (!hits.length) return <>{text}</>
+  if (!hits.length) return <>{inline(text)}</> // maths typeset (ADR 0063); a search shows the source
   const parts: React.ReactNode[] = []
   let at = 0
   for (const h of hits) {

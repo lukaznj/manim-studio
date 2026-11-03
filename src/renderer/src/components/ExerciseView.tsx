@@ -145,7 +145,7 @@ function StateIcon({ item, paused }: { item: ExerciseItem; paused: boolean }) {
 
 function IntakeRow({ set }: { set: ExerciseSet }) {
   const intake = set.intake!
-  const what = intake.files ? `${intake.files === 1 ? 'the file' : `${intake.files} files`} you added` : 'what you typed'
+  const what = intake.files ? (intake.files === 1 ? uiText('the file you added') : format('the {0} files you added', [intake.files])) : uiText('what you typed')
   return (
     <li className={`ex-intake ${intake.state}`}>
       {intake.state === 'reading' ? <span className="spinner" /> : <CircleAlert />}
@@ -180,7 +180,7 @@ function LectureNote({ set }: { set: ExerciseSet }) {
     <p className="ex-lecture">
       <Check /> {uiText(' Lecture video ready.')}{' '}
       <button className="link-btn" onClick={() => void api.reveal(l.file!)}>
-        {revealLabel}
+        {revealLabel()}
       </button>
     </p>
   )
@@ -255,7 +255,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
               <Code2 /> {uiText(' Open in editor')}
             </button>
           )}
-          <button className="icon-btn" title={revealLabel} aria-label={revealLabel} onClick={() => void api.reveal(item.dir)}>
+          <button className="icon-btn" title={revealLabel()} aria-label={revealLabel()} onClick={() => void api.reveal(item.dir)}>
             <FolderOpen />
           </button>
           <button
@@ -263,7 +263,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
             title={uiText('Remove this exercise')}
             aria-label={uiText('Remove this exercise')}
             onClick={() => {
-              if (confirm(`Remove “${item.title}”? Its folder goes to the Trash.`)) void api.removeExercise(item.dir).catch((e) => toast(errorText(e), 'error'))
+              if (confirm(format('Remove “{0}”? Its folder goes to the Trash.', [item.title]))) void api.removeExercise(item.dir).catch((e) => toast(errorText(e), 'error'))
             }}
           >
             <Trash2 />

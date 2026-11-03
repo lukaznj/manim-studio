@@ -60,7 +60,9 @@ class RenderTimeline(unittest.TestCase):
         self.assertEqual(v["text"], "Let's look at the derivative.")
         self.assertEqual(v["source"], "silence")
         self.assertEqual([b["mark"] for b in v["bookmarks"]], ["A"])
-        self.assertTrue(self.result["subtitles"])
+        # The written form (ADR 0063): LaTeX in the timeline; subtitle files get plain text.
+        self.assertEqual(v["subtitle"], "Let's look at $f'(x)$.")
+        self.assertEqual([s["text"] for s in self.result["subtitles"]], ["Let's look at $f'(x)$."])
 
     def test_offscreen_warning(self):
         kinds = {w["kind"] for w in self.result["warnings"]}

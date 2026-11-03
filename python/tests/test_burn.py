@@ -59,3 +59,11 @@ class Burn(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Cli(unittest.TestCase):
+    def test_main_never_shadows_module_imports(self):
+        # A local `import json` in one branch once broke `thumbnail` and `thumbnail-card` (v0.17.0).
+        from studio_runner.__main__ import main
+
+        self.assertFalse({"json", "shutil", "sys"} & set(main.__code__.co_varnames))

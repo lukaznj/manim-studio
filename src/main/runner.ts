@@ -46,8 +46,6 @@ export function pauseTag(tag: string, on: boolean): void {
   for (const [pid, job] of runningJobs) if (job.tag === tag) suspend(pid, on)
 }
 
-export const isPaused = (tag: string): boolean => paused.has(tag)
-
 /** Before quitting: nothing stays stopped behind the app. */
 export function resumeAll(): void {
   for (const tag of [...paused]) pauseTag(tag, false)
