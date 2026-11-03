@@ -19,11 +19,17 @@ One educational maths video, made with manim 0.21 + manim-voiceover. Manim Studi
       self.wait_until_bookmark("v")
       self.play(Indicate(vertex))
   ```
-  The block waits for the speech to finish. Bookmarks sync an animation to a word. Subtitles are generated from the narration automatically.
+  The block waits for the speech to finish. Bookmarks sync an animation to a word. Subtitles are generated from the narration automatically (see *Subtitles with maths*).
 - **Speakable narration**:
   - Spell out maths the way a teacher says it ("x squared", "f of x", "equals", "over"). Speech engines read symbols badly.
   - Write numbers in words when they are part of a sentence.
   - Labels and indices are names, not amounts: say R₂₃ (`R_{23}`) as "R two three", never "R twenty-three"; `x_{12}` as "x one two". Only a quantity is read as a number.
+- **Subtitles with maths** — when a sentence speaks a symbol or formula, give the block a `subcaption` that writes it, with the maths in `$…$` LaTeX; it's what viewers read. Keep the same words otherwise, and leave the bookmarks out of it:
+  ```python
+  with self.voiceover("When tau is much less than T P, <bookmark mark='a'/>the pulse gets through.",
+                      subcaption="When $\\tau \\ll T_P$, the pulse gets through.") as v:
+  ```
+  Studio typesets it in the app and writes it as plain text (τ ≪ Tₚ) in subtitle files. Sentences without spoken maths need no `subcaption`.
 - **On-screen text** — prose uses `Text` or `MarkupText`, rendered in the bundled Nunito. Formulas use `MathTex` (LaTeX). Never put prose sentences inside `Tex`/`MathTex`.
 - **Colours** — use only the palette names: `TEXT`, `MUTED`, `ACCENT`, `HIGHLIGHT`, `POSITIVE`, `NEGATIVE`. They follow the project's light/dark theme, so never hardcode hex colours.
 - **Layout** — keep everything inside the safe area:

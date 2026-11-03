@@ -168,6 +168,7 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
           <StudyPlayer
             src={src}
             vtt={detail?.video ? detail.vtt : undefined}
+            cues={detail?.subtitles}
             chapters={detail?.chapters ?? []}
             video={video}
             resume

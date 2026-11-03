@@ -105,7 +105,7 @@ export function Home() {
                 {production?.folder === inSeries[0].series!.folder ? <><Clapperboard />{uiText('Production')}</> : <><Play />{uiText(' Watch')}</>}
               </button>
               <button className="btn small ghost" onClick={() => void api.reveal(inSeries[0].series!.folder)}>
-                <FolderOpen /> {revealLabel}
+                <FolderOpen /> {revealLabel()}
               </button>
             </nav>
             <section className="project-grid" data-tour="home-library">
@@ -216,6 +216,8 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
   const done = set.items.filter((i) => i.state === 'done').length
   const working = !!set.intake || set.items.some((i) => ['solving', 'video', 'export'].includes(i.state))
   const open = () => void openExerciseSet(set.folder)
+  // Like a series, the card shows a picture from its first finished video.
+  const cover = useStore((s) => s.projects.find((p) => p.exercise?.set === set.folder && p.thumbnail)?.thumbnail)
   return (
     <article
       className="project-card exercise-card"
@@ -225,10 +227,16 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
       tabIndex={0}
       aria-label={format('Exercise set {0}, {1} exercises', [set.title, set.items.length])}
     >
-      <div className="thumb landscape exercise-thumb">
-        <GraduationCap />
-        <span className="mono">{set.items.length}</span>
-      </div>
+      {cover ? (
+        <div className="thumb stack landscape">
+          <img src={api.mediaUrl(cover)} alt="" draggable={false} />
+        </div>
+      ) : (
+        <div className="thumb landscape exercise-thumb">
+          <GraduationCap />
+          <span className="mono">{set.items.length}</span>
+        </div>
+      )}
       <div className="project-meta">
         <div className="project-name">{set.title}</div>
         <div className="project-sub">

@@ -11,6 +11,7 @@ import { openDialog, renderNow, renderProgress, saveScene, sendChat, updateSetti
 import { NarrationRecovery } from './NarrationRecovery'
 import { narrationStatus } from '../../../shared/narration'
 import { subtitleStyle, subtitleVariables } from '../../../shared/subtitle-style'
+import { inline } from './Markdown'
 
 export function PreviewPane() {
   const timeline = useStore((s) => s.timeline)
@@ -172,7 +173,7 @@ function CaptionOverlay() {
   const style = subtitleStyle(useStore((s) => s.settings?.subtitleStyle))
   const [text, setText] = useState('')
   useEffect(() => playback.subscribe((t) => setText(subtitles.find((s) => t >= s.start && t <= s.end)?.text ?? '')), [subtitles])
-  return <div className={`captions ${text ? 'on' : ''}`} style={{ ...subtitleVariables(style), ...(style.position === 'top' ? { top: '6%', bottom: 'auto' } : {}) } as CSSProperties}>{text && <span>{text}</span>}</div>
+  return <div className={`captions ${text ? 'on' : ''}`} style={{ ...subtitleVariables(style), ...(style.position === 'top' ? { top: '6%', bottom: 'auto' } : {}) } as CSSProperties}>{text && <span>{inline(text)}</span>}</div>
 }
 
 function ErrorCard() {

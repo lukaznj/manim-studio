@@ -50,7 +50,7 @@ import { fakeAgents } from './agent-fake'
 import { askClaude, claudeStatus, languageName } from './claude'
 import { setupStatus } from './env'
 import { cancelExport, queueExport } from './exports'
-import { createProject, readMeta, readTimeline } from './projects'
+import { createProject, readMeta, readTimeline, updateMetaAt } from './projects'
 import { checkAndFix } from './quick'
 import { cancel } from './render'
 import { runRunner } from './runner'
@@ -365,6 +365,19 @@ export async function reviseExercise(dir: string, request: string): Promise<void
   writeSaved(dir, { revise: request.trim(), failed: undefined })
   update(set, it, { state: 'solved', error: undefined })
   void drive(set)
+}
+
+/** Renamed from its study page, like a series (ADR 0045): the set file and each exercise's project. */
+export function renameExerciseSet(folder: string, title: string): void {
+  if (!title) throw new Error('Give the exercise set a title.')
+  const set = loaded(folder)
+  writeSetFile(folder, { ...readSetFile(folder), title })
+  set.title = title
+  for (const it of set.items) {
+    const meta = readMeta(it.dir)
+    if (meta.exercise) updateMetaAt(it.dir, { exercise: { ...meta.exercise, title } })
+  }
+  changed(set)
 }
 
 export function pauseExercises(folder: string, paused: boolean): void {

@@ -17,7 +17,7 @@ function ExerciseInputFields({ input, onChange }: { input: ExerciseInput; onChan
   const [dragging, setDragging] = useState(false)
   const add = (paths: string[]) => {
     const odd = paths.filter((p) => !FILE.test(p))
-    if (odd.length) toast(`Only pictures (PNG, JPEG, GIF, WebP) and PDFs can be added; skipped ${odd.map(fileName).join(', ')}.`, 'error')
+    if (odd.length) toast(format('Only pictures (PNG, JPEG, GIF, WebP) and PDFs can be added; skipped {0}.', [odd.map(fileName).join(', ')]), 'error')
     onChange({ ...input, files: [...input.files, ...paths.filter((p) => FILE.test(p) && !input.files.includes(p))] })
   }
   return (
@@ -84,7 +84,6 @@ export function NewExerciseSetDialog() {
   const omnivoice = useStore((s) => s.setup?.omnivoice)
   const elevenLabsCheck = useStore((s) => s.elevenLabsCheck)
   const [input, setInput] = useState(empty)
-  const [title, setTitle] = useState('')
   const [level, setLevel] = useState('')
   const aspect: Aspect = '16:9'
   const theme: Theme = defaults?.defaultTheme ?? 'dark'
@@ -96,7 +95,7 @@ export function NewExerciseSetDialog() {
   useEffect(() => {
     if (!open) return
     setInput(empty())
-    setTitle('')
+    setLevel('')
     setBusy(false)
   }, [open]) // a fresh form each time
   useEffect(() => {
@@ -108,7 +107,7 @@ export function NewExerciseSetDialog() {
     if (!hasInput(input) || busy || voiceIssue) return
     setBusy(true)
     const ok = await createExerciseSet({
-      title,
+      title: '',
       level,
       language,
       aspect,
@@ -145,27 +144,15 @@ export function NewExerciseSetDialog() {
           )}
         </p>
         <ExerciseInputFields input={input} onChange={setInput} />
-        <div className="quick-row">
-          <div className="field">
-            <label htmlFor="ex-title">{uiText('Title')}</label>
-            <input
-              id="ex-title"
-              className="input"
-              placeholder={uiText('Optional: taken from the exercises')}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="ex-level">{uiText('Who it’s for')}</label>
-            <input
-              id="ex-level"
-              className="input"
-              placeholder={uiText('e.g. Croatian matura, first-year physics')}
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor="ex-level">{uiText('Who it’s for')}</label>
+          <input
+            id="ex-level"
+            className="input"
+            placeholder={uiText('e.g. Croatian matura, first-year physics')}
+            value={level}
+            onChange={(e) => setLevel(e.target.value)}
+          />
         </div>
         {voiceIssue && (
           <div className="quick-warning">

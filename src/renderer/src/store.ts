@@ -224,7 +224,7 @@ const get = useStore.getState
 let toastId = 1
 export function toast(text: string, kind: Toast['kind'] = 'info'): void {
   const id = toastId++
-  set((s) => ({ toasts: [...s.toasts, { id, kind, text }] }))
+  set((s) => ({ toasts: [...s.toasts, { id, kind, text: uiText(text) }] })) // a catalog miss stays as given
   setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), kind === 'error' ? 7000 : 3800)
 }
 
@@ -311,14 +311,14 @@ export async function boot(): Promise<void> {
   })
   void api.seriesRuns().then(receiveSeriesRuns)
   void api.seriesRun().then(receiveSeries)
-  // An interrupted planning request or edited plan reopens without starting paid work automatically.
+  // A draft waits in New series; a finished plan gets the title bar's review pill, not a popup on every launch.
   void api.seriesDraft().then((draft) => {
-    if (draft && settings.onboardingDone && !get().dialog && (draft.plan || draft.request.pdfs.length || draft.request.topic?.trim()))
-      openDialog({ kind: 'series' })
+    if (draft?.plan && !get().seriesPlanning) set({ seriesPlanning: 'ready' })
   })
   // Claude wrote the script: show it, unless you're in the middle of something else.
   api.on('script', ({ text }) => set((s) => ({ script: text, leftTab: text && s.leftTab === 'code' && !s.dirty ? 'script' : s.leftTab })))
   void api.exportJobs().then((exports) => set({ exports }))
+  api.on('app-error', ({ title, message }) => toast(`${uiText(title)} ${message}`, 'error'))
 }
 
 function receiveSeries(series: SeriesRun | null): void {
@@ -407,11 +407,18 @@ export async function followStudyReference(messageId: string, id: string): Promi
   const target = await api.studyReference(messageId, id)
   if (get().project?.path !== before.project.path) return null
   if (target.kind === 'pdf') return target
-  const back = { dir: before.project.path, at: before.watchTime ?? 0, playing: !(document.querySelector<HTMLVideoElement>('.study-video-stage video')?.paused ?? true) }
-  if (target.course && get().watchSeries?.folder !== target.course) await openWatch(target.course, target.dir, target.at)
-  else await selectStudied(target.dir, true, target.at, true)
-  if (get().project?.path === target.dir) set({ studyReturn: back })
+  await jumpToMoment(target.dir, target.at, target.course)
   return target
+}
+
+/** Plays a lesson from a moment; "Return to the lesson" goes back to where the viewer was. */
+export async function jumpToMoment(dir: string, at: number, course?: string): Promise<void> {
+  const before = get()
+  if (!before.project) return
+  const back = { dir: before.project.path, at: before.watchTime ?? 0, playing: !(document.querySelector<HTMLVideoElement>('.study-video-stage video')?.paused ?? true) }
+  if (course && get().watchSeries?.folder !== course) await openWatch(course, dir, at)
+  else await selectStudied(dir, true, at, true)
+  if (get().project?.path === dir && dir !== before.project.path) set({ studyReturn: back })
 }
 
 /** A voluntary detour returns to exactly where the viewer left the original lesson. */
@@ -641,9 +648,12 @@ export const canEdit = (s: Pick<State, 'settings'> = get()): boolean => s.settin
 export const studying = (s: Pick<State, 'settings'> = get()): boolean =>
   s.settings?.mode === 'learn' || (s.settings?.mode === 'both' && s.settings.homeTab === 'learn')
 
+const unfinishedQuick = (path: string): QuickRun | null => get().quickRuns.find((run) => run.project === path && run.state !== 'done') ?? null
+
 export async function openProject(path: string): Promise<void> {
   // Quick mode's progress screen isn't the editor: it opens the same way, and its video is watched after.
-  if (studying() && !get().quickRuns.some((run) => run.project === path)) return studyProject(path)
+  // A finished quick video is an ordinary project from then on.
+  if (studying() && !unfinishedQuick(path)) return studyProject(path)
   if (get().dirty) await saveScene({ render: false })
   const opened = await guard(api.openProject(path))
   if (!opened) return
@@ -699,7 +709,7 @@ function applyOpened(o: OpenProject, screen: State['screen'] = 'editor', autopla
     studyReturn: null,
     studyAutoplayPath: autoplay ? o.path : null,
     project: { path: o.path, meta: o.meta },
-    quick: get().quickRuns.find((run) => run.project === o.path) ?? null,
+    quick: unfinishedQuick(o.path),
     quickEditor: false,
     savedSource: o.source,
     // An episode made by hand starts with its request ready in the chat; Claude's brief has the rest.

@@ -58,7 +58,7 @@ function SeriesActions({ run }: { run: SeriesRun }) {
       {(run.state === 'queued' || run.state === 'stopped' || (run.state === 'done' && run.episodes.some((ep) => ep.state === 'failed'))) &&
         <button className="btn primary" disabled={busy} onClick={() => void resume()}>{busy ? <span className="spinner" /> : <Play />}{t(run.state === 'queued' ? 'Start now' : run.state === 'done' ? 'Try again' : 'Continue')}</button>}
       {current && (run.state === 'working' || run.state === 'paused') && <button className="btn" onClick={() => perform(() => api.stopSeries(run.folder))}><Square />{t('Stop')}</button>}
-      <button className="icon-btn" title={revealLabel} aria-label={revealLabel} onClick={() => perform(() => api.reveal(run.folder))}><FolderOpen /></button>
+      <button className="icon-btn" title={revealLabel()} aria-label={revealLabel()} onClick={() => perform(() => api.reveal(run.folder))}><FolderOpen /></button>
       {developer && run.report && <button className="btn small" onClick={() => perform(() => api.openEpisodeReport(run.folder))}><FileText />{t('Open series report')}</button>}
       {current && (run.state === 'done' || run.state === 'stopped' || run.state === 'queued') && <button className="icon-btn" title={t('Dismiss')} aria-label={t('Dismiss')} onClick={() => perform(async () => { await api.dismissSeries(run.folder) })}><X /></button>}
     </div>
@@ -184,7 +184,7 @@ export function LessonProduction({ episode, followUp, dir }: { episode: WatchEpi
     <div className="production-actions">
       {failed && <button className="btn primary" onClick={() => perform(() => followUp ? api.retryFollowUp(dir) : api.retryCourseLesson(dir))}><RotateCcw />{t('Try again')}</button>}
       {editing && failed && <button className="btn" onClick={() => useStore.setState({ screen: 'editor' })}><Code2 />{t('Open in editor')}</button>}
-      <button className="btn ghost" onClick={() => perform(() => api.reveal(dir))}><FolderOpen />{revealLabel}</button>
+      <button className="btn ghost" onClick={() => perform(() => api.reveal(dir))}><FolderOpen />{revealLabel()}</button>
     </div>
   </section>
 }

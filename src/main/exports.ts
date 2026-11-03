@@ -13,6 +13,7 @@ import { pauseTag } from './runner'
 import { formatUi, translateUi } from '../shared/i18n'
 import { getSettings } from './settings'
 import { writeAtomicJson } from './atomic-json'
+import { reportError } from './report'
 export { completedExport } from './export-recovery'
 
 const jobs: ExportJob[] = []
@@ -79,7 +80,7 @@ export function clearExports(): void {
 function next(): Promise<void> {
   const task = runNext()
   pending.add(task)
-  void task.finally(() => pending.delete(task)).catch((error) => console.error('[export queue]', error))
+  void task.finally(() => pending.delete(task)).catch((error) => reportError('Exporting stopped with an error.', error))
   return task
 }
 

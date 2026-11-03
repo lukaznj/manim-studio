@@ -101,7 +101,7 @@ export function StudyView() {
         <div className="study-library-inner">
           <div className="ex-side-head">
             <div className="study-library-heading"><span className="eyebrow">{series && !single ? uiText('Your course') : uiText('Your library')}</span><button className="icon-btn study-library-hide" title={uiText('Hide library')} aria-label={uiText('Hide library')} aria-expanded={true} aria-controls="study-library" onClick={() => void togglePanel('library', true)}><PanelLeftClose /></button></div>
-            <h2 className="ex-set-title study-course-title">{series && series.folder !== series.episodes[0]?.dir ? <SeriesTitle folder={series.folder} title={production?.title ?? series.title} /> : series?.title ?? set!.title}</h2>
+            <h2 className="ex-set-title study-course-title">{series && series.folder !== series.episodes[0]?.dir ? <SeriesTitle folder={series.folder} title={production?.title ?? series.title} /> : series?.title ?? <SeriesTitle folder={set!.folder} title={set!.title} label="Rename exercise set" />}</h2>
             {series ? (
               <>
                 <p className="faint">{format('{0} of {1} lessons watched', [watched, count])}</p>

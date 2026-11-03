@@ -3,7 +3,7 @@ import { Receipt } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { apiEstimateOf, costOf, modelName, usageTotals, type ModelTokens, type UsageEntry } from '../../../shared/usage'
 import { api } from '../lib/api'
-import { closeDialog, openDialog, useStore } from '../store'
+import { closeDialog, useStore } from '../store'
 import { Modal } from './ui'
 import { AccountPlanUsage } from './AccountPlanUsage'
 import { configuredAuth } from './LimitSwitch'
@@ -25,34 +25,6 @@ const TOOL: Record<string, string> = {
   Glob: 'searches',
   WebSearch: 'web searches',
   WebFetch: 'web pages',
-}
-
-/** Recorded project tokens; prices only for a verified, fully priced API-key history. */
-export function ProjectUsage() {
-  const project = useStore((s) => s.project?.path)
-  const [entries, setEntries] = useState<UsageEntry[]>([])
-  useEffect(() => {
-    let active = true
-    setEntries([])
-    const load = () => void api.projectUsage().then((usage) => active && setEntries(usage))
-    load()
-    const off = api.on('chat', (e) => e.type === 'done' && load())
-    return () => { active = false; off() }
-  }, [project])
-  const total = usageTotals(entries)
-  const count = sum(total, 'input') + sum(total, 'cacheRead') + sum(total, 'cacheWrite') + sum(total, 'output')
-  const estimate = apiEstimateOf(entries)
-  const showCost = estimate !== null
-  if (!entries.length) return null
-  return (
-    <button
-      className="usage-chip"
-      title={uiText(showCost ? 'API-equivalent estimate, not subscription charges or an invoice.' : 'Recorded tokens for this video. Open the usage breakdown.')}
-      onClick={() => openDialog({ kind: 'usage' })}
-    >
-      <Receipt /> {showCost ? dollars(estimate ?? costOf(total)) : format('{0} tokens', [tokens(count)])}
-    </button>
-  )
 }
 
 /** Where a video's usage went: by model (which one ran), by step (script, video, fixes, chat) and turn by turn. */

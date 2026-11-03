@@ -37,4 +37,4 @@ The booth lists every voiceover block from the last render as a teleprompter.
 
 ## Subtitles
 
-Each voiceover adds subcaptions (split at 70 characters). Export writes `.vtt` and `.srt`, so players can toggle them. Nothing is burned into the picture ([[../04-decisions/0005-voice-providers|ADR 0005]]).
+Each voiceover adds subcaptions (split at 70 characters, never inside a formula): its `subcaption=` when given, which writes spoken maths as `$…$` LaTeX, otherwise the narration. The app typesets the maths; export writes `.vtt` and `.srt` with it as plain Unicode, so any player can show them ([[../04-decisions/0063-maths-in-subtitles|ADR 0063]]). Save video can burn them in ([[../04-decisions/0062-save-video-copy|ADR 0062]]).

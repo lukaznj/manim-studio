@@ -31,6 +31,7 @@ export interface AgyHandlers {
   part(part: ChatPart): void
   status(id: string, status: 'ok' | 'error'): void
   conversation(id: string): void
+  delta?(text: string): void // the agent's text as it's written, before its part
 }
 
 const STUDIO_TOOL: Record<string, string> = {
@@ -83,7 +84,10 @@ export function agyFollower(on: AgyHandlers) {
       if (s.conversation_id && s.conversation_id !== conversation) on.conversation((conversation = s.conversation_id))
       const id = `${s.conversation_id}:${s.step_index}`
       if (s.step_type === 'agent_response') {
-        if (s.text_delta) texts.set(s.step_index, (texts.get(s.step_index) ?? '') + s.text_delta)
+        if (s.text_delta) {
+          texts.set(s.step_index, (texts.get(s.step_index) ?? '') + s.text_delta)
+          on.delta?.(s.text_delta)
+        }
         const text = texts.get(s.step_index)?.trim()
         if (s.state !== 'ACTIVE' && text) {
           on.part({ kind: 'text', text })

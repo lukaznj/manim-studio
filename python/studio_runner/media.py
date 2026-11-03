@@ -83,7 +83,10 @@ def _stamp(seconds: float, sep: str) -> str:
 
 
 def write_subtitles(subtitles: list[dict], vtt: Path, srt: Path) -> None:
-    cues = [(s["start"], s["end"], s["text"]) for s in subtitles]
+    from .captions import plain
+
+    # Files are for any player: their maths is plain text (ADR 0063); the app reads the LaTeX.
+    cues = [(s["start"], s["end"], plain(s["text"])) for s in subtitles]
     vtt.write_text(
         "WEBVTT\n\n" + "".join(f"{_stamp(a, '.')} --> {_stamp(b, '.')}\n{t}\n\n" for a, b, t in cues),
         encoding="utf-8",

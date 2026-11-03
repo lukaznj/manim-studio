@@ -300,47 +300,7 @@
   border-radius: var(--r-lg);
   background: #000;
 }
-.ex-player-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-}
-.ex-chapters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-width: 0;
-}
-.ex-chapter {
-  padding: 4px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--line-strong);
-  background: transparent;
-  color: var(--text-2);
-  font-size: 12px;
-  cursor: pointer;
-}
-.ex-chapter:hover {
-  color: var(--text);
-}
-.ex-chapter.on {
-  background: var(--sun-soft);
-  border-color: var(--sun);
-  color: var(--sun-text);
-}
-.ex-rate {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-.ex-rate .select {
-  width: auto;
-  height: 28px;
-}
+
 .ex-preview-note {
   margin: 0;
   font-size: 12px;
@@ -486,14 +446,6 @@
 }
 .ex-row.follow .ex-row-title {
   font-weight: 500;
-}
-
-/* The study screen's list headings, when a course has both lessons and exercises (ADR 0030). */
-.ex-group {
-  padding: 12px 8px 4px;
-}
-.ex-group:first-child {
-  padding-top: 4px;
 }
 
 /* The transcript column (Transcript.tsx, ADR 0032): the video's lines, like lyrics, the one being

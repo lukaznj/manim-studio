@@ -6,7 +6,7 @@ class Video(StudioScene):
     def construct(self):
         self.next_section("Intro")
         title = Text("Derivatives")
-        with self.voiceover("Let's look <bookmark mark='A'/> at the derivative.") as v:
+        with self.voiceover("Let's look <bookmark mark='A'/> at the derivative.", subcaption="Let's look at $f'(x)$.") as v:
             self.wait_until_bookmark("A")
             self.play(Write(title))
         self.wait(0.5)
