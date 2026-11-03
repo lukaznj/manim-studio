@@ -44,6 +44,7 @@ import { readAtomicJson, writeAtomicJson } from './atomic-json'
 import { protectWork, shutdownRequested } from './work-lifecycle'
 import { saveSeriesDraft, saveSeriesPlan } from './series-draft'
 import { paths } from './paths'
+import { reportError } from './report'
 
 /** Per PDF, at most this much text goes into the planning request. */
 const MAX_TEXT = 40_000
@@ -356,7 +357,7 @@ async function pumpSeriesQueue(): Promise<void> {
   if (!next) return
   pumping = true
   try { selectedFolder = next.series.folder; setSettings({ seriesRun: selectedFolder }); await next.continueSeries() }
-  catch (error) { next.series.state = 'stopped'; next.save(); console.error('[series queue]', error) }
+  catch (error) { next.series.state = 'stopped'; next.save(); reportError('The series stopped with an error.', error) }
   finally { pumping = false; void pumpSeriesQueue() }
 }
 export function pauseSeries(paused: boolean, folder?: string): void { controllerFor(folder).pauseSeries(paused); void pumpSeriesQueue() }
@@ -524,7 +525,7 @@ class SeriesController {
   drive = (): Promise<void> => {
     if (this.driving) return this.driving
     this.driving = this.driveLoop().catch((error) => {
-      console.error('[series scheduler]', error)
+      reportError('The series stopped with an error.', error)
       this.stopSeries()
     }).finally(() => {
       this.driving = null
@@ -577,7 +578,7 @@ class SeriesController {
 
   track = (task: Promise<void>): void => {
     this.tasks.add(task)
-    void task.catch((error) => console.error('[series task]', error)).finally(() => this.tasks.delete(task))
+    void task.catch((error) => reportError('A step of the series failed.', error)).finally(() => this.tasks.delete(task))
   }
 
   writeScript = async (ep: EpisodeRun): Promise<void> => {

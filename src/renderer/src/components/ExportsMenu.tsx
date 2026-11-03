@@ -98,8 +98,8 @@ function ExportsPopover({ jobs, onClose }: { jobs: ExportJob[]; onClose: () => v
                 <button
                   className="icon-btn"
                   onClick={() => void api.reveal(j.result!.files[0] ?? j.result!.folder)}
-                  title={revealLabel}
-                  aria-label={revealLabel}
+                  title={revealLabel()}
+                  aria-label={revealLabel()}
                 >
                   <FolderOpen />
                 </button>

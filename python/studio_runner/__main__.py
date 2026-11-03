@@ -184,8 +184,6 @@ def main(argv: list[str] | None = None) -> int:
         return export(args.timeline, args.dest)
 
     if args.cmd == "burn-subtitles":
-        import json
-
         from .burn import burn
 
         try:

@@ -8,7 +8,6 @@ import { Modal } from './ui'
 
 /** Add a full lesson to this course; a follow-up remains a separate action attached to a moment. */
 export function AddLessonDialog({ open, onClose, series }: { open: boolean; onClose: () => void; series: WatchSeries }) {
-  const [title, setTitle] = useState('')
   const [prompt, setPrompt] = useState('')
   const [sources, setSources] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -17,9 +16,8 @@ export function AddLessonDialog({ open, onClose, series }: { open: boolean; onCl
     setBusy(true)
     setError('')
     try {
-      const dir = await api.addCourseLesson(series.folder, { title, prompt, sources })
+      const dir = await api.addCourseLesson(series.folder, { prompt, sources })
       onClose()
-      setTitle('')
       setPrompt('')
       setSources([])
       await selectStudied(dir)
@@ -42,7 +40,7 @@ export function AddLessonDialog({ open, onClose, series }: { open: boolean; onCl
           <button className="btn ghost" disabled={busy} onClick={onClose}>
             {uiText('Cancel')}
           </button>
-          <button className="btn primary" disabled={busy || !title.trim() || (!prompt.trim() && !sources.length)} onClick={() => void add()}>
+          <button className="btn primary" disabled={busy || (!prompt.trim() && !sources.length)} onClick={() => void add()}>
             {busy ? <span className="spinner" /> : <Plus />}
             {uiText('Create lesson')}
           </button>
@@ -50,19 +48,12 @@ export function AddLessonDialog({ open, onClose, series }: { open: boolean; onCl
       }
     >
       <div className="modal-body quick-form">
-        <p className="hint">
-          {uiText('A new lesson for this course, using the same notation and video settings. It will appear after your existing lessons.')}
-        </p>
         <div className="field">
-          <label htmlFor="lesson-title">{uiText('Lesson title')}</label>
-          <input className="input" id="lesson-title" data-autofocus value={title} onChange={(e) => setTitle(e.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="lesson-topic">{uiText('What would you like to learn?')}</label>
           <textarea
             className="textarea ex-input"
-            id="lesson-topic"
-            rows={4}
+            aria-label={uiText('What would you like to learn?')}
+            data-autofocus
+            rows={5}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder={uiText('Describe the topic, ask a question, or add PDFs below.')}

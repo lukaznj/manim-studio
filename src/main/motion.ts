@@ -1,5 +1,5 @@
 // Provider-neutral, deterministic browser graphics compiled to ordinary VideoClip media.
-import { app, BrowserWindow, session } from 'electron'
+import { BrowserWindow, session } from 'electron'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'

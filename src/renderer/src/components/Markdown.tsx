@@ -79,7 +79,7 @@ export function Markdown({ text, reference }: { text: string; reference?: (id: s
 }
 
 export function inline(text: string, reference?: (id: string) => ReactNode): ReactNode[] {
-  return text.split(/(\[[^\]\n]+\]\(study:[a-zA-Z0-9._-]+\)|\\\([^\n]+?\\\)|\\\[[^\n]+?\\\]|\$\$[^$]+\$\$|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*)/g).map((seg, k) => {
+  return text.split(/(\[[^\]\n]+\]\(study:[a-zA-Z0-9._-]+\)|\\\([^\n]+?\\\)|\\\[[^\n]+?\\\]|\$\$[^$]+\$\$|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*|\*(?![\s*])[^*\n]+?(?<!\s)\*)/g).map((seg, k) => {
     const link = /^\[([^\]\n]+)\]\(study:([a-zA-Z0-9._-]+)\)$/.exec(seg)
     if (link) return <span key={k}>{reference?.(link[2]) ?? link[1]}</span>
     if (seg.startsWith('\\(') && seg.endsWith('\\)')) return math(seg.slice(2, -2), false, k)
@@ -87,7 +87,9 @@ export function inline(text: string, reference?: (id: string) => ReactNode): Rea
     if (seg.startsWith('$$') && seg.endsWith('$$') && seg.length > 4) return math(seg.slice(2, -2), true, k)
     if (seg.startsWith('$') && seg.endsWith('$') && seg.length > 2) return math(seg.slice(1, -1), false, k)
     if (seg.startsWith('`') && seg.endsWith('`')) return <code key={k}>{seg.slice(1, -1)}</code>
-    if (seg.startsWith('**') && seg.endsWith('**')) return <strong key={k}>{seg.slice(2, -2)}</strong>
+    // Bold and italic text keeps its maths and links: `**$T_P$ is the pulse width**`.
+    if (seg.startsWith('**') && seg.endsWith('**') && seg.length > 4) return <strong key={k}>{inline(seg.slice(2, -2), reference)}</strong>
+    if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) return <em key={k}>{inline(seg.slice(1, -1), reference)}</em>
     return seg
   })
 }

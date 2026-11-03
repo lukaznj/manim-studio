@@ -4,6 +4,7 @@ The runner configures manim (resolution, frame size, theme) before this module i
 imported, so the frame constants below match the project's aspect ratio."""
 
 import os
+import re
 from pathlib import Path
 
 import numpy as np
@@ -62,10 +63,34 @@ class StudioScene(VoiceoverScene):
             bg.scale(max(FRAME_W / bg.width, FRAME_H / bg.height)).set_z_index(-1000)
             self.add(bg)
 
+    def add_wrapped_subcaption(self, subcaption: str, duration: float, subcaption_buff: float = 0.1, max_subcaption_len: int = 70) -> None:
+        """Like manim-voiceover's, but a formula between $…$ is never split, and counts by what it
+        shows: `voiceover("te pe je…", subcaption="$T_P$ je…")` writes the symbol (ADR 0063)."""
+        pieces: list[str] = []
+        for token in re.findall(r"\S*\$[^$\n]+\$\S*|\S+", " ".join(subcaption.split())):
+            if pieces and _shown(pieces[-1]) + 1 + _shown(token) <= max_subcaption_len:
+                pieces[-1] += " " + token
+            else:
+                pieces.append(token)
+        total = sum(_shown(piece) for piece in pieces) or 1
+        offset = 0.0
+        for piece in pieces:
+            share = duration * _shown(piece) / total
+            self.add_subcaption(piece, duration=max(share - subcaption_buff, 0), offset=offset)
+            offset += share
+
     def thumbnail(self, text: str | None = None) -> None:
         """Marks this moment for the video's thumbnail: call it right after the animation that
         completes the key picture. `text` is the hook printed on it (2 to 5 words). The renderer
         records it; outside a Studio render it does nothing."""
+
+
+def _shown(text: str) -> int:
+    """About how many characters a subtitle shows: in a formula, a command is one, braces none."""
+    def formula(m: re.Match) -> str:
+        return re.sub(r"\\[A-Za-z]+", "x", m.group(1)).translate({ord(c): None for c in "{}^_ "})
+
+    return len(re.sub(r"\$([^$\n]+)\$", formula, text))
 
 
 def fit(mobject: Mobject, width: float = SAFE_W, height: float = SAFE_H) -> Mobject:

@@ -1,4 +1,6 @@
 // Labels that differ by OS. The shortcut handlers accept Cmd and Ctrl alike.
+import { t } from './i18n'
+
 const mac = navigator.userAgent.includes('Mac')
 
 /** `shortcut('S')` is ⌘S on macOS and Ctrl+S elsewhere; `shift` adds ⇧ / Shift+. */
@@ -10,4 +12,4 @@ export function shortcut(key: string, shift = false): string {
 export const modKey = mac ? '⌘' : 'Ctrl'
 
 /** What the OS calls revealing a file in its file manager. */
-export const revealLabel = mac ? 'Show in Finder' : 'Show in Explorer'
+export const revealLabel = (): string => t(mac ? 'Show in Finder' : 'Show in Explorer')

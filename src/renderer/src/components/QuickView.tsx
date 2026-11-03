@@ -40,7 +40,7 @@ export function QuickView() {
           {run.state !== 'done' && <button className="btn primary" onClick={resume}><RotateCcw />{t('Continue')}</button>}
           {run.state === 'done' && <button className="btn primary" onClick={() => void openWatch(run.project)}><Play />{t('Watch it')}</button>}
           {editing && <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>{t('Open in the editor')}</button>}
-          {run.result && <button className="btn" onClick={() => void api.reveal(run.result!.files[0] ?? run.result!.folder)}><FolderOpen />{revealLabel}</button>}
+          {run.result && <button className="btn" onClick={() => void api.reveal(run.result!.files[0] ?? run.result!.folder)}><FolderOpen />{revealLabel()}</button>}
           <button className="btn ghost" onClick={() => openDialog({ kind: 'quick' })}><Zap />{t('Make another')}</button>
         </>}
       </div>

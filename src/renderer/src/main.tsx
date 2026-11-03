@@ -12,7 +12,15 @@ import './styles/study-assistant.css'
 import './styles/onboarding.css'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { boot } from './store'
+import { boot, errorText, toast } from './store'
+
+// A failed call to the main process that no caller handled still tells you what broke.
+window.addEventListener('unhandledrejection', (event) => {
+  const message = event.reason instanceof Error ? event.reason.message : ''
+  if (!message.startsWith('Error invoking remote method')) return
+  event.preventDefault()
+  toast(errorText(event.reason), 'error')
+})
 
 void boot()
 createRoot(document.getElementById('root')!).render(<App />)

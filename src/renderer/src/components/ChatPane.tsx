@@ -1,6 +1,6 @@
 import { ChatRouting } from './ModelRouting'
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowDown, ArrowUp, BookOpen, Camera, Check, ChevronDown, CircleAlert, Clock3, Download, FileText, Film, Gauge, ListChecks, Loader, Plus, ScanLine, Settings2, Sparkles, Square, Video, X, ZoomIn } from 'lucide-react'
+import { ArrowDown, ArrowUp, Camera, Check, ChevronDown, CircleAlert, Clock3, Download, FileText, Film, Gauge, ListChecks, Loader, Plus, ScanLine, Settings2, Sparkles, Square, Video, X, ZoomIn } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { pageRanges } from '../../../shared/pages'
 import type { StudyReference, ChatMessage, ChatPart, Effort, ModelOption, SourceRef } from '../../../shared/types'
@@ -372,10 +372,7 @@ function Message({ message: m, streaming, busy, onPreview, onReference }: { mess
           <span className="caret" />
         </div>
       )}
-      {m.studyContext && <details className="study-answer-context"><summary><BookOpen />{uiText('Course materials')}<span>{format('{0} PDFs · {1} lessons', [m.studyContext.sources, m.studyContext.episodes])}</span></summary>
-        {m.studyReferences?.map((ref) => <ReferenceButton key={ref.id} reference={ref} onClick={() => void onReference(ref.id)} />)}
-        {m.studyContext.incomplete && <p>{uiText('Some course material could not be read. Ask again after restoring missing sources.')}</p>}
-      </details>}
+      {m.studyContext?.incomplete && <p className="hint">{uiText('Some course material could not be read. Ask again after restoring missing sources.')}</p>}
       {m.videoOffer && <div className="study-chat-result">
         <Video />
         <div><strong>{m.videoOffer.title}</strong><span>{m.videoOffer.state === 'created' ? additional?.state === 'done' ? uiText('Ready to watch') : additional?.state === 'failed' ? uiText('Didn’t finish') : uiText('Your additional video is being made. You can keep studying.') : uiText('Would a video still help?')}</span></div>

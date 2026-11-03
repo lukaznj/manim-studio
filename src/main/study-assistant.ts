@@ -31,7 +31,7 @@ export async function refineStudyNotes(dir: string, text: string): Promise<strin
   readMeta(dir)
   if (!text.trim() || text.length > 40_000) throw new Error('Select shorter notes to refine (up to 40,000 characters).')
   if (fakeAgents()) return `## Refined notes\n\n${text}\n\n$$E = mc^2$$`
-  return askClaude('Edit the student’s notes for clarity and concision. Preserve their meaning and language. Correct obvious mathematical errors, without inventing facts. Use Markdown and LaTeX ($inline$ and $$display$$). Return only the revised notes; never instructions or commentary.', text, 'refine notes', modelOptions(dir))
+  return askClaude('Edit the student’s notes for clarity and concision. Preserve their meaning and language. Correct obvious mathematical errors, without inventing facts. Use Markdown and LaTeX ($inline$ and $$display$$). Keep every video moment, written [6:40] or [6:40](study:…), exactly as it is. Return only the revised notes; never instructions or commentary.', text, 'refine notes', modelOptions(dir))
 }
 
 export async function studyFrame(dir: string, at: number, region?: FrameRegion, selectedImage?: string): Promise<string | undefined> {
