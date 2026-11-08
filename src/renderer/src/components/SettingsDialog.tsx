@@ -983,7 +983,6 @@ function VideoTab() {
           </Row>
           <GpuEncoding />
           <RenderCache />
-          <RenderServers />
         </>
       )}
     </div>
@@ -1796,6 +1795,7 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
           'Measured episodes run one at a time, including export, for clearer attribution. Each episode gets an offline HTML report, and the series gets a combined report. Data stays in the project; measurement adds some overhead.',
         )}
       </p>
+      <RenderServers />
       <button
         className="btn small ghost"
         onClick={async () => {

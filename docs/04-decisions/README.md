@@ -24,7 +24,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0018-quick-mode]] | Quick video uses resumable project-bound background agents, the configured export theme and shared production progress | accepted |
 | [[0019-series-mode]] | Series mode: Claude plans episodes and a series bible from a course's PDFs; episodes refer back through series.md | accepted |
 | [[0020-parallel-exports]] | Exports draw slices of the animations in parallel into the shared cache, then render once | accepted |
-| [[0021-render-servers]] | Exports can render on a paired worker (Docker, pairing code with a token); narration stays local | accepted |
+| [[0021-render-servers]] | Exports can render on a paired worker (Docker, pairing code with a token); narration stays local | on hold (developer mode only) |
 | [[0022-codex-as-second-agent]] | Codex as a second agent: installed on demand, its own sign-in, Studio's tools through the MCP bridge | accepted |
 | [[0023-parallel-series-episodes]] | A series writes scripts in order and starts every ready video without an agent-count ceiling | accepted |
 | [[0024-usage-per-project]] | Recorded project tokens; subscription accounts show account-wide limit percentages, with API estimates restricted to known key usage or developer mode | accepted |
