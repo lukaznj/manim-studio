@@ -325,14 +325,13 @@
   margin: 12px 0 0;
   padding: 0;
   display: grid;
-  gap: 12px;
 }
+/* One list with dividers: the steps read as one solution, not a stack of cards. */
 .ex-step {
-  padding: 12px 14px;
-  border-radius: var(--r-md);
-  background: var(--panel);
-  border: 1px solid var(--line);
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
 }
+.ex-step:last-child { padding-bottom: 4px; }
 .ex-step-head {
   display: flex;
   align-items: center;

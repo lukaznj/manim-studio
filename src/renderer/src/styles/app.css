@@ -2105,3 +2105,15 @@
 .thumb-kind svg { width: 12px; height: 12px; }
 .series-card-progress.watched::-webkit-progress-value { background: var(--mint); }
 
+/* The ⋯ menu (ui.tsx MoreMenu). */
+.more-menu { margin: 0; min-width: 220px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow-pop); }
+.more-menu > button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font-size: 12.5px; text-align: left; cursor: pointer; }
+.more-menu > button:hover, .more-menu > button:focus-visible { background: var(--raised); outline: none; }
+.more-menu > button > svg { width: 15px; height: 15px; flex: none; color: var(--text-3); }
+.more-menu > button.danger, .more-menu > button.danger > svg { color: light-dark(#b42318, #ffb3a6); }
+/* Watched: a round check beside the title, filled once watched. */
+.watched-check { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1.5px solid var(--line-strong); border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.watched-check svg { width: 15px; height: 15px; }
+.watched-check:hover { border-color: var(--mint); color: var(--mint); }
+.watched-check.on { border-color: var(--mint); background: var(--mint); color: #08240f; }
+
