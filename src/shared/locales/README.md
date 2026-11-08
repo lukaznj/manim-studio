@@ -17,6 +17,11 @@ The drafts have automatic completeness, placeholder, product-name and repetition
 they have not all been reviewed by native speakers. Common UI terminology is
 maintained separately in `scripts/ui-copy-overrides.json`.
 
+Counts use an ICU-lite plural, for example
+`Added {0, plural, one {# file} other {# files}} to media/`. A translation lists the
+forms its language needs (`one`, `few`, `many`, `other`, `=1`…; see `Intl.PluralRules`)
+and always keeps `other`. Text outside the plural is translated as usual.
+
 To maintain the catalogs:
 
 1. Run `node scripts/extract-ui-copy.mjs` after adding or changing product copy.
