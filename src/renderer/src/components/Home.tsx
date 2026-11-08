@@ -55,7 +55,8 @@ export function Home() {
     <div className="home">
       <div className="home-inner">
         <header className="home-head">
-          <div className="home-heading">
+          <h1>{editing ? uiText('Projects') : uiText('Library')}</h1>
+          <div className="home-actions">
             {both && (
               <div className="home-mode-switch" data-tour="home-tabs">
                 <Tabs
@@ -72,11 +73,8 @@ export function Home() {
                 />
               </div>
             )}
-            <h1>{editing ? uiText('Projects') : uiText('Library')}</h1>
-          </div>
-          <div className="home-actions">
             <button className="btn primary" data-tour="home-add" aria-label={uiText('Add video, course or exercises')} onClick={() => setAdding(true)}>
-              <Plus /><span>{uiText(editing ? 'Create' : 'Add')}</span>
+              <Plus /><span>{uiText('New')}</span>
             </button>
           </div>
         </header>
@@ -227,23 +225,14 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
       tabIndex={0}
       aria-label={`${set.title}, ${format(EXERCISES, [set.items.length])}`}
     >
-      {cover ? (
-        <div className="thumb stack landscape">
-          <img src={api.mediaUrl(cover)} alt="" draggable={false} />
-        </div>
-      ) : (
-        <div className="thumb landscape exercise-thumb">
-          <GraduationCap />
-          <span className="mono">{set.items.length}</span>
-        </div>
-      )}
+      <div className={`thumb stack landscape ${cover ? '' : 'exercise-thumb'}`}>
+        {cover ? <img src={api.mediaUrl(cover)} alt="" draggable={false} /> : <GraduationCap />}
+        <span className="thumb-kind"><GraduationCap />{uiText('Exercises')}</span>
+      </div>
       <div className="project-meta">
         <div className="project-name">{set.title}</div>
         <div className="project-sub">
-          <span className="badge sun">
-            <GraduationCap /> {uiText(' Exercises')}
-          </span>
-          <span className="faint">{working ? uiText('Solving…') : format('{0} of {1} with a video', [done, set.items.length])}</span>
+          <span className="faint">{format(EXERCISES, [set.items.length])}{working ? ` · ${uiText('Solving…')}` : done < set.items.length ? ` · ${format('{0} of {1} with a video', [done, set.items.length])}` : ''}</span>
         </div>
       </div>
     </article>
@@ -258,6 +247,7 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
   const first = episodes[0]
   const cover = episodes.find((e) => e.thumbnail) ?? first
   const latest = Math.max(...episodes.map((e) => e.updatedAt))
+  const watched = episodes.filter((e) => e.watched).length
   // Learn mode watches a series; Create opens its episodes to edit.
   const open = () => (run || studying() ? void openWatch(folder) : useStore.setState({ homeSeries: folder }))
   return (
@@ -271,23 +261,21 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
     >
       <div className={`thumb stack ${cover.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${cover.theme}`}>
         {cover.thumbnail ? <img src={api.mediaUrl(cover.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
+        {!statusRun && <span className="thumb-kind"><Library />{uiText('Course')}</span>}
         {statusRun && <span className={`series-card-status ${statusRun.state}`}><Clapperboard />{uiText(seriesStatus(statusRun))}<span className="series-card-count">{made}/{statusRun.episodes.length}</span></span>}
       </div>
       <div className="project-meta">
         <div className="project-name">{first.series!.title}</div>
         <div className="project-sub">
-          <span className="badge sun">
-            <Library /> {uiText(' Course')}
-          </span>
-          <span className="faint">{format(LESSONS, [episodes.length])}</span>
-          {exercises ? (
-            <span className="faint">{format(EXERCISES, [exercises])}</span>
-          ) : (
-            <span className="faint project-ago">{ago(latest)}</span>
-          )}
+          <span className="faint">{format(LESSONS, [episodes.length])}{exercises ? ` · ${format(EXERCISES, [exercises])}` : ''}</span>
+          <span className="faint project-ago">{ago(latest)}</span>
         </div>
       </div>
-      {statusRun && <progress className="series-card-progress" value={made} max={statusRun.episodes.length} aria-label={uiText('Production')} />}
+      {statusRun ? (
+        <progress className="series-card-progress" value={made} max={statusRun.episodes.length} aria-label={uiText('Production')} />
+      ) : studying() && watched > 0 && (
+        <progress className="series-card-progress watched" value={watched} max={episodes.length} aria-label={format('{0}/{1} watched', [watched, episodes.length])} />
+      )}
     </article>
   )
 }
@@ -320,13 +308,8 @@ function ProjectCard({ project: p, index }: { project: ProjectSummary; index: nu
             </span>
           ) : (
             <>
-              <span className="badge">{p.aspect}</span>
-              {p.series && (
-                <span className="badge sun">
-                  {uiText('Episode ')}
-                  {p.series.episode}
-                </span>
-              )}
+              {!studying() && <span className="badge">{p.aspect}</span>}
+              {p.series && <span className="badge sun">{format('Lesson {0}', [p.series.episode])}</span>}
               <span className="faint project-ago">{ago(p.updatedAt)}</span>
             </>
           )}

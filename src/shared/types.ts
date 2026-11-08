@@ -56,6 +56,7 @@ export interface ProjectSummary {
   theme: Theme
   updatedAt: number
   duration?: number
+  watched?: boolean // Home's course progress
   thumbnail?: string
   missing?: boolean
   series?: SeriesRef
