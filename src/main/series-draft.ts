@@ -21,7 +21,7 @@ export function saveSeriesDraft(draft: SeriesDraft | null): void {
 
 /** Explicitly saved and attempted plans survive replacement of the current editing draft. */
 export function saveSeriesPlan(draft: SeriesDraft): SeriesDraft {
-  if (!draft.plan?.title || !Array.isArray(draft.plan.episodes) || !draft.plan.episodes.length) throw new Error('Plan the episodes before saving.')
+  if (!draft.plan?.title || !Array.isArray(draft.plan.episodes) || !draft.plan.episodes.length) throw new Error('Plan the lessons before saving.')
   const id = createHash('sha256').update(JSON.stringify({ request: draft.request, plan: draft.plan })).digest('hex').slice(0, 32)
   const saved = { ...draft, id, savedAt: Date.now() }
   writeAtomicJson(join(paths.userData(), 'series-plans', `${id}.json`), saved)
