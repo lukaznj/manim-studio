@@ -51,6 +51,7 @@ class RenderTimeline(unittest.TestCase):
         self.assertEqual(by_line[16][0]["edit"]["prefix"], ", run_time=")  # play without run_time
         self.assertEqual(by_line[17][0]["edit"]["line"], 18)  # multi-line call: insert after FadeOut(wide)
         self.assertEqual(by_line[21][0]["repeat"], 2)  # loop: one literal drives both clips
+        self.assertEqual(by_line[21][0]["anims"][0]["methods"], ["shift"])  # .animate.shift names the clip
         self.assertEqual(by_line[10][0]["locked"], "bookmark")
 
     def test_voice_and_subtitles(self):

@@ -355,7 +355,7 @@ export interface Clip {
   end: number
   line: number | null
   kind: 'play' | 'wait'
-  anims: { name: string; target: string | null }[]
+  anims: { name: string; target: string | null; methods?: string[] }[] // methods: what an .animate call does
   edit?: EditSpan
   locked?: string
   repeat?: number

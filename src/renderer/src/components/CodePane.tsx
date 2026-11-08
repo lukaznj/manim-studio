@@ -212,17 +212,17 @@ export function CodePane() {
             <span className="tab-label">{uiText('Sources')}</span>
           </button>
         </div>
-      </div>
-      <div className={`code-actions-head ${tab !== 'code' ? 'hidden' : ''}`}>
-        <span className="code-file-status"><FileCode2 /><span>scene.py</span>{dirty && <span className="dirty-dot" />}</span>
-        <div className="pane-actions">
-          <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title={uiText('Save without rendering')}>
-            <Save /> <span className="btn-label">{uiText('Save')}</span>
-          </button>
-          <button className="btn small primary" onClick={() => void saveScene({ render: true })} title={format('Save and render ({0})', [shortcut('S')])}>
-            <Play /> <span className="render-label">{uiText('Render')}</span> <span className="kbd">{shortcut('S')}</span>
-          </button>
-        </div>
+        {/* One header row: the code's actions sit at the end of the tabs. */}
+        {tab === 'code' && (
+          <div className="pane-actions">
+            <button className="btn ghost small" disabled={!dirty} onClick={() => void saveScene({ render: false })} title={uiText('Save without rendering')}>
+              <Save /> <span className="btn-label">{uiText('Save')}</span>
+            </button>
+            <button className="btn small primary" onClick={() => void saveScene({ render: true })} title={format('Save and render ({0})', [shortcut('S')])}>
+              <Play /> <span className="render-label">{uiText('Render')}</span>
+            </button>
+          </div>
+        )}
       </div>
       {conflict !== null && (
         <div className="banner">

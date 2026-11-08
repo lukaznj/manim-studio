@@ -458,3 +458,7 @@
   flex: none;
   margin-top: 2px;
 }
+/* No narration yet: the voice and subtitle lanes stay as thin rows instead of empty bands. */
+.timeline.no-voice .tl-label.taller, .timeline.no-voice .lane-voice { height: 22px; }
+.timeline.no-voice .tl-label.taller, .timeline.no-voice .tl-labels .tl-label:last-child { opacity: .55; }
+
