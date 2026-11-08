@@ -408,7 +408,7 @@ function InstallPage({ mode }: { mode: AppMode }) {
       </div>
       <p className="onb-note">
         {all
-          ? t('Everything’s installed. Continue to choose where your projects go.')
+          ? t('Everything’s installed.')
           : t('This takes a few minutes. Carry on with the setup: it keeps installing in the background.')}
       </p>
     </>
@@ -855,7 +855,7 @@ function DonePage({ mode, onFirstVideo, onFix }: { mode: AppMode; onFirstVideo: 
     <>
       <Head
         eyebrow={ready ? 'All done' : 'Last step'}
-        title={ready ? 'You’re all set' : engine ? 'Two last things' : 'Almost there'}
+        title={ready ? 'You’re all set' : engine && rows.every(([ok]) => !ok) ? 'Two last things' : 'Almost there'}
         lead={
           !engine
             ? 'Studio is finishing the install. It takes a few more minutes; the app opens as soon as it’s done.'

@@ -765,8 +765,8 @@
   gap: 14px;
   animation: fade-up 0.25s var(--ease-out);
 }
-.subtitle-settings { display: grid; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
-.subtitle-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.subtitle-settings { display: grid; gap: 16px; }
+.subtitle-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .subtitle-settings-head h3 { margin: 0; font-size: 14px; }
 .subtitle-preview { height: 145px; position: relative; overflow: hidden; border-radius: 12px; background: #0b1828; border: 1px solid var(--line-strong); display: grid; place-items: center; }
 .subtitle-preview-formula { color: #c0cee0; font: italic 30px Georgia, serif; }
@@ -778,7 +778,7 @@
 .subtitle-slider input { min-width: 0; flex: 1; accent-color: var(--sun); }
 .subtitle-slider output { min-width: 42px; color: var(--text-2); font: 11px var(--font-mono); text-align: right; }
 .subtitle-color { width: 44px; height: 30px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 3px; background: var(--panel); cursor: pointer; }
-.settings-advanced, .sign-in-log {
+.sign-in-log {
   min-width: 0;
   width: 100%;
 }
@@ -789,12 +789,12 @@
 .account-plan-usage .plan-usage-row {
   grid-template-columns: minmax(0, 1fr) minmax(60px, 140px) max-content minmax(0, 1fr);
 }
-.settings-advanced > summary, .sign-in-log > summary {
+.sign-in-log > summary {
   cursor: pointer;
   color: var(--text-2);
   margin-bottom: 12px;
 }
-.settings-advanced > label {
+.set-advanced > label {
   display: block;
   margin-bottom: 12px;
 }
@@ -2050,7 +2050,7 @@
 .new-files { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px 10px; }
 .new-files .lang-chip.unused { opacity: .5; }
 .new-extras { display: flex; gap: 4px; margin-right: auto; }
-.settings-body .set-section { margin: 26px 0 4px; padding-top: 18px; border-top: 1px solid var(--line); font: 700 13px var(--font-ui); color: var(--text-2); letter-spacing: .02em; }
+.settings-body .set-section { margin: 26px 0 12px; padding-top: 18px; border-top: 1px solid var(--line); font: 700 13px var(--font-ui); color: var(--text-2); letter-spacing: .02em; }
 .set-advanced { margin-top: 14px; }
 .set-advanced > summary { cursor: pointer; padding: 8px 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
 .set-advanced[open] > summary { margin-bottom: 6px; }

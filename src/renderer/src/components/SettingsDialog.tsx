@@ -263,9 +263,6 @@ function AgentTab() {
           }))}
         />
       </Row>
-      {Object.values(available).some((ready) => !ready) && (
-        <></>
-      )}
       {!status ? (
         <Row title={uiText('Checking account…')} />
       ) : signedIn ? (
@@ -288,18 +285,17 @@ function AgentTab() {
             seriesModels: { ...settings.seriesModels, [agent]: { ...settings.seriesModels?.[agent], plan: { model, effort: effort ?? 'high' } } },
           })} />
         </Row>
-        <details className="settings-advanced">
-          <summary>{uiText(override ? 'Advanced · course lesson override enabled' : 'Advanced')}</summary>
-          <label className="hint"><input type="checkbox" checked={!!override} onChange={(e) => void setMaker(e.target.checked ? { model: maker.model, effort: maker.effort ?? 'high' } : undefined)} />{' '}
-            {uiText('Override model for course lessons')}
+      </>}
+      <details className="set-advanced">
+      <summary>{uiText(override ? 'Advanced · course lesson override enabled' : 'Advanced')}</summary>
+      {signedIn && <>
+        <label className="hint"><input type="checkbox" checked={!!override} onChange={(e) => void setMaker(e.target.checked ? { model: maker.model, effort: maker.effort ?? 'high' } : undefined)} />{' '}
+          {uiText('Override model for course lessons')}
           </label>
           {override ? <Row title={uiText('Course: making the lessons')}>
             <ModelPicker model={maker.model} effort={maker.effort ?? 'high'} models={models} onChange={(model, effort) => void setMaker({ model, effort: effort ?? 'high' })} />
           </Row> : null}
-        </details>
       </>}
-      <details className="set-advanced">
-      <summary>{uiText('Advanced')}</summary>
       <FallbackSettings />
       <Row title={uiText('Agents at once')}>
         <label className="agent-capacity-toggle"><input type="checkbox" checked={!settings.agentConcurrency} onChange={(e) => void updateSettings({ agentConcurrency: e.target.checked ? 0 : 3 })} />{uiText('Unlimited')}</label>

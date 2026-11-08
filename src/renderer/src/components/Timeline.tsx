@@ -395,8 +395,7 @@ function Ruler({ duration, scale }: { duration: number; scale: number }) {
 
 function clipLabel(c: Clip): string {
   if (c.kind === 'wait') return 'wait'
-  const label = c.anims.map((a) => (a.name === 'animate' ? (a.methods?.length ? `.${a.methods.join('.')}` : '.animate') : a.name)).join(' · ')
-  return c.repeat && c.repeat > 1 ? `${label} ×${c.repeat}` : label
+  return c.anims.map((a) => (a.name === 'animate' ? (a.methods?.length ? `.${a.methods.join('.')}` : '.animate') : a.name)).join(' · ')
 }
 
 function ClipView(props: {
