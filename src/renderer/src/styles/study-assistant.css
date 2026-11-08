@@ -89,7 +89,7 @@
 div.study-notes-body { cursor: text; }
 div.study-notes-body:hover { background: color-mix(in srgb, var(--raised) 45%, transparent); }
 div.study-notes-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sun-soft); }
-.study-notes-body.empty > p, .study-notes-input::placeholder { color: var(--text-3); }
+.study-notes-body.is-empty > p, .study-notes-input::placeholder { color: var(--text-3); }
 .study-notes-body > :first-child { margin-top: 0; }
 .study-notes-body > :last-child { margin-bottom: 0; }
 .study-notes-input { resize: none; overflow: hidden; }
