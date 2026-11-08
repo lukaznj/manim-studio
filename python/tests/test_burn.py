@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from studio_runner.burn import ass_colour, ass_time, burn, parse_srt, to_ass
+from studio_runner.burn import burn, cue_image, parse_srt
 
 SRT = "1\n00:00:00,200 --> 00:00:01,800\nZbroj kutova je {180°}\n\n2\n00:00:02,000 --> 00:00:03,500\nDruga linija\ni treća\n"
 STYLE = {"size": 100, "color": "#ffffff", "background": "#000000", "opacity": 70, "position": "bottom", "outline": True}
@@ -17,22 +17,18 @@ class Conversion(unittest.TestCase):
         self.assertEqual([(round(a, 1), round(b, 1)) for a, b, _ in cues], [(0.2, 1.8), (2.0, 3.5)])
         self.assertEqual(cues[1][2], "Druga linija\ni treća")
 
-    def test_ass_times_and_colours(self):
-        self.assertEqual(ass_time(3723.456), "1:02:03.46")
-        self.assertEqual(ass_colour("#ff8000"), "&H000080FF")
-        self.assertEqual(ass_colour("#000000", 70), "&H4C000000")
+    def test_cue_sits_in_the_subtitle_band(self):
+        top, bottom = cue_image("Zbroj kutova je 180°", 1920, 1080, STYLE, band=True).getbbox()[1::2]
+        self.assertGreaterEqual(top, 1080 - 1080 * 1.1 / 8)  # inside the landscape band
+        self.assertLess(bottom, 1080)
+        first = cue_image("Gore", 1080, 1920, {**STYLE, "position": "top"}, band=True).getbbox()
+        self.assertLess(first[3], 1920 * 2.6 / 14.2)  # at the top of a portrait frame
+        self.assertLess(first[2], 1080 - 1080 * 0.9 / 8)  # clear of the apps' buttons on the right
 
-    def test_style_sits_in_the_subtitle_band(self):
-        ass = to_ass(parse_srt(SRT), 1920, 1080, STYLE, band=True)
-        style = next(line for line in ass.splitlines() if line.startswith("Style:")).split(",")
-        size, align, margin_v = int(style[2]), int(style[18]), int(style[21])
-        self.assertEqual(align, 2)  # bottom centre
-        self.assertLessEqual(margin_v + size, 1080 * 1.1 / 8)  # inside the band's 148 px
-        self.assertIn("{", SRT)
-        self.assertNotIn("{180", ass)  # braces would be override tags
-        self.assertIn("Druga linija\\Ni treća", ass)
-        top = to_ass(parse_srt(SRT), 1080, 1920, {**STYLE, "position": "top"}, band=True)
-        self.assertEqual(int(next(l for l in top.splitlines() if l.startswith("Style:")).split(",")[18]), 8)
+    def test_long_cues_wrap_inside_the_frame(self):
+        box = cue_image("riječ " * 40, 640, 360, STYLE, band=True).getbbox()
+        self.assertGreater(box[0], 0)
+        self.assertLess(box[2], 640)
 
 
 class Burn(unittest.TestCase):
@@ -45,7 +41,7 @@ class Burn(unittest.TestCase):
             srt.write_text(SRT, encoding="utf-8")
             result = burn(video, srt, out, STYLE, band=True)
             self.assertEqual((result["width"], result["height"], result["lines"]), (640, 360, 2))
-            self.assertFalse(list(out.parent.glob("*.ass")))
+            self.assertEqual([p.name for p in out.parent.iterdir()], ["copy.mp4"])  # no cue pictures left
             frame = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-ss", "1", "-i", str(out), "-frames:v", "1",
                                     "-f", "rawvideo", "-pix_fmt", "gray", "-"], check=True, capture_output=True).stdout
             rows = [frame[y * 640:(y + 1) * 640] for y in range(360)]
