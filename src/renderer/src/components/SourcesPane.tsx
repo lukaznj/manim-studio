@@ -66,7 +66,7 @@ export function SourcesPane() {
   }
 
   const remove = async (item: SourceItem) => {
-    if (!confirm(`Move “${item.name}” to the Trash? A scene that shows its pages won’t render until you put it back.`)) return
+    if (!confirm(format('Move “{0}” to the Trash? A scene that shows its pages won’t render until you put it back.', [item.name]))) return
     setItems(await api.removeSource(item.name))
   }
 

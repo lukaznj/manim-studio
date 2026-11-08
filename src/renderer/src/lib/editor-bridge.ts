@@ -1,5 +1,6 @@
 // The one Monaco instance, reachable from the store and the timeline without prop drilling.
 import type * as Monaco from 'monaco-editor'
+import { t } from './i18n'
 import type { LayoutWarning, RenderError } from '../../../shared/types'
 import type { TextEdit } from './edits'
 
@@ -133,7 +134,7 @@ export const editorBridge = {
   },
 
   setReadOnly(readOnly: boolean) {
-    editor?.updateOptions({ readOnly, readOnlyMessage: { value: 'Claude is editing the scene right now. Wait for it to finish, or stop it.' } })
+    editor?.updateOptions({ readOnly, readOnlyMessage: { value: t('Claude is editing the scene right now. Wait for it to finish, or stop it.') } })
   },
 
   focus() {

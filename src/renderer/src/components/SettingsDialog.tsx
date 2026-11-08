@@ -438,9 +438,9 @@ function AuthSwitch(props: {
   keyText: string
 }) {
   return (
-    <Row title={`Use ${props.agent} with`} text={props.value === 'api-key' ? props.keyText : props.accountText}>
+    <Row title={format('Use {0} with', [props.agent])} text={props.value === 'api-key' ? props.keyText : props.accountText}>
       <Tabs
-        radio={`Use ${props.agent} with`}
+        radio={format('Use {0} with', [props.agent])}
         value={props.value}
         onChange={(v) => void props.onChange(v)}
         items={[
@@ -1039,7 +1039,7 @@ function VoiceTab() {
 function RevoiceRow() {
   const outdated = useOutdatedVoice()
   if (!outdated) return null
-  const credit = outdated.to.provider === 'elevenlabs' ? ` That uses up to ${outdated.characters.toLocaleString('en')} ElevenLabs characters.` : ''
+  const credit = outdated.to.provider === 'elevenlabs' ? ` ${format('That uses up to {0} ElevenLabs characters.', [outdated.characters.toLocaleString(currentLocale())])}` : ''
   return (
     <div className="revoice">
       <Row
@@ -1057,9 +1057,12 @@ function RevoiceRow() {
 export function voiceProblem(voice: VoiceSettings | undefined, hasKey: boolean, omnivoice?: ComponentState, check?: ElevenLabsCheck | null): string | null {
   if (!voice) return uiText('Choose a voice for the narration.')
   if (voice.provider === 'elevenlabs' && !hasKey) return uiText('Add your ElevenLabs API key for the narration.')
-  if (voice.provider === 'elevenlabs' && check?.problem && !check.voices && !check.tts) return `${check.problem} Replace the key in Settings → Accounts.`
+  if (voice.provider === 'elevenlabs' && check?.problem && !check.voices && !check.tts) return format('{0} Replace the key in Settings → Accounts.', [check.problem])
   if (voice.provider === 'elevenlabs' && check && (!check.tts || !check.voices))
-    return `Your ElevenLabs key is missing ${[!check.tts && 'Text to Speech', !check.voices && 'Voices (Read)'].filter(Boolean).join(' and ')}: switch ${!check.tts && !check.voices ? 'them' : 'it'} on at elevenlabs.io → Developers → API keys, then check again in the voice settings.`
+    // Text to Speech and Voices (Read) are ElevenLabs' own permission names, so they stay in English.
+    return !check.tts && !check.voices
+      ? uiText('Your ElevenLabs key is missing Text to Speech and Voices (Read): switch them on at elevenlabs.io → Developers → API keys, then check again in the voice settings.')
+      : format('Your ElevenLabs key is missing {0}: switch it on at elevenlabs.io → Developers → API keys, then check again in the voice settings.', [!check.tts ? 'Text to Speech' : 'Voices (Read)'])
   if (voice.provider === 'elevenlabs' && !voice.elevenlabs?.voiceId) return uiText('Choose an ElevenLabs voice for the narration.')
   if (voice.provider === 'omnivoice' && omnivoice !== 'ready') return uiText('Install the OmniVoice model for the narration.')
   return null
@@ -1481,7 +1484,7 @@ function RenderServers() {
       setPairError('')
       setCode('')
       await refresh()
-      toast('Paired. Exports can now run there (Export → Export on).', 'ok')
+      toast('Paired. Exports can now run there (Export → Render on).', 'ok')
     } catch (e) {
       setPairError(errorText(e))
     } finally {

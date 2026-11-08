@@ -28,6 +28,12 @@ import { getSettings } from './settings'
 import { voiceEnv } from './voice'
 import { projectCache, pruneRenderCache } from './render-cache'
 import { sliceProgress } from './export-progress'
+import { formatUi } from '../shared/i18n'
+import { uiLocale } from '../shared/ui-languages'
+
+// Progress stages are shown as they are, so they are worded in the interface language.
+const say = (template: string, ...values: unknown[]) => formatUi(getSettings().uiLanguage ?? 'en', template, values)
+const nameOf = (code: string) => new Intl.DisplayNames([uiLocale(getSettings().uiLanguage ?? 'en')], { type: 'language' }).of(code) ?? code
 
 type Progress = (e: { stage: string; percent?: number; phase?: 'rendering' | 'assembling' }) => void
 
@@ -58,7 +64,7 @@ export async function exportVideo(
   signal?: AbortSignal,
   tag?: string,
 ): Promise<ExportResult> {
-  progress({ stage: 'Copying the project' })
+  progress({ stage: say('Copying the project') })
   const snap = join(work, 'project')
   snapshotProject(project, snap)
   const meta = readMeta(snap)
@@ -104,7 +110,7 @@ export async function exportVideo(
   try {
     if (options.server) {
       // On a render server (ADR 0021): the narration is made here first, since the server has no voice.
-      progress({ stage: 'Making the narration' })
+      progress({ stage: say('Making the narration') })
       await (
         await runRunner('default', ['render', snap, '--quality', 'preview', '--voice-only', '--out', 'voice-only'], {
           extraEnv: await voiceEnv(meta, snap),
@@ -112,7 +118,7 @@ export async function exportVideo(
           tag,
         })
       ).done
-      progress({ stage: 'Packing the project' })
+      progress({ stage: say('Packing the project') })
       const archive = join(work, 'project.tar.gz')
       await packProject(snap, archive)
       // project.json's voice as is: narration is keyed by paths inside the project, so the server finds it.
@@ -135,14 +141,15 @@ export async function exportVideo(
       // The GPU's video encoder when one works here (ADR 0034); if it fails, the CPU's, for the rest of the export.
       let encoder = await exportEncoder()
       for (const theme of themes) {
-        const stage = themes.length > 1 ? `Rendering the ${theme} version` : 'Rendering at full quality'
+        const stage =
+          themes.length > 1 ? say(theme === 'dark' ? 'Rendering the dark version' : 'Rendering the light version') : say('Rendering at full quality')
         const parts = await renderSlices(
           snap,
           meta,
           { theme, size, fps, encoder },
           cache,
           animations,
-          (p, n) => progress({ stage: `${stage}: ${n} parts at once`, percent: p, phase: 'rendering' }),
+          (p, n) => progress({ stage: say('{0}: {1, plural, one {# part at once} other {# parts at once}}', stage, n), percent: p, phase: 'rendering' }),
           signal,
           tag,
         )
@@ -156,10 +163,10 @@ export async function exportVideo(
               signal,
               tag,
               onProgress: (t) =>
-                progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, phase: parts > 1 ? 'assembling' : 'rendering', percent: duration ? Math.min(t / duration, 1) : undefined }),
+                progress({ stage: parts > 1 ? say('{0}: joining the parts', stage) : stage, phase: parts > 1 ? 'assembling' : 'rendering', percent: duration ? Math.min(t / duration, 1) : undefined }),
             },
           )
-        progress({ stage: parts > 1 ? `${stage}: joining the parts` : stage, phase: parts > 1 ? 'assembling' : 'rendering' })
+        progress({ stage: parts > 1 ? say('{0}: joining the parts', stage) : stage, phase: parts > 1 ? 'assembling' : 'rendering' })
         try {
           await final(encoder)
         } catch (e) {
@@ -169,10 +176,10 @@ export async function exportVideo(
             `The GPU’s video encoder (${encoder}) failed with ${why}, so this video was encoded on the CPU. Settings → Environment can turn GPU encoding off.`,
           )
           encoder = undefined
-          progress({ stage: `${stage} on the CPU`, phase: 'rendering' })
+          progress({ stage: say('{0} on the CPU', stage), phase: 'rendering' })
           await final(undefined)
         }
-        progress({ stage: 'Saving the video' })
+        progress({ stage: say('Saving the video') })
         const timeline = join(snap, '.studio', `final-${theme}`, 'timeline.json')
         const base = join(folder, themes.length > 1 ? `${slug}.${theme}` : slug)
         await (
@@ -186,7 +193,7 @@ export async function exportVideo(
     // Delivery shape is independent of the scene's layout, for local and remote renders alike.
     const aspect = options.aspect ?? meta.export?.aspect ?? meta.aspect
     if (aspect !== meta.aspect) {
-      progress({ stage: 'Saving the video', phase: 'assembling' })
+      progress({ stage: say('Saving the video'), phase: 'assembling' })
       for (const card of cards) {
         const fitted = `${card.base}.fit.mp4`
         const dimensions = await (await runRunner<{ width: number; height: number }>('default', ['fit-video', `${card.base}.mp4`, fitted, '--aspect', aspect], { signal, tag })).done
@@ -199,7 +206,7 @@ export async function exportVideo(
     }
 
     // The thumbnail made for publishing (card.py): the key picture, its hook, number and series.
-    progress({ stage: 'Making the thumbnail' })
+    progress({ stage: say('Making the thumbnail') })
     for (const c of cards) {
       try {
         await (
@@ -223,9 +230,9 @@ export async function exportVideo(
     const subtitleText = [...new Set(studyTimeline.voice.flatMap((v) => (v.subtitle ? [v.subtitle] : [])))]
     for (const lang of options.languages.filter((l) => l !== original)) {
       const name = languageName(lang)
-      progress({ stage: `Translating the narration into ${name}` })
+      progress({ stage: say('Translating the narration into {0}', nameOf(lang)) })
       const translations = await translationFile(project, narrationText, original, lang, subtitleText)
-      progress({ stage: `Voicing ${name}` })
+      progress({ stage: say('Voicing {0}', nameOf(lang)) })
       const env = await voiceEnv({ ...meta, voice: { ...meta.voice, language: lang } }, snap)
       const args = ['dub', timelinePath, translations, lang, join(folder, slug), ...(options.languageVideos ? videos.flatMap((v) => ['--video', v]) : [])]
       const job = await runRunner<{ files: string[]; warnings: string[] }>('default', args, {
@@ -233,7 +240,7 @@ export async function exportVideo(
         signal,
         tag,
         onEvent: (e) => {
-          if (e.type === 'progress') progress({ stage: `Voicing ${name}`, percent: Number(e.done) / Number(e.total) })
+          if (e.type === 'progress') progress({ stage: say('Voicing {0}', nameOf(lang)), percent: Number(e.done) / Number(e.total) })
         },
       })
       const dubbed = await job.done

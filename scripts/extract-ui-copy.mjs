@@ -23,7 +23,7 @@ const literal = (node) => {
 for (const path of files(join(root, 'src')).filter((p) => /\.(tsx?|mjs)$/.test(p) && !p.includes('/locales/') && !p.endsWith('.test.ts'))) {
   const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, path.endsWith('tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   function visit(node) {
-    if (ts.isCallExpression(node) && /^(t|uiText|format|localize|say|translateUi|formatUi)$/.test(node.expression.getText(source))) {
+    if (ts.isCallExpression(node) && /^(t|uiText|format|localize|say|toast|translateUi|formatUi)$/.test(node.expression.getText(source))) {
       const arg = node.arguments[/^(translateUi|formatUi)$/.test(node.expression.getText(source)) ? 1 : 0]
       literal(arg)
     }
