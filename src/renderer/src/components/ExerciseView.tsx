@@ -110,7 +110,7 @@ export function ExerciseRows({ set, selected }: { set: ExerciseSet; selected?: s
                   ? (it.topic && it.topic !== set.items[i - 1]?.topic ? it.topic : null)
                   : set.paused && ['waiting', 'solved'].includes(it.state)
                     ? uiText('Paused')
-                    : (it.activity ?? LABEL[it.state])}
+                    : (it.activity ?? uiText(LABEL[it.state]))}
               </StudyRowProgress>
             </span>
             <StateIcon item={it} paused={!!set.paused} />
@@ -339,7 +339,7 @@ function ExercisePlayer({ item, detail, video }: { item: ExerciseItem; detail: E
         <Film />
         {item.state === 'video' || item.state === 'export' ? (
           <span>
-            <span className="spinner" /> {item.activity ?? LABEL[item.state]}…
+            <span className="spinner" /> {item.activity ?? uiText(LABEL[item.state])}…
           </span>
         ) : (
           <span>{uiText('The video is made once the written solution is checked.')}</span>
