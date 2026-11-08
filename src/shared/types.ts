@@ -402,12 +402,6 @@ export interface FolderInfo {
   found: { videos: number; courses: number; exerciseSets: number } | null // Manim Studio projects already in it
 }
 
-export interface ProjectsFolders {
-  local: FolderInfo // ~/Manim Studio: not synced
-  documents: FolderInfo // Documents/Manim Studio: the default before 0.11, often synced
-  current: string
-}
-
 export interface Subtitle {
   start: number
   end: number
@@ -1084,7 +1078,6 @@ export interface StudioApi {
   setWatched(dir: string, watched: boolean): Promise<void>
   renderServers(): Promise<RenderServer[]>
   /** Where projects can go (ADR 0043): a local folder, Documents and whether a cloud drive syncs it, the one in use. */
-  projectsFolders(): Promise<ProjectsFolders>
   /** What a folder holds (a returning user's projects) and whether it's synced. */
   inspectFolder(dir: string): Promise<FolderInfo>
   useProjectsFolder(dir: string): Promise<Settings>

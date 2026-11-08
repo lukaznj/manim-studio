@@ -74,7 +74,7 @@ import * as ex from './exercises'
 import { saveVideoCopy, videoCopyInfo } from './save-copy'
 import { agentRoutes } from './agent'
 import { videoEncoder } from './encoder'
-import { inspectFolder, projectsFolders, useProjectsFolder } from './folders'
+import { inspectFolder, useProjectsFolder } from './folders'
 import { clearRenderCache, pruneRenderCache, renderCacheInfo } from './render-cache'
 import {
   addCourseLesson,
@@ -522,7 +522,6 @@ function registerIpc(): void {
   handle('retryFollowUp', (dir: string) => retryFollowUp(dir))
   handle('setWatched', (dir: string, watched: boolean) => setWatched(dir, watched, ex.watchedChanged))
   handle('renderServers', () => listServers())
-  handle('projectsFolders', () => projectsFolders())
   handle('inspectFolder', (dir: string) => inspectFolder(dir))
   handle('useProjectsFolder', (dir: string) => useProjectsFolder(dir))
   handle('renderCacheInfo', () => renderCacheInfo())
