@@ -2126,9 +2126,13 @@
 .new-box { display: grid; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--field); transition: border-color .15s, box-shadow .15s; }
 .new-box:focus-within { border-color: var(--sun); box-shadow: 0 0 0 3px var(--sun-soft); }
 .new-box.dragging { border-style: dashed; border-color: var(--sun); background: var(--sun-soft); }
-.new-input { display: block; width: 100%; min-height: 140px; resize: vertical; padding: 14px 16px 8px; border: 0; outline: none; background: transparent; color: var(--text); font: 13px/1.6 var(--font-ui); }
+.new-input { display: block; width: 100%; min-height: 140px; resize: none; padding: 14px 16px 8px; border: 0; outline: none; background: transparent; color: var(--text); font: 13px/1.6 var(--font-ui); }
 .new-input::placeholder { color: var(--text-3); }
 .new-files { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px 10px; }
 .new-files .lang-chip.unused { opacity: .5; }
 .new-extras { display: flex; gap: 4px; margin-right: auto; }
+.settings-body .set-section { margin: 26px 0 4px; padding-top: 18px; border-top: 1px solid var(--line); font: 700 13px var(--font-ui); color: var(--text-2); letter-spacing: .02em; }
+.set-advanced { margin-top: 14px; }
+.set-advanced > summary { cursor: pointer; padding: 8px 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
+.set-advanced[open] > summary { margin-bottom: 6px; }
 
