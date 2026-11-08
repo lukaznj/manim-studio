@@ -17,6 +17,8 @@ import { Modal } from './ui'
  */
 export function SeriesDialog() {
   const open = useStore((s) => s.dialog?.kind === 'series')
+  const request = useStore((s) => (s.dialog?.kind === 'series' ? s.dialog.request : undefined))
+  const [autoPlan, setAutoPlan] = useState(false)
   const defaultVoice = useStore((s) => s.settings?.defaultVoice)
   const defaults = useStore((s) => s.settings)
   const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
@@ -62,6 +64,18 @@ export function SeriesDialog() {
     setDraftReady(false)
     loaded.current = false
     let active = true
+    // From New: the request is the form, and planning starts at once.
+    if (request) {
+      setPdfs(request.pdfs)
+      setNoPdfs(!request.pdfs.length)
+      setTopic(request.pdfs.length ? '' : request.text)
+      setInstructions(request.pdfs.length ? request.text : '')
+      setStep('details')
+      loaded.current = true
+      setDraftReady(true)
+      setAutoPlan(true)
+      return
+    }
     void api.seriesDraft().then((draft) => {
       if (!active) return
       if (draft) {
@@ -175,6 +189,11 @@ export function SeriesDialog() {
       setBusy(null)
     }
   }
+  useEffect(() => {
+    if (!autoPlan || !draftReady) return
+    setAutoPlan(false)
+    if (!voiceIssue) void makePlan()
+  }, [autoPlan, draftReady])
   const cancelPlan = () => {
     cancelled.current = true
     void api.cancelSeriesPlan()
@@ -311,11 +330,6 @@ export function SeriesDialog() {
       ) : !plan && step === 'material' ? (
         <div className="modal-body quick-form">
           {!!savedPlans.length && <details className="saved-series-plans"><summary>{uiText('Saved plans')} · {savedPlans.length}</summary>{savedPlans.map((saved) => <button className="btn ghost" key={saved.id} onClick={() => restorePlan(saved)}><Library />{saved.plan?.title}</button>)}</details>}
-          <p className="hint">
-            {uiText(
-              "Add a course's material, one PDF per lecture for example. Your selected agent reads it all and proposes the lessons: usually one per PDF, merged or split where that makes better videos. You review the plan before anything is made.",
-            )}
-          </p>
           <div
             className={`series-pdfs ${dragging ? 'dragging' : ''}`}
             onDragOver={(e) => {

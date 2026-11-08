@@ -1173,9 +1173,10 @@
 .export-option {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: 8px 18px;
 }
+.export-summary { margin: 4px 0 0; font-size: 11px; }
 .export-option .hint {
   margin-top: 2px;
 }
@@ -2116,4 +2117,18 @@
 .watched-check svg { width: 15px; height: 15px; }
 .watched-check:hover { border-color: var(--mint); color: var(--mint); }
 .watched-check.on { border-color: var(--mint); background: var(--mint); color: #08240f; }
+
+/* New (NewDialog.tsx): what to make, one box for the request and its files, the defaults. */
+.new-dialog { display: grid; gap: 14px; }
+.new-dialog > .tabs { justify-self: start; }
+.new-dialog > .tabs button { display: inline-flex; align-items: center; gap: 7px; padding-inline: 14px; }
+.new-dialog > .tabs svg { width: 14px; height: 14px; }
+.new-box { display: grid; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--field); transition: border-color .15s, box-shadow .15s; }
+.new-box:focus-within { border-color: var(--sun); box-shadow: 0 0 0 3px var(--sun-soft); }
+.new-box.dragging { border-style: dashed; border-color: var(--sun); background: var(--sun-soft); }
+.new-input { display: block; width: 100%; min-height: 140px; resize: vertical; padding: 14px 16px 8px; border: 0; outline: none; background: transparent; color: var(--text); font: 13px/1.6 var(--font-ui); }
+.new-input::placeholder { color: var(--text-3); }
+.new-files { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px 10px; }
+.new-files .lang-chip.unused { opacity: .5; }
+.new-extras { display: flex; gap: 4px; margin-right: auto; }
 

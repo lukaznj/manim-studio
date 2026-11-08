@@ -1,4 +1,4 @@
-import { t as uiText, localize, format, LESSONS, EXERCISES } from '../lib/i18n'
+import { t as uiText, format, LESSONS, EXERCISES } from '../lib/i18n'
 import { ChevronLeft, Clapperboard, Download, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Trash2, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ExerciseSet, ProjectSummary } from '../../../shared/types'
@@ -13,25 +13,21 @@ import {
   openExerciseSet,
   openProject,
   openWatch,
-  pickAndOpenProject,
   refreshProjects,
   updateSettings,
   useStore,
 } from '../store'
-import { Modal, Tabs } from './ui'
+import { Tabs } from './ui'
 import { SeriesTitle } from './SeriesTitle'
 import { productionVisible, seriesStatus } from '../../../shared/series-presentation'
 
 export function Home() {
-  const [adding, setAdding] = useState(false)
   const all = useStore((s) => s.projects)
   const projects = useMemo(() => all.filter((p) => !p.exercise && !p.extra), [all]) // exercises show in their set's card, follow-ups under their episode
   const allSets = useStore((s) => s.exerciseSets)
   const sets = useMemo(() => allSets.filter((x) => !x.course), [allSets]) // a course's own set shows in its series' card
   const editing = useStore((s) => !studying(s)) // Learn: a library to watch, no editor (ADR 0029); Both has a tab for each
   const both = useStore((s) => s.settings?.mode === 'both')
-  const claude = useStore((s) => s.claude)
-  const signedOut = !!claude && !claude.loggedIn
 
   useEffect(() => offerTour('home'), [])
   useEffect(() => {
@@ -73,7 +69,7 @@ export function Home() {
                 />
               </div>
             )}
-            <button className="btn primary" data-tour="home-add" aria-label={uiText('Add video, course or exercises')} onClick={() => setAdding(true)}>
+            <button className="btn primary" data-tour="home-add" aria-label={uiText('Add video, course or exercises')} onClick={() => openDialog({ kind: 'new' })}>
               <Plus /><span>{uiText('New')}</span>
             </button>
           </div>
@@ -81,7 +77,7 @@ export function Home() {
 
         {projects.length === 0 && !sets.length ? (
           <div className="library-empty" data-tour="home-library">
-            <button className="library-add" aria-label={uiText('Add your first video, course or exercises')} onClick={() => setAdding(true)}>
+            <button className="library-add" aria-label={uiText('Add your first video, course or exercises')} onClick={() => openDialog({ kind: 'new' })}>
               <Plus />
             </button>
             <p className="muted">{uiText('Add a video, course or exercise set')}</p>
@@ -132,58 +128,6 @@ export function Home() {
             )}
           </section>
         )}
-        <Modal open={adding} onClose={() => setAdding(false)} title={uiText('What would you like to make?')} width={560}>
-          <div className="modal-body creation-choices">
-            {signedOut && (
-              <button
-                className="btn ghost"
-                onClick={() => {
-                  setAdding(false)
-                  openDialog({ kind: 'settings', tab: 'accounts' })
-                }}
-              >
-                {uiText('Connect your AI agent to make videos')}
-              </button>
-            )}
-            {[
-              { kind: 'quick' as const, title: 'Quick video', text: 'Describe a topic and get a finished video.', icon: <Zap /> },
-              {
-                kind: 'series' as const,
-                title: editing ? 'New course' : 'New course',
-                text: 'Turn your material into a sequence of lessons.',
-                icon: <Library />,
-              },
-              { kind: 'exercises' as const, title: 'Exercises', text: 'Get checked solutions and a video for each exercise.', icon: <GraduationCap /> },
-              ...(editing
-                ? [{ kind: 'new-project' as const, title: 'New project', text: 'Open the editor and build a video with your agent.', icon: <Plus /> }]
-                : []),
-            ].map((item) => (
-              <button
-                className="provider-card creation-choice"
-                key={item.kind}
-                onClick={() => {
-                  setAdding(false)
-                  openDialog({ kind: item.kind })
-                }}
-              >
-                {item.icon}
-                <strong>{localize(item.title)}</strong>
-                <span className="hint">{localize(item.text)}</span>
-              </button>
-            ))}
-            {editing && (
-              <button
-                className="btn ghost"
-                onClick={() => {
-                  setAdding(false)
-                  void pickAndOpenProject()
-                }}
-              >
-                <FolderOpen /> {uiText(' Open folder…')}
-              </button>
-            )}
-          </div>
-        </Modal>
       </div>
     </div>
   )
