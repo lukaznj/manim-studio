@@ -64,6 +64,7 @@ import { exerciseBrief } from './exercises'
 import { momentNote } from '../shared/moment'
 import { fakeAgents, fakeReadOnly } from './agent-fake'
 import { studyReply } from './study-assistant'
+import { aboutYouBrief, rememberLine } from './about-you'
 
 type Sdk = typeof import('@anthropic-ai/claude-agent-sdk')
 let sdkPromise: Promise<Sdk> | null = null
@@ -470,6 +471,16 @@ async function codexChat(dir: string, text: string, frame?: string): Promise<voi
         thread: (id) => project() && project()!.meta.codexThreadId !== id && updateMeta({ codexThreadId: id }),
       })
   finishTurn(result.ok, result.error)
+}
+
+/** The user's answer to a line the study chat proposed for "What Studio knows about you". */
+export function chatRemember(messageId: string, save: boolean): void {
+  const message = messages.find((m) => m.id === messageId)
+  if (message?.memoryProposal?.state !== 'offered') return
+  if (save) rememberLine(message.memoryProposal.text)
+  message.memoryProposal = { ...message.memoryProposal, state: save ? 'saved' : 'dismissed' }
+  writeChat(messages)
+  emit({ type: 'message', message })
 }
 
 export async function chatInterrupt(): Promise<void> {
@@ -939,6 +950,7 @@ export function studioPrompt(dir: string, agent: Agent, autopilot: boolean): str
       : '',
     mediaNote(dir),
     sourcesNote(dir),
+    aboutYouBrief(),
     'To find something in a long PDF, Grep its text in .studio/sources/<name>/text.txt (one "=== Page N ===" line per page).',
     `The python used for renders is ${pythonExe('default')} (for reference only).`,
   ].join('\n')

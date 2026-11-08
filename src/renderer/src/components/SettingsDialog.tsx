@@ -1274,6 +1274,35 @@ function EnvTab() {
 }
 
 /** The projects folder, and whether a cloud drive syncs it (ADR 0043): allowed, never the default. */
+/** "What Studio knows about you" (ADR 0065): off until turned on; the note is the user's to read and edit. */
+function AboutYouRow() {
+  const on = useStore((s) => !!s.settings?.aboutYou)
+  const [note, setNote] = useState<string | null>(null)
+  useEffect(() => void api.readAboutYou().then(setNote), [])
+  const save = (text: string) => void api.writeAboutYou(text).then(setNote)
+  return (
+    <>
+      <Row title={uiText('What Studio knows about you')} note={uiText('Only on this computer. The study chat and new videos read it.')}>
+        <label className="switch"><input type="checkbox" aria-label={uiText('What Studio knows about you')} checked={on} onChange={(e) => void updateSettings({ aboutYou: e.target.checked })} /><span /></label>
+      </Row>
+      {on && note !== null && (
+        <div className="about-you">
+          <textarea
+            key={note}
+            className="input about-you-note"
+            rows={4}
+            aria-label={uiText('What Studio knows about you')}
+            placeholder={uiText('e.g. First-year electrical engineering. Prefers short answers with one worked example.')}
+            defaultValue={note}
+            onBlur={(e) => e.currentTarget.value.trim() !== note && save(e.currentTarget.value)}
+          />
+          {note && <button className="btn small ghost" onClick={() => save('')}><Trash2 /> {uiText('Clear')}</button>}
+        </div>
+      )}
+    </>
+  )
+}
+
 function ProjectsFolderRow() {
   const dir = useStore((s) => s.settings!.projectsDir)
   const [cloud, setCloud] = useState<string | null>(null)
@@ -1614,6 +1643,7 @@ function AboutTab() {
           />
         </div>
       </Row>
+      <AboutYouRow />
       <ProjectsFolderRow />
       <Row
         title={uiText('Guided tours')}
