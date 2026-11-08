@@ -1,4 +1,4 @@
-import { t as uiText } from '../lib/i18n'
+import { t as uiText, format } from '../lib/i18n'
 import { FolderOpen, ImagePlus, Plus, Sparkles, SquarePlay, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { MediaItem } from '../../../shared/types'
@@ -43,7 +43,7 @@ export function MediaPane() {
       const next = await api.importMedia(paths)
       setItems(next)
       const added = next.length - before
-      if (added > 0) toast(added === 1 ? 'Added 1 file to media/' : `Added ${added} files to media/`, 'ok')
+      if (added > 0) toast(format('Added {0, plural, one {# file} other {# files}} to media/', [added]), 'ok')
     } catch (e) {
       toast(errorText(e), 'error')
       setItems(await api.listMedia())
@@ -56,7 +56,7 @@ export function MediaPane() {
   }
 
   const remove = async (item: MediaItem) => {
-    if (!confirm(`Move “${item.name}” to the Trash? A scene that uses it won’t render until you put it back.`)) return
+    if (!confirm(format('Move “{0}” to the Trash? A scene that uses it won’t render until you put it back.', [item.name]))) return
     setItems(await api.removeMedia(item.name))
   }
 

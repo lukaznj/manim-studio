@@ -88,7 +88,7 @@ export function ExportDialog() {
       const ahead = useStore.getState().exports.filter((j) => j.id !== job.id && (j.state === 'running' || j.state === 'waiting')).length
       toast(
         ahead
-          ? `Export queued after ${ahead === 1 ? 'one other' : `${ahead} others`}. Keep working; Exports in the title bar shows it.`
+          ? format('Export queued after {0, plural, =1 {one other} other {# others}}. Keep working; Exports in the title bar shows it.', [ahead])
           : 'Exporting in the background. Keep working; Exports in the title bar shows it.',
         'ok',
       )
@@ -111,11 +111,11 @@ export function ExportDialog() {
     size === 720
       ? fps === 60
         ? null
-        : 'about half as long'
+        : 'Exporting takes about half as long.'
       : size === 1440 && fps === 60
-        ? 'about twice as long'
+        ? 'Exporting takes about twice as long.'
         : size === 1440 || fps === 60
-          ? 'about 1.5× as long'
+          ? 'Exporting takes about 1.5× as long.'
           : null
   const both = options.themes.length > 1
   const extra = options.languages.filter((l) => l !== original)
@@ -124,7 +124,7 @@ export function ExportDialog() {
   const projectExports = project ? `${project.path}${sep}exports` : ''
   const destination = options.folder ?? projectExports
   const chooseFolder = async () => {
-    const dir = await api.pickFolder('Export to', destination)
+    const dir = await api.pickFolder(uiText('Export to'), destination)
     // The project's own exports/ folder is the default, not a choice to remember.
     if (dir)
       setOptions((o) => ({
@@ -187,7 +187,7 @@ export function ExportDialog() {
               {uiText(
                 '720p is the fastest, plenty to watch on a laptop. 1440p keeps thin lines and small text sharp, also after YouTube compresses the video. 60 fps makes motion smoother.',
               )}
-              {slower && ` Exporting takes ${slower}.`}
+              {slower && ` ${uiText(slower)}`}
             </div>
           </div>
           <div className="export-quality">

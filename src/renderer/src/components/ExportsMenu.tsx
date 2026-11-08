@@ -123,14 +123,14 @@ function ExportsPopover({ jobs, onClose }: { jobs: ExportJob[]; onClose: () => v
 function status(j: ExportJob): string {
   switch (j.state) {
     case 'waiting':
-      return 'Waiting for the export before it'
+      return uiText('Waiting for the export before it')
     case 'running':
-      return `${j.paused ? 'Paused · ' : ''}${j.stage ?? 'Starting'}${j.percent !== undefined ? ` · ${Math.round(j.percent * 100)}%` : ''}`
+      return `${j.paused ? `${uiText('Paused')} · ` : ''}${j.stage ?? uiText('Starting')}${j.percent !== undefined ? ` · ${Math.round(j.percent * 100)}%` : ''}`
     case 'done':
-      return `Done · ${j.result?.files.length ?? 0} files in ${j.result?.folder.split(/[\\/]/).pop()}`
+      return format('Done · {0, plural, one {# file} other {# files}} in {1}', [j.result?.files.length ?? 0, j.result?.folder.split(/[\\/]/).pop()])
     case 'failed':
-      return `Failed: ${j.error}`
+      return format('Failed: {0}', [uiText(j.error ?? '')])
     case 'cancelled':
-      return 'Stopped'
+      return uiText('Stopped')
   }
 }

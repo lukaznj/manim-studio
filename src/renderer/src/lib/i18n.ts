@@ -1,4 +1,4 @@
-import { translateUi } from '../../../shared/i18n'
+import { formatUi, translateUi } from '../../../shared/i18n'
 import { resolveUiLanguage, uiLocale, type UiLanguage } from '../../../shared/ui-languages'
 
 let language: UiLanguage = 'en'
@@ -22,5 +22,5 @@ export function localize<T>(value: T): T {
 
 /** Translate the template first; interpolated user content is always preserved verbatim. */
 export function format(template: string, values: unknown[]): string {
-  return t(template).replace(/\{(\d+)\}/g, (_match, index: string) => String(values[Number(index)] ?? ''))
+  return formatUi(language, template, values)
 }

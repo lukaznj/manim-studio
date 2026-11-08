@@ -52,7 +52,7 @@ export function VoicePicker(props: { language: string; hasKey: boolean; value?: 
       await a.play()
     } catch (e) {
       if (wanted.current === v.id) stop()
-      toast(`The sample of ${v.name} didn’t play: ${errorText(e)}`, 'error')
+      toast(format('The sample of {0} didn’t play: {1}', [v.name, errorText(e)]), 'error')
     }
   }
 

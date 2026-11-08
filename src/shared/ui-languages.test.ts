@@ -63,3 +63,16 @@ test('draft validation catches lost tokens, changed product names and runaway or
   assert.deepEqual(uiCatalogIssues('de', 'Python 3.12', 'Python 3.12'), [])
   assert.deepEqual(uiCatalogIssues('fr', 'Version 2026', 'Version 2026'), [])
 })
+
+test('plural templates pick the language’s own form and keep interpolation verbatim', () => {
+  const files = 'Added {0, plural, one {# file} other {# files}} to media/'
+  assert.equal(formatUi('en', files, [1]), 'Added 1 file to media/')
+  assert.equal(formatUi('en', files, [3]), 'Added 3 files to media/')
+  assert.equal(formatUi('hr', files, [3]), 'Dodane su 3 datoteke u media/')
+  assert.equal(formatUi('hr', files, [5]), 'Dodano je 5 datoteka u media/')
+  assert.equal(formatUi('hr', files, [21]), 'Dodana je 21 datoteka u media/')
+  assert.equal(formatUi('en', 'Done · {0, plural, one {# file} other {# files}} in {1}', [2, '{0}']), 'Done · 2 files in {0}')
+  assert.equal(formatUi('en', '{0, plural, =1 {one other} other {# others}}', [1]), 'one other')
+  assert.deepEqual(uiCatalogIssues('hr', files, 'Dodano {1, plural, other {#}}'), ['placeholders changed'])
+  assert.deepEqual(uiCatalogIssues('hr', files, 'Dodano {0, plural, one {#} few {#}}'), ['placeholders changed'])
+})

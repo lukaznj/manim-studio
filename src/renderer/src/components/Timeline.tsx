@@ -27,8 +27,8 @@ const LOCK_REASON: Record<string, string> = {
 }
 
 function lockText(reason: string): string {
-  if (reason.startsWith('computed:')) return `The duration is an expression (${reason.slice(9)}): change it in code, or ask Claude.`
-  return LOCK_REASON[reason] ?? reason
+  if (reason.startsWith('computed:')) return format('The duration is an expression ({0}): change it in code, or ask Claude.', [reason.slice(9)])
+  return uiText(LOCK_REASON[reason] ?? reason)
 }
 
 export function Timeline() {
@@ -445,7 +445,12 @@ function ClipView(props: {
       if (source === null) return
       markEdited(source)
       void saveScene({ render: true })
-      toast(`Duration ${next.toFixed(1)} s · line ${c.edit.line}${c.repeat && c.repeat > 1 ? ` (all ${c.repeat} repeats)` : ''}`, 'ok')
+      toast(
+        c.repeat && c.repeat > 1
+          ? format('Duration {0} s · line {1} (all {2} repeats)', [next.toFixed(1), c.edit.line, c.repeat])
+          : format('Duration {0} s · line {1}', [next.toFixed(1), c.edit.line]),
+        'ok',
+      )
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
