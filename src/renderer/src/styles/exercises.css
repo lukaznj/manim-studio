@@ -417,13 +417,9 @@
   background: radial-gradient(circle at 30% 20%, var(--sun-soft), transparent 60%), var(--raised);
   color: var(--sun-text);
 }
-.exercise-thumb svg {
+.exercise-thumb > svg {
   width: 34px;
   height: 34px;
-}
-.exercise-thumb .mono {
-  font-size: 26px;
-  font-weight: 600;
 }
 
 @media (max-width: 1100px) {
