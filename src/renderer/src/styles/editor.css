@@ -1523,3 +1523,8 @@ body.resizing-y .code-host {
   color: var(--text);
   font: 13px/1.6 var(--font-mono);
 }
+/* Code pane: one header row. Inactive tabs show their icon (the name is in the tooltip). */
+.code-tabs-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.code-tabs-head .file-tab:not([aria-selected='true']) .tab-label { display: none; }
+.code-tabs-head > .pane-actions { display: flex; gap: 6px; flex: none; }
+
