@@ -89,7 +89,7 @@
 div.study-notes-body { cursor: text; }
 div.study-notes-body:hover { background: color-mix(in srgb, var(--raised) 45%, transparent); }
 div.study-notes-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sun-soft); }
-.study-notes-body.empty > p, .study-notes-input::placeholder { color: var(--text-3); }
+.study-notes-body.is-empty > p, .study-notes-input::placeholder { color: var(--text-3); }
 .study-notes-body > :first-child { margin-top: 0; }
 .study-notes-body > :last-child { margin-bottom: 0; }
 .study-notes-input { resize: none; overflow: hidden; }
@@ -219,3 +219,8 @@ div.study-notes-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sun-soft)
 .narration-recovery.using-fallback { background: var(--raised); }
 .narration-recovery .narration-recovery-error { color: var(--coral); }
 .preview-pane > .narration-recovery { margin: 8px 10px; padding: 12px; max-height: 210px; overflow: auto; }
+/* Your question with its frame: a small picture beside the words, not a banner above them. */
+.study-chat .msg.user:has(.msg-frame-button) { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.study-chat .msg.user:has(.msg-frame-button) .msg-attach { margin: 0; }
+.study-chat .msg-attach .msg-frame-button img { max-width: 76px; height: 44px; }
+

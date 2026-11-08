@@ -142,7 +142,7 @@ export function Timeline() {
   const width = duration * scale + 28
 
   return (
-    <div className="timeline">
+    <div className={`timeline ${timeline && !timeline.voice.length && !timeline.subtitles.length ? 'no-voice' : ''}`}>
       <Toolbar timeline={timeline} scale={scale} loop={loop} setLoop={setLoop} zoomTo={zoomTo} onFit={() => setFit(true)} fit={fit} />
       <div className="tl-body">
         <div className="tl-labels" style={{ width: LABEL_W }}>
@@ -395,7 +395,7 @@ function Ruler({ duration, scale }: { duration: number; scale: number }) {
 
 function clipLabel(c: Clip): string {
   if (c.kind === 'wait') return 'wait'
-  return c.anims.map((a) => (a.name === 'animate' ? '.animate' : a.name)).join(' · ')
+  return c.anims.map((a) => (a.name === 'animate' ? (a.methods?.length ? `.${a.methods.join('.')}` : '.animate') : a.name)).join(' · ')
 }
 
 function ClipView(props: {

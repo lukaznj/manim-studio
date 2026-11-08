@@ -12,6 +12,7 @@ import { slugify } from './slug'
 import { paths } from './paths'
 import { getSettings, rememberProject, setSettings } from './settings'
 import { readAtomicJson, writeAtomicJson } from './atomic-json'
+import { isWatched } from './watched'
 
 export interface Current {
   path: string
@@ -90,6 +91,7 @@ export function listProjects(): ProjectSummary[] {
         series: meta.series,
         exercise: meta.exercise,
         extra: !!meta.extra,
+        watched: isWatched(dir),
       })
     } catch {
       // unreadable project.json: skip it

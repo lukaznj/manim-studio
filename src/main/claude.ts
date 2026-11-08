@@ -258,7 +258,7 @@ export async function chatSelectModel(value: ModelRoute): Promise<void> {
   const option = route && (await fallbackModels()).find((option) => modelRouteKey(option.route) === modelRouteKey(route))
   if (!option) throw new Error('Connect this agent under Accounts first.')
   if (turn || foreground || agentBusy.has(p.path)) throw new Error('Wait for the current message to finish before switching models.')
-  if (requireProject().path !== p.path) throw new Error('The open episode changed. Select its model again.')
+  if (requireProject().path !== p.path) throw new Error('The open lesson changed. Select its model again.')
   if (route.effort && !option.efforts.includes(route.effort) && option.efforts.length) route.effort = option.route.effort
   closeChat()
   messages = readChat(p.path)

@@ -53,7 +53,7 @@ export function UsageDialog() {
       <div className="modal-body usage-dialog">
         {settings && <AccountPlanUsage agent={settings.agent} auth={configuredAuth(settings, settings.agent)} />}
         {!log.length ? (
-          <p className="muted">{uiText('No agent turns recorded yet. Every turn from now on is (chat, quick mode and series).')}</p>
+          <p className="muted">{uiText('No agent turns recorded yet. Every turn from now on is (chat, quick mode and course).')}</p>
         ) : (
           <>
             <p className="muted">

@@ -17,6 +17,10 @@ Projects went to `Documents/Manim Studio`. Documents is synced by iCloud on many
 - **Onboarding asks where projects go** (after "What will you do?"): only on this computer (recommended), in Documents (saying when iCloud, OneDrive, Dropbox or Google Drive syncs it, as backup that uses cloud storage), or a folder of the user's own. A synced folder is allowed; Settings → General says when the projects folder is synced (`folders.ts` `cloudSync`).
 - **Returning users:** if the old `Documents/Manim Studio` holds projects, onboarding offers it first, with what it holds ("1 video and 1 course"); "I already have a Manim Studio folder somewhere else…" picks another. Choosing a folder repairs the absolute paths its courses and exercise sets store (another user name, another disk), and Home lists everything in it, a course's own exercise set included.
 
+## Update (0.19.0)
+
+Onboarding no longer asks where projects go ([[0064-simplifying-pass]]). New installs use `~/Manim Studio`; a first run that finds an old `Documents/Manim Studio` with anything in it uses that folder, so a returning user sees their projects. Settings → General changes the folder and repairs moved courses and sets as before.
+
 ## Consequences
 
 - Moving a project, or opening it on another computer, renders it from scratch once.

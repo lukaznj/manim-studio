@@ -1,5 +1,5 @@
 import { app, safeStorage } from 'electron'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Settings } from '../shared/types'
 import { migrateVoice } from '../shared/voice'
@@ -60,7 +60,9 @@ export function getSettings(): Settings {
       // Installs from before 0.11 keep the projects folder they had (Documents), set or not (ADR 0043).
       stored.projectsDir ??= process.env.STUDIO_PROJECTS_DIR ?? paths.legacyProjectsDir()
     } catch {
-      // first run, or a corrupt file: fall back to defaults
+      // First run, or a corrupt file: defaults, but a returning user's old folder keeps its projects in view (ADR 0043).
+      const legacy = paths.legacyProjectsDir()
+      if (!process.env.STUDIO_PROJECTS_DIR && existsSync(legacy) && readdirSync(legacy).some((n) => !n.startsWith('.'))) stored.projectsDir = legacy
     }
     if (stored.defaultVoice) stored.defaultVoice = migrateVoice(stored.defaultVoice)
     const base = defaults()

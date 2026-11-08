@@ -5,7 +5,7 @@ import { t } from '../lib/i18n'
 export const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
 /** A native top-layer popover also works above a fullscreen video. */
-export function PlaybackSpeed({ rate, onChange, onOpen }: { rate: number; onChange: (rate: number) => void; onOpen: (open: boolean) => void }) {
+export function PlaybackSpeed({ rate, onChange, onOpen, autoplay }: { rate: number; onChange: (rate: number) => void; onOpen: (open: boolean) => void; autoplay?: { on: boolean; onChange: (on: boolean) => void } }) {
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
@@ -83,6 +83,12 @@ export function PlaybackSpeed({ rate, onChange, onOpen }: { rate: number; onChan
             {rate === value && <Check />}
           </button>
         ))}
+        {autoplay && (
+          <button role="menuitemcheckbox" aria-checked={autoplay.on} tabIndex={-1} className="study-speed-autoplay" onClick={() => autoplay.onChange(!autoplay.on)}>
+            <span>{t('Autoplay next lesson')}</span>
+            {autoplay.on && <Check />}
+          </button>
+        )}
       </div>
     </>
   )

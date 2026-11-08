@@ -5,7 +5,7 @@ import { t as uiText } from '../lib/i18n'
 import { errorText, refreshProjects, toast, useStore } from '../store'
 
 /** A series' title in its folder view; the pencil turns it into a field (Enter saves, Escape cancels). */
-export function SeriesTitle({ folder, title, label = 'Rename series' }: { folder: string; title: string; label?: string }) {
+export function SeriesTitle({ folder, title, label = 'Rename course' }: { folder: string; title: string; label?: string }) {
   const [draft, setDraft] = useState<string | null>(null)
   const cancelled = useRef(false) // Escape: the field's blur mustn't save
   const save = async () => {
@@ -44,7 +44,7 @@ export function SeriesTitle({ folder, title, label = 'Rename series' }: { folder
     <input
       className="input series-rename"
       autoFocus
-      aria-label={uiText(label === 'Rename series' ? 'Series title' : 'Title')}
+      aria-label={uiText(label === 'Rename course' ? 'Course title' : 'Title')}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onFocus={(e) => e.target.select()}

@@ -266,10 +266,10 @@ export function courseExercises(series: string): string {
   const folder = join(series, 'exercises')
   if (!existsSync(setFile(folder))) {
     const file = join(series, 'series.json')
-    if (!existsSync(file)) throw new Error('That folder isn’t a series any more (its series.json is gone).')
+    if (!existsSync(file)) throw new Error('That folder isn’t a course any more (its series.json is gone).')
     const { plan, episodes } = JSON.parse(readFileSync(file, 'utf8')) as { plan: { title: string }; episodes: string[] }
     const first = episodes.map((name) => join(series, name)).find((d) => existsSync(join(d, 'project.json')))
-    if (!first) throw new Error('The series has no episodes yet.')
+    if (!first) throw new Error('The course has no lessons yet.')
     const meta = readMeta(first)
     mkdirSync(folder, { recursive: true })
     writeSetFile(folder, {
