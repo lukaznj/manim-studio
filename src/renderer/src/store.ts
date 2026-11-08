@@ -80,15 +80,17 @@ export function renderProgress(r: RenderState): { label: string; detail: string;
   }
 }
 
+/** What the New dialog makes (NewDialog.tsx). */
+export type Make = 'video' | 'course' | 'exercises'
+
 export type Dialog =
+  | { kind: 'new'; make?: Make }
   | { kind: 'new-project' }
   | { kind: 'settings'; tab?: 'account' | 'accounts' | 'voice' | 'video' | 'env' | 'about' }
   | { kind: 'booth'; key?: string }
   | { kind: 'export' }
-  | { kind: 'quick' }
-  | { kind: 'series' }
+  | { kind: 'series'; request?: { pdfs: string[]; text: string } } // planning a course; a request from New plans at once
   | { kind: 'usage' }
-  | { kind: 'exercises' } // a new exercise set
   | { kind: 'add-exercises' } // more exercises for the open set
   | { kind: 'lecture' }
   | { kind: 'save-video'; project: string } // Save video (ADR 0062)
@@ -578,11 +580,11 @@ function onMenu({ action, path, value }: { action: MenuAction; path?: string; va
     case 'new-project':
       return openDialog({ kind: 'new-project' })
     case 'quick':
-      return openDialog({ kind: 'quick' })
+      return openDialog({ kind: 'new', make: 'video' })
     case 'series':
-      return openDialog({ kind: 'series' })
+      return openDialog({ kind: 'new', make: 'course' })
     case 'exercises':
-      return openDialog({ kind: 'exercises' })
+      return openDialog({ kind: 'new', make: 'exercises' })
     case 'open-project':
       return void pickAndOpenProject()
     case 'open-recent':

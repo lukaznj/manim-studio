@@ -157,7 +157,7 @@ export function Onboarding() {
             {step === 'connect' && <ConnectPage agent={settings.agent} />}
             {step === 'voice' && <VoicePage />}
             {step === 'done' && (
-              <DonePage mode={mode} onFirstVideo={() => void finish(() => openDialog({ kind: 'quick' }))} onFix={(s) => go(STEPS.indexOf(s))} />
+              <DonePage mode={mode} onFirstVideo={() => void finish(() => openDialog({ kind: 'new', make: 'video' }))} onFix={(s) => go(STEPS.indexOf(s))} />
             )}
             {error && (
               <p className="onb-error" role="alert">

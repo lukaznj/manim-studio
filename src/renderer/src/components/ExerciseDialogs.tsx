@@ -1,13 +1,10 @@
 import { t as uiText, format } from '../lib/i18n'
-import { Film, FileText, GraduationCap, Image, Plus, X } from 'lucide-react'
+import { Film, FileText, Image, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { DEFAULT_TONE } from '../../../shared/tone'
-import type { Aspect, ExerciseInput, Theme, Tone } from '../../../shared/types'
+import type { ExerciseInput } from '../../../shared/types'
 import { api } from '../lib/api'
-import { closeDialog, createExerciseSet, errorText, openDialog, toast, useStore } from '../store'
-import { voiceProblem } from './SettingsDialog'
+import { closeDialog, errorText, toast, useStore } from '../store'
 import { Modal } from './ui'
-import { useVoiceFor } from './VoicePicker'
 
 const FILE = /\.(png|jpe?g|gif|webp|pdf)$/i
 const fileName = (p: string) => p.split(/[\\/]/).pop() ?? p
@@ -74,98 +71,6 @@ function ExerciseInputFields({ input, onChange }: { input: ExerciseInput; onChan
 
 const empty = (): ExerciseInput => ({ text: '', files: [] })
 const hasInput = (i: ExerciseInput) => !!i.text.trim() || !!i.files.length
-
-/** A new exercise set: its first exercises and how its videos sound and look. */
-export function NewExerciseSetDialog() {
-  const open = useStore((s) => s.dialog?.kind === 'exercises')
-  const defaultVoice = useStore((s) => s.settings?.defaultVoice)
-  const defaults = useStore((s) => s.settings)
-  const hasKey = useStore((s) => !!s.settings?.hasElevenLabsKey)
-  const omnivoice = useStore((s) => s.setup?.omnivoice)
-  const elevenLabsCheck = useStore((s) => s.elevenLabsCheck)
-  const [input, setInput] = useState(empty)
-  const [level, setLevel] = useState('')
-  const aspect: Aspect = '16:9'
-  const theme: Theme = defaults?.defaultTheme ?? 'dark'
-  const tone: Tone = defaults?.defaultTone ?? DEFAULT_TONE
-  const language = defaultVoice?.language ?? 'en'
-  const voice = useVoiceFor(language)
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    setInput(empty())
-    setLevel('')
-    setBusy(false)
-  }, [open]) // a fresh form each time
-  useEffect(() => {
-    if (open && hasKey && defaultVoice?.provider === 'elevenlabs') void api.checkElevenLabsKey().then((c) => useStore.setState({ elevenLabsCheck: c }))
-  }, [open, hasKey])
-
-  const voiceIssue = voiceProblem(voice, hasKey, omnivoice, elevenLabsCheck)
-  const start = async () => {
-    if (!hasInput(input) || busy || voiceIssue) return
-    setBusy(true)
-    const ok = await createExerciseSet({
-      title: '',
-      level,
-      language,
-      aspect,
-      theme,
-      tone,
-      voice,
-      input,
-    })
-    if (!ok) setBusy(false)
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={closeDialog}
-      title={uiText('New exercise set')}
-      icon={<GraduationCap className="head-icon" />}
-      width={680}
-      footer={
-        <>
-          <button className="btn ghost" onClick={closeDialog}>
-            {uiText('Cancel')}
-          </button>
-          <button className="btn primary" disabled={!hasInput(input) || busy || !!voiceIssue} title={voiceIssue ?? undefined} onClick={() => void start()}>
-            {busy ? <span className="spinner" /> : <GraduationCap />} {uiText(" Solve them")}
-          </button>
-        </>
-      }
-    >
-      <div className="modal-body quick-form">
-        <p className="hint">
-          {uiText(
-            'Give it exercises, one or a whole sheet. Claude reads them, writes a checked step-by-step solution for each, then makes a short video of it. You can add more at any time, ask about any step, and join the videos into a lecture.',
-          )}
-        </p>
-        <ExerciseInputFields input={input} onChange={setInput} />
-        <div className="field">
-          <label htmlFor="ex-level">{uiText('Who it’s for')}</label>
-          <input
-            id="ex-level"
-            className="input"
-            placeholder={uiText('e.g. Croatian matura, first-year physics')}
-            value={level}
-            onChange={(e) => setLevel(e.target.value)}
-          />
-        </div>
-        {voiceIssue && (
-          <div className="quick-warning">
-            {voiceIssue}{' '}
-            <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'voice' })}>
-              {uiText('Choose one in Settings → Voice')}
-            </button>
-          </div>
-        )}
-      </div>
-    </Modal>
-  )
-}
 
 /** More exercises for the open set. */
 export function AddExercisesDialog() {

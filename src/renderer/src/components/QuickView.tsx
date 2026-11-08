@@ -41,7 +41,7 @@ export function QuickView() {
           {run.state === 'done' && <button className="btn primary" onClick={() => void openWatch(run.project)}><Play />{t('Watch it')}</button>}
           {editing && <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>{t('Open in the editor')}</button>}
           {run.result && <button className="btn" onClick={() => void api.reveal(run.result!.files[0] ?? run.result!.folder)}><FolderOpen />{revealLabel()}</button>}
-          <button className="btn ghost" onClick={() => openDialog({ kind: 'quick' })}><Zap />{t('Make another')}</button>
+          <button className="btn ghost" onClick={() => openDialog({ kind: 'new', make: 'video' })}><Zap />{t('Make another')}</button>
         </>}
       </div>
       <details className="production-usage"><summary><Globe />{t('Creation settings')}</summary><p className="hint">{format('{0} PDF sources', [run.sources ?? 0])} · {t('Web research available')}</p>{run.route && <AccountPlanUsage agent={run.route.agent} auth={run.route.auth} />}</details>
