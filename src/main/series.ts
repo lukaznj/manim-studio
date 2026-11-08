@@ -57,9 +57,9 @@ export async function planSeries(
   signal?: AbortSignal,
 ): Promise<SeriesPlan> {
   const topic = req.topic?.trim()
-  if (!req.pdfs.length && !topic) throw new Error('Add the PDFs the series is made from, or say what you want to learn.')
+  if (!req.pdfs.length && !topic) throw new Error('Add the PDFs the course is made from, or say what you want to learn.')
   if (fakeAgents()) return fakeSeriesPlan(req, report, signal)
-  if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Accounts): it reads the PDFs and plans the episodes.')
+  if (!(await claudeStatus()).loggedIn) throw new Error('Sign in to your agent first (Settings → Accounts): it reads the PDFs and plans the lessons.')
   const work = join(tmpdir(), 'manim-studio-series', randomUUID())
   try {
     const material: string[] = []
@@ -105,7 +105,7 @@ export async function planSeries(
       signal,
       model: planner.model,
       effort: planner.effort,
-      onUsage: (e) => (usage = { ...e, step: 'Planning the series' }),
+      onUsage: (e) => (usage = { ...e, step: 'Planning the course' }),
       onText: (soFar) => report({ ...progress, stage: /"bible"\s*:/.test(soFar) ? 'bible' : 'planning', episodes: titlesSoFar(soFar) }),
     })
     const plan = parsePlan(
@@ -126,7 +126,7 @@ const two = (n: number) => String(n).padStart(2, '0')
  */
 export function switchSeriesAgent(to: AgentRoute, folder?: string): void {
   const controller = controllerFor(folder)
-  if (controller.series.state === 'done') throw new Error('No series is being made.')
+  if (controller.series.state === 'done') throw new Error('No course is being made.')
   switchSeriesSelection(controller.series, to, seriesSelection(getSettings(), 'make', to.agent))
   controller.save()
 }
@@ -134,7 +134,7 @@ export function switchSeriesAgent(to: AgentRoute, folder?: string): void {
 /** Renames a series everywhere it's shown: each episode's project.json, series.json and a run on Home. Folders keep their names. */
 export function renameSeries(folder: string, title: string): void {
   const name = title.trim()
-  if (!name) throw new Error('Give the series a title.')
+  if (!name) throw new Error('Give the course a title.')
   for (const entry of readdirSync(folder)) {
     const dir = join(folder, entry)
     if (!existsSync(join(dir, 'project.json'))) continue
@@ -154,7 +154,7 @@ export function renameSeries(folder: string, title: string): void {
 /** Creates the series folder and one project per episode; unattended, makes them all in quick mode. */
 export async function startSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>): Promise<string> {
   saveSeriesPlan({ request: { pdfs: start.pdfs, language: start.language, tone: start.tone, topic: !start.pdfs.length ? start.plan.instructions ?? start.plan.title : undefined, instructions: start.plan.instructions }, plan: start.plan })
-  if (creating) throw new Error('A series is already being created. Your plan is saved; try again in a moment.')
+  if (creating) throw new Error('A course is already being created. Your plan is saved; try again in a moment.')
   creating = true
   try {
     const pending = pendingCreation()
@@ -175,7 +175,7 @@ const pendingCreation = () => readAtomicJson(creationFile(), (value): value is S
 })
 
 async function createSeries(start: SeriesStart, openInWindow: (dir: string) => Promise<void>, recovering?: string): Promise<string> {
-  if (!start.plan.episodes.length) throw new Error('The series needs at least one episode.')
+  if (!start.plan.episodes.length) throw new Error('The course needs at least one lesson.')
   if (!recovering) {
     if (start.unattended) await ensureQuickReady(start.plan.episodes[0]?.assignment?.agent)
     const { plan } = start
@@ -184,10 +184,10 @@ async function createSeries(start: SeriesStart, openInWindow: (dir: string) => P
     if (assignments.length) {
       const learning = settings.mode === 'learn' || (settings.mode === 'both' && settings.homeTab === 'learn')
       if (!settings.developerMode || !settings.developerEpisodeModels || !learning || !start.unattended)
-        throw new Error('Enable episode model comparison in Settings → Develop and start the series in Learn.')
-      if (assignments.length !== plan.episodes.length) throw new Error('Choose an agent and model for every episode.')
+        throw new Error('Enable lesson model comparison in Settings → Develop and start the course in Learn.')
+      if (assignments.length !== plan.episodes.length) throw new Error('Choose an agent and model for every lesson.')
       for (const agent of new Set(assignments.map((a) => a.agent))) {
-        if (!['claude', 'codex', 'antigravity'].includes(agent)) throw new Error('Unknown episode agent.')
+        if (!['claude', 'codex', 'antigravity'].includes(agent)) throw new Error('Unknown lesson agent.')
         if (fakeAgents()) continue
         if (!(await claudeStatus(agent)).loggedIn) throw new Error(`Connect ${agent} in Settings → Accounts before starting this series.`)
         const models = await chatModels(agent)
@@ -202,7 +202,7 @@ async function createSeries(start: SeriesStart, openInWindow: (dir: string) => P
   const { plan } = start
   const root = getSettings().projectsDir
   const pending = pendingCreation()
-  if (!recovering && pending) throw new Error('Reopen the app to recover the series that was being created.')
+  if (!recovering && pending) throw new Error('Reopen the app to recover the course that was being created.')
   let folder = recovering ?? join(root, slugify(plan.title))
   if (!recovering) for (let i = 2; existsSync(folder); i++) folder = join(root, `${slugify(plan.title)}-${i}`)
   writeAtomicJson(creationFile(), { start, folder })
@@ -217,7 +217,7 @@ async function createSeries(start: SeriesStart, openInWindow: (dir: string) => P
     const ordered = join(folder, `${two(i + 1)}-${slugify(ep.title)}`)
     const staging = join(folder, '.studio', `creating-${i + 1}`)
     if (existsSync(join(ordered, 'project.json')) && (readMeta(ordered).series?.folder !== folder || readMeta(ordered).series?.episode !== i + 1))
-      throw new Error('An episode folder belongs to another video. Move it before continuing.')
+      throw new Error('A lesson folder belongs to another video. Move it before continuing.')
     if (!existsSync(join(ordered, 'project.json'))) {
       // Only this transaction's disposable staging folder is removed after an interruption.
       rmSync(staging, { recursive: true, force: true })
@@ -288,11 +288,11 @@ export function seriesRunFor(folder: string): SeriesRun | null {
   return saved ? recoveredRun(saved.run) : null
 }
 function controllerFor(folder = selectedFolder): SeriesController {
-  if (!folder) throw new Error('No series is being made.')
+  if (!folder) throw new Error('No course is being made.')
   let controller = controllers.get(folder)
   if (!controller) {
     const saved = readAtomicJson(runFile(folder), isSeriesCheckpoint)
-    if (!saved) throw new Error('The series checkpoint could not be read.')
+    if (!saved) throw new Error('The course checkpoint could not be read.')
     controller = new SeriesController(recoveredRun(saved.run), saved.exportOptions)
     controllers.set(folder, controller)
     unrecovered.delete(folder)
@@ -357,7 +357,7 @@ async function pumpSeriesQueue(): Promise<void> {
   if (!next) return
   pumping = true
   try { selectedFolder = next.series.folder; setSettings({ seriesRun: selectedFolder }); await next.continueSeries() }
-  catch (error) { next.series.state = 'stopped'; next.save(); reportError('The series stopped with an error.', error) }
+  catch (error) { next.series.state = 'stopped'; next.save(); reportError('The course stopped with an error.', error) }
   finally { pumping = false; void pumpSeriesQueue() }
 }
 export function pauseSeries(paused: boolean, folder?: string): void { controllerFor(folder).pauseSeries(paused); void pumpSeriesQueue() }
@@ -482,7 +482,7 @@ class SeriesController {
   retrySeriesEpisode = async (dir: string): Promise<void> => {
     if (shutdownRequested()) return
     const folder = readMeta(dir).series?.folder
-    if (!folder) throw new Error('That video does not belong to a series.')
+    if (!folder) throw new Error('That video does not belong to a course.')
     const run = this.series
     const ep = run?.episodes.find((episode) => episode.dir === dir)
     if (!run || !ep || ep.state !== 'failed') return
@@ -525,7 +525,7 @@ class SeriesController {
   drive = (): Promise<void> => {
     if (this.driving) return this.driving
     this.driving = this.driveLoop().catch((error) => {
-      reportError('The series stopped with an error.', error)
+      reportError('The course stopped with an error.', error)
       this.stopSeries()
     }).finally(() => {
       this.driving = null
@@ -578,7 +578,7 @@ class SeriesController {
 
   track = (task: Promise<void>): void => {
     this.tasks.add(task)
-    void task.catch((error) => reportError('A step of the series failed.', error)).finally(() => this.tasks.delete(task))
+    void task.catch((error) => reportError('A step of the course failed.', error)).finally(() => this.tasks.delete(task))
   }
 
   writeScript = async (ep: EpisodeRun): Promise<void> => {

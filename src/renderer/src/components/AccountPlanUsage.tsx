@@ -22,18 +22,18 @@ export function AccountPlanUsage({ agent, auth = 'account' }: { agent: Agent; au
   if (auth === 'api-key') return null
   const usage = reading?.agent === agent ? reading.usage : null
   const name = agent === 'claude' ? 'Claude' : agent === 'codex' ? 'Codex' : 'Antigravity'
+  if (!usage?.windows.length) return null // nothing to show until the provider reports usage
   return (
     <div className="plan-usage account-plan-usage">
       <div className="eyebrow">{format('{0} account usage · shared with other apps', [name])}</div>
-      {usage?.windows.length ? usage.windows.map((window) => (
+      {usage.windows.map((window) => (
         <div className="plan-usage-row" key={window.label}>
           <span>{window.label.split(' · ').map(t).join(' · ')}</span>
           <span className="usage-bar"><span style={{ width: `${Math.max(0, Math.min(100, window.percent))}%` }} /></span>
           <span className="mono">{format('{0}% used', [Math.round(window.percent)])}</span>
           <span className="hint">{window.resetsAt ? format('resets {0}', [resetTime(window.resetsAt, currentLanguage())]) : ''}</span>
         </div>
-      )) : <p className="hint">{t(reading?.agent === agent ? 'Plan usage is unavailable from this provider.' : 'Checking plan usage…')}</p>}
-      <p className="hint">{t('These are account-wide limits, not usage attributed to this video or series.')}</p>
+      ))}
     </div>
   )
 }

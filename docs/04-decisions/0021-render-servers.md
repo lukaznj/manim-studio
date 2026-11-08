@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: on hold
 date: 2026-10-14
 ---
 
@@ -23,3 +23,8 @@ An export keeps a computer busy for minutes. With a home server around, a friend
 - Anyone with a server's token can run a scene's Python code inside its container. The README says so: share the code only with people you trust, and don't expose the port to the internet without a tunnel that adds its own login.
 - The worker image must match the app's version (the narration cache keys and the runner's options move with it); `/info` reports its version and Settings shows it.
 - Rendering on a slow server can take longer than on the laptop; it's still off the laptop.
+
+## Update (0.19.0): on hold, developer mode only
+
+Nobody uses a render server, and keeping the worker image in step with every release was work for no return. The renderer repository is private for now. The app keeps the code, but pairing lives under Settings → Develop and the export choice only appears in developer mode; a server remembered in a project's export settings is ignored otherwise. We come back to it if offloading exports becomes worth it.
+

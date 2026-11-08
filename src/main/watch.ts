@@ -91,7 +91,7 @@ export function watchSeries(folder: string): WatchSeries {
       episodes: [{ dir: folder, number: 1, title: meta.name, video: exported(folder), watched: isWatched(folder), followUps: [] }],
     }
   }
-  if (!existsSync(file)) throw new Error('That folder isn’t a series any more (its series.json is gone).')
+  if (!existsSync(file)) throw new Error('That folder isn’t a course any more (its series.json is gone).')
   const { plan, episodes } = JSON.parse(readFileSync(file, 'utf8')) as { plan: { title: string }; episodes: string[] }
   const production = seriesRunFor(folder) ?? undefined
   const extras = join(folder, 'extras')
@@ -167,7 +167,7 @@ export async function requestFollowUp(dir: string, at: number, request: string, 
   if (!request.trim()) throw new Error('Say what the new video should explain.')
   const meta = readMeta(dir)
   const s = meta.series
-  if (!s) throw new Error('Follow-up videos are for a series’ episodes.')
+  if (!s) throw new Error('Follow-up videos are for a course’s lessons.')
   const extras = join(s.folder, 'extras')
   mkdirSync(extras, { recursive: true })
   const made = await createProject({

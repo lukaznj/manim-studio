@@ -186,7 +186,7 @@ export function refreshMetricsReport(root: string): string {
     const episode = readEpisodeReport(join(root, name))
     return episode?.metrics.finishedAt ? [episode] : []
   })
-  if (!episodes.length) throw new Error('No saved episode measurements could be read for this report.')
+  if (!episodes.length) throw new Error('No saved lesson measurements could be read for this report.')
   const report = join(root, 'developer-report.html')
   writeFileSync(report, renderMetricsReport(episodes, source.plan.title, language))
   return report

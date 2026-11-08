@@ -89,11 +89,6 @@ body.resizing-y .code-host {
 .editor-pane-title { display: inline-flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 650; color: var(--text-2); }
 .editor-pane-title svg { width: 15px; height: 15px; color: var(--text-3); }
 .editor-preview-head .badge { font-size: 10px; }
-.code-actions-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 42px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
-.code-actions-head.hidden { display: none; }
-.code-file-status { display: inline-flex; align-items: center; min-width: 0; gap: 6px; color: var(--text-3); font: 11px var(--font-mono); }
-.code-file-status svg { width: 13px; height: 13px; }
-.code-actions-head .btn { border-radius: 8px; }
 .file-tab {
   display: inline-flex;
   align-items: center;
@@ -156,7 +151,7 @@ body.resizing-y .code-host {
   .code-pane .pane-tabs .file-tab:not([aria-selected='true']) .tab-label { display: none; }
 }
 @container (max-width: 280px) {
-  .code-pane .code-file-status > svg, .code-pane .pane-actions .render-label { display: none; }
+  .code-pane .pane-actions .render-label { display: none; }
 }
 
 /* ---- code ----------------------------------------------------------------------------------- */
@@ -1523,3 +1518,8 @@ body.resizing-y .code-host {
   color: var(--text);
   font: 13px/1.6 var(--font-mono);
 }
+/* Code pane: one header row. Inactive tabs show their icon (the name is in the tooltip). */
+.code-tabs-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.code-tabs-head .file-tab:not([aria-selected='true']) .tab-label { display: none; }
+.code-tabs-head > .pane-actions { display: flex; gap: 6px; flex: none; }
+

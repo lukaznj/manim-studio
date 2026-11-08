@@ -16,7 +16,7 @@ export interface UsageEntry {
   providerUsage?: Record<string, number> // original CLI counters; no invented category semantics
   costKnown?: boolean // false: this provider did not report an API price
   at: number
-  step: string // "Script", "Video", "Fixing the render", "Chat", "Planning the series"…
+  step: string // "Script", "Video", "Fixing the render", "Chat", "Planning the course"…
   session?: string
   models: Record<string, ModelTokens> // this turn's own use, by model id
   tools: Record<string, number> // tool calls in the turn, by name

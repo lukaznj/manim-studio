@@ -537,7 +537,7 @@ function Composer() {
         />
         <div className="composer-foot">
           {exercise ? <StudyTools /> : <button className="icon-btn" title={uiText('Model and effort settings')} aria-label={uiText('Model and effort settings')} onClick={() => openDialog({ kind: 'settings', tab: 'account' })}><Settings2 /></button>}
-          <ChatRouting />
+          {!exercise && <ChatRouting />}
           {busy ? (
             <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title={uiText('Stop')}>
               <Square />

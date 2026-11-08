@@ -24,7 +24,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0018-quick-mode]] | Quick video uses resumable project-bound background agents, the configured export theme and shared production progress | accepted |
 | [[0019-series-mode]] | Series mode: Claude plans episodes and a series bible from a course's PDFs; episodes refer back through series.md | accepted |
 | [[0020-parallel-exports]] | Exports draw slices of the animations in parallel into the shared cache, then render once | accepted |
-| [[0021-render-servers]] | Exports can render on a paired worker (Docker, pairing code with a token); narration stays local | accepted |
+| [[0021-render-servers]] | Exports can render on a paired worker (Docker, pairing code with a token); narration stays local | on hold (developer mode only) |
 | [[0022-codex-as-second-agent]] | Codex as a second agent: installed on demand, its own sign-in, Studio's tools through the MCP bridge | accepted |
 | [[0023-parallel-series-episodes]] | A series writes scripts in order and starts every ready video without an agent-count ceiling | accepted |
 | [[0024-usage-per-project]] | Recorded project tokens; subscription accounts show account-wide limit percentages, with API estimates restricted to known key usage or developer mode | accepted |
@@ -46,7 +46,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
 | [[0041-focused-study-workspace]] | Focused study page with navigation only when needed for standalone videos, collapsible sidebars and resizable assistant, compact video controls and expandable courses | accepted |
 | [[0042-study-playback-preferences]] | Per-video resume and sidebar progress, per-course selected view, continuous playback preserving fullscreen with the assistant, and remembered playback preferences | accepted |
-| [[0043-projects-folder-and-render-cache]] | Render cache in a local, unsynced cache folder (20 GB, LRU); new installs keep projects out of iCloud/OneDrive; onboarding asks where projects go and finds a returning user's folder | accepted |
+| [[0043-projects-folder-and-render-cache]] | Render cache in a local, unsynced cache folder (20 GB, LRU); new installs keep projects out of iCloud/OneDrive; onboarding asks where projects go and finds a returning user's folder (folder question dropped by 0064) | accepted |
 | [[0044-full-window-onboarding]] | Full-window first launch that explains the app, installs the engine and LaTeX in the background from the mode choice, and waits for them before the app opens | accepted |
 | [[0045-series-planner-and-maker]] | Separate series planner; episodes inherit the creation model with an optional advanced override; series without PDFs; planner names titles | accepted |
 | [[0046-app-sounds]] | Short UI cues synthesized with the Web Audio API, played from state transitions (renders you waited for, exports, episodes, series, setup, failures); deduplicated native notifications and attention cues at agent usage limits; on/off and volume in Settings → General | accepted |
@@ -67,3 +67,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0061-browser-motion-inserts]] | Preview-first, cached HTML/SVG/Canvas inserts through every agent, isolated locally and bounded to short 1080p clips | accepted |
 | [[0062-save-video-copy]] | Save video: copy the newest export to a chosen folder (Downloads by default), with subtitles as a same-named .srt, burned in with the viewer’s style inside the subtitle band, or none | accepted |
 | [[0063-maths-in-subtitles]] | Maths in subtitles: a voiceover’s `subcaption` writes it as `$…$` LaTeX, formulas never split; the app typesets it with KaTeX, subtitle files and burned-in text get Unicode, translations keep the LaTeX | accepted |
+| [[0064-simplifying-pass]] | One New composer (video, course, exercises), Settings in four tabs with one Advanced section, course/lesson wording, Croatian "ti", ICU plurals, no explanatory paragraphs, six-step onboarding without the folder question | accepted |

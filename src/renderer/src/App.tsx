@@ -3,12 +3,12 @@ import { useEffect, useRef } from 'react'
 import { BoothDialog } from './components/RecordingBooth'
 import { Editor } from './components/Editor'
 import { ExportDialog } from './components/ExportDialog'
-import { AddExercisesDialog, LectureDialog, NewExerciseSetDialog } from './components/ExerciseDialogs'
+import { AddExercisesDialog, LectureDialog } from './components/ExerciseDialogs'
 import { StudyView } from './components/StudyView'
 import { Onboarding, SetupGate, requiredReady, startInstalls } from './components/Onboarding'
 import { Home } from './components/Home'
 import { NewProjectDialog } from './components/NewProjectDialog'
-import { QuickDialog } from './components/QuickDialog'
+import { NewDialog } from './components/NewDialog'
 import { QuickView } from './components/QuickView'
 import { SeriesDialog } from './components/SeriesDialog'
 import { SettingsDialog } from './components/SettingsDialog'
@@ -70,10 +70,9 @@ export function App() {
       <SaveVideoDialog />
       <BoothDialog />
       <ExportDialog />
-      <QuickDialog />
+      <NewDialog />
       <SeriesDialog />
       <UsageDialog />
-      <NewExerciseSetDialog />
       <AddExercisesDialog />
       <LectureDialog />
       <Tour />

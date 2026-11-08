@@ -363,12 +363,12 @@
 }
 .home-head {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 28px;
 }
-.home-heading { min-width: 0; display: grid; gap: 22px; }
 .home-head h1 {
   margin: 0;
   font: 850 36px/1.15 var(--font-display);
@@ -376,13 +376,14 @@
 }
 .home-mode-switch { width: max-content; max-width: 100%; }
 .home-mode-switch .tabs { gap: 4px; padding: 4px; border-radius: 14px; background: var(--panel); }
-.home-mode-switch .tabs button { flex: none; gap: 9px; min-width: 118px; min-height: 36px; padding: 7px 18px; font-size: 13px; }
+.home-mode-switch .tabs button { flex: none; gap: 8px; min-width: 104px; min-height: 32px; padding: 5px 14px; font-size: 13px; }
 .home-mode-switch .tabs button svg { width: 16px; height: 16px; }
 .home-mode-switch .tabs-indicator { border-radius: 10px; background: light-dark(color-mix(in srgb, var(--sun) 14%, var(--panel)), var(--raised-2)); box-shadow: inset 0 0 0 1px light-dark(color-mix(in srgb, var(--sun) 32%, transparent), color-mix(in srgb, var(--sun) 40%, transparent)); }
 .home-mode-switch .tabs button[aria-selected='true'] { color: var(--sun-text); }
 .home-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   flex: none;
 }
 .home-actions .btn { gap: 8px; min-height: 38px; padding-inline: 16px; border-radius: 12px; }
@@ -764,8 +765,8 @@
   gap: 14px;
   animation: fade-up 0.25s var(--ease-out);
 }
-.subtitle-settings { display: grid; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
-.subtitle-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.subtitle-settings { display: grid; gap: 16px; }
+.subtitle-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .subtitle-settings-head h3 { margin: 0; font-size: 14px; }
 .subtitle-preview { height: 145px; position: relative; overflow: hidden; border-radius: 12px; background: #0b1828; border: 1px solid var(--line-strong); display: grid; place-items: center; }
 .subtitle-preview-formula { color: #c0cee0; font: italic 30px Georgia, serif; }
@@ -777,7 +778,7 @@
 .subtitle-slider input { min-width: 0; flex: 1; accent-color: var(--sun); }
 .subtitle-slider output { min-width: 42px; color: var(--text-2); font: 11px var(--font-mono); text-align: right; }
 .subtitle-color { width: 44px; height: 30px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 3px; background: var(--panel); cursor: pointer; }
-.settings-advanced, .sign-in-log {
+.sign-in-log {
   min-width: 0;
   width: 100%;
 }
@@ -788,12 +789,12 @@
 .account-plan-usage .plan-usage-row {
   grid-template-columns: minmax(0, 1fr) minmax(60px, 140px) max-content minmax(0, 1fr);
 }
-.settings-advanced > summary, .sign-in-log > summary {
+.sign-in-log > summary {
   cursor: pointer;
   color: var(--text-2);
   margin-bottom: 12px;
 }
-.settings-advanced > label {
+.set-advanced > label {
   display: block;
   margin-bottom: 12px;
 }
@@ -1144,46 +1145,18 @@
   display: grid;
   gap: 16px;
 }
-.export-files {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-.export-files li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--r-sm);
-  background: var(--bg);
-  border: 1px solid var(--line);
-}
-.export-files svg {
-  width: 16px;
-  height: 16px;
-  color: var(--text-2);
-}
-.export-files .mono {
-  margin-left: auto;
-  font-size: 11.5px;
-}
+
 .export-option {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: 8px 18px;
 }
+.export-summary { margin: 4px 0 0; font-size: 11px; }
 .export-option .hint {
   margin-top: 2px;
 }
-.export-quality {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
+
 .language-picker {
   grid-column: 1 / -1;
   display: flex;
@@ -1338,10 +1311,7 @@
   display: grid;
   gap: 16px;
 }
-.quick-prompt {
-  min-height: 96px;
-  resize: vertical;
-}
+
 .quick-pdfs {
   display: flex;
   flex-wrap: wrap;
@@ -1755,20 +1725,7 @@
     transform: none;
   }
 }
-.creation-choices {
-  display: grid;
-  gap: 12px;
-}
-.creation-choice {
-  text-align: left;
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  align-items: center;
-  gap: 5px 12px;
-}
-.creation-choice .hint {
-  grid-column: 2;
-}
+
 @media (prefers-reduced-motion: reduce) {
   .library-add {
     transition: none;
@@ -1817,39 +1774,7 @@
   flex-wrap: wrap;
 }
 
-/* Onboarding: where projects go (ProjectsFolderStep.tsx, ADR 0043). */
-.folder-choices {
-  display: grid;
-  gap: 10px;
-}
-.folder-card {
-  display: grid;
-  gap: 4px;
-  text-align: left;
-  min-width: 0;
-}
-.folder-card-head {
-  justify-self: stretch;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.folder-card-head svg {
-  width: 18px;
-  height: 18px;
-  color: var(--sun-text);
-}
-.folder-card-head .folder-card-check {
-  margin-left: auto;
-}
-.folder-card-path {
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-.folder-card-found {
-  font-size: 13px;
-  color: var(--mint);
-}
+/* Projects folder note (Settings → About). */
 .folder-synced {
   display: flex;
   align-items: flex-start;
@@ -2053,16 +1978,12 @@
 .saved-series-plans { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; }
 .saved-series-plans summary { cursor: pointer; color: var(--text-2); }
 .saved-series-plans button { display: flex; width: 100%; justify-content: flex-start; white-space: normal; text-align: left; margin-top: 6px; }
-.creation-estimate { max-width: 65ch; }
-.quick-intro { display: flex; gap: 16px; align-items: flex-start; }
-.quick-intro > span { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 13px; background: var(--sun-soft); color: var(--sun-text); }
-.quick-intro h2 { margin: 0 0 8px; font: 750 21px/1.2 var(--font-display); }
-.quick-intro p { margin: 0; color: var(--text-2); line-height: 1.6; }
+
 .quick-config { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 14px; background: var(--raised); border-radius: var(--r-md); color: var(--text-2); font-size: 11px; }
 .quick-config > span, .quick-config > button { display: inline-flex; align-items: center; gap: 6px; }
 .quick-config svg { width: 14px; height: 14px; flex: none; }
 .quick-config > button { margin-left: auto; }
-.quick-form .quick-prompt { min-height: 130px; resize: vertical; line-height: 1.65; }
+
 @media (prefers-reduced-motion: reduce) { .creation-dial .dial-value { transition: none; animation: none; } }
 @media (max-width: 700px) {
   .quick-view { padding: 24px 16px; }
@@ -2098,3 +2019,39 @@
   display: grid;
   gap: 6px;
 }
+
+/* Home: what a card is, on its picture's corner, so the meta line can say how far along it is. */
+.thumb-kind { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 6px; border-radius: 999px; background: rgb(8 16 30 / 0.72); color: #ffd166; font-size: 10.5px; font-weight: 650; backdrop-filter: blur(6px); }
+.thumb .thumb-kind svg { width: 12px; height: 12px; }
+.series-card-progress.watched::-webkit-progress-value { background: var(--mint); }
+
+/* The ⋯ menu (ui.tsx MoreMenu). */
+.more-menu { margin: 0; min-width: 220px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow-pop); }
+.more-menu > button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font-size: 12.5px; text-align: left; cursor: pointer; }
+.more-menu > button:hover, .more-menu > button:focus-visible { background: var(--raised); outline: none; }
+.more-menu > button > svg { width: 15px; height: 15px; flex: none; color: var(--text-3); }
+.more-menu > button.danger, .more-menu > button.danger > svg { color: light-dark(#b42318, #ffb3a6); }
+/* Watched: a round check beside the title, filled once watched. */
+.watched-check { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1.5px solid var(--line-strong); border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.watched-check svg { width: 15px; height: 15px; }
+.watched-check:hover { border-color: var(--mint); color: var(--mint); }
+.watched-check.on { border-color: var(--mint); background: var(--mint); color: #08240f; }
+
+/* New (NewDialog.tsx): what to make, one box for the request and its files, the defaults. */
+.new-dialog { display: grid; gap: 14px; }
+.new-dialog > .tabs { justify-self: start; }
+.new-dialog > .tabs button { display: inline-flex; align-items: center; gap: 7px; padding-inline: 14px; }
+.new-dialog > .tabs svg { width: 14px; height: 14px; }
+.new-box { display: grid; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--field); transition: border-color .15s, box-shadow .15s; }
+.new-box:focus-within { border-color: var(--sun); box-shadow: 0 0 0 3px var(--sun-soft); }
+.new-box.dragging { border-style: dashed; border-color: var(--sun); background: var(--sun-soft); }
+.new-input { display: block; width: 100%; min-height: 140px; resize: none; padding: 14px 16px 8px; border: 0; outline: none; background: transparent; color: var(--text); font: 13px/1.6 var(--font-ui); }
+.new-input::placeholder { color: var(--text-3); }
+.new-files { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px 10px; }
+.new-files .lang-chip.unused { opacity: .5; }
+.new-extras { display: flex; gap: 4px; margin-right: auto; }
+.settings-body .set-section { margin: 26px 0 12px; padding-top: 18px; border-top: 1px solid var(--line); font: 700 13px var(--font-ui); color: var(--text-2); letter-spacing: .02em; }
+.set-advanced { margin-top: 14px; }
+.set-advanced > summary { cursor: pointer; padding: 8px 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
+.set-advanced[open] > summary { margin-bottom: 6px; }
+
