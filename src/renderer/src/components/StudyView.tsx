@@ -1,5 +1,5 @@
 import { StudyNotes } from './StudyNotes'
-import { t as uiText, format, EXERCISES } from '../lib/i18n'
+import { t as uiText, format } from '../lib/i18n'
 import { BookOpen, FileText, ListChecks, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Sparkles } from 'lucide-react'
 import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import { addCourseExercises, offerTour, openDialog, selectStudied, updateSettings, useStore } from '../store'
@@ -100,8 +100,10 @@ export function StudyView() {
       <aside className="ex-side" data-tour="study-library" id="study-library" inert={!libraryNeeded || leftCollapsed || fullscreen} aria-hidden={!libraryNeeded || leftCollapsed || fullscreen}>
         <div className="study-library-inner">
           <div className="ex-side-head">
-            <div className="study-library-heading"><span className="eyebrow">{series && !single ? uiText('Your course') : uiText('Your library')}</span><button className="icon-btn study-library-hide" title={uiText('Hide library')} aria-label={uiText('Hide library')} aria-expanded={true} aria-controls="study-library" onClick={() => void togglePanel('library', true)}><PanelLeftClose /></button></div>
-            <h2 className="ex-set-title study-course-title">{series && series.folder !== series.episodes[0]?.dir ? <SeriesTitle folder={series.folder} title={production?.title ?? series.title} /> : series?.title ?? <SeriesTitle folder={set!.folder} title={set!.title} label="Rename exercise set" />}</h2>
+            <div className="study-library-heading">
+              <h2 className="ex-set-title study-course-title">{series && series.folder !== series.episodes[0]?.dir ? <SeriesTitle folder={series.folder} title={production?.title ?? series.title} /> : series?.title ?? <SeriesTitle folder={set!.folder} title={set!.title} label="Rename exercise set" />}</h2>
+              <button className="icon-btn study-library-hide" title={uiText('Hide library')} aria-label={uiText('Hide library')} aria-expanded={true} aria-controls="study-library" onClick={() => void togglePanel('library', true)}><PanelLeftClose /></button>
+            </div>
             {series ? (
               <>
                 <p className="faint">{format('{0}/{1} watched', [watched, count])}</p>
@@ -116,11 +118,9 @@ export function StudyView() {
                   <span style={{ width: `${count ? (watched / count) * 100 : 0}%` }} />
                 </div>
               </>
-            ) : (
-              <p className="faint">{format(EXERCISES, [set!.items.length])}</p>
-            )}
+            ) : null}
             {production && showProduction && <ProductionNavigation run={production} selected={!!overview} onClick={() => { setLibrary('lessons'); showSeriesProduction() }} />}
-            {series && (!single || !!series.exercises || !!set) ? (
+            {series && set ? (
               <Tabs
                 label={uiText('Course library')}
                 value={library}
@@ -148,9 +148,7 @@ export function StudyView() {
                   },
                 ]}
               />
-            ) : (
-              <span className="study-library-label">{series ? uiText('Lessons') : uiText('Exercises')}</span>
-            )}
+            ) : null}
             {library === 'exercises' && set && <ExerciseSearch query={query} onQuery={setQuery} />}
             {library === 'lessons' && count > 5 && (
               <label className="ex-search">

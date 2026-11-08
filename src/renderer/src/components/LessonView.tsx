@@ -1,5 +1,5 @@
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowLeft, Check, ChevronDown, CircleAlert, Code2, CornerDownRight, Download, Eye, EyeOff, Play, RotateCcw, Video } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, CircleAlert, Code2, CornerDownRight, Download, Eye, FolderOpen, Play, RotateCcw, Video } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { FollowUp, SeriesRun, WatchDetail, WatchEpisode } from '../../../shared/types'
 import { nextStudyEpisode } from '../../../shared/study-playback'
@@ -11,6 +11,8 @@ import { nearbyFollowUps } from '../../../shared/study-assistant'
 import { EpisodeStatus, ProductionIcon } from './SeriesProduction'
 import { StudyRowProgress } from './StudyRowProgress'
 import { NarrationRecovery } from './NarrationRecovery'
+import { MoreMenu } from './ui'
+import { revealLabel } from '../lib/platform'
 import { narrationStatus } from '../../../shared/narration'
 
 // The study screen's lessons (StudyView.tsx): a series' episodes and follow-ups, or a single video
@@ -41,11 +43,9 @@ export function EpisodeRow({ episode: e, selected, run }: { episode: WatchEpisod
                 ? (e.activity ?? uiText('Making the video'))
                 : e.state === 'failed'
                   ? uiText('Didn’t finish')
-                  : e.watched
-                    ? uiText('Watched')
-                    : e.video
-                      ? uiText('Ready to watch')
-                      : uiText('Preview')}
+                  : e.video
+                    ? null
+                    : uiText('Preview')}
             </StudyRowProgress>
           </span>
           {producing && producing.state !== 'done' ? <span className={`production-row-icon state-${producing.state}`}><ProductionIcon run={run!} episode={producing} /></span> : e.state === 'making' ? (
@@ -144,20 +144,14 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
               <RotateCcw /> {uiText(' Try again')}
             </button>
           )}
-          {detail?.video && (
-            <button className="btn small ghost" title={uiText('Save a copy of this video, to keep or share')} onClick={() => openDialog({ kind: 'save-video', project: dir })}>
-              <Download /> {uiText('Save video')}
-            </button>
-          )}
-          {editing && (
-            <button
-              className="btn small ghost"
-              title={uiText('The code, timeline and voice of this video')}
-              onClick={() => useStore.setState({ screen: 'editor' })}
-            >
-              <Code2 /> {uiText(' Open in editor')}
-            </button>
-          )}
+          <MoreMenu
+            label={uiText('More')}
+            items={[
+              !!detail?.video && { icon: <Download />, label: uiText('Save video'), onClick: () => openDialog({ kind: 'save-video', project: dir }) },
+              editing && { icon: <Code2 />, label: uiText('Open in editor'), onClick: () => useStore.setState({ screen: 'editor' }) },
+              { icon: <FolderOpen />, label: revealLabel(), onClick: () => void api.reveal(dir) },
+            ]}
+          />
         </div>
       </header>
       {src && <NarrationRecovery dir={dir} status={detail.narration} />}
@@ -216,14 +210,10 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
 
 /** Watched or not: marked by itself at 90%, or here by hand. */
 export function WatchedToggle({ dir, watched }: { dir: string; watched: boolean }) {
+  const label = watched ? uiText('Mark as not watched') : uiText('Mark as watched')
   return (
-    <button
-      className={`btn small ${watched ? '' : 'ghost'}`}
-      aria-pressed={watched}
-      onClick={() => void api.setWatched(dir, !watched)}
-      title={watched ? uiText('Mark as not watched') : uiText('Mark as watched')}
-    >
-      {watched ? <Eye /> : <EyeOff />} {watched ? uiText('Watched') : uiText('Not watched')}
+    <button className={`watched-check ${watched ? 'on' : ''}`} aria-pressed={watched} onClick={() => void api.setWatched(dir, !watched)} title={label} aria-label={label}>
+      <Check />
     </button>
   )
 }
