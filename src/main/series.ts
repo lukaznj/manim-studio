@@ -45,6 +45,7 @@ import { protectWork, shutdownRequested } from './work-lifecycle'
 import { saveSeriesDraft, saveSeriesPlan } from './series-draft'
 import { paths } from './paths'
 import { reportError } from './report'
+import { aboutYouBrief } from './about-you'
 
 /** Per PDF, at most this much text goes into the planning request. */
 const MAX_TEXT = 40_000
@@ -101,7 +102,7 @@ export async function planSeries(
     report({ ...progress, stage: 'planning' })
     let usage: UsageEntry | undefined
     const planner = seriesSelection(getSettings(), 'plan')
-    const answer = await askClaude('You plan educational maths and engineering video series. You answer with JSON only.', prompt, 'plan the series', {
+    const answer = await askClaude(['You plan educational maths and engineering video series. You answer with JSON only.', aboutYouBrief()].filter(Boolean).join('\n\n'), prompt, 'plan the series', {
       signal,
       model: planner.model,
       effort: planner.effort,
