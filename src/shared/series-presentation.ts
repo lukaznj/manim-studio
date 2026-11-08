@@ -25,7 +25,7 @@ export function lessonIsBuilding(ep?: EpisodeRun, state?: string): boolean {
 
 export function seriesStatus(run: SeriesRun): string {
   if (run.state === 'queued') return 'Queued'
-  return run.state === 'working' ? 'Making a series' : run.state === 'paused' ? 'Series paused' : run.state === 'stopped' ? 'Stopped' : run.episodes.some((ep) => ep.state === 'failed') ? 'Didn’t finish' : 'Ready to watch'
+  return run.state === 'working' ? 'Making a course' : run.state === 'paused' ? 'Course paused' : run.state === 'stopped' ? 'Stopped' : run.episodes.some((ep) => ep.state === 'failed') ? 'Didn’t finish' : 'Ready to watch'
 }
 
 /** Keep recovery discoverable, but finished successful courses do not need a production screen. */

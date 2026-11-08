@@ -11,7 +11,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'home-add',
       title: 'Start a video',
-      text: 'A quick video from one sentence, a series from your material or a learning goal, a set of exercises, or an empty project to write yourself.',
+      text: 'A quick video from one sentence, a course from your material or a learning goal, a set of exercises, or an empty project to write yourself.',
       learn: {
         title: 'Add something to learn',
         text: 'A quick video on any topic, a course from your lecture PDFs or just from what you want to learn, or exercises with worked solutions and a video each.',
@@ -25,7 +25,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'home-library',
       title: 'Your projects',
-      text: 'Every project is a card. A series opens as a folder of episodes; rename it with the pencil next to its title.',
+      text: 'Every project is a card. A course opens as a folder of lessons; rename it with the pencil next to its title.',
       learn: {
         title: 'Your library',
         text: 'Every course, exercise set and video lands here. A course opens as a folder of lessons; rename it with the pencil next to its title.',
@@ -42,7 +42,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'study-production',
       title: 'What’s being made',
-      text: 'While a series is made, each episode’s progress shows here. Pause it, stop it, or carry on later, even after quitting the app.',
+      text: 'While a course is made, each lesson’s progress shows here. Pause it, stop it, or carry on later, even after quitting the app.',
     },
     {
       target: 'study-library',
