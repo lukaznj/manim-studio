@@ -66,10 +66,7 @@
   font: 10px var(--font-mono);
   opacity: 0.6;
 }
-.study-library-label {
-  color: var(--text-3);
-  font-size: 12px;
-}
+
 .study-library-content {
   min-height: 0;
   overflow: auto;
