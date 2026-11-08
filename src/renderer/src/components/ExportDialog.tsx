@@ -17,10 +17,11 @@ const PROVIDER_NAMES = {
  * versions come from the same scene. Everything lands in exports/<name>/ (see src/main/export.ts).
  * Export queues it and closes: it runs in the background, listed under the title bar's Exports.
  */
-/** Where an export renders: this computer, or a paired render server (ADR 0021). Hidden until one is paired. */
+/** Where an export renders: this computer, or a paired render server (ADR 0021). Developer mode only, once one is paired. */
 export function ExportOn({ value, onChange }: { value?: string; onChange: (server: string | undefined) => void }) {
   const servers = useStore((s) => s.settings?.renderServers ?? [])
-  if (!servers.length) return null
+  const developer = useStore((s) => !!s.settings?.developerMode)
+  if (!servers.length || !developer) return null
   const current = servers.some((s) => s.id === value) ? value : undefined
   return (
     <div className="field">
@@ -65,6 +66,8 @@ export function ExportDialog() {
         ...meta.export,
         size: meta.export?.size ?? settings?.studySize ?? 1080,
         fps: meta.export?.fps ?? (meta.fps === 60 ? 60 : 30),
+        // Render servers are developer-only (ADR 0021): a server remembered from before stays unused.
+        server: settings?.developerMode ? meta.export?.server : undefined,
       })
   }, [open])
 
