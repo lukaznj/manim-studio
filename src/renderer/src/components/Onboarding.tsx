@@ -21,8 +21,7 @@ import { DEFAULT_EL_MODEL } from '../../../shared/voice'
 import { api } from '../lib/api'
 import { format, t } from '../lib/i18n'
 import { LANGUAGES, languageName } from '../lib/languages'
-import { errorText, installComponent, openDialog, refreshClaude, refreshProjects, switchMode, updateSettings, useStore } from '../store'
-import { ProjectsFolderStep } from './ProjectsFolderStep'
+import { errorText, installComponent, openDialog, refreshClaude, switchMode, updateSettings, useStore } from '../store'
 import { AntigravityConsent } from './AntigravityConsent'
 import { SignInLog } from './SignInLog'
 import { ElevenLabsStatus } from './SettingsDialog'
@@ -36,7 +35,8 @@ import { narrationLanguageForUi } from '../../../shared/narration-languages'
  * it needs, one decision per page. It replaces Home until a mode is chosen. Every step saves as it
  * goes, so quitting halfway loses nothing; optional steps can be left for later.
  */
-const STEPS = ['welcome', 'how', 'mode', 'install', 'folder', 'agent', 'connect', 'voice', 'done'] as const
+// Six steps: the projects folder defaults to Documents (Settings → General), and signing in sits with the agent.
+const STEPS = ['welcome', 'mode', 'install', 'agent', 'voice', 'done'] as const
 type Step = (typeof STEPS)[number]
 
 const AGENTS: { id: Agent; name: string; maker: string; plan: string; key: string; keyUrl: string; keyPlace: string }[] = [
@@ -74,7 +74,6 @@ export function Onboarding() {
   const [at, setAt] = useState(0)
   const [dir, setDir] = useState<1 | -1>(1)
   const [mode, setMode] = useState<AppMode>('learn')
-  const [folder, setFolder] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const step = STEPS[at]
@@ -89,10 +88,6 @@ export function Onboarding() {
     setError('')
     try {
       if (step === 'mode') startInstalls(mode)
-      if (step === 'folder' && folder) {
-        useStore.setState({ settings: await api.useProjectsFolder(folder) })
-        await refreshProjects()
-      }
       if (step === 'done') return void (requiredReady(useStore.getState().setup) && (await finish()))
       go(at + 1)
     } catch (e) {
@@ -122,7 +117,7 @@ export function Onboarding() {
   const setup = useStore((s) => s.setup)
   const connected = useStore((s) => !!s.claude?.loggedIn)
   const voiced = settings.defaultVoice.provider === 'elevenlabs' ? !!settings.hasElevenLabsKey : setup?.omnivoice === 'ready'
-  const optional = (step === 'connect' && !connected) || (step === 'voice' && !voiced)
+  const optional = (step === 'agent' && !connected) || (step === 'voice' && !voiced)
   const waiting = step === 'done' && !requiredReady(setup)
   const art: Step = waiting ? 'install' : step // while the last page waits, the stage shows the install
   const allSet = connected && voiced && requiredReady(setup) // the done page's own button is then the main action
@@ -149,12 +144,9 @@ export function Onboarding() {
         <div className="onb-scroll">
           <div className={`onb-page ${dir > 0 ? 'fwd' : 'back'}`} key={step}>
             {step === 'welcome' && <Welcome />}
-            {step === 'how' && <How />}
             {step === 'mode' && <ModePage mode={mode} onChange={setMode} />}
             {step === 'install' && <InstallPage mode={mode} />}
-            {step === 'folder' && <FolderPage folder={folder} onChange={setFolder} />}
-            {step === 'agent' && <AgentPage />}
-            {step === 'connect' && <ConnectPage agent={settings.agent} />}
+            {step === 'agent' && <><AgentPage /><ConnectPage agent={settings.agent} /></>}
             {step === 'voice' && <VoicePage />}
             {step === 'done' && (
               <DonePage mode={mode} onFirstVideo={() => void finish(() => openDialog({ kind: 'new', make: 'video' }))} onFix={(s) => go(STEPS.indexOf(s))} />
@@ -177,12 +169,12 @@ export function Onboarding() {
           )}
           <div className="onb-foot-end">
             {optional && (
-              <button className={step === 'connect' ? 'onb-btn' : 'onb-link'} disabled={busy} onClick={() => go(at + 1)}>
+              <button className={step === 'agent' ? 'onb-btn' : 'onb-link'} disabled={busy} onClick={() => go(at + 1)}>
                 {t('Set up later')}
               </button>
             )}
             {/* Signing in is the page's own action; until it's done, the only way on is to skip. */}
-            {!(optional && step === 'connect') && (
+            {!(optional && step === 'agent') && (
               <button className={`onb-btn ${step === 'done' && allSet ? '' : 'primary'}`} disabled={busy || waiting} onClick={() => void next()}>
                 {step === 'welcome' ? t('Get started') : step === 'done' ? (waiting ? t('Waiting for the install…') : t('Open my library')) : t('Continue')}
                 {step !== 'done' && <ArrowRight />}
@@ -197,12 +189,9 @@ export function Onboarding() {
 
 const CAPTIONS: Record<Step, string> = {
   welcome: 'Maths, explained in motion.',
-  how: 'From your material to a finished video.',
-  mode: 'You can switch any time.',
+  mode: 'Learn, create or both.',
   install: 'Installed once, into Studio’s own folder.',
-  folder: 'Your videos, where you want them.',
   agent: 'The agent writes every scene.',
-  connect: 'Your password never touches Studio.',
   voice: 'Every video is narrated.',
   done: 'Ready when you are.',
 }
@@ -269,34 +258,6 @@ function Welcome() {
   )
 }
 
-function How() {
-  const steps: [ReactNode, string, string][] = [
-    [<BookOpen key="i" />, 'You give it something to explain', 'A topic in a sentence, your lecture PDFs, or photos of exercises.'],
-    [
-      <Wand2 key="i" />,
-      'An AI agent writes the video',
-      'It plans the explanation as a script, then animates every step in code with manim, the library behind 3Blue1Brown.',
-    ],
-    [<Clapperboard key="i" />, 'Studio renders and narrates it', 'Your computer draws the animation, a voice reads the script, and subtitles follow along.'],
-    [<GraduationCap key="i" />, 'You watch, ask and adjust', 'Ask questions about any moment, request a slower explanation, or edit the video yourself.'],
-  ]
-  return (
-    <>
-      <Head eyebrow="How it works" title="From your material to a finished video" />
-      <ol className="onb-steps">
-        {steps.map(([icon, title, text], i) => (
-          <li key={title} style={{ ['--i' as string]: i }}>
-            <span className="onb-step-icon">{icon}</span>
-            <div>
-              <strong>{t(title)}</strong>
-              <span>{t(text)}</span>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </>
-  )
-}
 
 function ModePage({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode) => void }) {
   const items: [AppMode, ReactNode, string, string, string][] = [
@@ -488,17 +449,6 @@ export function SetupGate() {
   )
 }
 
-function FolderPage({ folder, onChange }: { folder: string | null; onChange: (dir: string) => void }) {
-  const say = (en: string, _croatian: string) => t(en)
-  return (
-    <>
-      <Head eyebrow="Your projects" title="Where should your videos go?" />
-      <div className="onb-folder">
-        <ProjectsFolderStep say={say} value={folder} onChange={onChange} />
-      </div>
-    </>
-  )
-}
 
 function AgentPage() {
   const agent = useStore((s) => s.settings!.agent)
@@ -892,7 +842,7 @@ function DonePage({ mode, onFirstVideo, onFix }: { mode: AppMode; onFirstVideo: 
   const voiceReady = v.provider === 'elevenlabs' ? !!settings.hasElevenLabsKey : setup?.omnivoice === 'ready'
   const agentName = AGENTS.find((a) => a.id === settings.agent)!.name
   const rows: [boolean, string, string, Step][] = [
-    [!!claude?.loggedIn, format('Agent: {0}', [agentName]), claude?.loggedIn ? t('Connected') : t('Not connected yet'), 'connect'],
+    [!!claude?.loggedIn, format('Agent: {0}', [agentName]), claude?.loggedIn ? t('Connected') : t('Not connected yet'), 'agent'],
     [
       voiceReady,
       format('Voice: {0}', [v.provider === 'elevenlabs' ? 'ElevenLabs' : 'OmniVoice']),
@@ -966,23 +916,6 @@ function Art({ step, mode }: { step: Step; mode: AppMode }) {
           </text>
         </svg>
       )
-    case 'how':
-      return (
-        <svg viewBox="0 0 400 300" className="onb-svg">
-          <rect className="draw soft" x="30" y="95" width="80" height="105" rx="8" pathLength={1} style={{ ['--d' as string]: '0s' }} />
-          {[120, 140, 160].map((y, i) => (
-            <path key={y} className="draw muted" d={`M46 ${y} H${94 - i * 12}`} pathLength={1} style={{ ['--d' as string]: `${0.3 + i * 0.1}s` }} />
-          ))}
-          <path className="draw arrow" d="M122 148 H158 M150 140 L158 148 L150 156" pathLength={1} style={{ ['--d' as string]: '.7s' }} />
-          <rect className="draw soft" x="168" y="95" width="80" height="105" rx="8" pathLength={1} style={{ ['--d' as string]: '.85s' }} />
-          <text className="pop code" x="208" y="157" style={{ ['--d' as string]: '1.15s' }}>
-            {'{ }'}
-          </text>
-          <path className="draw arrow" d="M260 148 H296 M288 140 L296 148 L288 156" pathLength={1} style={{ ['--d' as string]: '1.35s' }} />
-          <rect className="draw curve" x="306" y="105" width="70" height="86" rx="8" pathLength={1} style={{ ['--d' as string]: '1.5s' }} />
-          <path className="pop play" d="M333 132 L353 148 L333 164 Z" style={{ ['--d' as string]: '1.85s' }} />
-        </svg>
-      )
     case 'mode':
       return (
         <svg viewBox="0 0 400 300" className="onb-svg">
@@ -1000,15 +933,6 @@ function Art({ step, mode }: { step: Step; mode: AppMode }) {
       )
     case 'install':
       return <InstallArt />
-    case 'folder':
-      return (
-        <svg viewBox="0 0 400 300" className="onb-svg">
-          <path className="draw curve" d="M90 100 H170 L190 120 H310 V230 H90 Z" pathLength={1} style={{ ['--d' as string]: '0s' }} />
-          {[0, 1, 2].map((i) => (
-            <rect key={i} className="pop card" x={120 + i * 60} y={150} width="46" height="56" rx="6" style={{ ['--d' as string]: `${0.6 + i * 0.15}s` }} />
-          ))}
-        </svg>
-      )
     case 'agent':
       return (
         <svg viewBox="0 0 400 300" className="onb-svg">
@@ -1033,15 +957,6 @@ function Art({ step, mode }: { step: Step; mode: AppMode }) {
             />
           ))}
           <path className="pop spark" d="M300 118 l6 14 l14 6 l-14 6 l-6 14 l-6 -14 l-14 -6 l14 -6 Z" style={{ ['--d' as string]: '1.6s' }} />
-        </svg>
-      )
-    case 'connect':
-      return (
-        <svg viewBox="0 0 400 300" className="onb-svg">
-          <rect className="draw soft" x="140" y="130" width="120" height="95" rx="14" pathLength={1} style={{ ['--d' as string]: '0s' }} />
-          <path className="draw curve" d="M165 130 V100 Q165 65 200 65 Q235 65 235 100 V130" pathLength={1} style={{ ['--d' as string]: '.35s' }} />
-          <circle className="pop dot" cx="200" cy="172" r="10" style={{ ['--d' as string]: '.8s' }} />
-          <path className="draw curve" d="M200 182 V200" pathLength={1} style={{ ['--d' as string]: '1s' }} />
         </svg>
       )
     case 'voice':
