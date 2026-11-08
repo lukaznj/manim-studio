@@ -363,12 +363,12 @@
 }
 .home-head {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 28px;
 }
-.home-heading { min-width: 0; display: grid; gap: 22px; }
 .home-head h1 {
   margin: 0;
   font: 850 36px/1.15 var(--font-display);
@@ -376,13 +376,14 @@
 }
 .home-mode-switch { width: max-content; max-width: 100%; }
 .home-mode-switch .tabs { gap: 4px; padding: 4px; border-radius: 14px; background: var(--panel); }
-.home-mode-switch .tabs button { flex: none; gap: 9px; min-width: 118px; min-height: 36px; padding: 7px 18px; font-size: 13px; }
+.home-mode-switch .tabs button { flex: none; gap: 8px; min-width: 104px; min-height: 32px; padding: 5px 14px; font-size: 13px; }
 .home-mode-switch .tabs button svg { width: 16px; height: 16px; }
 .home-mode-switch .tabs-indicator { border-radius: 10px; background: light-dark(color-mix(in srgb, var(--sun) 14%, var(--panel)), var(--raised-2)); box-shadow: inset 0 0 0 1px light-dark(color-mix(in srgb, var(--sun) 32%, transparent), color-mix(in srgb, var(--sun) 40%, transparent)); }
 .home-mode-switch .tabs button[aria-selected='true'] { color: var(--sun-text); }
 .home-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   flex: none;
 }
 .home-actions .btn { gap: 8px; min-height: 38px; padding-inline: 16px; border-radius: 12px; }
@@ -2098,3 +2099,9 @@
   display: grid;
   gap: 6px;
 }
+
+/* Home: what a card is, on its picture's corner, so the meta line can say how far along it is. */
+.thumb-kind { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 6px; border-radius: 999px; background: rgb(8 16 30 / 0.72); color: #ffd166; font-size: 10.5px; font-weight: 650; backdrop-filter: blur(6px); }
+.thumb-kind svg { width: 12px; height: 12px; }
+.series-card-progress.watched::-webkit-progress-value { background: var(--mint); }
+
