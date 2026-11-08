@@ -119,7 +119,7 @@ function PlanningPill() {
   const open = useStore((s) => s.dialog?.kind === 'series')
   if (!state || open) return null
   return <button className="exports-pill busy" onClick={() => openDialog({ kind: 'series' })}>
-    {state === 'working' ? <span className="spinner" /> : <Check />} {uiText(state === 'working' ? 'Planning the series' : 'Review the series plan')}
+    {state === 'working' ? <span className="spinner" /> : <Check />} {uiText(state === 'working' ? 'Planning the course' : 'Review the course plan')}
   </button>
 }
 function QuickPill() {

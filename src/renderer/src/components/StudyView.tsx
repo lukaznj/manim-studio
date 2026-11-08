@@ -1,5 +1,5 @@
 import { StudyNotes } from './StudyNotes'
-import { t as uiText, format } from '../lib/i18n'
+import { t as uiText, format, EXERCISES } from '../lib/i18n'
 import { BookOpen, FileText, ListChecks, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Search, Sparkles } from 'lucide-react'
 import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import { addCourseExercises, offerTour, openDialog, selectStudied, updateSettings, useStore } from '../store'
@@ -104,7 +104,7 @@ export function StudyView() {
             <h2 className="ex-set-title study-course-title">{series && series.folder !== series.episodes[0]?.dir ? <SeriesTitle folder={series.folder} title={production?.title ?? series.title} /> : series?.title ?? <SeriesTitle folder={set!.folder} title={set!.title} label="Rename exercise set" />}</h2>
             {series ? (
               <>
-                <p className="faint">{format('{0} of {1} lessons watched', [watched, count])}</p>
+                <p className="faint">{format('{0}/{1} watched', [watched, count])}</p>
                 <div
                   className="study-course-progress"
                   role="progressbar"
@@ -117,7 +117,7 @@ export function StudyView() {
                 </div>
               </>
             ) : (
-              <p className="faint">{format('{0} exercises', [set!.items.length])}</p>
+              <p className="faint">{format(EXERCISES, [set!.items.length])}</p>
             )}
             {production && showProduction && <ProductionNavigation run={production} selected={!!overview} onClick={() => { setLibrary('lessons'); showSeriesProduction() }} />}
             {series && (!single || !!series.exercises || !!set) ? (

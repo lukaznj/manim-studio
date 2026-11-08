@@ -78,7 +78,7 @@ export function ChatRouting() {
     </button>
     <div ref={picker} id={pickerId} popover="auto" className="chat-routing-popover">
       <header><div><span className="eyebrow">{t('This conversation')}</span><h4>{t('Choose a model')}</h4></div><Sparkles /></header>
-      <p className="hint">{t('Your conversation stays with this episode when you switch.')}</p>
+      <p className="hint">{t('Your conversation stays with this lesson when you switch.')}</p>
       {options.map((option) => {
         const selected = modelRouteKey(option.route) === key
         const reading = option.route.auth === 'account' ? readings[option.route.agent] : null

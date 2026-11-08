@@ -130,7 +130,7 @@ export function Watched({ dir, episode, followUp, single }: { dir: string; episo
       <header className="ex-detail-head">
         <div>
           <span className="eyebrow">
-            {followUp ? format('Follow-up to episode {0}', [episode.number]) : single ? uiText('Video') : format('Lesson {0}', [episode.number])}
+            {followUp ? format('Follow-up to lesson {0}', [episode.number]) : single ? uiText('Video') : format('Lesson {0}', [episode.number])}
           </span>
           <h1>{followUp ? followUp.title : episode.title}</h1>
         </div>

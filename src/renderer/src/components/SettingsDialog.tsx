@@ -252,7 +252,7 @@ function AgentTab() {
       <Row
         title={uiText('Agent')}
         text={uiText(
-          'Who writes the scenes, solves exercises and makes series episodes. Quick mode, series planning and translation use it too. Switching keeps the saved conversation.',
+          'Who writes the scenes, solves exercises and makes course lessons. Quick mode, course planning and translation use it too. Switching keeps the saved conversation.',
         )}
       >
         <Tabs
@@ -273,7 +273,7 @@ function AgentTab() {
       {!status ? (
         <Row title={uiText('Checking account…')} />
       ) : signedIn ? (
-        <Row title={uiText('Creation model and effort')} text={uiText('Used for videos and series episodes, unless you enable an episode override below.')}>
+        <Row title={uiText('Creation model and effort')} text={uiText('Used for videos and course lessons, unless you enable a lesson override below.')}>
           <ModelControls />
         </Row>
       ) : (
@@ -287,19 +287,19 @@ function AgentTab() {
         <Row title={uiText('Study chat model and effort')} text={uiText('For questions about videos and refining notes. Separate from video creation.')}>
           <ModelPicker model={studyModel(settings).model} effort={studyModel(settings).effort} models={models} onChange={(model, effort) => void updateSettings({ studyModels: { ...settings.studyModels, [agent]: { model, effort: effort ?? 'high' } } })} />
         </Row>
-        <Row title={uiText('Series: planning')} text={uiText('Reads the material once and plans every episode and the series bible. A stronger model plans better.')}>
+        <Row title={uiText('Course: planning')} text={uiText('Reads the material once and plans every lesson and the course bible. A stronger model plans better.')}>
           <ModelPicker model={planner.model} effort={planner.effort ?? 'high'} models={models} onChange={(model, effort) => void updateSettings({
             seriesModels: { ...settings.seriesModels, [agent]: { ...settings.seriesModels?.[agent], plan: { model, effort: effort ?? 'high' } } },
           })} />
         </Row>
         <details className="settings-advanced">
-          <summary>{uiText(override ? 'Advanced · series episode override enabled' : 'Advanced')}</summary>
+          <summary>{uiText(override ? 'Advanced · course lesson override enabled' : 'Advanced')}</summary>
           <label className="hint"><input type="checkbox" checked={!!override} onChange={(e) => void setMaker(e.target.checked ? { model: maker.model, effort: maker.effort ?? 'high' } : undefined)} />{' '}
-            {uiText('Override model for series episodes')}
+            {uiText('Override model for course lessons')}
           </label>
-          {override ? <Row title={uiText('Series: making the episodes')} text={uiText('Applies to new series. Running series keep their captured model.')}>
+          {override ? <Row title={uiText('Course: making the lessons')} text={uiText('Applies to new course. Running course keep their captured model.')}>
             <ModelPicker model={maker.model} effort={maker.effort ?? 'high'} models={models} onChange={(model, effort) => void setMaker({ model, effort: effort ?? 'high' })} />
-          </Row> : <p className="hint">{uiText('Series episodes use the creation model and effort above.')}</p>}
+          </Row> : <p className="hint">{uiText('Course lessons use the creation model and effort above.')}</p>}
         </details>
       </>}
       <FallbackSettings />
@@ -311,7 +311,7 @@ function AgentTab() {
         <Row
           title={uiText('When an OpenAI model is busy')}
           text={uiText(
-            'For chat and background video turns: retry once, then use this model on the same account. Account limits, sign-in errors and interrupted tool work never trigger a model switch. Episode model comparisons keep their assigned model.',
+            'For chat and background video turns: retry once, then use this model on the same account. Account limits, sign-in errors and interrupted tool work never trigger a model switch. Lesson model comparisons keep their assigned model.',
           )}
         >
           <select
@@ -438,9 +438,9 @@ function AuthSwitch(props: {
   keyText: string
 }) {
   return (
-    <Row title={`Use ${props.agent} with`} text={props.value === 'api-key' ? props.keyText : props.accountText}>
+    <Row title={format('Use {0} with', [props.agent])} text={props.value === 'api-key' ? props.keyText : props.accountText}>
       <Tabs
-        radio={`Use ${props.agent} with`}
+        radio={format('Use {0} with', [props.agent])}
         value={props.value}
         onChange={(v) => void props.onChange(v)}
         items={[
@@ -1643,7 +1643,7 @@ function AboutTab() {
       </Row>
       <Row
         title={uiText('Sounds')}
-        text={uiText('A short cue when something finishes while you look elsewhere: a render, an export, an episode, a series. Silent while a video plays.')}
+        text={uiText('A short cue when something finishes while you look elsewhere: a render, an export, a lesson, a course. Silent while a video plays.')}
       >
         <div className="sound-controls">
           <Tabs
@@ -1743,13 +1743,13 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
   return (
     <div className="set-group">
       <Row
-        title={uiText('Episode model comparison')}
+        title={uiText('Lesson model comparison')}
         text={uiText(
-          'In Learn, choose an agent and model for each episode after reviewing a course or mini-series plan. Only connected accounts are offered. Assignments stay with the episodes when reordered and resumed.',
+          'In Learn, choose an agent and model for each lesson after reviewing a course or mini-course plan. Only connected accounts are offered. Assignments stay with the lessons when reordered and resumed.',
         )}
       >
         <Tabs
-          radio={uiText('Episode model comparison')}
+          radio={uiText('Lesson model comparison')}
           value={enabled ? 'on' : 'off'}
           onChange={(v) => void updateSettings({ developerEpisodeModels: v === 'on' })}
           items={[
@@ -1770,7 +1770,7 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
             'Usage graphs',
             'Record per-turn agent tokens, ElevenLabs request billing and account plan windows. Account percentages are shared with other apps; missing provider counters remain unavailable.',
           ],
-          ['developerTimingMetrics', 'Episode timing', 'Measure scripting, implementation, render checks, fixes and export, with active and wall time.'],
+          ['developerTimingMetrics', 'Lesson timing', 'Measure scripting, implementation, render checks, fixes and export, with active and wall time.'],
           [
             'developerResourceMetrics',
             'Hardware graphs',
@@ -1792,7 +1792,7 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
       ))}
       <p className="hint">
         {uiText(
-          'Measured episodes run one at a time, including export, for clearer attribution. Each episode gets an offline HTML report, and the series gets a combined report. Data stays in the project; measurement adds some overhead.',
+          'Measured lessons run one at a time, including export, for clearer attribution. Each lesson gets an offline HTML report, and the course gets a combined report. Data stays in the project; measurement adds some overhead.',
         )}
       </p>
       <RenderServers />

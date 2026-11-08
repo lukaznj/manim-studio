@@ -33,7 +33,7 @@ export function AccountPlanUsage({ agent, auth = 'account' }: { agent: Agent; au
           <span className="hint">{window.resetsAt ? format('resets {0}', [resetTime(window.resetsAt, currentLanguage())]) : ''}</span>
         </div>
       )) : <p className="hint">{t(reading?.agent === agent ? 'Plan usage is unavailable from this provider.' : 'Checking plan usage…')}</p>}
-      <p className="hint">{t('These are account-wide limits, not usage attributed to this video or series.')}</p>
+      <p className="hint">{t('These are account-wide limits, not usage attributed to this video or course.')}</p>
     </div>
   )
 }

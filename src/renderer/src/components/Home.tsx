@@ -1,4 +1,4 @@
-import { t as uiText, localize, format } from '../lib/i18n'
+import { t as uiText, localize, format, LESSONS, EXERCISES } from '../lib/i18n'
 import { ChevronLeft, Clapperboard, Download, FolderOpen, FolderSearch, GraduationCap, Library, MoreHorizontal, Play, Plus, Trash2, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ExerciseSet, ProjectSummary } from '../../../shared/types'
@@ -96,11 +96,11 @@ export function Home() {
               </button>
               <span className="faint">/</span>
               <SeriesTitle folder={inSeries[0].series!.folder} title={inSeries[0].series!.title} />
-              <span className="faint">{inSeries.length === 1 ? uiText('1 episode') : format('{0} episodes', [inSeries.length])}</span>
+              <span className="faint">{format(LESSONS, [inSeries.length])}</span>
               <button
                 className="btn small"
                 onClick={() => void openWatch(inSeries[0].series!.folder)}
-                title={uiText('Study the series: the videos, a transcript and a chat that knows where you are')}
+                title={uiText('Study the course: the videos, a transcript and a chat that knows where you are')}
               >
                 {production?.folder === inSeries[0].series!.folder ? <><Clapperboard />{uiText('Production')}</> : <><Play />{uiText(' Watch')}</>}
               </button>
@@ -151,7 +151,7 @@ export function Home() {
               { kind: 'quick' as const, title: 'Quick video', text: 'Describe a topic and get a finished video.', icon: <Zap /> },
               {
                 kind: 'series' as const,
-                title: editing ? 'New series' : 'New course',
+                title: editing ? 'New course' : 'New course',
                 text: 'Turn your material into a sequence of lessons.',
                 icon: <Library />,
               },
@@ -225,7 +225,7 @@ function ExerciseSetCard({ set, index }: { set: ExerciseSet; index: number }) {
       onClick={open}
       onKeyDown={(e) => e.key === 'Enter' && open()}
       tabIndex={0}
-      aria-label={format('Exercise set {0}, {1} exercises', [set.title, set.items.length])}
+      aria-label={`${set.title}, ${format(EXERCISES, [set.items.length])}`}
     >
       {cover ? (
         <div className="thumb stack landscape">
@@ -267,7 +267,7 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
       onClick={open}
       onKeyDown={(e) => e.key === 'Enter' && open()}
       tabIndex={0}
-      aria-label={format('Series {0}, {1} episodes', [first.series!.title, episodes.length])}
+      aria-label={`${first.series!.title}, ${format(LESSONS, [episodes.length])}`}
     >
       <div className={`thumb stack ${cover.aspect === '9:16' ? 'portrait' : 'landscape'} theme-${cover.theme}`}>
         {cover.thumbnail ? <img src={api.mediaUrl(cover.thumbnail)} alt="" draggable={false} /> : <div className="thumb-empty" />}
@@ -277,11 +277,11 @@ function SeriesCard({ folder, episodes, exercises, index }: { folder: string; ep
         <div className="project-name">{first.series!.title}</div>
         <div className="project-sub">
           <span className="badge sun">
-            <Library /> {uiText(' Series')}
+            <Library /> {uiText(' Course')}
           </span>
-          <span className="faint">{episodes.length === 1 ? uiText('1 episode') : format('{0} episodes', [episodes.length])}</span>
+          <span className="faint">{format(LESSONS, [episodes.length])}</span>
           {exercises ? (
-            <span className="faint">{exercises === 1 ? uiText('1 exercise') : format('{0} exercises', [exercises])}</span>
+            <span className="faint">{format(EXERCISES, [exercises])}</span>
           ) : (
             <span className="faint project-ago">{ago(latest)}</span>
           )}
