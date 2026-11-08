@@ -166,7 +166,7 @@ function Booth({ initialKey }: { initialKey?: string }) {
         if (buffer) setTake(buffer)
       }
     } catch (e) {
-      toast(`Microphone: ${errorText(e)}`, 'error')
+      toast(format('Microphone: {0}', [errorText(e)]), 'error')
     }
   }, [rec, device])
 
@@ -208,7 +208,7 @@ function Booth({ initialKey }: { initialKey?: string }) {
   }
 
   const remove = async () => {
-    if (!key || !confirm('Delete this recording? The sentence goes back to the computer voice.')) return
+    if (!key || !confirm(uiText('Delete this recording? The sentence goes back to the computer voice.'))) return
     useStore.setState({ recordings: await api.deleteRecording(key) })
     changed.current = true
   }

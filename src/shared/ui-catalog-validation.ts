@@ -1,6 +1,7 @@
 import type { UiLanguage } from './ui-languages'
 
-const placeholders = (s: string) => (s.match(/\{\d+\}/g) ?? []).sort().join('|')
+// {0} and {0, plural, …} both count, and a plural must keep its `other` form.
+const placeholders = (s: string) => (s.match(/\{\d+(?=[,}])/g) ?? []).sort().join('|') + (/, plural,/.test(s) && !/\bother\s*\{/.test(s) ? '|no other' : '')
 const names = ['Manim Studio', 'Claude', 'Codex', 'Antigravity', 'ChatGPT', 'OpenAI', 'ElevenLabs', 'OmniVoice', 'Gemini']
 
 /** Structural checks for offline translation drafts; these do not replace native-language review. */

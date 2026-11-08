@@ -86,7 +86,7 @@ export function ExportDialog() {
       const ahead = useStore.getState().exports.filter((j) => j.id !== job.id && (j.state === 'running' || j.state === 'waiting')).length
       toast(
         ahead
-          ? `Export queued after ${ahead === 1 ? 'one other' : `${ahead} others`}. Keep working; Exports in the title bar shows it.`
+          ? format('Export queued after {0, plural, =1 {one other} other {# others}}. Keep working; Exports in the title bar shows it.', [ahead])
           : 'Exporting in the background. Keep working; Exports in the title bar shows it.',
         'ok',
       )
@@ -110,7 +110,7 @@ export function ExportDialog() {
   const projectExports = project ? `${project.path}${sep}exports` : ''
   const destination = options.folder ?? projectExports
   const chooseFolder = async () => {
-    const dir = await api.pickFolder('Export to', destination)
+    const dir = await api.pickFolder(uiText('Export to'), destination)
     // The project's own exports/ folder is the default, not a choice to remember.
     if (dir)
       setOptions((o) => ({

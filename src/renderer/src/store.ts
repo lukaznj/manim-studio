@@ -1,4 +1,4 @@
-import { setLanguage, t as uiText } from './lib/i18n'
+import { format, setLanguage, t as uiText } from './lib/i18n'
 import { create } from 'zustand'
 import { productionVisible } from '../../shared/series-presentation'
 import { validStudySelection } from '../../shared/study-navigation'
@@ -68,14 +68,13 @@ export function renderProgress(r: RenderState): { label: string; detail: string;
   const fraction = fits ? clips / r.expected! : undefined
   const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
   return {
-    label: r.paused ? 'Preview paused' : 'Rendering preview',
-    detail: fraction !== undefined ? `${Math.round(fraction * 100)}%` : r.t ? `${clock(r.t)} so far` : '',
+    label: uiText(r.paused ? 'Preview paused' : 'Rendering preview'),
+    detail: fraction !== undefined ? `${Math.round(fraction * 100)}%` : r.t ? format('{0} so far', [clock(r.t)]) : '',
     title: [
-      `Manim draws the video one animation at a time: ${clips} done`,
-      fits ? `, of about ${r.expected} (as many as the last render had)` : '',
-      r.t ? `, ${clock(r.t)} of video` : '',
-      '.',
-    ].join(''),
+      format('Manim draws the video one animation at a time: {0} done.', [clips]),
+      fits ? format('About {0} in all, as many as the last render had.', [r.expected]) : '',
+      r.t ? format('{0} of video so far.', [clock(r.t)]) : '',
+    ].filter(Boolean).join(' '),
     fraction,
   }
 }
@@ -479,7 +478,7 @@ export async function locateProject(path: string): Promise<void> {
     const r = await api.locateProject(path)
     if (!r) return
     await refreshProjects()
-    toast(r.found ? `Found it, and ${r.found === 1 ? '1 more project' : `${r.found} more projects`} next to it` : 'Found it')
+    toast(r.found ? format('Found it, and {0, plural, one {# more project} other {# more projects}} next to it', [r.found]) : 'Found it')
   } catch (e) {
     toast(errorText(e), 'error')
   }
@@ -828,7 +827,7 @@ function onRender(e: RenderEvent): void {
       set({ timeline: e.timeline, selection: get().selection.filter((i) => i < e.timeline.clips.length) })
       void checkStale(editorBridge.getValue() ?? get().savedSource)
       requestAnimationFrame(() => playback.restore(Math.min(t, e.timeline.duration)))
-      if (e.timeline.voiceWarnings.length) toast(`Voice: ${e.timeline.voiceWarnings[0]}`, 'error')
+      if (e.timeline.voiceWarnings.length) toast(format('Voice: {0}', [e.timeline.voiceWarnings[0]]), 'error')
     }
   }
 }
@@ -898,7 +897,7 @@ function onChat(e: ChatEvent): void {
       streaming: {},
       chat: e.ok
         ? s.chat.map((m) => ({ ...m, parts: m.parts.map((p) => (p.kind === 'tool' && p.status === 'running' ? { ...p, status: 'ok' as const } : p)) }))
-        : [...s.chat, { id: crypto.randomUUID(), role: 'error', parts: [{ kind: 'text', text: e.error || 'Claude stopped with an error.' }], at: Date.now() }],
+        : [...s.chat, { id: crypto.randomUUID(), role: 'error', parts: [{ kind: 'text', text: e.error || uiText('Claude stopped with an error.') }], at: Date.now() }],
     }))
   }
 }

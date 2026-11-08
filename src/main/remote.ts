@@ -11,6 +11,9 @@ import { randomUUID } from 'node:crypto'
 import { parsePairingCode } from '../shared/pairing'
 import type { RenderServer, WorkerInfo } from '../shared/types'
 import { getSecret, getSettings, setSecret, setSettings } from './settings'
+import { formatUi } from '../shared/i18n'
+
+const say = (template: string, ...values: unknown[]) => formatUi(getSettings().uiLanguage ?? 'en', template, values)
 
 const tokenOf = (id: string) => getSecret(`server-${id}`)
 
@@ -99,19 +102,19 @@ export async function renderRemote(
 ): Promise<string[]> {
   const server = find(serverId)
   const token = tokenOf(serverId)
-  const job = await upload(server, token, archive, options, (p) => progress({ stage: `Sending the project to ${server.name}`, percent: p }), signal)
+  const job = await upload(server, token, archive, options, (p) => progress({ stage: say('Sending the project to {0}', server.name), percent: p }), signal)
   try {
     for (let state = job; ; ) {
       if (state.state === 'failed') throw new Error(`On ${server.name}: ${state.error}`)
       if (state.state === 'cancelled') throw new Error(`The export was stopped on ${server.name}`)
       if (state.state === 'done') {
         for (const [i, name] of state.files.entries()) {
-          progress({ stage: `Downloading from ${server.name}`, percent: i / state.files.length })
+          progress({ stage: say('Downloading from {0}', server.name), percent: i / state.files.length })
           await download(server, token, job.id, name, join(folder, name), signal)
         }
         return state.files
       }
-      progress(state.state === 'waiting' ? { stage: `Queued on ${server.name}` } : { stage: `On ${server.name}: ${state.stage}`, percent: state.percent ?? undefined })
+      progress(state.state === 'waiting' ? { stage: say('Queued on {0}', server.name) } : { stage: say('On {0}: {1}', server.name, state.stage), percent: state.percent ?? undefined })
       await new Promise((r) => setTimeout(r, 2000))
       if (signal?.aborted) throw Object.assign(new Error('cancelled'), { cancelled: true })
       state = await call<RemoteJob>(server.url, token, 'GET', `/jobs/${job.id}`)
