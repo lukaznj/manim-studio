@@ -85,7 +85,12 @@ export function SettingsDialog() {
   const developerMode = useStore((s) => s.settings?.developerMode)
   const [tab, setTab] = useState<Tab>('account')
   useEffect(() => {
-    if (dialog?.kind === 'settings') setTab(dialog.tab ?? 'account')
+    // Accounts live in the Agent tab and the tools in General (four tabs, ADR 0064).
+    const asked = dialog?.kind === 'settings' ? dialog.tab ?? 'account' : null
+    if (!asked) return
+    setTab(asked === 'accounts' ? 'account' : asked === 'env' ? 'about' : asked)
+    if (asked === 'accounts' || asked === 'env')
+      requestAnimationFrame(() => document.querySelector('.settings-body .set-section')?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
   }, [dialog])
 
   return (
@@ -96,34 +101,31 @@ export function SettingsDialog() {
           onChange={setTab}
           items={[
             { value: 'account', label: 'Agent' },
-            { value: 'accounts', label: 'Accounts' },
             { value: 'voice', label: 'Voice' },
             { value: 'video', label: 'Video' },
-            { value: 'env', label: 'Environment' },
             { value: 'about', label: 'General' },
             ...(developerMode ? [{ value: 'develop' as const, label: 'Develop' }] : []),
           ]}
         />
       </div>
       <div className="modal-body settings-body">
-        {tab === 'account' && <AgentTab />}
-        {tab === 'accounts' && <AccountsTab />}
+        {tab === 'account' && <><AgentTab /><h3 className="set-section">{uiText('Accounts')}</h3><AccountsTab /></>}
         {tab === 'voice' && <VoiceTab />}
         {tab === 'video' && <VideoTab />}
-        {tab === 'env' && <EnvTab />}
-        {tab === 'about' && <AboutTab />}
+        {tab === 'about' && <><AboutTab /><h3 className="set-section">{uiText('Tools')}</h3><EnvTab /></>}
         {tab === 'develop' && <DevelopTab onDisable={() => setTab('about')} />}
       </div>
     </Modal>
   )
 }
 
-function Row(props: { title: ReactNode; text?: ReactNode; children?: ReactNode }) {
+/** A setting: its name and control. `note` only for status or something to act on, never to explain. */
+function Row(props: { title: ReactNode; note?: ReactNode; children?: ReactNode }) {
   return (
     <div className="set-row">
       <div className="set-row-text">
         <div className="set-row-title">{localize(props.title)}</div>
-        {props.text && <div className="hint">{localize(props.text)}</div>}
+        {props.note && <div className="hint">{localize(props.note)}</div>}
       </div>
       <div className="set-row-control">{props.children}</div>
     </div>
@@ -177,7 +179,6 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
         width={460}
       >
         <div className="modal-body set-group">
-          <p className="hint">{uiText('The key is checked and stored encrypted on this computer.')}</p>
           <input
             className="input"
             aria-label={uiText('API key')}
@@ -251,9 +252,6 @@ function AgentTab() {
     <div className="set-group">
       <Row
         title={uiText('Agent')}
-        text={uiText(
-          'Who writes the scenes, solves exercises and makes series episodes. Quick mode, series planning and translation use it too. Switching keeps the saved conversation.',
-        )}
       >
         <Tabs
           radio="Agent"
@@ -265,54 +263,47 @@ function AgentTab() {
           }))}
         />
       </Row>
-      {Object.values(available).some((ready) => !ready) && (
-        <p className="hint">{uiText('Unavailable agents need to be connected under Accounts first.')}{' '}
-          <button className="link-btn" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>{uiText('Accounts')}</button>
-        </p>
-      )}
       {!status ? (
         <Row title={uiText('Checking account…')} />
       ) : signedIn ? (
-        <Row title={uiText('Creation model and effort')} text={uiText('Used for videos and series episodes, unless you enable an episode override below.')}>
+        <Row title={uiText('Creation model and effort')}>
           <ModelControls />
         </Row>
       ) : (
-        <Row title={format('{0} isn’t signed in', [AGENT_NAMES[agent]])} text={uiText('Sign in, or add an API key, under Accounts.')}>
+        <Row title={format('{0} isn’t signed in', [AGENT_NAMES[agent]])} note={uiText('Sign in, or add an API key, under Accounts.')}>
           <button className="btn small primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
             <KeyRound /> {uiText(' Accounts')}
           </button>
         </Row>
       )}
       {signedIn && <>
-        <Row title={uiText('Study chat model and effort')} text={uiText('For questions about videos and refining notes. Separate from video creation.')}>
+        <Row title={uiText('Study chat model and effort')}>
           <ModelPicker model={studyModel(settings).model} effort={studyModel(settings).effort} models={models} onChange={(model, effort) => void updateSettings({ studyModels: { ...settings.studyModels, [agent]: { model, effort: effort ?? 'high' } } })} />
         </Row>
-        <Row title={uiText('Series: planning')} text={uiText('Reads the material once and plans every episode and the series bible. A stronger model plans better.')}>
+        <Row title={uiText('Course: planning')}>
           <ModelPicker model={planner.model} effort={planner.effort ?? 'high'} models={models} onChange={(model, effort) => void updateSettings({
             seriesModels: { ...settings.seriesModels, [agent]: { ...settings.seriesModels?.[agent], plan: { model, effort: effort ?? 'high' } } },
           })} />
         </Row>
-        <details className="settings-advanced">
-          <summary>{uiText(override ? 'Advanced · series episode override enabled' : 'Advanced')}</summary>
-          <label className="hint"><input type="checkbox" checked={!!override} onChange={(e) => void setMaker(e.target.checked ? { model: maker.model, effort: maker.effort ?? 'high' } : undefined)} />{' '}
-            {uiText('Override model for series episodes')}
+      </>}
+      <details className="set-advanced">
+      <summary>{uiText(override ? 'Advanced · course lesson override enabled' : 'Advanced')}</summary>
+      {signedIn && <>
+        <label className="hint"><input type="checkbox" checked={!!override} onChange={(e) => void setMaker(e.target.checked ? { model: maker.model, effort: maker.effort ?? 'high' } : undefined)} />{' '}
+          {uiText('Override model for course lessons')}
           </label>
-          {override ? <Row title={uiText('Series: making the episodes')} text={uiText('Applies to new series. Running series keep their captured model.')}>
+          {override ? <Row title={uiText('Course: making the lessons')}>
             <ModelPicker model={maker.model} effort={maker.effort ?? 'high'} models={models} onChange={(model, effort) => void setMaker({ model, effort: effort ?? 'high' })} />
-          </Row> : <p className="hint">{uiText('Series episodes use the creation model and effort above.')}</p>}
-        </details>
+          </Row> : null}
       </>}
       <FallbackSettings />
-      <Row title={uiText('Agents at once')} text={uiText('Shared across all videos. Finishes active work first; chat stays available.')}>
+      <Row title={uiText('Agents at once')}>
         <label className="agent-capacity-toggle"><input type="checkbox" checked={!settings.agentConcurrency} onChange={(e) => void updateSettings({ agentConcurrency: e.target.checked ? 0 : 3 })} />{uiText('Unlimited')}</label>
         {!!settings.agentConcurrency && <input className="input agent-capacity-input" type="number" min={1} step={1} value={settings.agentConcurrency} aria-label={uiText('Agents at once')} onChange={(e) => { if (e.currentTarget.value && e.currentTarget.validity.valid) void updateSettings({ agentConcurrency: Number(e.currentTarget.value) }) }} />}
       </Row>
       {agent === 'codex' && signedIn && (
         <Row
           title={uiText('When an OpenAI model is busy')}
-          text={uiText(
-            'For chat and background video turns: retry once, then use this model on the same account. Account limits, sign-in errors and interrupted tool work never trigger a model switch. Episode model comparisons keep their assigned model.',
-          )}
         >
           <select
             className="input"
@@ -334,6 +325,7 @@ function AgentTab() {
           </select>
         </Row>
       )}
+      </details>
     </div>
   )
 }
@@ -438,7 +430,7 @@ function AuthSwitch(props: {
   keyText: string
 }) {
   return (
-    <Row title={format('Use {0} with', [props.agent])} text={props.value === 'api-key' ? props.keyText : props.accountText}>
+    <Row title={format('Use {0} with', [props.agent])}>
       <Tabs
         radio={format('Use {0} with', [props.agent])}
         value={props.value}
@@ -464,7 +456,7 @@ export function ElevenLabsAccount() {
       </header>
       <Row
         title={uiText('ElevenLabs API key')}
-        text={
+        note={
           settings.hasElevenLabsKey
             ? uiText('Saved and encrypted on this computer.')
             : uiText('A key from elevenlabs.io → Developers → API keys, for its voices.')
@@ -508,7 +500,6 @@ function CodexAccount({ status, refresh }: AccountProps) {
     <>
       <Row
         title={uiText('Program')}
-        text={uiText("OpenAI's coding agent. Its program, about 140 MB, is downloaded once from OpenAI's npm package and checked against its published hash.")}
       >
         <InstallButton component="codex" state={setup?.codex ?? 'missing'} />
       </Row>
@@ -550,7 +541,7 @@ function CodexAccount({ status, refresh }: AccountProps) {
         </div>
       )}
       {installed && auth === 'api-key' && (
-        <Row title="OpenAI API key" text={settings.hasOpenAIKey ? 'Saved and encrypted on this computer.' : 'A key from platform.openai.com → API keys.'}>
+        <Row title="OpenAI API key">
           <KeyField
             saved={settings.hasOpenAIKey}
             placeholder={uiText('sk-…')}
@@ -611,9 +602,6 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
     <>
       <Row
         title={uiText('Program')}
-        text={uiText(
-          "Google's coding agent, with Gemini 4 Argon. Its program is downloaded once (about 60 MB, 180 MB unpacked) from Google's GitHub release and checked against its published hash. It works only inside the project.",
-        )}
       >
         <InstallButton component="antigravity" state={setup?.antigravity ?? 'missing'} />
       </Row>
@@ -684,7 +672,7 @@ function AntigravityAccount({ status, refresh }: AccountProps) {
         </div>
       )}
       {installed && auth === 'api-key' && (
-        <Row title="Gemini API key" text={settings.hasGeminiKey ? 'Saved and encrypted on this computer.' : 'A key from aistudio.google.com → API keys.'}>
+        <Row title="Gemini API key">
           <KeyField
             saved={settings.hasGeminiKey}
             placeholder={uiText('AIza…')}
@@ -751,7 +739,6 @@ function ClaudeAccount({ status: claude, refresh, chosen }: AccountProps & { cho
         <>
           <Row
             title="Anthropic API key"
-            text={settings.hasAnthropicKey ? 'Saved and encrypted on this computer.' : 'A key from console.anthropic.com → API keys.'}
           >
             <div className="inline-form">
               <KeyField saved={settings.hasAnthropicKey} placeholder={uiText('sk-ant-…')} onSave={saveKey} />
@@ -803,9 +790,6 @@ function DesktopConnections() {
     <>
       <Row
         title={uiText('Codex / ChatGPT Desktop')}
-        text={uiText(
-          'Make videos from your conversation through the local Studio plugin. Learn returns a video to the chat; Create opens the editor. In Both, requests default to Learn unless production is requested.',
-        )}
       >
         <button
           className="btn small"
@@ -871,7 +855,7 @@ function ClaudeDesktopRow() {
         ? 'The Manim Studio extension is installed. Ask Claude in the Claude desktop app for a maths video.'
         : 'The extension is installed but turned off. Turn it on in Claude Desktop → Settings → Extensions.'
   return (
-    <Row title={uiText('Claude Desktop')} text={text}>
+    <Row title={uiText('Claude Desktop')} note={text}>
       {status?.installed && !outdated ? (
         <span className={`badge ${status.enabled ? 'mint' : ''}`}>
           <Check /> {status.enabled ? uiText('Installed') : uiText('Turned off')}
@@ -918,8 +902,9 @@ function VideoTab() {
   return (
     <div className="set-group">
       <SubtitleSettings />
+      <h3 className="set-section">{uiText('Making videos')}</h3>
       {
-        <Row title={uiText('Export quality')} text={uiText('1080p is the default. Choose 720p for faster rendering or 1440p for more detail.')}>
+        <Row title={uiText('Export quality')}>
           <Tabs
             radio="Study videos"
             value={String(settings.studySize ?? 1080)}
@@ -948,7 +933,6 @@ function VideoTab() {
         <>
           <Row
             title={uiText('Preview quality')}
-            text={uiText('1080p by default. Lower resolutions render faster. Export quality is configured separately above.')}
           >
             <div className="stack-controls">
               <Tabs
@@ -983,7 +967,6 @@ function VideoTab() {
           </Row>
           <GpuEncoding />
           <RenderCache />
-          <RenderServers />
         </>
       )}
     </div>
@@ -1002,7 +985,6 @@ function VoiceTab() {
       {project ? (
         <Row
           title={uiText('Voice for')}
-          text={forProject ? format('Only “{0}”.', [project.meta.name]) : uiText('What new projects start with; each can then pick its own.')}
         >
           <Tabs
             radio="Voice for"
@@ -1022,7 +1004,7 @@ function VoiceTab() {
         inProject={forProject}
         onChange={(voice) => void (forProject ? updateMeta({ voice }) : updateSettings({ defaultVoice: voice }))}
       />
-      <Row title={uiText('Tone')} text={uiText('How the narration talks.')}>
+      <Row title={uiText('Tone')}>
         <Tabs
           radio="Tone"
           value={(forProject ? project.meta.tone : settings.defaultTone) ?? DEFAULT_TONE}
@@ -1044,7 +1026,7 @@ function RevoiceRow() {
     <div className="revoice">
       <Row
         title={uiText('The narration still has the old voice')}
-        text={format('It was made with {0}. Re-voicing speaks it again; your recordings stay.{1}', [voiceLabel(outdated.from), credit])}
+        note={format('It was made with {0}. Re-voicing speaks it again; your recordings stay.{1}', [voiceLabel(outdated.from), credit])}
       >
         <RevoiceButton className="btn primary small" />
       </Row>
@@ -1132,7 +1114,7 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
         ))}
       </div>
 
-      <Row title={uiText('Narration language')} text={uiText('Claude writes the narration and on-screen text in it; voices and subtitles follow it.')}>
+      <Row title={uiText('Narration language')}>
         <select
           className="select"
           value={voice.language}
@@ -1152,7 +1134,6 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
         <>
           <Row
             title={uiText('Voice')}
-            text={format('The most used voices in {0}, or search the library. ▶ plays a sample.', [languageName.of(voice.language)])}
           >
             <VoicePicker
               language={voice.language}
@@ -1181,7 +1162,6 @@ export function VoiceForm({ voice, onChange, inProject }: { voice: VoiceSettings
         <>
           <Row
             title={uiText('OmniVoice model')}
-            text={uiText('About 3.3 GB of weights plus PyTorch, downloaded once. Uses the GPU on Apple Silicon and NVIDIA.')}
           >
             <InstallButton component="omnivoice" state={setup?.omnivoice ?? 'missing'} />
           </Row>
@@ -1274,7 +1254,7 @@ function EnvTab() {
       <div className="set-row"><button className="btn small" disabled={checking} onClick={() => { setChecking(true); void refreshSetup(true).catch((error) => toast(errorText(error), 'error')).finally(() => setChecking(false)) }}><RefreshCw />{uiText('Check installation')}</button></div>
       {COMPONENTS.map((c) => (
         <div key={c.id} className="env-row">
-          <Row title={c.title} text={setup.errors[c.id] ?? c.text}>
+          <Row title={c.title} note={setup.errors[c.id]}>
             <InstallButton component={c.id} state={setup[c.id]} />
           </Row>
           {setup[c.id] === 'installing' && <ProgressLine value={progress[c.id]} />}
@@ -1286,7 +1266,7 @@ function EnvTab() {
           {openLog === c.id && <pre className="env-log mono">{log[c.id]?.join('\n')}</pre>}
         </div>
       ))}
-      <div className="runtime-cleanup"><Row title={uiText('Downloaded tools')} text={uiText('Removes Studio’s downloaded tools and caches. Projects, recordings, settings and sign-ins are kept.')}>
+      <div className="runtime-cleanup"><Row title={uiText('Downloaded tools')}>
         <div className="pane-actions">
           <button className="btn small" disabled={removing || checking || Object.values(setup).includes('installing')} onClick={() => void remove()}><Trash2 />{uiText('Remove downloaded tools…')}</button>
           {canUninstall && <button className="btn small" disabled={removing || checking} onClick={() => void remove(true)}><LogOut />{uiText('Uninstall Manim Studio…')}</button>}
@@ -1297,6 +1277,35 @@ function EnvTab() {
 }
 
 /** The projects folder, and whether a cloud drive syncs it (ADR 0043): allowed, never the default. */
+/** "What Studio knows about you" (ADR 0065): off until turned on; the note is the user's to read and edit. */
+function AboutYouRow() {
+  const on = useStore((s) => !!s.settings?.aboutYou)
+  const [note, setNote] = useState<string | null>(null)
+  useEffect(() => void api.readAboutYou().then(setNote), [])
+  const save = (text: string) => void api.writeAboutYou(text).then(setNote)
+  return (
+    <>
+      <Row title={uiText('What Studio knows about you')} note={uiText('Only on this computer. The study chat and new videos read it.')}>
+        <label className="switch"><input type="checkbox" aria-label={uiText('What Studio knows about you')} checked={on} onChange={(e) => void updateSettings({ aboutYou: e.target.checked })} /><span /></label>
+      </Row>
+      {on && note !== null && (
+        <div className="about-you">
+          <textarea
+            key={note}
+            className="input about-you-note"
+            rows={4}
+            aria-label={uiText('What Studio knows about you')}
+            placeholder={uiText('e.g. First-year electrical engineering. Prefers short answers with one worked example.')}
+            defaultValue={note}
+            onBlur={(e) => e.currentTarget.value.trim() !== note && save(e.currentTarget.value)}
+          />
+          {note && <button className="btn small ghost" onClick={() => save('')}><Trash2 /> {uiText('Clear')}</button>}
+        </div>
+      )}
+    </>
+  )
+}
+
 function ProjectsFolderRow() {
   const dir = useStore((s) => s.settings!.projectsDir)
   const [cloud, setCloud] = useState<string | null>(null)
@@ -1311,17 +1320,7 @@ function ProjectsFolderRow() {
   return (
     <Row
       title={uiText('Projects folder')}
-      text={
-        <>
-          <span className="mono">{dir}</span>
-          {cloud && (
-            <span className="folder-synced">
-              <Cloud />{' '}
-              {format('{0} syncs this folder, so projects are backed up but use your cloud storage. The render cache stays on this computer.', [cloud])}
-            </span>
-          )}
-        </>
-      }
+      note={<><span className="mono">{dir}</span>{cloud && <span className="folder-synced"><Cloud /> {format('{0} syncs this folder.', [cloud])}</span>}</>}
     >
       <div className="pane-actions">
         <button className="btn small" onClick={() => void api.openProjectsFolder().catch((e) => toast(errorText(e), 'error'))}>
@@ -1353,14 +1352,7 @@ function RenderCache() {
   return (
     <Row
       title={uiText('Render cache')}
-      text={
-        <>
-          {format('Finished animations, kept so renders don’t draw them again: {0}, up to 20 GB. Kept on this computer only, outside the projects folder.', [
-            info ? gigabytes(info.bytes) : '…',
-          ])}{' '}
-          {info && <span className="mono">{info.path}</span>}
-        </>
-      }
+      note={info ? gigabytes(info.bytes) : '…'}
     >
       <button
         className="btn small"
@@ -1395,18 +1387,9 @@ function GpuEncoding() {
     }
   }
   useEffect(() => void check(false), [])
-  const text = checking
-    ? uiText('Checking this computer’s graphics…')
-    : info?.encoder
-      ? format(
-          'Exports encode their video on the GPU with {0}, which is faster than the CPU. Previews stay on the CPU. If it fails, the export carries on on the CPU.',
-          [info.label],
-        )
-      : info?.error
-        ? format('The check failed: {0}', [info.error])
-        : 'No GPU encoder works on this computer, so exports encode on the CPU. Supported: Apple VideoToolbox on Macs, NVIDIA (NVENC), and AMD on Windows (Media Foundation).'
+  const text = checking ? uiText('Checking this computer’s graphics…') : info?.encoder ? info.label : info?.error ? format('The check failed: {0}', [info.error]) : uiText('Not available on this computer')
   return (
-    <Row title={uiText('GPU video encoding')} text={text}>
+    <Row title={uiText('GPU video encoding')} note={text}>
       <div className="inline-form">
         {info?.encoder && (
           <Tabs
@@ -1496,9 +1479,6 @@ function RenderServers() {
     <div className="render-servers">
       <Row
         title={uiText('Render servers')}
-        text={uiText(
-          "Another computer renders your exports, so this one stays free. Run Manim Studio's render server there (github.com/lukaznj/manim-studio-renderer), then paste the pairing code it prints.",
-        )}
       />
       {servers.map((s) => (
         <div key={s.id} className="render-server">
@@ -1577,13 +1557,6 @@ function AboutTab() {
     >
       <Row
         title={uiText('How you use Manim Studio')}
-        text={
-          settings.mode === 'learn'
-            ? uiText('Learn: courses and exercises become videos to study, with a chat to ask about them. No editor.')
-            : settings.mode === 'both'
-              ? uiText('Both: Home has a Create tab (projects and the editor) and a Learn tab (courses to study).')
-              : uiText('Create: the full studio, with the editor, the timeline and exports for publishing.')
-        }
       >
         <Tabs
           radio="How you use Manim Studio"
@@ -1596,10 +1569,10 @@ function AboutTab() {
           ]}
         />
       </Row>
-      <Row title={uiText('App language')} text={uiText('The interface language. Narration is chosen separately under Voice.')}>
+      <Row title={uiText('App language')}>
         <LanguagePicker value={settings.uiLanguage ?? 'en'} onChange={(uiLanguage) => void updateSettings({ uiLanguage })} />
       </Row>
-      <Row title={uiText('Appearance')} text={uiText('System follows your computer’s light or dark setting.')}>
+      <Row title={uiText('Appearance')}>
         <Tabs
           radio="Appearance"
           value={settings.appearance}
@@ -1635,19 +1608,18 @@ function AboutTab() {
           ]}
         />
       </Row>
-      <Row title={uiText('Interface size')} text={uiText('Resize text and controls throughout the app. Use Cmd/Ctrl + plus or minus; Cmd/Ctrl + 0 resets to 100%.')}>
+      <Row title={uiText('Interface size')}>
         <select className="select" aria-label={uiText('Interface size')} value={settings.interfaceSize ?? 100} onChange={(e) => void updateSettings({ interfaceSize: Number(e.target.value) })}>
           {INTERFACE_SIZES.map((size) => <option key={size} value={size}>{size}%</option>)}
         </select>
       </Row>
-      <Row title={uiText('Chat text size')} text={uiText('Adjust questions, explanations and the chat input independently of the rest of the interface.')}>
+      <Row title={uiText('Chat text size')}>
         <select className="select" aria-label={uiText('Chat text size')} value={settings.chatTextSize ?? 13} onChange={(e) => void updateSettings({ chatTextSize: Number(e.target.value) })}>
           {CHAT_TEXT_SIZES.map((size) => <option key={size} value={size}>{size} px</option>)}
         </select>
       </Row>
       <Row
         title={uiText('Sounds')}
-        text={uiText('A short cue when something finishes while you look elsewhere: a render, an export, an episode, a series. Silent while a video plays.')}
       >
         <div className="sound-controls">
           <Tabs
@@ -1674,16 +1646,10 @@ function AboutTab() {
           />
         </div>
       </Row>
+      <AboutYouRow />
       <ProjectsFolderRow />
       <Row
         title={uiText('Guided tours')}
-        text={
-          canEdit({ settings })
-            ? uiText(
-                'Short tours of the library, the study page and the editor. This one starts on the screen you’re on; the others show again when you open them.',
-              )
-            : uiText('Short tours of the library and the study page. This one starts on the screen you’re on; the other shows again when you open it.')
-        }
       >
         <button
           className="btn small"
@@ -1713,7 +1679,6 @@ function AboutTab() {
             {format('Manim Studio {0}', [app.version])}
           </button>
         }
-        text={`${app.platform} · ${app.arch} · ${uiText('Open source')} (AGPLv3)`}
       >
         <button className="btn small ghost" onClick={() => void api.openExternal('https://github.com/lukaznj/manim-studio')}>{uiText('Source code')}</button>
         <button className="btn small" onClick={() => void api.checkForUpdates()}>
@@ -1747,13 +1712,13 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
   return (
     <div className="set-group">
       <Row
-        title={uiText('Episode model comparison')}
-        text={uiText(
-          'In Learn, choose an agent and model for each episode after reviewing a course or mini-series plan. Only connected accounts are offered. Assignments stay with the episodes when reordered and resumed.',
+        title={uiText('Lesson model comparison')}
+        note={uiText(
+          'In Learn, choose an agent and model for each lesson after reviewing a course or mini-course plan. Only connected accounts are offered. Assignments stay with the lessons when reordered and resumed.',
         )}
       >
         <Tabs
-          radio={uiText('Episode model comparison')}
+          radio={uiText('Lesson model comparison')}
           value={enabled ? 'on' : 'off'}
           onChange={(v) => void updateSettings({ developerEpisodeModels: v === 'on' })}
           items={[
@@ -1774,7 +1739,7 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
             'Usage graphs',
             'Record per-turn agent tokens, ElevenLabs request billing and account plan windows. Account percentages are shared with other apps; missing provider counters remain unavailable.',
           ],
-          ['developerTimingMetrics', 'Episode timing', 'Measure scripting, implementation, render checks, fixes and export, with active and wall time.'],
+          ['developerTimingMetrics', 'Lesson timing', 'Measure scripting, implementation, render checks, fixes and export, with active and wall time.'],
           [
             'developerResourceMetrics',
             'Hardware graphs',
@@ -1782,7 +1747,7 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
           ],
         ] as const
       ).map(([key, title, text]) => (
-        <Row key={key} title={uiText(title)} text={uiText(text)}>
+        <Row key={key} title={uiText(title)} note={uiText(text)}>
           <Tabs
             radio={uiText(title)}
             value={settings[key] ? 'on' : 'off'}
@@ -1796,9 +1761,10 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
       ))}
       <p className="hint">
         {uiText(
-          'Measured episodes run one at a time, including export, for clearer attribution. Each episode gets an offline HTML report, and the series gets a combined report. Data stays in the project; measurement adds some overhead.',
+          'Measured lessons run one at a time, including export, for clearer attribution. Each lesson gets an offline HTML report, and the course gets a combined report. Data stays in the project; measurement adds some overhead.',
         )}
       </p>
+      <RenderServers />
       <button
         className="btn small ghost"
         onClick={async () => {

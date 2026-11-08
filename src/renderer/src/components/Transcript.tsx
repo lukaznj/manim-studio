@@ -51,6 +51,11 @@ export function Transcript({ dir, version, head }: { dir: string; version: strin
     }
   }, [dir, version])
 
+  // Nothing to read without narration: the chat is the useful side then.
+  useEffect(() => {
+    if (lines && !lines.length && useStore.getState().studyTab === 'transcript') useStore.setState({ studyTab: 'chat' })
+  }, [lines])
+
   const hits = useMemo(() => transcriptHits(lines ?? [], query), [lines, query])
   const hit: TranscriptHit | undefined = hits[Math.min(pick, hits.length - 1)]
   const current = lineAt(lines ?? [], now)

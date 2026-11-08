@@ -1,5 +1,5 @@
 import { t as uiText, format } from '../lib/i18n'
-import { AudioLines, Captions, Download, FileVideo, FolderOpen, Image, Languages, X } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Aspect, ExportFps, ExportOptions, ExportSize, Theme } from '../../../shared/types'
 import { api } from '../lib/api'
@@ -7,20 +7,16 @@ import { LANGUAGES, languageName } from '../lib/languages'
 import { closeDialog, errorText, studying, toast, updateMeta, useStore } from '../store'
 import { Modal, Tabs } from './ui'
 
-const PROVIDER_NAMES = {
-  elevenlabs: 'ElevenLabs',
-  omnivoice: 'OmniVoice',
-} as const
-
 /**
  * One video, then an audio track and subtitles per language: what YouTube asks for. Light and dark
  * versions come from the same scene. Everything lands in exports/<name>/ (see src/main/export.ts).
  * Export queues it and closes: it runs in the background, listed under the title bar's Exports.
  */
-/** Where an export renders: this computer, or a paired render server (ADR 0021). Hidden until one is paired. */
+/** Where an export renders: this computer, or a paired render server (ADR 0021). Developer mode only, once one is paired. */
 export function ExportOn({ value, onChange }: { value?: string; onChange: (server: string | undefined) => void }) {
   const servers = useStore((s) => s.settings?.renderServers ?? [])
-  if (!servers.length) return null
+  const developer = useStore((s) => !!s.settings?.developerMode)
+  if (!servers.length || !developer) return null
   const current = servers.some((s) => s.id === value) ? value : undefined
   return (
     <div className="field">
@@ -65,6 +61,8 @@ export function ExportDialog() {
         ...meta.export,
         size: meta.export?.size ?? settings?.studySize ?? 1080,
         fps: meta.export?.fps ?? (meta.fps === 60 ? 60 : 30),
+        // Render servers are developer-only (ADR 0021): a server remembered from before stays unused.
+        server: settings?.developerMode ? meta.export?.server : undefined,
       })
   }, [open])
 
@@ -105,18 +103,6 @@ export function ExportDialog() {
   const fps = options.fps ?? 30
   const long = Math.round((size * 16) / 9 / 2) * 2 // as the runner computes it
   const res = portrait ? `${size} × ${long}` : `${long} × ${size}`
-  // Measured on a 46 s scene: 1440p or 60 fps about 1.5×, both about 2× (docs/02-architecture/render-performance.md).
-  // 720p: about 2.3× faster than 1080p (a 24 s scene, 4 cores, ADR 0035).
-  const slower =
-    size === 720
-      ? fps === 60
-        ? null
-        : 'Exporting takes about half as long.'
-      : size === 1440 && fps === 60
-        ? 'Exporting takes about twice as long.'
-        : size === 1440 || fps === 60
-          ? 'Exporting takes about 1.5× as long.'
-          : null
   const both = options.themes.length > 1
   const extra = options.languages.filter((l) => l !== original)
   const offered = LANGUAGES.filter((l) => l !== original && !options.languages.includes(l))
@@ -153,18 +139,12 @@ export function ExportDialog() {
     >
       <div className="modal-body export">
         {editing && <div className="export-option">
-          <div>
-            <strong>{uiText('Aspect ratio')}</strong>
-            <div className="hint">{uiText('Keeps the whole frame; adds padding when the shape changes.')}</div>
-          </div>
+          <strong>{uiText('Aspect ratio')}</strong>
           <Tabs radio="Aspect ratio" value={aspect} onChange={(value) => setOptions((o) => ({ ...o, aspect: value as Aspect }))}
             items={[{ value: '16:9', label: '16:9 landscape' }, { value: '9:16', label: '9:16 portrait' }]} />
         </div>}
         <div className="export-option">
-          <div>
-            <strong>{uiText('Versions')}</strong>
-            <div className="hint">{uiText('The same video in the light and the dark theme, from one scene.')}</div>
-          </div>
+          <strong>{uiText('Versions')}</strong>
           <div className="theme-swatches">
             {(['dark', 'light'] as Theme[]).map((t) => (
               <button
@@ -179,49 +159,24 @@ export function ExportDialog() {
             ))}
           </div>
         </div>
-
         <div className="export-option">
-          <div>
-            <strong>{uiText('Quality')}</strong>
-            <div className="hint">
-              {uiText(
-                '720p is the fastest, plenty to watch on a laptop. 1440p keeps thin lines and small text sharp, also after YouTube compresses the video. 60 fps makes motion smoother.',
-              )}
-              {slower && ` ${uiText(slower)}`}
-            </div>
-          </div>
-          <div className="export-quality">
-            <Tabs
-              radio="Resolution"
-              value={String(size)}
-              onChange={(v) => setOptions((o) => ({ ...o, size: Number(v) as ExportSize }))}
-              items={[
-                { value: '720', label: '720p' },
-                { value: '1080', label: '1080p' },
-                { value: '1440', label: '1440p' },
-              ]}
-            />
-            <Tabs
-              radio="Frame rate"
-              value={String(fps)}
-              onChange={(v) => setOptions((o) => ({ ...o, fps: Number(v) as ExportFps }))}
-              items={[
-                { value: '30', label: '30 fps' },
-                { value: '60', label: '60 fps' },
-              ]}
-            />
-          </div>
+          <strong>{uiText('Quality')}</strong>
+          <select
+            className="select"
+            aria-label={uiText('Quality')}
+            value={`${size}-${fps}`}
+            onChange={(e) => {
+              const [nextSize, nextFps] = e.target.value.split('-').map(Number)
+              setOptions((o) => ({ ...o, size: nextSize as ExportSize, fps: nextFps as ExportFps }))
+            }}
+          >
+            {[720, 1080, 1440].flatMap((s) => [30, 60].map((f) => (
+              <option key={`${s}-${f}`} value={`${s}-${f}`}>{s}p · {f} fps</option>
+            )))}
+          </select>
         </div>
-
         <div className="export-option">
-          <div>
-            <strong>{uiText('Narration languages')}</strong>
-            <div className="hint">
-              {languageName.of(original)}{' '}
-              {uiText(" plus any you add: Claude translates the narration (kept in voice/translations/, so you can correct it), and")}{' '}
-              {meta ? PROVIDER_NAMES[meta.voice.provider] : uiText('the project’s voice')} {uiText(" speaks it over the same video.")}
-            </div>
-          </div>
+          <strong>{uiText('Narration languages')}</strong>
           <div className="language-picker">
             <span className="lang-chip fixed">{languageName.of(original)}</span>
             {extra.map((l) => (
@@ -254,58 +209,23 @@ export function ExportDialog() {
           </label>
         )}
 
-        <ul className="export-files">
-          <li>
-            <FileVideo /> <strong>{both ? uiText('Two videos') : uiText('Video')}</strong>{' '}
-            <span className="mono faint">
-              {uiText(".mp4 · ")}
-              {res} · {fps} {uiText(" fps")}
-              {both ? uiText(' · dark and light') : ''}
-            </span>
-          </li>
-          {extra.length > 0 && (
-            <li>
-              <AudioLines /> <strong>{uiText('Audio tracks')}</strong>{' '}
-              <span className="mono faint">.m4a · {extra.map((l) => languageName.of(l)).join(', ')}</span>
-            </li>
-          )}
-          <li>
-            <Captions /> <strong>{uiText('Subtitles')}</strong>{' '}
-            <span className="mono faint">
-              {uiText(".srt + .vtt · ")}
-              {[original, ...extra].map((l) => languageName.of(l)).join(', ')}
-            </span>
-          </li>
-          {extra.length > 0 && options.languageVideos && (
-            <li>
-              <Languages /> <strong>{uiText('A video per language')}</strong>{' '}
-              <span className="mono faint">{uiText('.mp4 with that language’s narration')}</span>
-            </li>
-          )}
-          <li>
-            <Image /> <strong>{uiText('Thumbnail')}</strong> <span className="mono faint">{uiText('.jpg, the key picture with its hook')}</span>
-          </li>
-        </ul>
-
         <ExportOn value={options.server} onChange={(server) => setOptions((o) => ({ ...o, server }))} />
 
-        <div className="field">
-          <span className="label">{uiText('Save to')}</span>
-          <div className="path-pick">
-            <span className="mono path-text" title={destination}>
-              {destination}
-            </span>
+        <div className="export-option">
+          <strong>{uiText('Save to')}</strong>
+          <div className="save-video-folder">
+            <span className="mono" title={destination}>{options.folder ? destination.split(/[\\/]/).filter(Boolean).pop() : 'exports'}</span>
             {options.folder && (
               <button className="btn small ghost" onClick={() => setOptions((o) => ({ ...o, folder: undefined }))}>
                 {uiText('Use project folder')}
               </button>
             )}
-            <button className="btn small" onClick={() => void chooseFolder()}>
-              <FolderOpen /> {uiText(" Change")}
-            </button>
+            <button className="btn small" onClick={() => void chooseFolder()}>{uiText('Change')}</button>
           </div>
-          <span className="hint">{uiText('The files go in a folder named after the video.')}</span>
         </div>
+        <p className="hint export-summary mono">
+          {[`${both ? uiText('Two videos') : 'MP4'} ${res} · ${fps} fps`, uiText('Subtitles'), uiText('Thumbnail'), extra.length ? `${uiText('Audio tracks')}: ${extra.map((l) => languageName.of(l)).join(', ')}` : ''].filter(Boolean).join(' · ')}
+        </p>
       </div>
     </Modal>
   )

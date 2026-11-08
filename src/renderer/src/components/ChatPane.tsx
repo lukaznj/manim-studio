@@ -1,6 +1,6 @@
 import { ChatRouting } from './ModelRouting'
 import { t as uiText, format } from '../lib/i18n'
-import { ArrowDown, ArrowUp, Camera, Check, ChevronDown, CircleAlert, Clock3, Download, FileText, Film, Gauge, ListChecks, Loader, Plus, ScanLine, Settings2, Sparkles, Square, Video, X, ZoomIn } from 'lucide-react'
+import { ArrowDown, ArrowUp, BookmarkPlus, Camera, Check, ChevronDown, CircleAlert, Clock3, Download, FileText, Film, Gauge, ListChecks, Loader, Plus, ScanLine, Settings2, Sparkles, Square, Video, X, ZoomIn } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { pageRanges } from '../../../shared/pages'
 import type { StudyReference, ChatMessage, ChatPart, Effort, ModelOption, SourceRef } from '../../../shared/types'
@@ -382,6 +382,18 @@ function Message({ message: m, streaming, busy, onPreview, onReference }: { mess
         }}>{m.videoOffer.state === 'created' ? uiText('Open') : uiText('Create the video anyway')}</button>
       </div>}
       {m.exerciseFolder && <div className="study-chat-result"><ListChecks /><div><strong>{uiText('Practice exercises')}</strong><span>{uiText('Your exercises are being prepared with checked solutions.')}</span></div><button className="btn small" onClick={() => void import('../store').then(({ openExerciseSet }) => openExerciseSet(m.exerciseFolder!))}>{uiText('Open')}</button></div>}
+      {m.memoryProposal && m.memoryProposal.state !== 'dismissed' && (
+        <div className={`memory-chip ${m.memoryProposal.state}`}>
+          {m.memoryProposal.state === 'saved' ? <Check /> : <BookmarkPlus />}
+          <span><strong>{uiText(m.memoryProposal.state === 'saved' ? 'Remembered:' : 'Remember?')}</strong> {m.memoryProposal.text}</span>
+          {m.memoryProposal.state === 'offered' && (
+            <>
+              <button className="btn small" onClick={() => void api.chatRemember(m.id, true)}>{uiText('Remember')}</button>
+              <button className="memory-chip-no" aria-label={uiText('Don’t remember')} title={uiText('Don’t remember')} onClick={() => void api.chatRemember(m.id, false)}><X /></button>
+            </>
+          )}
+        </div>
+      )}
       {working && !m.videoOffer && !m.exerciseFolder && (
         <div className="thinking">
           <span />
@@ -537,7 +549,7 @@ function Composer() {
         />
         <div className="composer-foot">
           {exercise ? <StudyTools /> : <button className="icon-btn" title={uiText('Model and effort settings')} aria-label={uiText('Model and effort settings')} onClick={() => openDialog({ kind: 'settings', tab: 'account' })}><Settings2 /></button>}
-          <ChatRouting />
+          {!exercise && <ChatRouting />}
           {busy ? (
             <button className="send-btn stop" onClick={() => void api.chatInterrupt()} title={uiText('Stop')}>
               <Square />

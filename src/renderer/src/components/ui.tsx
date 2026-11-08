@@ -1,5 +1,5 @@
 import { t as uiText, localize } from '../lib/i18n'
-import { X } from 'lucide-react'
+import { MoreHorizontal, X } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 export function Modal(props: {
@@ -194,3 +194,47 @@ export function Wordmark({ size = 15 }: { size?: number }) {
     </span>
   )
 }
+
+/** A ⋯ button with a short list of actions, for headers that would otherwise stack text buttons. */
+export function MoreMenu({ label, items }: { label: string; items: ({ icon: ReactNode; label: string; onClick: () => void; danger?: boolean } | false | null | undefined)[] }) {
+  const id = useId()
+  const menu = useRef<HTMLDivElement>(null)
+  const shown = items.filter((item): item is Exclude<typeof item, false | null | undefined> => !!item)
+  if (!shown.length) return null
+  return (
+    <>
+      <button
+        className="icon-btn"
+        popoverTarget={id}
+        aria-label={label}
+        title={label}
+        onClick={(e) => {
+          const box = e.currentTarget.getBoundingClientRect()
+          if (menu.current) {
+            menu.current.style.top = `${box.bottom + 6}px`
+            menu.current.style.left = `${Math.max(12, box.right - 240)}px`
+          }
+        }}
+      >
+        <MoreHorizontal />
+      </button>
+      <div id={id} ref={menu} popover="auto" className="more-menu" role="menu">
+        {shown.map((item) => (
+          <button
+            key={item.label}
+            role="menuitem"
+            className={item.danger ? 'danger' : ''}
+            onClick={() => {
+              menu.current?.hidePopover()
+              item.onClick()
+            }}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+

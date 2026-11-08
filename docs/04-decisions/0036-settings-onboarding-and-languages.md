@@ -21,6 +21,10 @@ Accounts and Voice both exposed credentials, General mixed app and video prefere
 - Both libraries use a small plus button, with a larger central plus when empty. A chooser offers quick video, course/series and exercises, plus an editable project and open-folder action in Create.
 - Shared segmented controls animate their selection, respecting reduced motion. Settings keep a fixed width and top position; only the body extends downwards and scrolls. Modal dismissal retains the complete content while fading. Theme changes apply directly while a native dialog is open.
 
+## Update (0.19.0)
+
+Settings now has four tabs, Agent (Accounts below it), Voice, Video and General (Tools below it), and the three "new" choices are one composer ([[0064-simplifying-pass]]).
+
 ## Consequences
 
 This revises the UI-language portion of [[0011-open-source-english]], the control placement in [[0015-tone-and-pacing]], first-launch setup in [[0029-learn-and-create]], and export-quality placement in [[0035-720p-study-videos]]. A project snapshots defaults when created; changing defaults does not rewrite existing projects.

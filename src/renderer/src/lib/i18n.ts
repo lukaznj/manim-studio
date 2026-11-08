@@ -24,3 +24,7 @@ export function localize<T>(value: T): T {
 export function format(template: string, values: unknown[]): string {
   return formatUi(language, template, values)
 }
+
+/** Counts in the UI: "1 lesson", "2 lekcije", "5 lekcija". */
+export const LESSONS = '{0, plural, one {# lesson} other {# lessons}}'
+export const EXERCISES = '{0, plural, one {# exercise} other {# exercises}}'

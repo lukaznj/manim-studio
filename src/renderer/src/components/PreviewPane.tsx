@@ -42,7 +42,7 @@ export function PreviewPane() {
 
   return (
     <div className="preview-pane">
-      <div className="pane-head editor-preview-head"><span className="editor-pane-title"><Video />{uiText('Preview')}</span><span className="badge">{aspect}</span></div>
+      <div className="pane-head editor-preview-head"><span className="editor-pane-title"><Video />{uiText('Preview')}</span></div>
       <div className="stage" ref={stage}>
         <div className={`frame ${render.status === 'rendering' ? 'rendering' : ''}`} style={{ width: box.w, height: box.h }}>
           {src ? (

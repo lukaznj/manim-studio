@@ -332,7 +332,6 @@
 
 /* Lists that arrive one item after another (--i). */
 .onb-points li,
-.onb-steps li,
 .onb-card,
 .onb-install,
 .onb-summary li {
@@ -340,7 +339,6 @@
 }
 
 .onb-points,
-.onb-steps,
 .onb-summary {
   list-style: none;
   margin: 30px 0 0;
@@ -348,15 +346,13 @@
   display: grid;
   gap: 18px;
 }
-.onb-points li,
-.onb-steps li {
+.onb-points li {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
-.onb-points li > svg,
-.onb-step-icon {
+.onb-points li > svg {
   box-sizing: border-box;
   width: 48px;
   height: 48px;
@@ -365,43 +361,19 @@
   background: var(--sun-soft);
   color: var(--sun-text);
 }
-.onb-step-icon svg {
-  width: 24px;
-  height: 24px;
-}
-.onb-points strong,
-.onb-steps strong {
+
+.onb-points strong {
   display: block;
   font: 700 18px/1.3 var(--font-display);
   color: var(--text);
 }
-.onb-points span,
-.onb-steps li span:not(.onb-step-icon) {
+.onb-points span {
   display: block;
   margin-top: 3px;
   font-size: 15.5px;
   line-height: 1.5;
   color: var(--text-2);
 }
-/* The steps are a sequence, joined by a line. */
-.onb-steps {
-  position: relative;
-  gap: 26px;
-}
-.onb-steps li {
-  position: relative;
-}
-.onb-steps li:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  left: 23px;
-  top: 54px;
-  bottom: -20px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--line-strong);
-}
-
 /* ---- cards ---------------------------------------------------------------------------------- */
 
 .onb-cards {
@@ -797,28 +769,6 @@
   border: 0;
   background: none;
   animation: none;
-}
-
-.onb-folder {
-  margin-top: 24px;
-  font-size: 15px;
-}
-.onb-folder > p {
-  margin: 0 0 20px;
-  font-size: 17px;
-  line-height: 1.55;
-  color: var(--text-2);
-}
-.onb-folder .link-btn {
-  margin-top: 16px;
-  font-size: 15px;
-}
-.onb-folder .folder-card {
-  padding: 16px 18px;
-  border-radius: 16px;
-}
-.onb-folder .folder-card-head {
-  font: 700 17px var(--font-display);
 }
 
 .onb-summary {

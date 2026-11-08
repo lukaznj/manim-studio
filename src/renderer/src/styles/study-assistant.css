@@ -89,7 +89,7 @@
 div.study-notes-body { cursor: text; }
 div.study-notes-body:hover { background: color-mix(in srgb, var(--raised) 45%, transparent); }
 div.study-notes-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sun-soft); }
-.study-notes-body.empty > p, .study-notes-input::placeholder { color: var(--text-3); }
+.study-notes-body.is-empty > p, .study-notes-input::placeholder { color: var(--text-3); }
 .study-notes-body > :first-child { margin-top: 0; }
 .study-notes-body > :last-child { margin-bottom: 0; }
 .study-notes-input { resize: none; overflow: hidden; }
@@ -219,3 +219,19 @@ div.study-notes-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sun-soft)
 .narration-recovery.using-fallback { background: var(--raised); }
 .narration-recovery .narration-recovery-error { color: var(--coral); }
 .preview-pane > .narration-recovery { margin: 8px 10px; padding: 12px; max-height: 210px; overflow: auto; }
+/* Your question with its frame: a small picture beside the words, not a banner above them. */
+.study-chat .msg.user:has(.msg-frame-button) { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.study-chat .msg.user:has(.msg-frame-button) .msg-attach { margin: 0; }
+.study-chat .msg-attach .msg-frame-button img { max-width: 76px; height: 44px; }
+
+
+/* A line the chat suggests for "What Studio knows about you" (ADR 0065). */
+.memory-chip { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 7px 8px 7px 11px; border: 1px dashed var(--line-strong); border-radius: 11px; color: var(--text-2); font-size: 12.5px; line-height: 1.4; }
+.memory-chip > svg { flex: none; width: 15px; height: 15px; color: var(--sun-text); }
+.memory-chip > span { flex: 1; min-width: 0; }
+.memory-chip strong { color: var(--text); font-weight: 650; }
+.memory-chip.saved { border-style: solid; border-color: var(--line); }
+.memory-chip .btn { flex: none; }
+.memory-chip-no { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: none; color: var(--text-3); cursor: pointer; }
+.memory-chip-no:hover { background: var(--raised); color: var(--text); }
+.memory-chip-no svg { width: 14px; height: 14px; }

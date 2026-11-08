@@ -14,7 +14,7 @@ Exports land in each project's `exports/` folder, named for YouTube (ADR 0013). 
 - **Save video** copies a project's newest export (the same one the study screen plays) into a folder the user picks: Downloads at first, then the last folder used. The copy is named after the video's title, made safe for every file system, with "(2)" when the name is taken. It's offered on lessons, exercises, a project card's menu on Home, and finished exports in the exports list.
 - **Subtitles, three ways:**
   - **As a file** (the default): the export's `.srt` beside the copy with the same name, which most players load by themselves and YouTube takes as captions.
-  - **Burned in:** `studio_runner burn-subtitles` turns the `.srt` into an ASS script at the video's resolution, styled from the viewer's subtitle preference ([[0060-playback-subtitle-style]]) and placed inside the band projects keep clear for subtitles ([[0027-subtitle-band]]). ffmpeg (libass, already in the environment) re-encodes with x264, reporting progress.
+  - **Burned in:** `studio_runner burn-subtitles` draws each cue into a transparent frame-sized picture (Pillow; Nunito, with DejaVu Sans for Greek and maths), styled from the viewer's subtitle preference ([[0060-playback-subtitle-style]]) and placed inside the band projects keep clear for subtitles ([[0027-subtitle-band]]). ffmpeg's built-in `overlay` lays them over the video from an ffconcat list and re-encodes with x264, reporting progress. Not libass: conda-forge's Windows ffmpeg is built without it, which broke burning in on Windows in 0.17.0 and 0.18.0.
   - **None.**
 - The last folder and choice are remembered (`settings.saveCopy`). An unexported project says to export first; nothing is rendered by Save video.
 

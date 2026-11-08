@@ -184,7 +184,11 @@ def _anim(a) -> dict:
 
         target = getattr(a, "mobject", None)
         return {"name": type(a).__name__, "target": describe(target) if target is not None else None}
-    return {"name": "animate" if type(a).__name__ == "_AnimationBuilder" else type(a).__name__, "target": None}
+    if type(a).__name__ == "_AnimationBuilder":
+        # `.animate.shift(UP)`: the methods name the clip on the timeline ("shift", not ".animate").
+        methods = [getattr(getattr(m, "method", None), "__name__", "") for m in getattr(a, "methods", [])]
+        return {"name": "animate", "target": None, "methods": [m for m in methods if m]}
+    return {"name": type(a).__name__, "target": None}
 
 
 def load_scene_class(scene_file: Path, wanted: str | None):
