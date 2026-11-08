@@ -21,6 +21,7 @@ import {
   applyChatSettings,
   agentRuntimeBusy,
   chatInterrupt,
+  chatRemember,
   chatModels,
   chatSelectModel,
   resetChatModel,
@@ -75,6 +76,7 @@ import { saveVideoCopy, videoCopyInfo } from './save-copy'
 import { agentRoutes } from './agent'
 import { videoEncoder } from './encoder'
 import { inspectFolder, useProjectsFolder } from './folders'
+import { readAboutYou, writeAboutYou } from './about-you'
 import { clearRenderCache, pruneRenderCache, renderCacheInfo } from './render-cache'
 import {
   addCourseLesson,
@@ -571,6 +573,9 @@ function registerIpc(): void {
 
   handle('chatSend', (req: Parameters<typeof chatSend>[0]) => chatSend(req))
   handle('chatInterrupt', () => chatInterrupt())
+  handle('chatRemember', (id: string, save: boolean) => chatRemember(id, save))
+  handle('readAboutYou', () => readAboutYou())
+  handle('writeAboutYou', (text: string) => writeAboutYou(String(text)))
   handle('chatModels', (agent?: Agent) => chatModels(agent))
 
   handle('history', () => history(projects.requireProject().path))

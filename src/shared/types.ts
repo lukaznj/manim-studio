@@ -717,6 +717,7 @@ export interface SubtitleStyle {
 export interface Settings {
   studyModels?: Partial<Record<Agent, { model: string; effort: Effort }>> // tutor chat and notes, independent of video creation
   studyAutoplay?: boolean // advance to the next ready course lesson; unset: off
+  aboutYou?: boolean // agents read "What Studio knows about you" and the study chat may propose lines (ADR 0065); unset: off
   studyPlaybackRate?: number // preferred study player speed; unset: 1
   studyVolume?: number // preferred study player volume, 0–1; unset: 1
   studyMuted?: boolean // mute independently of the preferred volume; unset: off
@@ -835,6 +836,7 @@ export interface ChatMessage {
   studyReferences?: StudyReference[]
   studyContext?: StudyContextInfo
   videoOffer?: StudyVideoOffer
+  memoryProposal?: { text: string; state: 'offered' | 'saved' | 'dismissed' } // a line the study chat suggests for the note
   studyAction?: 'video' | 'exercises'
   exerciseFolder?: string
   auto?: boolean // a background agent's turn (series, exercises), not the user's conversation
@@ -1127,6 +1129,9 @@ export interface StudioApi {
 
   chatSend(request: ChatRequest): Promise<void>
   chatInterrupt(): Promise<void>
+  chatRemember(messageId: string, save: boolean): Promise<void>
+  readAboutYou(): Promise<string>
+  writeAboutYou(text: string): Promise<string>
   chatModels(agent?: Agent): Promise<ModelOption[]>
   openEpisodeReport(dir: string): Promise<void>
   /** Opens the bundled Claude Desktop extension, which Claude Desktop offers to install. */

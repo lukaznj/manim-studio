@@ -2055,3 +2055,7 @@
 .set-advanced > summary { cursor: pointer; padding: 8px 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
 .set-advanced[open] > summary { margin-bottom: 6px; }
 
+
+/* Settings → General: what Studio knows about you (ADR 0065). */
+.about-you { display: grid; justify-items: start; gap: 8px; margin: -4px 0 10px; }
+.about-you-note { width: 100%; min-height: 84px; resize: vertical; font: inherit; line-height: 1.5; }
