@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import { revealLabel } from '../lib/platform'
 import { askInChat, canEdit, errorText, openDialog, openExerciseSet, selectStudied, toast, useStore } from '../store'
 import { Markdown } from './Markdown'
+import { MoreMenu } from './ui'
 import { StudyPlayer } from './StudyPlayer'
 import { WatchedToggle } from './LessonView'
 import { StudyRowProgress } from './StudyRowProgress'
@@ -98,7 +99,7 @@ export function ExerciseRows({ set, selected }: { set: ExerciseSet; selected?: s
   return (
     <>
       {set.intake && <IntakeRow set={set} />}
-      {set.items.map((it) => (
+      {set.items.map((it, i) => (
         <li key={it.dir}>
           <button className={`ex-row ${it.dir === selected ? 'on' : ''} state-${it.state}`} onClick={() => void selectStudied(it.dir)}>
             <span className="ex-num mono">{it.number}</span>
@@ -106,7 +107,7 @@ export function ExerciseRows({ set, selected }: { set: ExerciseSet; selected?: s
               <span className="ex-row-title">{it.title}</span>
               <StudyRowProgress dir={it.dir} available={it.state === 'done' && !!it.video}>
                 {it.state === 'done'
-                  ? it.topic || uiText('Done')
+                  ? (it.topic && it.topic !== set.items[i - 1]?.topic ? it.topic : null)
                   : set.paused && ['waiting', 'solved'].includes(it.state)
                     ? uiText('Paused')
                     : (it.activity ?? uiText(LABEL[it.state]))}
@@ -241,38 +242,27 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
               <RotateCcw /> {uiText(' Try again')}
             </button>
           )}
-          {item.video && (
-            <button className="btn small ghost" title={uiText('Save a copy of this video, to keep or share')} onClick={() => openDialog({ kind: 'save-video', project: item.dir })}>
-              <Download /> {uiText('Save video')}
-            </button>
-          )}
-          {editing && (
-            <button
-              className="btn small ghost"
-              title={uiText('The code, timeline and voice of this video')}
-              onClick={() => useStore.setState({ screen: 'editor' })}
-            >
-              <Code2 /> {uiText(' Open in editor')}
-            </button>
-          )}
-          <button className="icon-btn" title={revealLabel()} aria-label={revealLabel()} onClick={() => void api.reveal(item.dir)}>
-            <FolderOpen />
-          </button>
-          <button
-            className="icon-btn"
-            title={uiText('Remove this exercise')}
-            aria-label={uiText('Remove this exercise')}
-            onClick={() => {
-              if (confirm(format('Remove “{0}”? Its folder goes to the Trash.', [item.title]))) void api.removeExercise(item.dir).catch((e) => toast(errorText(e), 'error'))
-            }}
-          >
-            <Trash2 />
-          </button>
+          <MoreMenu
+            label={uiText('More')}
+            items={[
+              !!item.video && { icon: <Download />, label: uiText('Save video'), onClick: () => openDialog({ kind: 'save-video', project: item.dir }) },
+              editing && { icon: <Code2 />, label: uiText('Open in editor'), onClick: () => useStore.setState({ screen: 'editor' }) },
+              { icon: <FolderOpen />, label: revealLabel(), onClick: () => void api.reveal(item.dir) },
+              {
+                icon: <Trash2 />,
+                label: uiText('Remove this exercise'),
+                danger: true,
+                onClick: () => {
+                  if (confirm(format('Remove “{0}”? Its folder goes to the Trash.', [item.title]))) void api.removeExercise(item.dir).catch((e) => toast(errorText(e), 'error'))
+                },
+              },
+            ]}
+          />
         </div>
       </header>
       {item.state === 'failed' && item.error && <p className="ex-error">{item.error}</p>}
 
-      <section className="ex-card ex-problem">
+      {(!detail || problemAddsToTitle(detail, item.title)) && <section className="ex-card ex-problem">
         <h2 className="ex-card-title">{uiText('The exercise')}</h2>
         {detail ? <Markdown text={detail.problem} /> : <p className="faint">…</p>}
         {!!detail?.pictures.length && (
@@ -284,7 +274,7 @@ export function ExerciseMain({ item }: { item: ExerciseItem }) {
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
       <ExercisePlayer item={item} detail={detail} video={video} />
 
@@ -382,9 +372,8 @@ function ExplainBetter({ item }: { item: ExerciseItem }) {
     return (
       <div className="ex-explain">
         <button className="btn small" disabled={working} title={working ? uiText('Once its agent is done') : undefined} onClick={() => setOpen(true)}>
-          <Sparkles /> {uiText(' Explain something better in the video')}
+          <Sparkles /> {uiText('Explain in the video')}
         </button>
-        <span className="faint">{uiText('For a quick question, ask in the chat instead: it answers right away.')}</span>
       </div>
     )
   return (
@@ -428,3 +417,10 @@ function ExplainBetter({ item }: { item: ExerciseItem }) {
     </div>
   )
 }
+
+/** The problem card is worth showing when it has a picture or says more than the exercise's title. */
+function problemAddsToTitle(detail: ExerciseDetail, title: string): boolean {
+  const plain = (text: string) => fold(text).replace(/[$*_`\\{}]/g, '').replace(/[\s.:;,!?]+/g, ' ').trim()
+  return detail.pictures.length > 0 || plain(detail.problem) !== plain(title)
+}
+

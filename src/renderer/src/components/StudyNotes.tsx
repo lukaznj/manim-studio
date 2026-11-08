@@ -108,7 +108,7 @@ export function StudyNotes({ dir }: { dir: string }) {
           onKeyDown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
           placeholder={t('Capture an idea, a question or a formula… Use $…$ for mathematics.')} aria-label={t('Video notes')} />
       ) : (
-        <div className={`study-notes-body md ${text ? '' : 'empty'}`} role="textbox" tabIndex={0} aria-label={t('Video notes')}
+        <div className={`study-notes-body md ${text ? '' : 'is-empty'}`} role="textbox" tabIndex={0} aria-label={t('Video notes')}
           onClick={(e) => !(e.target as HTMLElement).closest('a, button') && !window.getSelection()?.toString() && edit()}
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), edit())}>
           {text ? <Markdown text={withMoments(text)} reference={moment} /> : <p>{t('Capture an idea, a question or a formula… Use $…$ for mathematics.')}</p>}

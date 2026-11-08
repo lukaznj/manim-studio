@@ -1,12 +1,12 @@
-import { Check, CircleAlert, FolderOpen, Play, RotateCcw, Square, Zap, ArrowLeft, Globe } from 'lucide-react'
+import { Check, CircleAlert, Code2, FolderOpen, Play, RotateCcw, Square, Zap, ArrowLeft } from 'lucide-react'
 import { modelName } from '../../../shared/usage'
 import { api } from '../lib/api'
-import { t, format } from '../lib/i18n'
+import { t } from '../lib/i18n'
 import { revealLabel } from '../lib/platform'
 import { canEdit, closeProject, errorText, openDialog, openWatch, toast, useStore } from '../store'
 import { ProductionStages } from './ProductionStages'
-import { AccountPlanUsage } from './AccountPlanUsage'
 import { NarrationRecovery } from './NarrationRecovery'
+import { MoreMenu } from './ui'
 
 /** A production page, never the owner of the agent's lifetime or current project. */
 export function QuickView() {
@@ -32,19 +32,22 @@ export function QuickView() {
       </div>
       <ProductionStages project={run.project} stage={stage} active={working} job={job} />
       {run.state === 'done' && <NarrationRecovery dir={run.project} />}
-      <p className="hint creation-estimate">{t('Writing progress estimates completed sections, not time remaining. Rendering and assembly report their own progress.')}</p>
       {run.error && <div className="quick-error"><CircleAlert />{run.error}</div>}
       {!!run.warnings.length && <ul className="quick-warnings">{run.warnings.map((warning) => <li key={warning}><CircleAlert />{warning}</li>)}</ul>}
       <div className="quick-actions">
         {working ? <button className="btn" onClick={() => void api.stopQuick(run.project)}><Square />{t('Stop')}</button> : <>
           {run.state !== 'done' && <button className="btn primary" onClick={resume}><RotateCcw />{t('Continue')}</button>}
           {run.state === 'done' && <button className="btn primary" onClick={() => void openWatch(run.project)}><Play />{t('Watch it')}</button>}
-          {editing && <button className="btn ghost" onClick={() => useStore.setState({ quickEditor: true })}>{t('Open in the editor')}</button>}
-          {run.result && <button className="btn" onClick={() => void api.reveal(run.result!.files[0] ?? run.result!.folder)}><FolderOpen />{revealLabel()}</button>}
-          <button className="btn ghost" onClick={() => openDialog({ kind: 'quick' })}><Zap />{t('Make another')}</button>
+          <MoreMenu
+            label={t('More')}
+            items={[
+              editing && { icon: <Code2 />, label: t('Open in the editor'), onClick: () => useStore.setState({ quickEditor: true }) },
+              !!run.result && { icon: <FolderOpen />, label: revealLabel(), onClick: () => void api.reveal(run.result!.files[0] ?? run.result!.folder) },
+              { icon: <Zap />, label: t('Make another'), onClick: () => openDialog({ kind: 'new', make: 'video' }) },
+            ]}
+          />
         </>}
       </div>
-      <details className="production-usage"><summary><Globe />{t('Creation settings')}</summary><p className="hint">{format('{0} PDF sources', [run.sources ?? 0])} · {t('Web research available')}</p>{run.route && <AccountPlanUsage agent={run.route.agent} auth={run.route.auth} />}</details>
     </div>
   </section>
 }

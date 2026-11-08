@@ -6,9 +6,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
-import type { FolderInfo, ProjectsFolders, Settings } from '../shared/types'
-import { paths } from './paths'
-import { getSettings, setSettings } from './settings'
+import type { FolderInfo, Settings } from '../shared/types'
+import { setSettings } from './settings'
 
 /** The nearest existing folder's real path, for a folder that may not exist yet. */
 function realish(dir: string): string {
@@ -84,13 +83,6 @@ export function inspectFolder(dir: string): FolderInfo {
     }
   const any = found.videos + found.courses + found.exerciseSets > 0
   return { path: dir, cloud: cloudSync(dir), exists: existsSync(dir), found: any ? found : null }
-}
-
-/** The onboarding's choices: a local folder, Documents (and whether it's synced), and the folder in use. */
-export function projectsFolders(): ProjectsFolders {
-  const local = paths.defaultProjectsDir()
-  const documents = paths.legacyProjectsDir()
-  return { local: inspectFolder(local), documents: inspectFolder(documents), current: getSettings().projectsDir }
 }
 
 const readJson = (file: string) => JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>

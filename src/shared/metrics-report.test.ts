@@ -72,7 +72,7 @@ test('comparison time excludes measurement setup and finalization overhead', () 
     { at: 7000, name: 'Metrics finalization' },
   ]
   const html = renderMetricsReport([episode, episode], 'Comparison')
-  assert.match(html, /Episode comparison/)
+  assert.match(html, /Lesson comparison/)
   assert.match(html, /<td>0m 4s<\/td>/)
   assert.match(html, /Peak Studio RAM/)
 })

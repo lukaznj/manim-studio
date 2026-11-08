@@ -78,7 +78,7 @@ export function ChatRouting() {
     </button>
     <div ref={picker} id={pickerId} popover="auto" className="chat-routing-popover">
       <header><div><span className="eyebrow">{t('This conversation')}</span><h4>{t('Choose a model')}</h4></div><Sparkles /></header>
-      <p className="hint">{t('Your conversation stays with this episode when you switch.')}</p>
+      <p className="hint">{t('Your conversation stays with this lesson when you switch.')}</p>
       {options.map((option) => {
         const selected = modelRouteKey(option.route) === key
         const reading = option.route.auth === 'account' ? readings[option.route.agent] : null
@@ -119,8 +119,7 @@ export function FallbackSettings() {
   const remaining = options.filter((o) => !order.some((route) => modelRouteKey(route) === modelRouteKey(o.route)))
   const move = (index: number, by: number) => { const next = [...order]; [next[index], next[index + by]] = [next[index + by], next[index]]; save(next) }
   return <section className="model-fallback-settings">
-    <div className="fallback-settings-head"><div><h3>{t('Automatic switching')}</h3><p className="hint">{t('When a usage limit stops work, continue with the next available model in this order. Applies to chat, planning and video creation.')}</p></div><input type="checkbox" role="switch" aria-label={t('Automatic switching')} checked={!!policy?.enabled} disabled={!order.length} onChange={(e) => save(order, e.target.checked)} /></div>
-    <p className="hint">{t('Models on the same account may share limits. Studio skips an exhausted shared allowance until it resets. API keys are used only if you add them here.')}</p>
+    <div className="fallback-settings-head"><div><h3>{t('Automatic switching')}</h3></div><input type="checkbox" role="switch" aria-label={t('Automatic switching')} checked={!!policy?.enabled} disabled={!order.length} onChange={(e) => save(order, e.target.checked)} /></div>
     <ol className="fallback-model-order">{order.map((route, index) => {
       const option = options.find((o) => modelRouteKey(o.route) === modelRouteKey(route))
       return <li key={modelRouteKey(route)}><span className="fallback-position">{index + 1}</span><div><strong>{option?.label ?? modelName(route.model)}</strong><small>{names[route.agent]} · {method(route)}{!option && !loading ? ` · ${t('Unavailable')}` : ''}</small></div>

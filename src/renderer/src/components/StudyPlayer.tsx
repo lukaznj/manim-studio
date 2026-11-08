@@ -414,20 +414,6 @@ export function StudyPlayer(props: {
             >
               <Captions />
             </button>
-            {props.seriesAutoplay && (
-              <button
-                className={`study-autoplay ${autoplay ? 'active' : ''}`}
-                role="switch"
-                aria-checked={autoplay}
-                aria-label={uiText('Autoplay next lesson')}
-                title={uiText('Autoplay next lesson')}
-                onClick={() => void updateSettings({ studyAutoplay: !autoplay })}
-              >
-                <span>
-                  <Play />
-                </span>
-              </button>
-            )}
             {fullscreen && <button
               className={`icon-btn study-fullscreen-chat ${fullscreenChat ? 'active' : ''}`}
               aria-label={fullscreenChat ? uiText('Hide assistant') : uiText('Show assistant')}
@@ -442,7 +428,7 @@ export function StudyPlayer(props: {
                 }
               }}
             ><MessageCircle /></button>}
-            <PlaybackSpeed rate={rate} onChange={(studyPlaybackRate) => void updateSettings({ studyPlaybackRate })} onOpen={setSpeedOpen} />
+            <PlaybackSpeed rate={rate} onChange={(studyPlaybackRate) => void updateSettings({ studyPlaybackRate })} onOpen={setSpeedOpen} autoplay={props.seriesAutoplay ? { on: autoplay, onChange: (studyAutoplay) => void updateSettings({ studyAutoplay }) } : undefined} />
             <button
               className="icon-btn"
               onClick={expand}

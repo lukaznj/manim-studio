@@ -53,13 +53,13 @@ function SeriesActions({ run }: { run: SeriesRun }) {
   }
   return (
     <div className="production-actions">
-      {current && run.state === 'working' && <button className="btn" onClick={() => perform(() => api.pauseSeries(true, run.folder))}><Pause />{t('Pause the series')}</button>}
+      {current && run.state === 'working' && <button className="btn" onClick={() => perform(() => api.pauseSeries(true, run.folder))}><Pause />{t('Pause the course')}</button>}
       {current && run.state === 'paused' && <button className="btn primary" onClick={() => perform(() => api.pauseSeries(false, run.folder))}><Play />{t('Resume')}</button>}
       {(run.state === 'queued' || run.state === 'stopped' || (run.state === 'done' && run.episodes.some((ep) => ep.state === 'failed'))) &&
         <button className="btn primary" disabled={busy} onClick={() => void resume()}>{busy ? <span className="spinner" /> : <Play />}{t(run.state === 'queued' ? 'Start now' : run.state === 'done' ? 'Try again' : 'Continue')}</button>}
       {current && (run.state === 'working' || run.state === 'paused') && <button className="btn" onClick={() => perform(() => api.stopSeries(run.folder))}><Square />{t('Stop')}</button>}
       <button className="icon-btn" title={revealLabel()} aria-label={revealLabel()} onClick={() => perform(() => api.reveal(run.folder))}><FolderOpen /></button>
-      {developer && run.report && <button className="btn small" onClick={() => perform(() => api.openEpisodeReport(run.folder))}><FileText />{t('Open series report')}</button>}
+      {developer && run.report && <button className="btn small" onClick={() => perform(() => api.openEpisodeReport(run.folder))}><FileText />{t('Open course report')}</button>}
       {current && (run.state === 'done' || run.state === 'stopped' || run.state === 'queued') && <button className="icon-btn" title={t('Dismiss')} aria-label={t('Dismiss')} onClick={() => perform(async () => { await api.dismissSeries(run.folder) })}><X /></button>}
     </div>
   )
@@ -88,7 +88,7 @@ function EpisodeActions({ run, episode }: { run: SeriesRun; episode: EpisodeRun 
   return <div className="production-episode-actions">
     {episode.state === 'failed' && <button className="btn small" disabled={retrying} onClick={() => void retry()}>{retrying ? <span className="spinner" /> : <RotateCcw />}{t('Try again')}</button>}
     {current && !remote && !['done', 'failed'].includes(episode.state) && (run.state === 'working' || episode.held) &&
-      <button className="icon-btn" aria-label={t(episode.held ? 'Resume this episode' : 'Pause this episode')} title={t(episode.held ? 'Resume this episode' : 'Pause this episode')} onClick={() => perform(() => api.pauseEpisode(episode.dir, !episode.held))}>{episode.held ? <Play /> : <Pause />}</button>}
+      <button className="icon-btn" aria-label={t(episode.held ? 'Resume this lesson' : 'Pause this lesson')} title={t(episode.held ? 'Resume this lesson' : 'Pause this lesson')} onClick={() => perform(() => api.pauseEpisode(episode.dir, !episode.held))}>{episode.held ? <Play /> : <Pause />}</button>}
     {developer && episode.report && <button className="btn small ghost" onClick={() => perform(() => api.openEpisodeReport(episode.dir))}><FileText />{t('HTML report')}</button>}
   </div>
 }
@@ -104,7 +104,7 @@ function ProductionDetails({ run }: { run: SeriesRun }) {
     {expanded && <div>
       {providers.map((agent) => <AccountPlanUsage key={agent} agent={agent} auth={agent === run.agent ? run.auth ?? configuredAuth(settings, agent) : configuredAuth(settings, agent)} />)}
       {settings?.developerMode && <p className="hint">
-        {run.episodes.some((ep) => ep.assignment) ? t('Episode model comparison') : modelName(run.model || 'default')}
+        {run.episodes.some((ep) => ep.assignment) ? t('Lesson model comparison') : modelName(run.model || 'default')}
         {run.effort ? format(', {0} effort', [run.effort]) : ''}
         {cost !== null && cost > 0 && <> · {dollars(cost)} {t('API-equivalent estimate')}{run.planningApiEstimateUSD ? format(' (planning {0})', [dollars(run.planningApiEstimateUSD)]) : ''}</>}
       </p>}
@@ -122,10 +122,10 @@ export function SeriesOverview({ run }: { run: SeriesRun }) {
       <SeriesActions run={run} />
     </header>
     <div className="production-summary">
-      <div><strong>{made}<span> / {run.episodes.length}</span></strong><span role="status">{format('{0} of {1} episodes made.', [made, run.episodes.length])}</span></div>
+      <div><strong>{made}<span> / {run.episodes.length}</span></strong><span role="status">{format('{0} of {1} lessons made.', [made, run.episodes.length])}</span></div>
       <progress value={made} max={run.episodes.length} aria-label={t('Production')} />
-      {run.state === 'stopped' && <p className="hint">{format('Stopped with {0} of {1} episodes made. Continue carries on where each one stopped, also after you quit the app.', [made, run.episodes.length])}</p>}
-      {developer && run.metrics && <p className="hint">{t('Measuring one episode at a time, from script through export. HTML reports appear as episodes finish.')}</p>}
+      {run.state === 'stopped' && <p className="hint">{format('Stopped with {0} of {1} lessons made. Continue carries on where each one stopped, also after you quit the app.', [made, run.episodes.length])}</p>}
+      {developer && run.metrics && <p className="hint">{t('Measuring one lesson at a time, from script through export. HTML reports appear as lessons finish.')}</p>}
     </div>
     <SeriesLimit run={run} />
     <ol className="production-episodes">

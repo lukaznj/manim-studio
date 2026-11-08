@@ -66,10 +66,7 @@
   font: 10px var(--font-mono);
   opacity: 0.6;
 }
-.study-library-label {
-  color: var(--text-3);
-  font-size: 12px;
-}
+
 .study-library-content {
   min-height: 0;
   overflow: auto;
@@ -181,9 +178,9 @@
   text-wrap: balance;
 }
 .study-view .ex-detail-actions {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
-  max-width: 130px;
+  gap: 6px;
 }
 .study-view .ex-detail-actions .btn {
   font-size: 11px;
@@ -636,41 +633,7 @@
   width: 14px;
   height: 14px;
 }
-.study-autoplay {
-  width: 34px;
-  height: 20px;
-  padding: 2px;
-  flex-shrink: 0;
-  border: 0;
-  border-radius: 12px;
-  background: var(--text-3);
-  color: var(--panel);
-  cursor: pointer;
-  transition: background 0.18s;
-}
-.study-autoplay.active {
-  background: var(--sun);
-  color: var(--bg);
-}
-.study-autoplay > span {
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  background: var(--panel);
-  color: var(--text-2);
-  border-radius: 50%;
-  transition: transform 0.18s;
-}
-.study-autoplay.active > span {
-  transform: translateX(14px);
-  color: var(--sun-text);
-}
-.study-autoplay svg {
-  width: 10px;
-  height: 10px;
-  fill: currentColor;
-}
+
 .study-chapter-list {
   display: grid;
   gap: 4px;
@@ -899,7 +862,7 @@
 .study-view .ex-side { display: block; overflow: hidden; }
 .study-library-inner, .study-assistant-inner { min-width: 0; min-height: 0; height: 100%; }
 .study-library-inner { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
-.study-library-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.study-library-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .study-library-heading .icon-btn, .study-assistant-head > .icon-btn { flex-shrink: 0; }
 .study-assistant-head > .tabs { min-width: 0; }
 .study-view.library-collapsed { --study-library-track: 40px; }
@@ -923,6 +886,14 @@
 .study-view:fullscreen .study-content, .study-view:fullscreen .ex-detail { height: 100%; min-height: 0; max-width: none; padding: 0; margin: 0; display: block; }
 .study-view:fullscreen .study-content > :not(.ex-detail), .study-view:fullscreen .ex-detail > :not(.study-player) { display: none; }
 .study-player.is-fullscreen { position: relative; box-shadow: none; }
+/* Fullscreen chat opens smoothly: the column grows, the video shrinks with it, and the panel
+   slides in at its own width instead of reflowing its text on every frame. */
+.study-view:fullscreen { transition: grid-template-columns 0.38s var(--ease-out), gap 0.38s var(--ease-out); }
+.study-view:fullscreen .study-assistant { overflow: hidden; }
+.study-view:fullscreen .study-assistant-inner { width: var(--study-assistant-width, var(--study-assistant-min)); min-width: var(--study-assistant-width, var(--study-assistant-min)); height: 100%; }
+.study-view:fullscreen.assistant-collapsed .study-assistant-inner { display: grid; } /* slides out too; inert while closed */
+body.resizing-x .study-view:fullscreen { transition: none; }
+@media (prefers-reduced-motion: reduce) { .study-view:fullscreen { transition: none; } }
 
 /* The chapter title fills the quiet centre of the toolbar and opens chapter navigation. */
 .study-player { container: study-player / inline-size; }
@@ -930,7 +901,7 @@
 .study-current-chapter:hover { background: var(--raised); color: var(--text); }
 .study-current-chapter > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .study-current-chapter > svg { width: 12px; height: 12px; flex: none; }
-.study-control-row > .icon-btn, .study-volume, .study-rate, .study-autoplay, .study-time { flex-shrink: 0; }
+.study-control-row > .icon-btn, .study-volume, .study-rate, .study-time { flex-shrink: 0; }
 @container study-player (max-width: 620px) {
   .study-volume input { display: none; }
   .study-control-row { gap: 2px; }
@@ -940,3 +911,5 @@
   .study-skip { display: none !important; }
   .study-current-chapter { flex-basis: 60px; }
 }
+.study-speed-menu .study-speed-autoplay { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; padding-top: 10px; }
+.study-speed-menu .study-speed-autoplay > span { grid-column: 1 / 3; }
