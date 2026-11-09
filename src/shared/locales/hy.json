@@ -224,7 +224,7 @@
   "Close Project": "Փակել նախագիծը",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT աշխատասեղան",
   "Codex account limit read timed out.": "Codex հաշվի թողունակության նվազագույն ժամկետը լրացել է։",
-  "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex-ը չի առաջարկում GPT-6.1 Sol կամ GPT-6.1 Terra։ Ստուգեք ձեր հաշիվը Փոխադրումներ → Հաշիվներ բաժնում։",
+  "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex-ը չի առաջարկում GPT-6 Astra, GPT-6.1 Sol կամ GPT-6.1 Terra։ Ստուգեք ձեր հաշիվը Փոխադրումներ → Հաշիվներ բաժնում։",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex մոդելի հայտնաբերման ժամանակը լրացել է։ Պարզեք նորից Փոխադրումներ → Հաշիվներ-ից։",
   "Codex returned a repeated model catalog page.": "Codex վերադարձրել է կրկնվող մոդելի ցուցակի էջը։",
   "Codex stopped before returning its model catalog.": "Codex-ը կանգ առավ մոդելի ցուցակը վերադարձնելուց առաջ։",

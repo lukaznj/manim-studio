@@ -224,7 +224,7 @@
   "Close Project": "Uždaryti projektą",
   "Codex / ChatGPT Desktop": "Stalinis kompiuteris Codex / ChatGPT",
   "Codex account limit read timed out.": "Codex paskyros ribos skaitymas baigėsi.",
-  "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex nepasiūlė GPT-6.1 Sol ar GPT-6.1 Terra. Patikrinkite savo sąskaitą Nustatymai → Sąskaitos.",
+  "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex nepasiūlė GPT-6 Astra, GPT-6.1 Sol ar GPT-6.1 Terra. Patikrinkite savo sąskaitą Nustatymai → Sąskaitos.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex modelio aptikimo laikas baigėsi. Bandykite dar kartą iš Nustatymai → Paskyros.",
   "Codex returned a repeated model catalog page.": "Codex grąžino pasikartojantį modelio katalogo puslapį.",
   "Codex stopped before returning its model catalog.": "Codex sustojo prieš grąžinant savo modelio katalogą.",

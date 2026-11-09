@@ -42,7 +42,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0036-settings-onboarding-and-languages]] | Guided onboarding, offline national-language UI across Europe with English macOS menus, connected agents and shared Voice/Video defaults; simplified theme/background controls | accepted |
 | [[0037-desktop-conversation-videos]] | Desktop chat video jobs, mode-aware delivery and shared Claude/Codex/ChatGPT local bridge | accepted |
 | [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
-| [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI availability for the GPT-6.1 models (Sol, Terra), with opt-in OpenAI capacity fallback | accepted |
+| [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI availability for GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra, with opt-in OpenAI capacity fallback | accepted |
 | [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
 | [[0041-focused-study-workspace]] | Focused study page with navigation only when needed for standalone videos, collapsible sidebars and resizable assistant, compact video controls and expandable courses | accepted |
 | [[0042-study-playback-preferences]] | Per-video resume and sidebar progress, per-course selected view, continuous playback preserving fullscreen with the assistant, and remembered playback preferences | accepted |

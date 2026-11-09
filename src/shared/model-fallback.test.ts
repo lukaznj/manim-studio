@@ -8,10 +8,11 @@ const terra: ModelRoute = { ...opus, agent: 'codex', model: 'gpt-6.1-terra' }
 const sol: ModelRoute = { ...terra, model: 'gpt-6.1-sol' }
 
 test('fallback order preserves priority, canonicalizes defaults and rejects invalid or duplicate routes', () => {
-  const order = normalizeModelOrder([null, {}, { ...opus, model: 'opus' }, opus, { ...terra, model: 'gpt-6-terra' }, sol, { ...sonnet, auth: 'secret' }, { ...sonnet, model: 'bad\nmodel' }, { ...sonnet, effort: 'ultra' }])
+  const order = normalizeModelOrder([null, {}, { ...opus, model: 'opus' }, opus, { ...terra, model: 'gpt-6-luna' }, sol, { ...sonnet, auth: 'secret' }, { ...sonnet, model: 'bad\nmodel' }, { ...sonnet, effort: 'ultra' }])
   assert.deepEqual(order, [opus, sol, sonnet])
   assert.equal(normalizeModelOrder(null).length, 0)
   assert.equal(normalizeModelOrder([{ ...opus, model: 'fable' }])[0].model, 'claude-fable-5-2')
+  assert.equal(normalizeModelOrder([{ ...terra, model: 'gpt-6-astra' }])[0].model, 'gpt-6-astra')
   assert.equal(modelRouteKey(sonnet), modelRouteKey({ ...sonnet, effort: 'low' }))
   assert.notEqual(modelRouteKey(opus), modelRouteKey({ ...opus, auth: 'api-key' }))
 })

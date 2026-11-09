@@ -224,7 +224,7 @@
   "Close Project": "Закрити проект",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Робочий стіл",
   "Codex account limit read timed out.": "Перевищено обмеження часу читання облікового запису Codex.",
-  "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex не пропонує GPT- 6 Astra або GPT- 6. 1 Sol. Перевірте ваш обліковий запис за допомогою пункту меню Параметри → Облікові записи.",
+  "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex не пропонує GPT- 6 Astra або GPT- 6. 1 Sol. Перевірте ваш обліковий запис за допомогою пункту меню Параметри → Облікові записи.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex перевищено час очікування на виявлення моделі. Спробуйте знову з пункту меню Параметри → Облікові записи.",
   "Codex returned a repeated model catalog page.": "Codex повернув сторінку каталогу моделей, яка повторюється.",
   "Codex stopped before returning its model catalog.": "Codex зупинився перед поверненням каталогу моделей.",

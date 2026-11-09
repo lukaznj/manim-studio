@@ -224,7 +224,7 @@
   "Close Project": "Zavrieť projekt",
   "Codex / ChatGPT Desktop": "Stolný počítač Codex / ChatGPT",
   "Codex account limit read timed out.": "Codex Časový limit čítania účtu vypršal.",
-  "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex neponúkal GPT-6.1 Sol alebo GPT-6.1 Terra. Skontrolujte svoj účet v Nastavenia → Účty.",
+  "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex neponúkal GPT-6 Astra, GPT-6.1 Sol alebo GPT-6.1 Terra. Skontrolujte svoj účet v Nastavenia → Účty.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex Časový limit pre zistenie modelu vypršal. Skúste to znova z Nastavenia → Účty.",
   "Codex returned a repeated model catalog page.": "Codex vrátila opakovanú stránku katalógu modelov.",
   "Codex stopped before returning its model catalog.": "Codex sa zastavil pred vrátením katalógu modelov.",
