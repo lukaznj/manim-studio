@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { FallbackModelOption, ModelRoute } from '../shared/types'
 import { ModelLimitPools, modelRouteKey, normalizeModelOrder } from '../shared/model-fallback'
-import { CODEX_EXECUTOR, CODEX_PLANNER } from '../shared/codex-selection'
+import { CODEX_MODELS } from '../shared/codex-selection'
 import { formatUi } from '../shared/i18n'
 import { modelName } from '../shared/usage'
 import { agentRoutes } from './agent'
@@ -34,7 +34,7 @@ async function discoverFallbackModels(generation: number): Promise<FallbackModel
   const routes = await agentRoutes()
   const discovered = await Promise.all(routes.map(async (connection) => {
     const models = fakeAgents() ? connection.agent === 'codex'
-      ? [{ value: CODEX_PLANNER, label: 'GPT-6 Astra', efforts: ['high'] as const }, { value: CODEX_EXECUTOR, label: 'GPT-6.1 Sol', efforts: ['high'] as const }]
+      ? Object.entries(CODEX_MODELS).map(([value, label]) => ({ value, label, efforts: ['high'] as const }))
       : [{ value: 'claude-opus-5-5', label: 'Opus 5.5', efforts: ['low', 'medium', 'high'] as const }, { value: 'claude-sonnet-5-5', label: 'Sonnet 5.5', efforts: ['low', 'medium', 'high'] as const }]
       : await chatModels(connection.agent, connection.auth).catch(() => [])
     return models.map((model) => ({ route: normalizeModelOrder([{ ...connection, model: model.value, effort: model.efforts.some((effort) => effort === 'high') ? 'high' : model.efforts[0] ?? 'high' }])[0], label: model.label, efforts: [...model.efforts] }))

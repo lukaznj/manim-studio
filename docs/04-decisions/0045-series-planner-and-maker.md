@@ -12,11 +12,11 @@ New series asked for a title, required PDFs and asked for a model each time. Pla
 ## Decision
 
 - **Two normal model choices in Settings → Agent:** the creation model/effort (editor chat, videos and series episodes) and "Series: planning". [[0051-study-assistant-and-notes]] adds an independent study-chat model/effort in Settings; its questions and notes do not change the creation selection.
-  - Planning defaults: Claude Opus 5.5, Codex GPT-6-Astra, Antigravity Gemini 4 Argon; high effort.
-  - Episode creation inherits the selected provider's normal creation model and effort. Codex creation defaults to GPT-6.1 Sol; its only other choice is GPT-6 Astra. Old blank/retired Codex planner and maker overrides migrate to Astra and Sol respectively.
+  - Planning defaults: Claude Opus 5.5, Codex GPT-6.1 Sol, Antigravity Gemini 4 Argon; high effort.
+  - Episode creation inherits the selected provider's normal creation model and effort. Codex creation defaults to GPT-6.1 Sol; its only other choice is GPT-6.1 Terra ([[0039-codex-model-discovery-and-capacity-recovery]]). Old blank or retired Codex planner and maker overrides migrate to Sol.
   - **Advanced** offers an optional "Override model for series episodes". Existing saved maker selections remain explicit overrides; disabling one restores inheritance. Saved planner selections stay independent (`settings.seriesModels`, planner defaults in `shared/agent-selection.ts` `SERIES_PLANNERS`).
   - New series has no model picker; a run captures the maker at its start, as before.
-- **Claude's model list shows only the 5.5 generation**, plus Studio's default. A saved full model id counts as the listed alias with the same name, so it keeps its effort levels.
+- **Claude's model list shows only the current generation** (5.5, and Fable 5.2 since 0.20.0), plus Studio's default. A saved full model id counts as the listed alias with the same name, so it keeps its effort levels.
 - **New series is two steps:** first the PDFs, or "I have no PDFs"; then the details. Without PDFs, the user says what they want to learn and the planner chooses the curriculum, with episodes that have no sources. The optional instructions stay.
 - **No title field.** The planner names the series. The plan review can still edit it, and the series' folder view on Home renames it later. Renaming updates the episodes' `project.json` and `series.json`, and folders keep their names.
 
