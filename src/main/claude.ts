@@ -507,8 +507,8 @@ export async function chatModels(agent?: Agent, auth?: ClaudeAuth): Promise<Mode
   const inbox = new Inbox()
   const q = query({ prompt: inbox, options: { env: claudeEnv(auth), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
   try {
-    // Only the current generation (5.5): older models wrote noticeably worse scenes, and Fable isn't for this.
-    const list = (await q.supportedModels()).filter((m) => m.value === 'default' || /\b5\.5\b/.test(m.displayName))
+    // The current generation only (5.5, and Fable 5.2): older models wrote noticeably worse scenes.
+    const list = (await q.supportedModels()).filter((m) => m.value === 'default' || /\b5\.5\b/.test(m.displayName) || /fable[ -]5[.-]2\b/i.test(`${m.value} ${m.displayName}`))
     return list.map((m) => ({
       value: m.value === 'default' ? '' : m.value,
       // Claude Code's "Default" is its own (Opus on some plans); in Studio no model means Sonnet 5.5.

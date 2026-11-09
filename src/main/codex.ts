@@ -185,7 +185,7 @@ export async function codexModels(auth?: ClaudeAuth): Promise<ModelOption[]> {
   const env = codexEnv()
   if (apiKey(auth)) env.OPENAI_API_KEY = apiKey(auth)
   knownModels = studioCodexModels(await listCodexModels(bin, env))
-  if (!knownModels.length) throw new Error('Codex did not offer GPT-6 Astra or GPT-6.1 Sol. Check your account in Settings → Accounts.')
+  if (!knownModels.length) throw new Error('Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.')
   return knownModels
 }
 

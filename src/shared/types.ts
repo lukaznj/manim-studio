@@ -751,7 +751,7 @@ export interface Settings {
   claudeModel: string // '' = Claude Code's default for the account
   claudeEffort: Effort | '' // '' (older settings) reads as 'medium'
   agent: Agent // who writes the scenes (ADR 0022)
-  codexModel: string // GPT-6.1 Sol by default; GPT-6 Astra is the other supported choice
+  codexModel: string // GPT-6.1 Sol by default; GPT-6.1 Terra is the other supported choice
   codexEffort: Effort | ''
   antigravityModel: string // '' = Gemini 4 Argon
   antigravityEffort: Effort | ''

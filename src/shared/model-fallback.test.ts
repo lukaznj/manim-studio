@@ -4,13 +4,14 @@ import { ModelLimitPools, normalizeModelOrder, modelRouteKey } from './model-fal
 import type { ModelRoute } from './types.ts'
 const opus: ModelRoute = { agent: 'claude', auth: 'account', model: 'claude-opus-5-5', effort: 'high' }
 const sonnet: ModelRoute = { ...opus, model: 'claude-sonnet-5-5' }
-const astra: ModelRoute = { ...opus, agent: 'codex', model: 'gpt-6-astra' }
-const sol: ModelRoute = { ...astra, model: 'gpt-6.1-sol' }
+const terra: ModelRoute = { ...opus, agent: 'codex', model: 'gpt-6.1-terra' }
+const sol: ModelRoute = { ...terra, model: 'gpt-6.1-sol' }
 
 test('fallback order preserves priority, canonicalizes defaults and rejects invalid or duplicate routes', () => {
-  const order = normalizeModelOrder([null, {}, { ...opus, model: 'opus' }, opus, { ...astra, model: 'gpt-old' }, sol, { ...sonnet, auth: 'secret' }, { ...sonnet, model: 'bad\nmodel' }, { ...sonnet, effort: 'ultra' }])
+  const order = normalizeModelOrder([null, {}, { ...opus, model: 'opus' }, opus, { ...terra, model: 'gpt-6-terra' }, sol, { ...sonnet, auth: 'secret' }, { ...sonnet, model: 'bad\nmodel' }, { ...sonnet, effort: 'ultra' }])
   assert.deepEqual(order, [opus, sol, sonnet])
   assert.equal(normalizeModelOrder(null).length, 0)
+  assert.equal(normalizeModelOrder([{ ...opus, model: 'fable' }])[0].model, 'claude-fable-5-2')
   assert.equal(modelRouteKey(sonnet), modelRouteKey({ ...sonnet, effort: 'low' }))
   assert.notEqual(modelRouteKey(opus), modelRouteKey({ ...opus, auth: 'api-key' }))
 })
@@ -21,8 +22,8 @@ test('a generic account limit skips other models sharing that allowance but not 
   assert.equal(pools.until(opus, 1000), 2000)
   assert.equal(pools.until(sonnet, 1000), 2000)
   assert.equal(pools.until({ ...opus, auth: 'api-key' }, 1000), 0)
-  assert.equal(pools.until(astra, 1000), 0)
-  pools.reject(astra, 3000, undefined, 1000)
+  assert.equal(pools.until(terra, 1000), 0)
+  pools.reject(terra, 3000, undefined, 1000)
   assert.equal(pools.until(sol, 1000), 3000)
   assert.equal(pools.until(sonnet, 2000), 0)
 })
@@ -34,6 +35,11 @@ test('model-specific Claude limits leave the other model families available', ()
   assert.equal(pools.until(sonnet, 1000), 0)
   pools.reject(sonnet, 5000, 'seven_day', 1000)
   assert.equal(pools.until(opus, 1000), 5000)
+  const fable: ModelRoute = { ...opus, model: 'claude-fable-5-2' }
+  const fresh = new ModelLimitPools()
+  fresh.reject(fable, 4000, 'seven_day_fable', 1000)
+  assert.equal(fresh.until(fable, 1000), 4000)
+  assert.equal(fresh.until(sonnet, 1000), 0)
 })
 
 test('unknown resets are bounded and persisted; malformed entries cannot break startup', () => {
