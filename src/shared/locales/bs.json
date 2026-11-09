@@ -224,7 +224,7 @@
   "Close Project": "Zatvori projekat",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Desktop",
   "Codex account limit read timed out.": "Codex ograničenje računa za čitanje je isteklo.",
-  "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex nije ponudio GPT-6.1 Sol ili GPT-6.1 Terra. Provjerite svoj račun u Postavke → Računi.",
+  "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex nije ponudio GPT-6 Astra, GPT-6.1 Sol ili GPT-6.1 Terra. Provjerite svoj račun u Postavke → Računi.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex model detection timeout. Try again from Settings → Accounts.",
   "Codex returned a repeated model catalog page.": "Codex vratio ponavljajuću stranicu kataloga modela.",
   "Codex stopped before returning its model catalog.": "Codex je zaustavljeno prije vraćanja kataloga modela.",

@@ -32,7 +32,7 @@ test('episodes inherit the creation model and effort while planning stays indepe
   assert.deepEqual(seriesSelection(creation, 'plan'), { agent: 'claude', model: 'opus', effort: 'high' })
   assert.deepEqual(seriesSelection(creation, 'make'), { agent: 'claude', model: 'haiku', effort: 'low' })
   assert.deepEqual(seriesSelection(creation, 'make', 'codex'), { agent: 'codex', model: 'sol', effort: 'medium' })
-  assert.equal(seriesSelection(creation, 'plan', 'codex').model, 'gpt-6.1-sol')
+  assert.equal(seriesSelection(creation, 'plan', 'codex').model, 'gpt-6-astra')
   assert.equal(seriesSelection(creation, 'make', 'antigravity').effort, 'medium')
 })
 

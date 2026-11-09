@@ -74,7 +74,6 @@ export const apiEstimateOf = (entries: UsageEntry[]): number | null => entries.l
 /** "claude-sonnet-5-5" → "Sonnet 5.5"; "claude-opus-5-5-20261001" → "Opus 5.5". */
 export function modelName(id: string): string {
   if (Object.hasOwn(CODEX_MODELS, id)) return CODEX_MODELS[id]
-  if (id === 'gpt-6-astra') return 'GPT-6 Astra' // retired; still named in older usage logs
   const gemini = /^gemini-4-(argon|carbon)\b/.exec(id)
   if (gemini) return `Gemini 4 ${gemini[1][0].toUpperCase()}${gemini[1].slice(1)}`
   const m = /claude-(opus|sonnet|haiku|fable)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?/.exec(id)
