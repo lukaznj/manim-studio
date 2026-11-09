@@ -224,7 +224,7 @@
   "Close Project": "პროექტის დახურვა",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT სამუშაო მაგიდა",
   "Codex account limit read timed out.": "Codex ანგარიშის წაკითხვის ლიმიტი გადააჭარბა.",
-  "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex არ სთავაზობს GPT-6.1 Sol ან GPT-6.1 Terra. შეამოწმეთ თქვენი ანგარიში პარამეტრები → ანგარიშები.",
+  "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex არ სთავაზობს GPT-6 Astra, GPT-6.1 Sol ან GPT-6.1 Terra. შეამოწმეთ თქვენი ანგარიში პარამეტრები → ანგარიშები.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex მოდელის აღმოჩენის დრო გავიდა. სცადეთ ისევ პარამეტრები → ანგარიშები.",
   "Codex returned a repeated model catalog page.": "Codex დაუბრუნა გამეორებული მოდელის კატალოგის გვერდი.",
   "Codex stopped before returning its model catalog.": "Codex შეჩერდა მოდელის კატალოგის დაბრუნების წინ.",

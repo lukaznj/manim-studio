@@ -224,7 +224,7 @@
   "Close Project": "Fechar projeto",
   "Codex / ChatGPT Desktop": "Codex/ChatGPT Desktop",
   "Codex account limit read timed out.": "Codex tempo limite de leitura da conta expirou.",
-  "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex não ofereceu GPT-6.1 Sol ou GPT-6.1 Terra. Verifique sua conta em Configurações → Contas.",
+  "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex não ofereceu GPT-6 Astra, GPT-6.1 Sol ou GPT-6.1 Terra. Verifique sua conta em Configurações → Contas.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex O tempo limite de descoberta de modelo expirou. Tente novamente em Configurações → Contas.",
   "Codex returned a repeated model catalog page.": "Codex retornou uma página de catálogo de modelo repetida.",
   "Codex stopped before returning its model catalog.": "Codex parou antes de retornar seu catálogo de modelos.",
