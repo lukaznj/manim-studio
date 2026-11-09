@@ -224,7 +224,7 @@
   "Close Project": "Κλείσιμο έργου",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Επιτραπέζιος υπολογιστής",
   "Codex account limit read timed out.": "Codex Το όριο ανάγνωσης λογαριασμού έληξε.",
-  "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex δεν προσέφερε ή Ελέγξτε το λογαριασμό σας στις Ρυθμίσεις → Λογαριασμοί.",
+  "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex δεν προσέφερε ή Ελέγξτε το λογαριασμό σας στις Ρυθμίσεις → Λογαριασμοί.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex Έληξε ο χρόνος ανακάλυψης μοντέλου. Δοκιμάστε ξανά από Ρυθμίσεις → Λογαριασμοί.",
   "Codex returned a repeated model catalog page.": "Codex επέστρεψε μια επαναλαμβανόμενη σελίδα καταλόγου μοντέλων.",
   "Codex stopped before returning its model catalog.": "Codex σταμάτησε πριν επιστρέψει τον κατάλογο μοντέλων του.",
