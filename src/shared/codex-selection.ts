@@ -1,17 +1,19 @@
 import type { ModelOption, Settings } from './types'
 
+/** The Codex models Studio offers: the GPT-6.1 generation only (ADR 0039). */
+export const CODEX_MODELS: Readonly<Record<string, string>> = { 'gpt-6.1-sol': 'GPT-6.1 Sol', 'gpt-6.1-terra': 'GPT-6.1 Terra' }
 export const CODEX_EXECUTOR = 'gpt-6.1-sol'
-export const CODEX_PLANNER = 'gpt-6-astra'
+export const CODEX_PLANNER = 'gpt-6.1-sol'
 
 export function isCodexModel(model: string | undefined): boolean {
-  return model === CODEX_EXECUTOR || model === CODEX_PLANNER
+  return !!model && Object.hasOwn(CODEX_MODELS, model)
 }
 
 /** Keep account-provided availability and effort levels, within Studio's supported choices. */
 export function studioCodexModels(models: ModelOption[]): ModelOption[] {
   return models.filter((m) => isCodexModel(m.value)).map((m) => ({
     ...m,
-    label: m.value === CODEX_PLANNER ? 'GPT-6 Astra' : 'GPT-6.1 Sol',
+    label: CODEX_MODELS[m.value],
   }))
 }
 
