@@ -462,7 +462,6 @@
     "Settings": "Optiones",
     "Add an ElevenLabs key in Settings → Accounts first.": "Primum clavem ElevenLabs in Optionibus → Rationes adde.",
     "Choose whether to share Antigravity interactions with Google.": "Elige utrum actiones Antigravity cum Google communicare velis.",
-    "Codex did not offer GPT-6 Astra or GPT-6.1 Sol. Check your account in Settings → Accounts.": "Codex neque GPT-6 Astra neque GPT-6.1 Sol obtulit. Rationem tuam in Optionibus → Rationes verifica.",
     "16:9 landscape": "16:9 forma horizontalis",
     "Animation engine": "Machina animationis",
     "Anthropic API key": "Clavis API Anthropic",
@@ -532,7 +531,8 @@
     "Stop video creation before removing tools.": "Creationem pellicularum siste antequam instrumenta removes.",
     "This entry point is for the Windows uninstaller only.": "Hic aditus soli programmatum removendorum instrumento Windows destinatur.",
     "This installation cannot uninstall itself. Remove downloaded tools here, then uninstall the app normally.": "Haec institutio se ipsam removere non potest. Instrumenta recepta hic remove, deinde applicationem more solito remove.",
-    "Uninstall Manim Studio…": "Manim Studio remove…"
+    "Uninstall Manim Studio…": "Manim Studio remove…",
+    "Codex did not offer GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex neque GPT-6.1 Sol neque GPT-6.1 Terra obtulit. Rationem tuam in Optionibus → Rationes verifica."
   },
   "lv": {
     "Sounds": "Skaņas",

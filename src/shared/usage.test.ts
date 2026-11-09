@@ -39,5 +39,8 @@ test('CLI read-only turns retain their provider and auth without pretending unkn
   assert.equal(apiEstimateOf([account]), null)
   assert.equal(apiEstimateOf([{ ...account, auth: 'api-key' }]), null)
   assert.equal(modelName('gpt-6-astra'), 'GPT-6 Astra')
+  assert.equal(modelName('gpt-6.1-terra'), 'GPT-6.1 Terra')
+  assert.equal(modelName('gemini-4-carbon'), 'Gemini 4 Carbon')
+  assert.equal(modelName('claude-fable-5-2'), 'Fable 5.2')
   assert.equal(modelName('gpt-6.1-sol'), 'GPT-6.1 Sol')
 })
