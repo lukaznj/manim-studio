@@ -2,6 +2,7 @@ import { agentConcurrency, WorkSlots } from '../shared/work-slots'
 import { getSettings } from './settings'
 
 const slots = new WorkSlots()
+export const productionAgentBusy = (): boolean => slots.busy
 export const updateAgentCapacity = (): void => slots.setCapacity(agentConcurrency(getSettings().agentConcurrency))
 export function agentSlot(signal: AbortSignal, step: string, onWait: () => void): Promise<() => void> {
   updateAgentCapacity()

@@ -818,6 +818,7 @@
 .production-episode-copy small { font-size: 10px; color: var(--text-3); }
 .production-episode-copy strong { font-size: 14px; line-height: 1.45; }
 .production-episode-copy > span { font-size: 11.5px; color: var(--text-3); }
+.production-episode-copy .render-check-counter { display: block; margin-top: 5px; }
 .production-episode-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-right: 14px; }
 .production-episode-debug { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px; padding: 0 20px 12px 72px; font-size: 10.5px; }
 .production-usage { padding: 0 2px; color: var(--text-2); }

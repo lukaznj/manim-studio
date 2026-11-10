@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { artifactProgress, type ProductionPhase, type ProductionProgress } from '../shared/production-progress'
 import { readAtomicJson, writeAtomicJson } from './atomic-json'
 import { readMeta } from './projects'
+import { getSettings } from './settings'
 
 const file = (dir: string) => join(dir, '.studio', 'production-progress.json')
 const previews = new Map<string, { completed: number; total: number }>()
@@ -13,7 +14,8 @@ export function previewProgress(dir: string, completed: number, total: number): 
 const valid = (value: unknown): value is ProductionProgress => !!value && typeof value === 'object' &&
   Object.entries(value).every(([key, p]) => ['script', 'scene', 'check'].includes(key) && p &&
     Number.isFinite(p.completed) && Number.isFinite(p.total) && p.completed >= 0 && p.total >= 0 &&
-    (p.done === undefined || typeof p.done === 'boolean') && (p.detail === undefined || typeof p.detail === 'string'))
+    (p.done === undefined || typeof p.done === 'boolean') && (p.detail === undefined || typeof p.detail === 'string') &&
+    (p.counts === undefined || (key === 'check' && p.counts && [p.counts.failedPreviews, p.counts.layoutWarnings].every((n) => Number.isSafeInteger(n) && n >= 0))))
 const read = (name: string) => { try { return readFileSync(name, 'utf8') } catch { return '' } }
 
 export function productionProgress(dir: string): ProductionProgress {
@@ -28,6 +30,22 @@ export function reportProgress(dir: string, phase: ProductionPhase, completed: n
   const progress = productionProgress(dir)
   delete progress.preview
   progress[phase] = { completed, total, detail: detail?.slice(0, 180) }
+  writeAtomicJson(file(dir), progress)
+}
+
+export function countRenderCheck(dir: string, failed: boolean, warnings: number): void {
+  const settings = getSettings()
+  if (!settings.developerMode || !settings.developerRenderCheckCounter) return
+  const progress = productionProgress(dir)
+  delete progress.preview
+  const phase = progress.check ?? { completed: 0, total: 0 }
+  progress.check = {
+    ...phase,
+    counts: {
+      failedPreviews: (phase.counts?.failedPreviews ?? 0) + Number(failed),
+      layoutWarnings: (phase.counts?.layoutWarnings ?? 0) + warnings,
+    },
+  }
   writeAtomicJson(file(dir), progress)
 }
 

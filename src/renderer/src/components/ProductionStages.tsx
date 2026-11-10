@@ -1,8 +1,9 @@
 import { useEffect, useId, useState } from 'react'
 import type { ExportJob } from '../../../shared/types'
-import { phasePercent, type ProductionProgress } from '../../../shared/production-progress'
+import { phasePercent, type ProductionProgress, type RenderCheckCounts } from '../../../shared/production-progress'
 import { api } from '../lib/api'
 import { t, format } from '../lib/i18n'
+import { useStore } from '../store'
 
 const stages = [
   { key: 'script', label: 'Writing the script' },
@@ -28,6 +29,11 @@ export function useProductionProgress(project: string, active: boolean, stage?: 
   return snapshot.project === project ? snapshot.progress : {}
 }
 
+export function RenderCheckCounter({ counts }: { counts?: RenderCheckCounts }) {
+  const enabled = useStore((s) => s.settings?.developerMode && s.settings.developerRenderCheckCounter)
+  return enabled && counts ? <small className="render-check-counter">{format('Failed previews {0} · Layout warnings {1}', [counts.failedPreviews, counts.layoutWarnings])}</small> : null
+}
+
 /** Shared by single videos, series and follow-ups. Unknown work stays indeterminate. */
 export function ProductionStages({ project, stage: explicitStage, active = true, job }: { project: string; stage?: number; active?: boolean; job?: ExportJob }) {
   const id = useId()
@@ -49,6 +55,7 @@ export function ProductionStages({ project, stage: explicitStage, active = true,
         <div className="creation-stage-copy"><strong id={`${id}-${key}`}>{t(name)}</strong>
           {info && info.total > 0 && key !== 'check' && <small>{format('{0} of {1} sections', [Math.min(info.completed, info.total), info.total])}</small>}
           {current && percent !== undefined && key !== 'export' && <small>{t('Estimated')}</small>}
+          {key === 'check' && <RenderCheckCounter counts={progress.check?.counts} />}
         </div>
       </li>
     })}
