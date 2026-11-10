@@ -281,7 +281,8 @@ export interface SeriesRun {
   title: string
   folder: string
   agents?: number // legacy checkpoint field; ignored by scheduling and removed on recovery
-  agent?: Agent // captured at creation; changing Settings does not reroute a running series
+  agent?: Agent // captured at creation or replaced by an explicit switch
+  makerFirst?: boolean // a confirmed settings change makes this route first, ahead of automatic fallbacks
   metrics?: DeveloperMetricsOptions // measured episodes run serially, including export
   report?: string // combined developer report
   model?: string // the series' own model and effort; otherwise the chat's

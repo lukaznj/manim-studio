@@ -248,20 +248,20 @@ export function StudyView() {
               onChange={(studyTab) => useStore.setState({ studyTab })}
               items={[
                 {
-                  value: 'transcript',
-                  label: (
-                    <>
-                      <FileText />
-                      {uiText('Transcript')}
-                    </>
-                  ),
-                },
-                {
                   value: 'chat',
                   label: (
                     <>
                       <Sparkles />
                       {uiText('Chat')}
+                    </>
+                  ),
+                },
+                {
+                  value: 'transcript',
+                  label: (
+                    <>
+                      <FileText />
+                      {uiText('Transcript')}
                     </>
                   ),
                 },
@@ -272,11 +272,11 @@ export function StudyView() {
             <div className="ex-empty faint">{uiText('Choose a lesson or an exercise.')}</div>
           ) : (
             <div className="study-assistant-body" key={path}>
-              <div className={`study-panel ${tab === 'transcript' ? 'active' : ''}`} inert={tab !== 'transcript'} aria-hidden={tab !== 'transcript'}>
-                <Transcript dir={path} version={version} />
-              </div>
               <div className={`study-panel ${tab === 'chat' ? 'active' : ''}`} inert={tab !== 'chat'} aria-hidden={tab !== 'chat'}>
                 <ChatPane embedded />
+              </div>
+              <div className={`study-panel ${tab === 'transcript' ? 'active' : ''}`} inert={tab !== 'transcript'} aria-hidden={tab !== 'transcript'}>
+                <Transcript dir={path} version={version} />
               </div>
             </div>
           )}

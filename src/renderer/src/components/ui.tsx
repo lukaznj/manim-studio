@@ -50,14 +50,14 @@ export function Modal(props: {
       style={{ width: props.width ?? 560 }}
       onCancel={(e) => {
         e.preventDefault()
-        props.onClose()
+        if (props.open) props.onClose()
       }}
-      onMouseDown={(e) => e.target === ref.current && props.onClose()}
+      onMouseDown={(e) => props.open && e.target === ref.current && props.onClose()}
     >
       <div className="modal-head">
         {props.icon}
         <h2>{localize(content.title)}</h2>
-        <button className="icon-btn" onClick={props.onClose} aria-label={uiText('Close')}>
+        <button className="icon-btn" onClick={props.onClose} disabled={!props.open} aria-label={uiText('Close')}>
           <X />
         </button>
       </div>

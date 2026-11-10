@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto'
 import { SCRIPT_FILE, scriptStatus } from '../shared/script'
 import { nextQueuedSeries, nextSeriesTask } from '../shared/series-scheduling'
 import { TONES } from '../shared/tone'
-import { seriesAgentSelection, seriesSelection, switchSeriesSelection } from '../shared/agent-selection'
+import { episodeNeedsMaker, seriesAgentSelection, seriesSelection, switchSeriesSelection } from '../shared/agent-selection'
 import type {
   AgentRoute,
   EpisodeRun,
@@ -281,6 +281,37 @@ const unrecovered = new Set<string>()
 const saveRegistry = () => writeAtomicJson(registryFile(), [...new Set([...controllers.keys(), ...unrecovered])])
 
 export const seriesRuns = (): SeriesRun[] => [...controllers.values()].map((controller) => structuredClone(controller.series))
+const canChangeSeriesMaker = (run: SeriesRun): boolean =>
+  (run.state === 'working' || run.state === 'paused') && run.episodes.some(episodeNeedsMaker)
+
+export const coursesUsingMaker = (): string[] => [...controllers.values()]
+  .filter(({ series }) => canChangeSeriesMaker(series))
+  .map(({ series }) => series.folder)
+
+export function applySeriesMaker(folders: string[]): void {
+  const maker = seriesSelection(getSettings(), 'make')
+  const route = { agent: maker.agent, auth: configuredAuth(maker.agent) }
+  for (const folder of folders) {
+    const controller = controllers.get(folder)
+    if (!controller || !canChangeSeriesMaker(controller.series)) continue
+    const run = controller.series
+    for (const episode of run.episodes) {
+      if ((episode.state === 'done' || episode.state === 'export') && !episode.assignment) {
+        episode.assignment = seriesAgentSelection(run, episode, maker)
+        episode.assignmentAuth = run.auth
+      }
+    }
+    switchSeriesSelection(run, route, maker)
+    run.makerFirst = true
+    for (const episode of run.episodes.filter(episodeNeedsMaker)) {
+      if (controller.steps.has(episode.dir)) controller.halt(episode)
+      episode.limitedUntil = undefined
+      episode.activity = undefined
+    }
+    controller.save()
+    if (run.state === 'working') void controller.drive()
+  }
+}
 export const seriesRun = (): SeriesRun | null => selectedFolder ? seriesRunFor(selectedFolder) : null
 export function seriesRunFor(folder: string): SeriesRun | null {
   const controller = controllers.get(folder)
@@ -583,6 +614,10 @@ class SeriesController {
   }
 
   writeScript = async (ep: EpisodeRun): Promise<void> => {
+    if (ep.tried && scriptStatus(readScript(ep.dir) ?? '') === 'approved') {
+      this.update(ep, { state: 'scripted', activity: undefined, tried: false })
+      return
+    }
     await this.episodeStep(ep, 'script', async (turn) => {
       await turn(
         `${episodePrompt(readMeta(ep.dir))}\n\nFor now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: you’ll make the video in the next step.`,
@@ -618,7 +653,7 @@ class SeriesController {
     this.track((async () => {
       const generation = this.generations.get(ep.dir) ?? 0
       try {
-        await beginEpisodeMetrics(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
+        await beginEpisodeMetrics(ep.dir, ep.assignment ?? seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')), run.metrics)
         this.stopIf(ep)
         episodeMetricsPhase(ep.dir, 'Export')
         const { job, finished } = queueExport(ep.dir, this.exportOptions)
@@ -654,18 +689,22 @@ class SeriesController {
     // The agent and sign-in this episode runs on: the series' (switchable at a limit), or its fixed assignment.
     const route = (): AgentRoute => {
       const selection = seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make'))
-      return { agent: selection.agent, auth: ep.assignment ? ep.assignmentAuth ?? configuredAuth(selection.agent) : (run.auth ?? configuredAuth(selection.agent)) }
+      const auth = ep.assignment && !run.makerFirst ? ep.assignmentAuth : run.auth
+      return { agent: selection.agent, auth: auth ?? configuredAuth(selection.agent) }
     }
     const open = async () => {
       let opened = route()
+      const fixedAssignment = !!ep.assignment && !run.makerFirst
       episodeMetricsSelection(ep.dir, seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')))
       const a = await episodeAgent(ep.dir, {
         onTool: (summary) => { if (!interrupted()) this.update(ep, { activity: summary }) },
         onUsage: (e) => this.update(ep, { costUSD: (ep.costUSD ?? 0) + costOf(e.models), apiEstimateUSD: apiEstimateOf(readUsage(ep.dir)) }),
         ...seriesAgentSelection(run, ep, seriesSelection(getSettings(), 'make')),
         auth: opened.auth,
-        allowFallback: !ep.assignment,
-        strictModel: !!ep.assignment,
+        allowFallback: !fixedAssignment,
+        strictModel: fixedAssignment,
+        preferBase: run.makerFirst,
+        withHistory: run.makerFirst && again,
         followPriority: true,
         onSelection: (actual) => {
           if (interrupted()) return

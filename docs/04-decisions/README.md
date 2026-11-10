@@ -35,7 +35,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0029-learn-and-create]] | Learn, Create or Both: chosen at first launch; Learn hides the editor everywhere and opens every video on a study screen; Both has a Home tab for each | accepted |
 | [[0030-courses]] | A course is a series with its own exercise set in it, studied on one screen with its lessons and exercises together | accepted |
 | [[0031-antigravity-as-third-agent]] | Antigravity (Gemini 4 Argon) as a third agent: pinned CLI with its own home, contained by permission rules without the skip flag, Google sign-in through a pseudo-terminal or a Gemini key | accepted |
-| [[0032-searchable-transcript]] | The study screen's transcript follows the video line by line; searching what's said moves the video to each match | accepted |
+| [[0032-searchable-transcript]] | The study screen opens on Chat; the adjacent Transcript follows the video and can seek to search matches | accepted |
 | [[0033-every-agent-in-the-background]] | Codex and Antigravity run the background agents too (the bridge names its project); Settings → Accounts shows every agent's sign-in and key | accepted |
 | [[0034-gpu-video-encoding]] | Exports encode on the GPU (VideoToolbox, NVENC, Media Foundation for AMD) when one works, in a cache of their own, with the CPU as the fallback | accepted |
 | [[0035-720p-study-videos]] | Previews and exports default to 1080p in all modes; 720p and 1440p remain explicit choices; no 24 fps exports | accepted |
@@ -48,7 +48,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0042-study-playback-preferences]] | Per-video resume and sidebar progress, per-course selected view, continuous playback preserving fullscreen with the assistant, and remembered playback preferences | accepted |
 | [[0043-projects-folder-and-render-cache]] | Render cache in a local, unsynced cache folder (20 GB, LRU); new installs keep projects out of iCloud/OneDrive; onboarding asks where projects go and finds a returning user's folder (folder question dropped by 0064) | accepted |
 | [[0044-full-window-onboarding]] | Full-window first launch that explains the app, installs the engine and LaTeX in the background from the mode choice, and waits for them before the app opens | accepted |
-| [[0045-series-planner-and-maker]] | Separate series planner; episodes inherit the creation model with an optional advanced override; series without PDFs; planner names titles | accepted |
+| [[0045-series-planner-and-maker]] | Separate series planner; episodes inherit the creation model with an optional advanced override; changes to running or paused courses require confirmation; series without PDFs; planner names titles | accepted |
 | [[0046-app-sounds]] | Short UI cues synthesized with the Web Audio API, played from state transitions (renders you waited for, exports, episodes, series, setup, failures); deduplicated native notifications and attention cues at agent usage limits; on/off and volume in Settings → General | accepted |
 | [[0047-guided-tours]] | Guided tours for Home and the study page (and the editor) from one component; each shows once on first visit, replayable from Settings → General | accepted |
 | [[0048-switch-agent-at-usage-limit]] | At a usage limit, explicitly switch unfinished series episodes (including comparisons) or an exercise set to another signed-in agent or saved API key | accepted |
@@ -56,7 +56,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0050-course-production-workspace]] | Course-owned production overview and unfinished-lesson views; compact library status, retained controls, historical recovery and per-episode retry | accepted |
 | [[0051-study-assistant-and-notes]] | Persistent per-episode conversations, study chat tools and text-first video offers, selected frame areas and enlarged screenshot previews, collapsible timestamp detours, and local notes with reviewed AI revisions | accepted |
 | [[0052-interface-and-chat-text-size]] | Persistent interface zoom with Cmd/Ctrl shortcuts and independently adjustable chat text, including math and code | accepted |
-| [[0053-ordered-model-usage-fallback]] | Optional ordered model takeover across connected accounts and explicit keys, persistent chat model choices, and expandable provider usage rings; production returns to the highest available priority between turns | accepted |
+| [[0053-ordered-model-usage-fallback]] | Optional ordered model takeover across connected accounts and explicit keys, persistent chat model choices, and expandable provider usage rings; a confirmed live model takes priority for its course | accepted |
 | [[0054-agpl-copyleft-license]] | AGPLv3-only for future source and distributions, preserving prior MIT grants and third-party licenses | accepted |
 | [[0055-course-aware-study-evidence]] | Read-only full-course/PDF retrieval, verified persisted lesson/timestamp/page references, and return navigation | accepted |
 | [[0056-private-runtime-cleanup]] | App-owned runtime caches and protected tool cleanup; Settings-only macOS/AppImage uninstall and Windows uninstall hook, retaining projects and sign-ins | accepted |

@@ -17,6 +17,7 @@ const withMoments = (text: string) => text.replace(/\[(\d+):(\d{2})\](?!\()/g, (
  * them in place. Moments link to any lesson of the course, like the chat's. AI revisions are proposals.
  */
 export function StudyNotes({ dir }: { dir: string }) {
+  const prompt = t('What would you like to remember?')
   const [text, setText] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -106,12 +107,12 @@ export function StudyNotes({ dir }: { dir: string }) {
           onSelect={(e) => (caret.current = e.currentTarget.selectionStart)}
           onBlur={(e) => { caret.current = e.currentTarget.selectionStart; flush(); setEditing(false) }}
           onKeyDown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
-          placeholder={t('Capture an idea, a question or a formula… Use $…$ for mathematics.')} aria-label={t('Video notes')} />
+          placeholder={prompt} aria-label={t('Video notes')} />
       ) : (
         <div className={`study-notes-body md ${text ? '' : 'is-empty'}`} role="textbox" tabIndex={0} aria-label={t('Video notes')}
           onClick={(e) => !(e.target as HTMLElement).closest('a, button') && !window.getSelection()?.toString() && edit()}
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), edit())}>
-          {text ? <Markdown text={withMoments(text)} reference={moment} /> : <p>{t('Capture an idea, a question or a formula… Use $…$ for mathematics.')}</p>}
+          {text ? <Markdown text={withMoments(text)} reference={moment} /> : <p>{prompt}</p>}
         </div>
       )}
       {previous !== null && <button className="link-btn" onClick={() => { change(previous); setPrevious(null) }}><Undo2 />{t('Undo refinement')}</button>}

@@ -53,6 +53,8 @@ import { updateAgentCapacity } from './agent-slots'
 import { productionProgress } from './production-progress'
 import {
   continueSeries,
+  applySeriesMaker,
+  coursesUsingMaker,
   retrySeriesEpisode,
   dismissSeries,
   pauseEpisode,
@@ -99,6 +101,8 @@ import { criticalWork, QuitCoordinator, settleCriticalWork, shutdownRequested } 
 import { motionsBusy, stopMotions } from './motion'
 import { saveSeriesDraft, saveSeriesPlan, savedSeriesPlans, seriesDraft } from './series-draft'
 import { translateUi } from '../shared/i18n'
+import { seriesMakerChanged } from '../shared/agent-selection'
+import { normalizeCodexSettings } from '../shared/codex-selection'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
 import {
@@ -138,6 +142,7 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 let win: BrowserWindow | null = null
+let confirmingMaker = false
 const send = (channel: EventChannel, payload: unknown) => win?.webContents.send(channel, payload)
 showErrorsWith((e) => send('app-error', e))
 
@@ -292,8 +297,27 @@ function registerIpc(): void {
   })
 
   handle('getSettings', () => getSettings())
-  handle('setSettings', (patch: Parameters<typeof setSettings>[0]) => {
+  handle('setSettings', async (patch: Parameters<typeof setSettings>[0]) => {
+    const before = getSettings()
+    const affected = seriesMakerChanged(before, normalizeCodexSettings({ ...before, ...patch })) ? coursesUsingMaker() : []
+    if (affected.length) {
+      if (!win || confirmingMaker) return getSettings()
+      confirmingMaker = true
+      try {
+        const text = (key: string) => translateUi(before.uiLanguage ?? 'en', key)
+        const { response } = await dialog.showMessageBox(win, {
+          type: 'question',
+          message: text('Change the model for unfinished courses?'),
+          detail: text('The new model picks up from saved work. Paused courses stay paused until you resume them.'),
+          buttons: [text('Cancel'), text('Change')],
+          defaultId: 0,
+          cancelId: 0,
+        })
+        if (response !== 1 || shutdownRequested()) return getSettings()
+      } finally { confirmingMaker = false }
+    }
     const settings = setSettings(patch)
+    if (affected.length) applySeriesMaker(affected)
     if ('agentConcurrency' in patch) updateAgentCapacity()
     if ('claudeModel' in patch || 'claudeEffort' in patch) void applyChatSettings()
     if (patch.appearance) nativeTheme.themeSource = patch.appearance
