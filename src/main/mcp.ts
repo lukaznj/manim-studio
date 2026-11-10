@@ -31,6 +31,7 @@ import { queueExport } from './exports'
 import { rememberProject } from './settings'
 import { checkElevenLabsKey } from './voice'
 import { videoIntent } from '../shared/video-intent'
+import { threeDBrief } from '../shared/three-d'
 
 export interface DesktopHost {
   /** Shows the window and opens the project in it, the same way a click on Home does. */
@@ -342,6 +343,7 @@ function guide(): string {
     styleBrief(meta),
     seriesBrief(meta),
     scriptBrief({ desktop: true }),
+    threeDBrief,
     mediaNote(path),
     sourcesNote(path),
     'Change scene.py only through write_scene or edit_scene. After each change call render_preview, then view_frames at the moments you changed.',

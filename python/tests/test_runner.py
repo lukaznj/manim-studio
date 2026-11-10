@@ -70,6 +70,40 @@ class RenderTimeline(unittest.TestCase):
         self.assertIn("offscreen", kinds)
 
 
+class ThreeDRender(unittest.TestCase):
+    """A ThreeDScene with narration: layout warnings measure what the camera shows."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp())
+        project = cls.tmp / "project"
+        shutil.copytree(HERE / "fixture3d", project)
+        env = {**os.environ, "PYTHONPATH": str(PYTHON_DIR), "STUDIO_VOICE": json.dumps({"provider": "none"})}
+        proc = subprocess.run([sys.executable, "-m", "studio_runner", "render", str(project)], capture_output=True, text=True, env=env, timeout=600)
+        events = [json.loads(l[len("@@studio "):]) for l in proc.stdout.splitlines() if l.startswith("@@studio ")]
+        done = [e for e in events if e["type"] == "done"]
+        if not done:
+            raise AssertionError(f"render failed:\n{proc.stdout}\n{proc.stderr}")
+        cls.result = done[0]["result"]
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_renders_with_sections_and_voice(self):
+        self.assertEqual([s["name"] for s in self.result["sections"]], ["Surface", "Too far"])
+        self.assertTrue(self.result["voice"])
+
+    def test_only_what_the_camera_puts_off_the_frame_is_warned(self):
+        # The axes and surface fit once projected, and the pinned label is measured on screen;
+        # only the sphere 9 units up the z axis leaves the frame.
+        self.assertEqual([w["message"] for w in self.result.get("warnings", [])], ["Sphere goes outside the frame"])
+
+    def test_a_camera_move_is_one_camera_clip(self):
+        names = [[x["name"] for x in c["anims"]] for c in self.result["clips"]]
+        self.assertIn(["camera"], names)
+
+
 class CreditFailureRender(unittest.TestCase):
     def test_quota_failure_keeps_a_playable_video_and_recovery_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
