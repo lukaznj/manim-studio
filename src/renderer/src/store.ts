@@ -85,7 +85,7 @@ export type Make = 'video' | 'course' | 'exercises'
 export type Dialog =
   | { kind: 'new'; make?: Make }
   | { kind: 'new-project' }
-  | { kind: 'settings'; tab?: 'account' | 'accounts' | 'voice' | 'video' | 'env' | 'about' }
+  | { kind: 'settings'; tab?: 'account' | 'accounts' | 'voice' | 'video' | 'env' | 'about'; returnTo?: { kind: 'new'; make?: Make } }
   | { kind: 'booth'; key?: string }
   | { kind: 'export' }
   | { kind: 'series'; request?: { pdfs: string[]; text: string } } // planning a course; a request from New plans at once
@@ -195,7 +195,7 @@ export const useStore = create<State>(() => ({
   exerciseSet: null,
   watchSeries: null,
   studyFullscreenChat: false,
-  studyTab: 'transcript',
+  studyTab: 'chat',
   studyProduction: false,
   watchTime: null,
   studyAutoplayPath: null,
@@ -253,9 +253,13 @@ function withTransition(update: () => void): Promise<void> {
 export const openDialog = (dialog: Dialog) => {
   // Global settings live outside the fullscreen workspace; leave it before opening them.
   if (document.fullscreenElement?.matches('.study-view')) void document.exitFullscreen().catch(() => undefined)
-  set({ dialog })
+  const current = get().dialog
+  if (dialog?.kind === 'settings') {
+    const returnTo = current?.kind === 'new' ? current : current?.kind === 'settings' ? current.returnTo : undefined
+    set({ dialog: { ...dialog, returnTo } })
+  } else set({ dialog })
 }
-export const closeDialog = () => set({ dialog: null })
+export const closeDialog = () => set((s) => ({ dialog: s.dialog?.kind === 'settings' ? s.dialog.returnTo ?? null : null }))
 
 // --- boot ---------------------------------------------------------------------------------
 

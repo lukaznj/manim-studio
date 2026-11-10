@@ -80,16 +80,16 @@
 .study-frame-selector-tools > span { display: flex; align-items: center; gap: 6px; font-size: 11px; padding-inline: 4px; }
 .study-frame-selector-tools svg { width: 14px; height: 14px; }
 .study-notes { border: 1px solid var(--line); border-radius: 16px; background: var(--panel); margin-top: 24px; overflow: hidden; }
-.study-notes > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 12px 0 20px; }
+.study-notes > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px 8px 20px; }
 .study-notes > header > strong { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .study-notes > header > strong > svg { width: 15px; height: 15px; color: var(--text-3); }
-.study-notes-actions { display: flex; gap: 2px; }
+.study-notes-actions { display: flex; align-items: center; gap: 2px; }
 /* Read and edit share one box, so switching never moves the text. */
 .study-notes-body { display: block; box-sizing: border-box; width: 100%; min-height: 132px; margin: 0; padding: 10px 20px 20px; border: 0; border-radius: 0; outline: none; background: transparent; color: var(--text); font: 12px/1.8 var(--font-ui); overflow-wrap: anywhere; text-align: start; user-select: text; }
 div.study-notes-body { cursor: text; }
 div.study-notes-body:hover { background: color-mix(in srgb, var(--raised) 45%, transparent); }
 div.study-notes-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sun-soft); }
-.study-notes-body.is-empty > p, .study-notes-input::placeholder { color: var(--text-3); }
+.study-notes-body.is-empty > p, .study-notes-input::placeholder { color: var(--text-2); }
 .study-notes-body > :first-child { margin-top: 0; }
 .study-notes-body > :last-child { margin-bottom: 0; }
 .study-notes-input { resize: none; overflow: hidden; }

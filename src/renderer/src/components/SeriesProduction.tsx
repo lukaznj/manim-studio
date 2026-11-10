@@ -104,7 +104,7 @@ function ProductionDetails({ run }: { run: SeriesRun }) {
     {expanded && <div>
       {providers.map((agent) => <AccountPlanUsage key={agent} agent={agent} auth={agent === run.agent ? run.auth ?? configuredAuth(settings, agent) : configuredAuth(settings, agent)} />)}
       {settings?.developerMode && <p className="hint">
-        {run.episodes.some((ep) => ep.assignment) ? t('Lesson model comparison') : modelName(run.model || 'default')}
+        {!run.makerFirst && run.episodes.some((ep) => ep.assignment) ? t('Lesson model comparison') : modelName(run.model || 'default')}
         {run.effort ? format(', {0} effort', [run.effort]) : ''}
         {cost !== null && cost > 0 && <> · {dollars(cost)} {t('API-equivalent estimate')}{run.planningApiEstimateUSD ? format(' (planning {0})', [dollars(run.planningApiEstimateUSD)]) : ''}</>}
       </p>}

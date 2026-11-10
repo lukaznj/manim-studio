@@ -266,7 +266,7 @@ function AgentTab() {
       {!status ? (
         <Row title={uiText('Checking account…')} />
       ) : signedIn ? (
-        <Row title={uiText('Creation model and effort')}>
+        <Row title={uiText('Video creation model')}>
           <ModelControls />
         </Row>
       ) : (
@@ -277,10 +277,10 @@ function AgentTab() {
         </Row>
       )}
       {signedIn && <>
-        <Row title={uiText('Study chat model and effort')}>
+        <Row title={uiText('Lesson chat model')}>
           <ModelPicker model={studyModel(settings).model} effort={studyModel(settings).effort} models={models} onChange={(model, effort) => void updateSettings({ studyModels: { ...settings.studyModels, [agent]: { model, effort: effort ?? 'high' } } })} />
         </Row>
-        <Row title={uiText('Course: planning')}>
+        <Row title={uiText('Course planning')}>
           <ModelPicker model={planner.model} effort={planner.effort ?? 'high'} models={models} onChange={(model, effort) => void updateSettings({
             seriesModels: { ...settings.seriesModels, [agent]: { ...settings.seriesModels?.[agent], plan: { model, effort: effort ?? 'high' } } },
           })} />

@@ -28,7 +28,7 @@ const PLACEHOLDER: Record<Make, string> = {
  * a video (quick mode), a course (planned, then reviewed in the course dialog) or exercises.
  */
 export function NewDialog() {
-  const dialog = useStore((s) => (s.dialog?.kind === 'new' ? s.dialog : null))
+  const dialog = useStore((s) => s.dialog?.kind === 'new' ? s.dialog : s.dialog?.kind === 'settings' ? s.dialog.returnTo : undefined)
   const open = !!dialog
   const settings = useStore((s) => s.settings)
   const creating = useStore((s) => !studying(s))

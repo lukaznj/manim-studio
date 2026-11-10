@@ -5,7 +5,7 @@
 // With Codex or Antigravity chosen, the same agent runs on them (otherAgent): their bridge to
 // Studio's tools names the project, so several projects are worked on at once.
 import { availableFallback, exhaustedFallbackUntil, fallbackBlocked, fallbackEnabled, fallbackNotice, rejectFallback, resumeModelPrompt } from './model-fallback'
-import { normalizeModelOrder } from '../shared/model-fallback'
+import { modelRouteKey, normalizeModelOrder } from '../shared/model-fallback'
 import { routedAgent } from './routed-agent'
 import { defaultAgentSelection } from '../shared/agent-selection'
 import { randomUUID } from 'node:crypto'
@@ -43,6 +43,7 @@ export interface AgentOptions {
   autopilot?: boolean // false for the editor's conversational agent
   withHistory?: boolean
   preferSelected?: boolean
+  preferBase?: boolean // a course's explicitly confirmed maker precedes the global fallback order
   followPriority?: boolean // production rechecks the order before every turn, including saved assignments
   frame?: string
   displayText?: string
@@ -59,11 +60,13 @@ export async function episodeAgent(dir: string, opts: AgentOptions): Promise<Epi
   const settings = getSettings()
   const chosen = defaultAgentSelection(settings, opts.agent ?? settings.agent)
   const base = normalizeModelOrder([{ ...chosen, ...opts, auth: opts.auth ?? configuredAuth(chosen.agent) }])[0]
-  const selected = fallbackEnabled() && !opts.strictModel && !opts.preferSelected ? await availableFallback() ?? base : base
+  const selected = fallbackEnabled() && !opts.strictModel && !opts.preferSelected && !opts.preferBase ? await availableFallback() ?? base : base
   const routed = await routedAgent(selected, {
     open: (route) => createEpisodeAgent(dir, { ...opts, ...route }),
     enabled: fallbackEnabled,
-    preferred: availableFallback,
+    preferred: (tried) => opts.preferBase && !tried?.has(modelRouteKey(base)) && !fallbackBlocked(base)
+      ? Promise.resolve(base)
+      : availableFallback(tried),
     blocked: fallbackBlocked,
     exhaustedUntil: exhaustedFallbackUntil,
     reject: rejectFallback,

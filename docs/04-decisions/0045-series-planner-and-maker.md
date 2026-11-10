@@ -11,15 +11,15 @@ New series asked for a title, required PDFs and asked for a model each time. Pla
 
 ## Decision
 
-- **Two normal model choices in Settings → Agent:** the creation model/effort (editor chat, videos and series episodes) and "Series: planning". [[0051-study-assistant-and-notes]] adds an independent study-chat model/effort in Settings; its questions and notes do not change the creation selection.
+- **Two normal model choices in Settings → Agent:** the creation model/effort (editor chat, videos and series episodes) and "Course planning". [[0051-study-assistant-and-notes]] adds an independent study-chat model/effort in Settings; its questions and notes do not change the creation selection.
   - Planning defaults: Claude Opus 5.5, Codex GPT-6 Astra, Antigravity Gemini 4 Argon; high effort.
   - Episode creation inherits the selected provider's normal creation model and effort. Codex creation defaults to GPT-6.1 Sol; GPT-6 Astra and GPT-6.1 Terra are the other choices ([[0039-codex-model-discovery-and-capacity-recovery]]). Old blank or retired Codex planner and maker overrides migrate to Astra and Sol respectively.
   - **Advanced** offers an optional "Override model for series episodes". Existing saved maker selections remain explicit overrides; disabling one restores inheritance. Saved planner selections stay independent (`settings.seriesModels`, planner defaults in `shared/agent-selection.ts` `SERIES_PLANNERS`).
-  - New series has no model picker; a run captures the maker at its start, as before.
+  - New series has no model picker. A run captures its maker at the start. Changing the effective maker in Settings asks before updating running or paused courses. Confirming preserves completed episodes and exports. Running courses resume unfinished authoring from disk using the selected maker. Paused courses save the selected maker and use it when the user resumes them.
 - **Claude's model list shows only the current generation** (5.5, and Fable 5.2 since 0.20.0), plus Studio's default. A saved full model id counts as the listed alias with the same name, so it keeps its effort levels.
 - **New series is two steps:** first the PDFs, or "I have no PDFs"; then the details. Without PDFs, the user says what they want to learn and the planner chooses the curriculum, with episodes that have no sources. The optional instructions stay.
 - **No title field.** The planner names the series. The plan review can still edit it, and the series' folder view on Home renames it later. Renaming updates the episodes' `project.json` and `series.json`, and folders keep their names.
 
 ## Consequences
 
-Planning can spend more (Opus) once per series. Normal creation and series episodes share one model choice, with an advanced override when batch production needs a different model. Changing defaults or overrides affects new series only; running series and saved per-episode assignments retain their captured selections. This revises the "own model and effort" point of [[0023-parallel-series-episodes]].
+Planning can spend more (Opus) once per series. Normal creation and series episodes share one model choice, with an advanced override when batch production needs a different model. A running or paused course keeps its captured selections until the user confirms a maker change. A confirmed maker takes priority for that course, with the configured usage fallback order available when the maker is exhausted. This revises the "own model and effort" point of [[0023-parallel-series-episodes]].
