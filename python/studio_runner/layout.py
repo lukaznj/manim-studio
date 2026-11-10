@@ -2,9 +2,12 @@
 band kept clear for the viewer's subtitles (projects with captionBand).
 
 These are the two most common defects in generated manim code. A warning that holds
-over consecutive clips becomes one time range."""
+over consecutive clips becomes one time range. In a 3D scene, objects are measured where the
+camera draws them (projected, or pinned to the screen), not by their 3D coordinates."""
 
 from __future__ import annotations
+
+import numpy as np
 
 from manim import MathTex, Mobject, Paragraph, SingleStringMathTex, Text, config
 from manim.mobject.text.text_mobject import MarkupText
@@ -45,11 +48,13 @@ class LayoutChecker:
 def _find(scene) -> dict[tuple, str]:
     hw, hh = config.frame_width / 2, config.frame_height / 2
     found: dict[tuple, str] = {}
+    camera = getattr(scene, "camera", None)
+    projected = camera if hasattr(camera, "project_points") else None  # ThreeDScene's camera
 
     for m in scene.mobjects:
         if not _visible(m):
             continue
-        left, bottom, right, top = _box(m)
+        left, bottom, right, top = _box(m, projected)
         if right - left >= 2 * hw * 0.98 and top - bottom >= 2 * hh * 0.98:
             continue  # a full-frame background
         t = EDGE_TOLERANCE
@@ -60,7 +65,7 @@ def _find(scene) -> dict[tuple, str]:
     for m in scene.mobjects:
         _text_leaves(m, leaves)
     leaves = [m for m in leaves if _visible(m)]
-    boxes = [_box(m) for m in leaves]
+    boxes = [_box(m, projected) for m in leaves]
     found.update(_in_band(leaves, boxes, hw, hh))
     # ponytail: O(n²) over text leaves; scenes hold tens of them, not thousands.
     for i in range(len(leaves)):
@@ -109,7 +114,13 @@ def _visible(m: Mobject) -> bool:
     return False
 
 
-def _box(m: Mobject) -> tuple[float, float, float, float]:
+def _box(m: Mobject, camera=None) -> tuple[float, float, float, float]:
+    if camera is not None:
+        parts = [camera.transform_points_pre_display(sub, sub.points) for sub in m.get_family() if sub.has_points()]
+        if parts:
+            points = np.vstack(parts)
+            (left, bottom), (right, top) = points[:, :2].min(axis=0), points[:, :2].max(axis=0)
+            return float(left), float(bottom), float(right), float(top)
     left, bottom = m.get_corner([-1, -1, 0])[:2]
     right, top = m.get_corner([1, 1, 0])[:2]
     return float(left), float(bottom), float(right), float(top)
