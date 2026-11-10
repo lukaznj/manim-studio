@@ -135,7 +135,9 @@ class Recorder:
             play(scene, *args, **kwargs)
             end = scene.renderer.time
             kind = "wait" if args and all(isinstance(a, Wait) for a in args) else "play"
-            rec.clips.append({"start": start, "end": end, "line": line, "kind": kind, "anims": [_anim(a) for a in args]})
+            anims = [_anim(a, scene) for a in args]
+            anims = [x for i, x in enumerate(anims) if x["name"] != "camera" or all(y["name"] != "camera" for y in anims[:i])]
+            rec.clips.append({"start": start, "end": end, "line": line, "kind": kind, "anims": anims})
             rec.layout.check(scene, start, end, line)
             emit("progress", clips=len(rec.clips), t=end)
 
@@ -176,7 +178,13 @@ class Recorder:
         StudioScene.thumbnail = recorded_thumbnail
 
 
-def _anim(a) -> dict:
+def _camera_parts(scene) -> list:
+    """What a 3D camera move animates: the camera's angle, distance and zoom trackers and its centre."""
+    camera = getattr(scene, "camera", None)
+    return [v for k, v in vars(camera).items() if k.endswith("_tracker") or k == "_frame_center"] if camera is not None else []
+
+
+def _anim(a, scene=None) -> dict:
     from manim import Animation
 
     if isinstance(a, Animation):
@@ -185,6 +193,8 @@ def _anim(a) -> dict:
         target = getattr(a, "mobject", None)
         return {"name": type(a).__name__, "target": describe(target) if target is not None else None}
     if type(a).__name__ == "_AnimationBuilder":
+        if scene is not None and any(getattr(a, "mobject", None) is part for part in _camera_parts(scene)):
+            return {"name": "camera", "target": None}  # move_camera(...) animates the camera's trackers
         # `.animate.shift(UP)`: the methods name the clip on the timeline ("shift", not ".animate").
         methods = [getattr(getattr(m, "method", None), "__name__", "") for m in getattr(a, "methods", [])]
         return {"name": "animate", "target": None, "methods": [m for m in methods if m]}

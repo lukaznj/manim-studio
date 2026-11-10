@@ -52,6 +52,7 @@ import { mediaNames, project, readChat, readMeta, readTimeline, requireProject, 
 import { frameBase64, pauseCommits } from './render'
 import { calculate, getTimeline, readSource, renderMotion, renderPreview, reportAuthoringProgress, viewFrames, viewSourcePages } from './scene-tools'
 import { motionBrief } from '../shared/motion'
+import { threeDBrief } from '../shared/three-d'
 import { getSecret, getSettings } from './settings'
 import { sourcesNote } from './sources'
 import { scriptBrief } from '../shared/script'
@@ -937,6 +938,7 @@ export function studioPrompt(dir: string, agent: Agent, autopilot: boolean): str
     `Write all narration and on-screen text in ${languageName(meta.voice.language)}. Reply to the user in the language they write to you in, briefly: what you changed and what you checked.`,
     styleBrief(meta),
     motionBrief,
+    threeDBrief,
     'In narration, read labels and indices as names, not quantities: R_{23} is "R two three" (in Croatian "er dva tri"), not "R twenty-three"; x_{12} is "x one two"; a point A_1 is "A one". Read a number as a number only when it is an amount, and follow how the material names things.',
     meta.captionBand
       ? `Keep the band where viewers' subtitles appear free of text and formulas: the bottom ${meta.aspect === '9:16' ? '2.6 units, and the right 0.9 units where phone apps put their buttons' : '1.1 units'}. SAFE_W and SAFE_H already leave it out; centre a full layout on SAFE_CENTER (not ORIGIN) and use to_edge(DOWN, buff=BOTTOM_BUFF). Pictures, shapes and axes may cross it; the render warns about text that does.`
