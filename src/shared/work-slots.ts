@@ -5,6 +5,8 @@ export class WorkSlots {
   private capacity: number
   constructor(capacity = 0) { this.capacity = capacity }
 
+  get busy(): boolean { return this.active > 0 }
+
   setCapacity(capacity: number): void { this.capacity = capacity; this.pump() }
   acquire(signal?: AbortSignal, priority = 0, onWait?: () => void): Promise<() => void> {
     if (signal?.aborted) return Promise.reject(Object.assign(new Error('Stopped'), { cancelled: true }))

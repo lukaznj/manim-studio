@@ -1764,6 +1764,17 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
           'Measured lessons run one at a time, including export, for clearer attribution. Each lesson gets an offline HTML report, and the course gets a combined report. Data stays in the project; measurement adds some overhead.',
         )}
       </p>
+      <Row title={uiText('Render check counter')} note={uiText('Counts failed previews and layout warnings across render-check attempts.')}>
+        <Tabs
+          radio={uiText('Render check counter')}
+          value={settings.developerRenderCheckCounter ? 'on' : 'off'}
+          onChange={(value) => void updateSettings({ developerRenderCheckCounter: value === 'on' })}
+          items={[
+            { value: 'off', label: 'Off' },
+            { value: 'on', label: 'On' },
+          ]}
+        />
+      </Row>
       <RenderServers />
       <button
         className="btn small ghost"
@@ -1774,6 +1785,7 @@ function DevelopTab({ onDisable }: { onDisable: () => void }) {
             developerUsageMetrics: false,
             developerTimingMetrics: false,
             developerResourceMetrics: false,
+            developerRenderCheckCounter: false,
           })
           onDisable()
         }}

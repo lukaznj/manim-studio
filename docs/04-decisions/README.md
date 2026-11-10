@@ -43,7 +43,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0037-desktop-conversation-videos]] | Desktop chat video jobs, mode-aware delivery and shared Claude/Codex/ChatGPT local bridge | accepted |
 | [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
 | [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI availability for GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra, with opt-in OpenAI capacity fallback | accepted |
-| [[0040-developer-episode-measurements]] | Local per-episode and combined HTML usage, timing and hardware reports; measured episodes run serially | accepted |
+| [[0040-developer-episode-measurements]] | Local usage, timing and hardware reports; measured episodes run serially; a separate render check counter leaves scheduling alone | accepted |
 | [[0041-focused-study-workspace]] | Focused study page with navigation only when needed for standalone videos, collapsible sidebars and resizable assistant, compact video controls and expandable courses | accepted |
 | [[0042-study-playback-preferences]] | Per-video resume and sidebar progress, per-course selected view, continuous playback preserving fullscreen with the assistant, and remembered playback preferences | accepted |
 | [[0043-projects-folder-and-render-cache]] | Render cache in a local, unsynced cache folder (20 GB, LRU); new installs keep projects out of iCloud/OneDrive; onboarding asks where projects go and finds a returning user's folder (folder question dropped by 0064) | accepted |
@@ -52,7 +52,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0046-app-sounds]] | Short UI cues synthesized with the Web Audio API, played from state transitions (renders you waited for, exports, episodes, series, setup, failures); deduplicated native notifications and attention cues at agent usage limits; on/off and volume in Settings → General | accepted |
 | [[0047-guided-tours]] | Guided tours for Home and the study page (and the editor) from one component; each shows once on first visit, replayable from Settings → General | accepted |
 | [[0048-switch-agent-at-usage-limit]] | At a usage limit, explicitly switch unfinished series episodes (including comparisons) or an exercise set to another signed-in agent or saved API key | accepted |
-| [[0049-series-recovery-and-shutdown]] | Journalled series creation and planning drafts, atomic checkpoints, independent per-course scheduling and graceful quit/system shutdown with idle-sleep protection | accepted |
+| [[0049-series-recovery-and-shutdown]] | Journalled series creation and planning drafts, atomic checkpoints, independent per-course scheduling, graceful shutdown and idle-sleep protection on external power | accepted |
 | [[0050-course-production-workspace]] | Course-owned production overview and unfinished-lesson views; compact library status, retained controls, historical recovery and per-episode retry | accepted |
 | [[0051-study-assistant-and-notes]] | Persistent per-episode conversations, study chat tools and text-first video offers, selected frame areas and enlarged screenshot previews, collapsible timestamp detours, and local notes with reviewed AI revisions | accepted |
 | [[0052-interface-and-chat-text-size]] | Persistent interface zoom with Cmd/Ctrl shortcuts and independently adjustable chat text, including math and code | accepted |

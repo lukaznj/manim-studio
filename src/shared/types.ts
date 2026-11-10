@@ -730,6 +730,7 @@ export interface Settings {
   developerUsageMetrics?: boolean
   developerTimingMetrics?: boolean
   developerResourceMetrics?: boolean
+  developerRenderCheckCounter?: boolean
   codexFallbackModel?: string // opt-in, same-account fallback for capacity failures only
   uiLanguage?: UiLanguage
   onboardingDone?: boolean

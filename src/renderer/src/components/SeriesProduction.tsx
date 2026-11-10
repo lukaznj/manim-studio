@@ -9,7 +9,7 @@ import { revealLabel } from '../lib/platform'
 import { canEdit, errorText, selectStudied, showSeriesProduction, toast, useStore } from '../store'
 import { AccountPlanUsage } from './AccountPlanUsage'
 import { configuredAuth, LimitSwitch } from './LimitSwitch'
-import { ProductionStages, useProductionProgress } from './ProductionStages'
+import { ProductionStages, RenderCheckCounter, useProductionProgress } from './ProductionStages'
 import { phasePercent } from '../../../shared/production-progress'
 
 const dollars = (n: number) => `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`
@@ -27,7 +27,8 @@ export function EpisodeStatus({ run, episode, activity = false }: { run: SeriesR
   const progress = useProductionProgress(episode.dir, view.active && !episode.limitedUntil, view.stage)
   const writing = episode.state === 'script' || episode.state === 'scene' ? phasePercent(progress[episode.state]) : undefined
   return <>{view.prefix && <>{t(view.prefix)} · </>}{t(view.label)}{view.percent !== undefined ? <> · {view.percent}%</> : writing !== undefined && <> · {writing}% {t('Estimated').toLocaleLowerCase()}</>}
-    {activity && view.active && episode.activity && episode.state !== 'export' && <> · {t(episode.activity)}</>}</>
+    {activity && view.active && episode.activity && episode.state !== 'export' && <> · {t(episode.activity)}</>}
+    {activity && <RenderCheckCounter counts={progress.check?.counts} />}</>
 }
 
 /** The sidebar entry stays available while watching completed lessons or browsing exercises. */

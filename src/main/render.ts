@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path'
 import type { ProjectMeta, Quality, RenderError, RenderEvent, Theme, Timeline } from '../shared/types'
 import { commitAll } from './git'
 import { project, readMeta, readTimeline, requireProject } from './projects'
-import { killJob, pauseTag, runRunner } from './runner'
+import { isTagPaused, killJob, pauseTag, runRunner } from './runner'
 import { getSettings } from './settings'
 import { voiceEnv } from './voice'
 import { projectCache } from './render-cache'
@@ -20,10 +20,12 @@ export type RenderOutcome = { timeline: Timeline } | { error: RenderError } | { 
 interface Running {
   cancel: () => void
   outcome: Promise<RenderOutcome>
+  tag?: string
 }
 
 const running = new Map<string, Running>() // by project folder and quality
 export const rendersBusy = (dir?: string): boolean => dir ? [...running.keys()].some((id) => id.startsWith(`${dir}\n`)) : running.size > 0
+export const rendersActive = (): boolean => [...running.values()].some(({ tag }) => !tag || !isTagPaused(tag))
 const key = (dir: string, quality: Quality) => `${dir}\n${quality}`
 let nextId = 1
 let sendEvent: (e: RenderEvent) => void = () => {}
@@ -66,6 +68,7 @@ export function render(quality: Quality, variant: RenderVariant = {}, dir = requ
   const abort = new AbortController()
   let child: ChildProcess | null = null
   const entry: Running = {
+    tag: quality === 'preview' && open ? 'preview' : undefined,
     cancel: () => {
       cancelled = true
       abort.abort()
@@ -91,7 +94,7 @@ export function render(quality: Quality, variant: RenderVariant = {}, dir = requ
       const job = await runRunner<{ result: Timeline }>('default', ['render', dir, '--quality', quality, ...options], {
         signal: abort.signal,
         extraEnv: { ...(await voiceEnv(meta, dir)), STUDIO_CACHE_DIR: projectCache(dir) },
-        tag: quality === 'preview' && open ? 'preview' : undefined,
+        tag: entry.tag,
         onEvent: (e) => {
           if (e.type === 'progress') {
             if (quality === 'preview') previewProgress(dir, Number(e.clips), expectedClips)

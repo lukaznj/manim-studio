@@ -6,7 +6,15 @@ export interface PhaseProgress {
   done?: boolean
   detail?: string
 }
-export type ProductionProgress = Partial<Record<ProductionPhase, PhaseProgress>> & { preview?: PhaseProgress }
+export interface RenderCheckCounts {
+  failedPreviews: number
+  layoutWarnings: number
+}
+
+export type ProductionProgress = Partial<Record<'script' | 'scene', PhaseProgress>> & {
+  check?: PhaseProgress & { counts?: RenderCheckCounts }
+  preview?: PhaseProgress
+}
 
 export function phasePercent(progress?: PhaseProgress): number | undefined {
   if (progress?.done) return 100

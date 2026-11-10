@@ -49,7 +49,7 @@ import { history, restore } from './git'
 import { claudeDesktopStatus, startDesktopEndpoint, desktopVideosBusy, stopDesktopVideos } from './mcp'
 import { watchMemory } from './memory'
 import { quickRun, quickRuns, resumeQuick, settleQuick, setupQuick, startQuick, stopQuick } from './quick'
-import { updateAgentCapacity } from './agent-slots'
+import { productionAgentBusy, updateAgentCapacity } from './agent-slots'
 import { productionProgress } from './production-progress'
 import {
   continueSeries,
@@ -95,7 +95,8 @@ import { checkAnthropicKey, checkGeminiKey, checkOpenAIKey, keyUsable } from './
 import { refreshMenu, setupMenu } from './menu'
 import { paths } from './paths'
 import * as projects from './projects'
-import { cancel, frame, onRenderEvent, render, rendersBusy } from './render'
+import { cancel, frame, onRenderEvent, render, rendersActive, rendersBusy } from './render'
+import { linuxHasExternalPower } from './external-power'
 import { pauseTag, runningJobs, stopRunners } from './runner'
 import { criticalWork, QuitCoordinator, settleCriticalWork, shutdownRequested } from './work-lifecycle'
 import { motionsBusy, stopMotions } from './motion'
@@ -677,15 +678,21 @@ app.whenReady().then(async () => {
     pythonJobs: [...runningJobs].map(([pid, job]) => ({ pid, what: job.what, since: job.since, lastLog: job.log().split('\n').slice(-15) })),
   }))
   createWindow()
-  // Keep production running while the display sleeps; never prevent display sleep or a lid close.
+  // Use an idle-sleep assertion on external power while the display can still sleep.
   let powerBlock: number | null = null
   const updatePower = () => {
     const active = criticalWork() || !!planning || exportJobs().some((job) => ['waiting', 'running'].includes(job.state) && !job.paused)
+      || productionAgentBusy() || rendersActive() || motionsBusy()
       || quickRuns().some((run) => run.state === 'working' && !run.limitedUntil)
       || seriesRuns().some((run) => run.state === 'working' && run.episodes.some((ep) => !ep.held && !ep.limitedUntil && ['script', 'scene', 'check'].includes(ep.state)))
-    if (active && powerBlock === null) powerBlock = powerSaveBlocker.start('prevent-app-suspension')
-    else if (!active && powerBlock !== null) { powerSaveBlocker.stop(powerBlock); powerBlock = null }
+    const keepAwake = active && (process.platform === 'linux' ? linuxHasExternalPower() : !powerMonitor.isOnBatteryPower())
+    if (keepAwake && powerBlock === null) powerBlock = powerSaveBlocker.start('prevent-app-suspension')
+    else if (!keepAwake && powerBlock !== null) { powerSaveBlocker.stop(powerBlock); powerBlock = null }
   }
+  powerMonitor.on('on-ac', updatePower)
+  powerMonitor.on('on-battery', updatePower)
+  powerMonitor.on('resume', updatePower)
+  updatePower()
   const powerTimer = setInterval(updatePower, 1000)
   powerTimer.unref()
   powerMonitor.on('shutdown', (event?: { preventDefault(): void }) => {

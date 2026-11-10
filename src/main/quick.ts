@@ -18,7 +18,7 @@ import { titleFrom } from './title'
 import { getSettings, rememberProject } from './settings'
 import { paths } from './paths'
 import { readAtomicJson, writeAtomicJson } from './atomic-json'
-import { beginProductionPhase, finishProductionPhase } from './production-progress'
+import { beginProductionPhase, countRenderCheck, finishProductionPhase } from './production-progress'
 
 const FIX_ROUNDS = 3
 let send: (run: QuickRun | null) => void = () => {}
@@ -202,6 +202,7 @@ export async function checkAndFix(dir: string, turn: (text: string) => Promise<v
     const outcome = await currentOrNewRender(dir)
     check()
     if ('cancelled' in outcome) throw new Error('The render was cancelled')
+    countRenderCheck(dir, 'error' in outcome, 'timeline' in outcome ? outcome.timeline.warnings.length : 0)
     const problems =
       'error' in outcome
         ? [`fails: ${outcome.error.message}${outcome.error.line ? ` (scene.py line ${outcome.error.line})` : ''}`]
