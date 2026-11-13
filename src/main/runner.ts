@@ -6,6 +6,7 @@ import { dependencyFailure, REPAIR_MESSAGE } from './dependency-health'
 import { WorkSlots } from '../shared/work-slots'
 
 const PREFIX = '@@studio '
+const RUNNER_EXIT_GRACE_MS = 5000
 
 export interface RunnerEvent {
   type: string
@@ -109,6 +110,7 @@ export async function runRunner<T = RunnerEvent>(
   try { child = await spawn } catch (error) { release(); throw error } finally { starting.delete(spawn) }
   const log: string[] = []
   let final: RunnerEvent | null = null
+  let exitTimer: ReturnType<typeof setTimeout> | undefined
   let pending = ''
 
   const onStdout = (buf: Buffer) => {
@@ -118,7 +120,15 @@ export async function runRunner<T = RunnerEvent>(
     for (const line of lines) {
       if (line.startsWith(PREFIX)) {
         const event = JSON.parse(line.slice(PREFIX.length)) as RunnerEvent
-        if (event.type === 'done' || event.type === 'error') final = event
+        if (event.type === 'done' || event.type === 'error') {
+          final = event
+          // A renderer can finish its work and then hang joining Python threads at shutdown.
+          // Keep its terminal result and reap the process so it releases the drawing slot.
+          if (args[0] === 'render' && !exitTimer) {
+            exitTimer = setTimeout(() => killJob(child), RUNNER_EXIT_GRACE_MS)
+            exitTimer.unref()
+          }
+        }
         opts.onEvent?.(event)
       } else if (line.trim()) {
         pushLog(log, line)
@@ -142,6 +152,7 @@ export async function runRunner<T = RunnerEvent>(
     child.on('error', reject)
     child.on('close', (code, signal) => {
       if (pending) onStdout(Buffer.from('\n')) // retain a final event/log line without a trailing newline
+      clearTimeout(exitTimer)
       if (pid) runningJobs.delete(pid)
       const event = final as RunnerEvent | null
       const broken = !opts.signal?.aborted && dependencyFailure(`${log.join('\n')}\n${event?.message ?? ''}`, env)
