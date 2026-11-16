@@ -86,7 +86,7 @@ const plugin = {
   ),
   'server/index.js': readFileSync(join(dir, 'server', 'index.js')),
   'README.md': Buffer.from(
-    'Manim Studio desktop plugin\n\nRequires Manim Studio and Node.js 18+. Import this ZIP in a desktop client supporting local plugins, or configure the bundled server as a stdio MCP server. Ask for a video; create_video starts it and get_video returns progress and video resources. Local threads only. ChatGPT web requires a remote service, which this package does not expose.\n',
+    'Manim Studio desktop plugin\n\nRequires Manim Studio and Node.js 18+. Import this ZIP in a desktop client supporting local plugins, or configure the bundled server as a stdio MCP server. Ask for a video and keep chatting while Studio makes it. Ask for the status or the finished video in a later message. You can also ask to find a recent video by title or open it in Studio. Local threads only.\n',
   ),
 }
 writeFileSync(join(root, 'out', 'manim-studio-plugin.zip'), zipSync(plugin))

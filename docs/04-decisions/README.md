@@ -40,7 +40,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0034-gpu-video-encoding]] | Exports encode on the GPU (VideoToolbox, NVENC, Media Foundation for AMD) when one works, in a cache of their own, with the CPU as the fallback | accepted |
 | [[0035-720p-study-videos]] | Previews and exports default to 1080p in all modes; 720p and 1440p remain explicit choices; no 24 fps exports | accepted |
 | [[0036-settings-onboarding-and-languages]] | Guided onboarding, offline national-language UI across Europe with English macOS menus, connected agents and shared Voice/Video defaults; simplified theme/background controls | accepted |
-| [[0037-desktop-conversation-videos]] | Desktop chat video jobs, mode-aware delivery and shared Claude/Codex/ChatGPT local bridge | accepted |
+| [[0037-desktop-conversation-videos]] | Desktop chat starts quick-video production in Studio and checks jobs on request through a shared local bridge | accepted |
 | [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
 | [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI availability for GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra, with opt-in OpenAI capacity fallback | accepted |
 | [[0040-developer-episode-measurements]] | Local usage, timing and hardware reports; measured episodes run serially; a separate render check counter leaves scheduling alone | accepted |

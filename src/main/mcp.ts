@@ -12,7 +12,7 @@ import { homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { z } from 'zod'
 import { desktopTools, type DesktopToolName } from '../shared/studio-tools'
-import type { ClaudeDesktopStatus, ExportResult, Theme, Tone } from '../shared/types'
+import type { ClaudeDesktopStatus, ExportResult, Tone } from '../shared/types'
 import { languageName, mediaNote } from './claude'
 import { createProject, listProjects, project, readScene, readScript, requireProject, saveScene, saveScript } from './projects'
 import { agentProjects } from './agent-projects'
@@ -23,13 +23,8 @@ import { sourcesNote } from './sources'
 import { scriptBrief, scriptStatus } from '../shared/script'
 import { styleBrief } from '../shared/tone'
 import { seriesBrief } from './series'
-import { checkAndFix } from './quick'
-import { episodeAgent, turnPastLimits, type EpisodeAgent } from './agent'
-import { claudeStatus } from './claude'
+import { desktopQuickRun, recentDesktopQuickRuns, startQuick } from './quick'
 import { setupStatus } from './env'
-import { queueExport } from './exports'
-import { rememberProject } from './settings'
-import { checkElevenLabsKey } from './voice'
 import { videoIntent } from '../shared/video-intent'
 import { threeDBrief } from '../shared/three-d'
 
@@ -47,57 +42,9 @@ export interface DesktopHost {
 // Claude Desktop gives up on a tool call after about a minute, so nothing here waits longer.
 const MAX_WAIT_MS = 45_000
 
-// Only media produced by this endpoint is exposed, never an arbitrary caller-supplied path.
-type VideoJob = { result?: ExportResult; error?: string; project: string; activity: string; theme: Theme; agent?: EpisodeAgent }
-const videoJobs = new Map<string, VideoJob>()
-export const desktopVideosBusy = (): boolean => [...videoJobs.values()].some((job) => !job.result && !job.error)
-export function stopDesktopVideos(): void {
-  for (const job of videoJobs.values())
-    if (!job.result && !job.error) {
-      job.error = 'Studio was closed before the video finished.'
-      job.agent?.close()
-    }
-}
-
-async function makeDesktopVideo(job: VideoJob, prompt: string): Promise<void> {
-  const agent = await episodeAgent(job.project, {
-    onTool: (activity) => {
-      job.activity = activity
-    },
-    onUsage: () => undefined,
-  })
-  job.agent = agent
-  const turn = async (text: string, step: string) => {
-    const result = await turnPastLimits(
-      (message) => agent.turn(message, step),
-      text,
-      (note) => {
-        if (note) job.activity = note
-      },
-      () => undefined,
-    )
-    if (!result.ok) throw new Error(result.error ?? 'The video agent stopped.')
-  }
-  try {
-    job.activity = 'Writing the video'
-    await turn(prompt, 'Video from chat')
-    job.activity = 'Checking the render'
-    const warnings = await checkAndFix(
-      job.project,
-      (text) => turn(text, 'Fixing the render'),
-      () => undefined,
-    )
-    job.activity = 'Exporting'
-    const result = await queueExport(job.project, { themes: [job.theme], languages: [], languageVideos: false }).finished
-    job.result = { ...result, warnings: [...warnings, ...result.warnings] }
-    job.activity = 'Done'
-  } finally {
-    agent.close()
-  }
-}
-
+// Only media produced by desktop video jobs is exposed, never an arbitrary caller-supplied path.
 function videoFile(id: string, index: number): string {
-  const result = videoJobs.get(id)?.result
+  const result = desktopQuickRun(id)?.result
   const file = result?.files[index]
   if (!result || !file || !/\.(mp4|vtt|srt|jpg|png)$/i.test(file)) throw new Error('Video resource is not available.')
   const full = resolve(result.folder, file)
@@ -194,52 +141,53 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
   switch (name) {
     case 'create_video': {
       const settings = getSettings()
-      if (setupStatus().env !== 'ready') throw new Error('Install the video environment in Settings → Environment first.')
-      if (!(await claudeStatus()).loggedIn) throw new Error('Connect an agent in Settings → Accounts first.')
       if (settings.defaultVoice.provider === 'elevenlabs') {
         if (!settings.hasElevenLabsKey) throw new Error('Add an ElevenLabs key in Settings → Accounts first.')
-        const key = await checkElevenLabsKey()
-        if (!key.tts || !key.voices) throw new Error(key.problem ?? 'The ElevenLabs key needs Text to Speech and Voices permissions.')
         if (!settings.defaultVoice.elevenlabs?.voiceId) throw new Error('Choose a voice in Settings → Voice first.')
       } else if (setupStatus().omnivoice !== 'ready') throw new Error('Install OmniVoice in Settings → Environment first.')
       const intent = videoIntent(settings.mode, args.intent as 'learn' | 'create' | undefined)
-      const dir = await createProject({
-        name: String(args.title || String(args.prompt).slice(0, 80)),
+      const theme = settings.defaultTheme ?? 'dark'
+      const { run, finished } = await startQuick({
+        name: args.title as string | undefined,
+        prompt: String(args.prompt),
         aspect: settings.defaultAspect ?? '16:9',
-        theme: settings.defaultTheme ?? 'dark',
+        theme,
         tone: settings.defaultTone ?? 'warm',
         language: settings.defaultVoice.language,
         voice: settings.defaultVoice,
-      })
-      rememberProject(dir)
+        sources: [],
+        export: { themes: [theme], languages: [], languageVideos: false },
+      }, { desktop: true })
       host.projectsChanged()
-      if (intent === 'create') await host.openInWindow(dir)
-      const id = randomBytes(16).toString('hex')
-      const job: VideoJob = { project: dir, activity: 'Starting', theme: settings.defaultTheme ?? 'dark' }
-      videoJobs.set(id, job)
-      void makeDesktopVideo(job, String(args.prompt))
-        .catch((e) => {
-          job.error = (e as Error).message
-        })
-        .finally(() => host.projectsChanged())
+      void finished.then(host.projectsChanged, host.projectsChanged)
+      if (intent === 'create') void host.openInWindow(run.project).catch((error) => console.error('[desktop video]', error))
       return {
-        content: [{ type: 'text', text: `Video started. Poll get_video with job ${id}. Delivery: ${intent}.` }],
-        structuredContent: { job: id, state: 'working', intent },
+        content: [{ type: 'text', text: `Video started in Manim Studio. The project shows live progress. Give the user job ${run.id} for a later status check and end this reply so they can keep chatting.` }],
+        structuredContent: { job: run.id, state: run.state, intent },
       }
     }
     case 'get_video': {
       const id = String(args.job)
-      const job = videoJobs.get(id)
-      if (!job) return textResult('Unknown video job. Jobs are available until Studio restarts.', true)
-      if (job.error) return textResult(`Video failed: ${job.error}`, true)
+      const job = desktopQuickRun(id)
+      if (!job) return textResult('Unknown video job. Check the job ID or open the project in Manim Studio.', true)
+      if (job.state === 'failed' || job.state === 'stopped') {
+        return {
+          ...textResult(job.error ? `Video failed: ${job.error}` : 'Video stopped. Continue it from its project in Manim Studio.', true),
+          structuredContent: { job: id, state: job.state },
+        }
+      }
       if (!job.result) {
-        return { content: [{ type: 'text', text: job.activity }], structuredContent: { job: id, state: 'working', activity: job.activity } }
+        const activity = job.activity ?? 'Starting'
+        return {
+          content: [{ type: 'text', text: `Video in progress. ${activity}. Share this update and end the reply. Check again when the user asks.` }],
+          structuredContent: { job: id, state: 'working', stage: job.step, activity },
+        }
       }
       return {
         content: [
           {
             type: 'text',
-            text: `Video complete and saved in the Studio library.${job.result.warnings.length ? ` Warnings: ${job.result.warnings.join('; ')}` : ''}`,
+            text: `Video complete and saved in the Studio library.${job.warnings.length ? ` Warnings: ${job.warnings.join('; ')}` : ''}`,
           },
           ...job.result.files.map((file, index) => ({
             type: 'resource_link' as const,
@@ -248,7 +196,32 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
             mimeType: /\.mp4$/i.test(file) ? 'video/mp4' : /\.vtt$/i.test(file) ? 'text/vtt' : /\.srt$/i.test(file) ? 'text/plain' : 'image/jpeg',
           })),
         ],
-        structuredContent: { job: id, state: 'done', project: job.project, files: job.result.files, warnings: job.result.warnings },
+        structuredContent: { job: id, state: 'done', project: job.project, files: job.result.files, warnings: job.warnings },
+      }
+    }
+    case 'list_video_jobs': {
+      const jobs = recentDesktopQuickRuns(Number(args.limit ?? 10)).map((run) => ({
+        job: run.id,
+        title: run.name,
+        state: run.state,
+        stage: run.step,
+        ...(run.activity ? { activity: run.activity } : {}),
+        ...(run.limitedUntil ? { limitedUntil: run.limitedUntil } : {}),
+      }))
+      const lines = jobs.map((job) => `- ${job.title} (${job.job}): ${job.state}${job.activity ? ` · ${job.activity}` : ''}`)
+      return {
+        content: [{ type: 'text', text: lines.join('\n') || 'No videos have been started from desktop chat yet.' }],
+        structuredContent: { jobs },
+      }
+    }
+    case 'open_video': {
+      const id = String(args.job)
+      const job = desktopQuickRun(id)
+      if (!job || !existsSync(join(job.project, 'project.json'))) return textResult('That video job is no longer in the Studio library.', true)
+      await host.openInWindow(job.project)
+      return {
+        content: [{ type: 'text', text: `Opened “${job.name}” in Manim Studio.` }],
+        structuredContent: { job: id, state: job.state, title: job.name },
       }
     }
     case 'list_projects': {

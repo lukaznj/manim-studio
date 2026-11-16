@@ -845,7 +845,7 @@ function ClaudeDesktopRow() {
   }, [])
   const outdated = !!status?.installed && status.version !== status.current
   const text = !status?.installed
-    ? 'Ask Claude Desktop to make a video from your discussion. Learn works in the background; Create opens the editor. The video is returned as a chat resource and saved in your library. Install the extension to connect.'
+    ? 'Start a video from a Claude Desktop conversation and follow its progress in Studio. The finished video is saved in your library. Ask Claude for the video to get it in chat.'
     : outdated
       ? format('Claude Desktop has version {0} of the extension and this app ships {1}. Update it so both have the same tools.', [
           status.version,

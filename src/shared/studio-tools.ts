@@ -61,7 +61,7 @@ export const sceneTools = {
 export const desktopTools = {
   create_video: {
     description:
-      'Make a complete narrated video from a concept or explanation using Studio’s configured agent and voice. Returns a job ID immediately; poll get_video until done. Learn runs in the background and returns media to this chat; Create opens the studio. Both defaults to Learn unless intent is create. The video stays in the library.',
+      'Start a narrated video using Studio’s configured agent and voice. Return the job ID to the user and end the reply so they can keep chatting. Studio shows progress and saves the video in its library. Create opens the progress screen. Learn runs in the background. Both defaults to Learn unless intent is create.',
     shape: {
       prompt: z
         .string()
@@ -73,7 +73,15 @@ export const desktopTools = {
   },
   get_video: {
     description:
-      'Check a create_video job. When finished returns the exported video as a readable MCP resource link, plus subtitles and warnings. Share the resource with the user.',
+      'Check a create_video job once when the user asks for an update or the finished video. Return the current status or share the completed video resource, subtitles and any warnings. Finish the reply after this check, without waiting or polling.',
+    shape: { job: z.string().min(1) },
+  },
+  list_video_jobs: {
+    description: 'Find recent videos started from desktop chat by title and get their job IDs and status. Use this if the user asks about a video and the job ID is missing.',
+    shape: { limit: z.number().int().min(1).max(30).optional() },
+  },
+  open_video: {
+    description: 'Open a desktop chat video job in Manim Studio when the user asks. An unfinished video opens its progress and recovery controls.',
     shape: { job: z.string().min(1) },
   },
   list_projects: {
@@ -135,10 +143,11 @@ export const desktopTools = {
 
 export type DesktopToolName = keyof typeof desktopTools
 
-/** What Claude Desktop is told about the server as a whole. */
+/** Instructions shared by the external desktop clients. */
 export const desktopInstructions = [
-  'For a complete video from a discussion, prefer create_video. Include the explanation and audience from the conversation, then poll get_video with its job ID until done or failed. Share the returned video resource, mention any warnings, and tell the user it is also in their Studio library. Never claim completion before the job is done. Learn stays in the background; Create opens the editor; Both defaults to Learn unless the user asks for production/editing.',
+  'For a complete video from a discussion, use create_video with the explanation and audience. Give the user the job ID, tell them that Studio shows progress and saves the result to their library, and end the turn. Do not sleep, call get_video automatically or keep the turn open. If the user later asks for the status or video, call get_video once and share its result. Learn stays in the background. Create opens the production screen. Both defaults to Learn unless the user asks for production or editing.',
+  'If the job ID is missing, use list_video_jobs to match the user’s video by title. Ask which one they mean if several fit. Use open_video when they ask to see the video or its progress in Studio.',
   'Manim Studio is a desktop app that makes short maths explainer videos from manim code, with narration, subtitles and a timeline.',
-  'When the user asks for a maths, explainer or manim video: create_project (or open_project), read the guide it returns, write scene.py, then render_preview and view_frames until it looks right. Fix every error and layout warning before you call it done.',
+  'When the user explicitly asks you to edit a scene directly, use create_project or open_project. Read the guide, write scene.py, then use render_preview and view_frames. Fix render errors and layout warnings before calling the edit done.',
   'The app opens and shows the video, its code and its timeline while you work. Tell the user it is there: they can watch it, retime clips, record their own narration and export (or ask you to call export_video).',
 ].join('\n')

@@ -46,7 +46,7 @@ import { cancelExport, clearExports, exportJobs, exportsBusy, onExportsChanged, 
 import { importMedia, listMedia, removeMedia } from './media'
 import { importSources, listSources, removeSource, sourcePages } from './sources'
 import { history, restore } from './git'
-import { claudeDesktopStatus, startDesktopEndpoint, desktopVideosBusy, stopDesktopVideos } from './mcp'
+import { claudeDesktopStatus, startDesktopEndpoint } from './mcp'
 import { watchMemory } from './memory'
 import { quickRun, quickRuns, resumeQuick, settleQuick, setupQuick, startQuick, stopQuick } from './quick'
 import { productionAgentBusy, updateAgentCapacity } from './agent-slots'
@@ -726,7 +726,7 @@ let installOnExit = false
 
 function productionBusy(): boolean {
   return !!planning || seriesRuns().some((run) => run.state === 'working' || run.state === 'paused') || exportsBusy()
-    || desktopVideosBusy() || watchVideosBusy() || quickRuns().some((run) => run.state === 'working') || motionsBusy()
+    || watchVideosBusy() || quickRuns().some((run) => run.state === 'working') || motionsBusy()
 }
 
 const quit = new QuitCoordinator({
@@ -749,7 +749,6 @@ const quit = new QuitCoordinator({
     planning?.abort()
     stopAllSeries()
     stopQuick()
-    stopDesktopVideos()
     stopWatchVideos()
     closeChat()
     // Cancellation finishes before exit: narration is copied back and agent chats/checkpoints flush.

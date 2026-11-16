@@ -51,4 +51,4 @@ Constraints:
 
 ## 2026-10-17 revision
 
-[[0037-desktop-conversation-videos]] adds complete video jobs and media resources for Claude, Codex and compatible ChatGPT desktop clients. Learn requests stay in the background; Create opens the editor; Both defaults to Learn unless production is explicit. These jobs use the configured Studio agent and its usage, while the original low-level tools remain available. The endpoint remains loopback-only and authenticated.
+[[0037-desktop-conversation-videos]] adds complete video jobs and media resources for Claude, Codex and compatible ChatGPT desktop clients. Learn requests stay in the background. Create opens the production screen. Both defaults to Learn unless production is explicit. These jobs use the configured Studio agent and its usage, while the original low-level tools remain available. The endpoint remains loopback-only and authenticated.

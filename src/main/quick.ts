@@ -45,6 +45,17 @@ export function setupQuick(host: { send: typeof send; openInWindow: typeof openI
 }
 export const quickRuns = (): QuickRun[] => [...controllers.values()].map(c => structuredClone(c.run))
 export const quickRun = (project?: string): QuickRun | null => project ? structuredClone(controllers.get(project)?.run ?? null) : quickRuns().at(-1) ?? null
+export function desktopQuickRun(id: string): QuickRun | undefined {
+  const controller = [...controllers.values()].find(({ run, task }) => run.id === id && task.desktop)
+  return controller && structuredClone(controller.run)
+}
+export function recentDesktopQuickRuns(limit: number): QuickRun[] {
+  return [...controllers.values()]
+    .filter(({ task }) => task.desktop)
+    .sort((a, b) => (b.run.startedAt ?? 0) - (a.run.startedAt ?? 0))
+    .slice(0, limit)
+    .map(({ run }) => structuredClone(run))
+}
 export const stopQuick = (project?: string): void => { if (project) controllers.get(project)?.stop(); else for (const c of controllers.values()) c.stop() }
 export async function settleQuick(): Promise<void> { await Promise.allSettled([...controllers.values()].map(c => c.pending)) }
 class QuickController {
@@ -111,7 +122,7 @@ class QuickController {
         await turn(`${req.prompt.trim()}\n\nRead the PDFs in sources/ if present. For now, only the script: write script.md, review it and approve it, then stop. Don’t write scene.py yet: you’ll make the video in the next step.`, 'Script')
         if (scriptStatus(readFileSync(join(r.project, 'script.md'), 'utf8')) !== 'approved') throw new Error('The agent did not finish approving the script. Continue to finish it.')
         const title = readFileSync(join(r.project, 'script.md'), 'utf8').match(/^# ([^\r\n]+)/m)?.[1].trim().slice(0, 140)
-        if (title) { updateMetaAt(r.project, { name: title }); this.update({ name: title }) }
+        if (title && !req.desktop) { updateMetaAt(r.project, { name: title }); this.update({ name: title }) }
         this.update({ step: 'scene' })
       }
       if (r.step === 'scene') {
@@ -146,7 +157,7 @@ export async function ensureQuickReady(chosen?: Agent): Promise<void> {
   if (!status.loggedIn && !fakeAgents()) throw new Error('Sign in to your agent first (Settings → Accounts): quick mode needs it to write the video.')
 }
 
-export async function startQuick(req: QuickRequest): Promise<{ run: QuickRun; finished: Promise<ExportResult> }> {
+export async function startQuick(req: QuickRequest, { desktop = false }: { desktop?: boolean } = {}): Promise<{ run: QuickRun; finished: Promise<ExportResult> }> {
   await ensureQuickReady()
   if (!req.prompt.trim() || req.prompt.length > 40_000) throw new Error('Describe the video in up to 40,000 characters.')
   if (shutdownRequested()) throw new Error('The app is closing. Try again after reopening it.')
@@ -156,13 +167,13 @@ export async function startQuick(req: QuickRequest): Promise<{ run: QuickRun; fi
     rememberProject(dir)
     const selection = defaultAgentSelection(getSettings())
     const run: QuickRun = { id: randomUUID(), project: dir, name, state: 'working', step: 'setup', warnings: [], sources: req.sources.length, startedAt: Date.now(), route: { ...selection, auth: configuredAuth(selection.agent) } }
-    const controller = new QuickController(run, { prompt: req.prompt, sources: req.sources, export: req.export })
+    const controller = new QuickController(run, { prompt: req.prompt, sources: req.sources, export: req.export, ...(desktop ? { desktop } : {}) })
     controllers.set(dir, controller)
     const finished = controller.launch()
     return { controller, finished }
   })
   void finished.catch(() => undefined)
-  await openInWindow(controller.run.project)
+  if (!desktop) await openInWindow(controller.run.project)
   return { run: structuredClone(controller.run), finished }
 }
 export async function resumeQuick(project?: string): Promise<QuickRun> {
@@ -180,7 +191,7 @@ export async function resumeQuick(project?: string): Promise<QuickRun> {
   } finally { controller.resuming = false }
 }
 
-export interface QuickTask { prompt: string; sources: string[]; export: ExportOptions; imported?: boolean }
+export interface QuickTask { prompt: string; sources: string[]; export: ExportOptions; imported?: boolean; desktop?: boolean }
 export interface QuickCheckpoint { run: QuickRun; task: QuickTask }
 export function validQuickCheckpoint(value: unknown): value is QuickCheckpoint {
   const v = value as QuickCheckpoint | null
