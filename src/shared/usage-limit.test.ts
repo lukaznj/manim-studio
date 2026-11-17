@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { limitFrom, limitFromText, limitText, UsageLimitAlerts, usageLimitFromError } from './usage-limit.ts'
+import { limitFrom, limitFromText, limitText, UsageLimitAlerts, usageLimitFromError, CODEX_PLAN_MESSAGE, readableAgentError } from './usage-limit.ts'
 
 test('a rejected rate limit event becomes a limit in milliseconds; allowed clears it', () => {
   assert.deepEqual(limitFrom({ status: 'rejected', resetsAt: 1_760_000_000, rateLimitType: 'five_hour' }), { until: 1_760_000_000_000, kind: 'five_hour' })
@@ -48,4 +48,13 @@ test('unknown reset times stay quiet until recovery, including delayed automatic
   assert.equal(alerts.enter('antigravity:account', 0, 2_000_000), true)
   alerts.recovered('antigravity:account', 2_001_000)
   assert.equal(alerts.enter('antigravity:account', 0, 2_002_000), false)
+})
+
+test('a ChatGPT plan that cannot run the model gets a readable message and counts as a limit', () => {
+  const raw = '{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The \'gpt-6.1-sol\' model is not supported when using Codex with a ChatGPT account.","code":"model_not_found"}}'
+  assert.equal(readableAgentError(raw), CODEX_PLAN_MESSAGE)
+  assert.ok(usageLimitFromError(raw))
+  assert.ok(usageLimitFromError(CODEX_PLAN_MESSAGE)) // after it's reworded too, so automatic switching still moves on
+  assert.equal(readableAgentError('stream error: {"error":{"message":"The server had a problem."}}'), 'The server had a problem.')
+  assert.equal(readableAgentError('scene.py line 4: NameError'), 'scene.py line 4: NameError')
 })

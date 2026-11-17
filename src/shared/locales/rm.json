@@ -223,6 +223,7 @@
   "Close Project": "Clossar il project",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Desktop",
   "Codex account limit read timed out.": "Codex Limit da lectura dal conto è vegnì surpassà.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex na po betg duvrar quest model cun tes conto da ChatGPT per il mument. Forsa è il contingent da tes plan consumà, u il plan na cuntegna betg il model. Controllescha tes plan en ChatGPT u tscherna in auter model u agent sut Parameters → Agent.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex n'ha betg offert GPT-6 Astra, GPT-6.1 Sol u GPT-6.1 Terra. Verificais il contà en l'acziun Impostaziun → Cunts.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex Il temp da la tscherna dal model è scadì. Provar anc ina giada da Preferenzas → Cunts.",
   "Codex returned a repeated model catalog page.": "Codex ha returnà ina pagina da catalog da models repetida.",

@@ -15,9 +15,27 @@ export function limitFromText(text: string): Limit | null {
   return m ? { until: Number(m[1]) * 1000 } : null
 }
 
+/**
+ * Codex's reply when a ChatGPT plan can't run a model: its Codex usage has run out, or the plan
+ * never included the model. The raw form is a JSON body with code "model_not_found".
+ */
+export const CODEX_PLAN_MESSAGE = 'Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.'
+const codexPlanError = (message: string): boolean => /model_not_found|not supported when using Codex with a ChatGPT account/i.test(message)
+
+/** A provider's error for people: the plan message, or the message inside a JSON error body. */
+export function readableAgentError(message: string): string {
+  if (codexPlanError(message)) return CODEX_PLAN_MESSAGE
+  try {
+    const body = JSON.parse(message.slice(message.indexOf('{'))) as { error?: { message?: unknown }; message?: unknown }
+    const inner = body?.error?.message ?? body?.message
+    if (typeof inner === 'string' && inner.trim()) return inner.trim()
+  } catch { /* not JSON: shown as it is */ }
+  return message
+}
+
 /** Provider CLI failures that mean the account cannot currently continue. */
 export function usageLimitFromError(error: string = ''): Limit | null {
-  return limitFromText(error) ?? (/usage limit|rate limit|quota|too many requests|limit (?:was |has been )?reached/i.test(error) ? { until: 0 } : null)
+  return limitFromText(error) ?? (/usage limit|rate limit|quota|too many requests|limit (?:was |has been )?reached/i.test(error) || codexPlanError(error) || error.includes(CODEX_PLAN_MESSAGE) ? { until: 0 } : null)
 }
 
 /** One alert per provider/sign-in and limit window, shared by concurrent jobs. */

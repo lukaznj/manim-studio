@@ -112,7 +112,7 @@ export async function checkOpenAIKey(key = getSecret('openai'), again = false): 
 
 /**
  * A Gemini key for Antigravity (generativelanguage.googleapis.com): it's valid (it lists the
- * models), Gemini 4 Argon is among them, and it can make a request (one token from a Flash model).
+ * models), Gemini 4 Hydrogen is among them, and it can make a request (one token from a Flash model).
  */
 export async function checkGeminiKey(key = getSecret('gemini'), again = false): Promise<KeyCheck> {
   const hit = remembered('gemini', key, again)
@@ -141,7 +141,7 @@ export async function checkGeminiKey(key = getSecret('gemini'), again = false): 
       })
     result.items.push({ label: 'Valid key', ok: true })
     models = list.body?.models?.map((m) => m.name.replace(/^models\//, '')) ?? []
-    result.items.push({ label: 'Gemini 4 Argon', ok: models.some((m) => m.startsWith('gemini-4-argon')), why: 'Antigravity’s default model.' })
+    result.items.push({ label: 'Gemini 4 Hydrogen', ok: models.some((m) => m.startsWith('gemini-4-hydrogen')), why: 'Antigravity’s default model.' })
   } catch {
     return { items: [], problem: 'Google couldn’t be reached. Check the internet connection and try again.' }
   }

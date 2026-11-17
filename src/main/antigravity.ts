@@ -60,7 +60,9 @@ const ASSETS: Record<string, [string, string]> = {
   'win32-x64': ['agy_cli_windows_x64.zip', 'c9383bae8c377a9a12e9543d45904ac46cc234ec85caa4c61c57ed9405ff7634'],
   'win32-arm64': ['agy_cli_windows_arm64.zip', '266d130637a37d046547af27bac99a42cf3ad50cb3047e82ec926bd3983d98bc'],
 }
-const DEFAULT_MODEL = 'gemini-4-argon' // confirmed with `agy models`: gemini-4-argon-{low,medium,high}
+// Chat and video creation; courses are planned on Argon (shared/agent-selection.ts). Confirmed with `agy models`:
+// gemini-4-hydrogen-{low,medium,high,xhigh}, gemini-4-argon-{low,medium,high}, gemini-3.8-flash-{low,medium,high}.
+const DEFAULT_MODEL = 'gemini-4-hydrogen'
 
 const root = () => join(app.getPath('userData'), 'antigravity')
 const binDir = () => join(root(), AGY_VERSION)
@@ -214,7 +216,8 @@ function agyEnvBase(home = agyHome()): Record<string, string> {
  * The CLI's settings, Studio's tools and Studio's brief for a run in `project`, in the project's
  * own home. Written before every run: the key and the instructions change. Returns the home.
  */
-async function prepare(project: string, instructions: string): Promise<string> {
+/** `tools: false` is a one-off question: no Studio tools, no web, no writes, and no tool server to start. */
+async function prepare(project: string, instructions: string, tools = true): Promise<string> {
   const home = homeFor(project)
   await shareSignIn(home)
   mkdirSync(join(cliDir(home), 'brain'), { recursive: true })
@@ -224,7 +227,7 @@ async function prepare(project: string, instructions: string): Promise<string> {
   const real = (p: string) => (existsSync(p) ? realpathSync(p) : p)
   const dir = real(project)
   const site = join(paths.env(), '.pixi', 'envs', 'default')
-  const allow = [
+  const allow = !tools ? [`read_file(${dir})`] : [
     `write_file(${dir})`,
     `read_file(${dir})`,
     `read_file(${real(paths.python())})`,
@@ -247,7 +250,7 @@ async function prepare(project: string, instructions: string): Promise<string> {
     env: bridgeEnv,
     disabledTools: Object.keys(desktopTools).filter((t) => !(t in sceneTools)),
   }
-  writeFileSync(join(home, '.gemini', 'config', 'mcp_config.json'), JSON.stringify({ mcpServers: { studio } }, null, 2))
+  writeFileSync(join(home, '.gemini', 'config', 'mcp_config.json'), JSON.stringify({ mcpServers: tools ? { studio } : {} }, null, 2))
   // An always-on global rule is how the brief reaches a headless run (checked on 1.3.6).
   writeFileSync(join(home, '.gemini', 'config', 'rules', 'studio.md'), `---\ntrigger: always_on\ndescription: Manim Studio\n---\n${instructions}\n`)
   return home
@@ -430,10 +433,11 @@ async function forgetOnWindows(): Promise<void> {
   for (const t of targets) await run('cmdkey', [`/delete:${t}`]).catch(() => undefined)
 }
 
-/** The account's models (`agy models`), one per family with its efforts: gemini-4-argon-high → Gemini 4 Argon, high. */
+/** The account's models (`agy models`), one per family with its efforts: gemini-4-hydrogen-high → Gemini 4 Hydrogen, high. */
 export async function antigravityModels(): Promise<ModelOption[]> {
   const fallback: ModelOption[] = [
-    { value: '', label: 'Gemini 4 Argon', description: 'Google’s frontier model; Antigravity’s default', efforts: ['low', 'medium', 'high'] },
+    { value: '', label: 'Gemini 4 Hydrogen', description: 'Fast; Studio’s default for chat and videos', efforts: ['low', 'medium', 'high', 'xhigh'] },
+    { value: 'gemini-4-argon', label: 'Gemini 4 Argon', description: 'Google’s frontier model; plans courses', efforts: ['low', 'medium', 'high'] },
   ]
   const bin = installed()
   if (!bin) return fallback
@@ -458,7 +462,7 @@ export async function antigravityModels(): Promise<ModelOption[]> {
   return families.size ? [...families.values()] : fallback
 }
 
-/** The CLI's model slug for the chosen model and effort: gemini-4-argon-medium. */
+/** The CLI's model slug for the chosen model and effort: gemini-4-hydrogen-medium. */
 function slug(selection: { model?: string; effort?: Effort } = {}): string {
   const { antigravityModel, antigravityEffort } = getSettings()
   return `${(selection.model ?? antigravityModel) || DEFAULT_MODEL}-${selection.effort || antigravityEffort || 'medium'}`
@@ -603,7 +607,7 @@ export async function askAntigravity(
       return file
     })
     const named = images.length ? `${prompt}\n\nThe pictures, in order: ${images.map((img, i) => `${files[i]} is "${img.name}"`).join('; ')}.` : prompt
-    home = await prepare(dir, system)
+    home = await prepare(dir, system, false)
     if (selection.signal?.aborted) throw new Error('Stopped')
     const out = await runTurn(home, dir, withImages(named, files), undefined, { part: () => {}, status: () => {}, conversation: () => {}, delta: (text) => selection.onText?.((soFar += text)) }, (process) => {
       child = process

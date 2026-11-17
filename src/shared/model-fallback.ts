@@ -16,7 +16,7 @@ export function normalizeModelOrder(value: unknown): ModelRoute[] {
     if (!route || !['claude', 'codex', 'antigravity'].includes(route.agent) || !['account', 'api-key'].includes(route.auth)
       || typeof route.model !== 'string' || route.model.length > 200 || /[\r\n\0]/.test(route.model)
       || (route.agent === 'codex' && !isCodexModel(route.model))) continue
-    const model = route.agent === 'claude' ? !route.model || route.model === 'sonnet' ? 'claude-sonnet-5-5' : route.model === 'opus' ? 'claude-opus-5-5' : route.model === 'haiku' ? 'claude-haiku-5-5' : route.model === 'fable' ? 'claude-fable-5-2' : route.model : route.model || 'gemini-4-argon'
+    const model = route.agent === 'claude' ? !route.model || route.model === 'sonnet' ? 'claude-sonnet-5-5' : route.model === 'opus' ? 'claude-opus-5-5' : route.model === 'haiku' ? 'claude-haiku-5-5' : route.model === 'fable' ? 'claude-fable-5-2' : route.model : route.model || 'gemini-4-hydrogen'
     const effort = ['low', 'medium', 'high', 'xhigh', 'max'].includes(route.effort ?? '') ? route.effort : 'high' as Effort
     const normalized = { agent: route.agent, auth: route.auth, model, effort }
     if (!out.some((existing) => modelRouteKey(existing) === modelRouteKey(normalized))) out.push(normalized)

@@ -223,6 +223,7 @@
   "Close Project": "Lokaðu verkefni",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT skjáborð",
   "Codex account limit read timed out.": "Codex reikningstakmörk les tímabundið.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex getur ekki notað þetta líkan með ChatGPT-aðganginum þínum núna. Notkun áskriftarinnar gæti verið uppurin, eða áskriftin nær ekki yfir líkanið. Athugaðu áskriftina í ChatGPT, eða veldu annað líkan eða fulltrúa í Stillingar → Umboðsmaður.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex bauð ekki GPT-6 Astra, GPT-6.1 Sol eða GPT-6.1 Terra. Athugaðu reikninginn þinn í Stillingar → Reikningar.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex tími til að finna líkan rann út. Reyndu aftur frá Stillingar → Reikningar.",
   "Codex returned a repeated model catalog page.": "Codex skilaði endurteknu líkanaskráarsíðu.",

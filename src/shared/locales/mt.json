@@ -223,6 +223,7 @@
   "Close Project": "Agħlaq Proġett",
   "Codex / ChatGPT Desktop": "Desktop Codex / ChatGPT",
   "Codex account limit read timed out.": "Codex il-limitu tal-kont jinqara ħin.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex ma jistax juża dan il-mudell mal-kont ChatGPT tiegħek bħalissa. Forsi l-użu tal-pjan tiegħek spiċċa, jew il-pjan ma jinkludix il-mudell. Iċċekkja l-pjan tiegħek f’ChatGPT, jew agħżel mudell jew aġent ieħor f’Issettjar → Aġent.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex ma offrax GPT-6 Astra, GPT-6.1 Sol jew GPT-6.1 Terra. Iċċekkja l-kont tiegħek f'Settings → Kontijiet.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex l-iskoperta tal-mudell skadiet. Ipprova mill-ġdid minn Settings → Kontijiet.",
   "Codex returned a repeated model catalog page.": "Codex reġgħet lura paġna tal-katalgu tal-mudell ripetuta.",

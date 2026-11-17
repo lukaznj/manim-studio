@@ -223,6 +223,7 @@
   "Close Project": "Uždaryti projektą",
   "Codex / ChatGPT Desktop": "Stalinis kompiuteris Codex / ChatGPT",
   "Codex account limit read timed out.": "Codex paskyros ribos skaitymas baigėsi.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex dabar negali naudoti šio modelio su tavo ChatGPT paskyra. Gali būti, kad tavo plano limitas išnaudotas arba planas šio modelio neapima. Patikrink planą ChatGPT arba pasirink kitą modelį ar agentą Nustatymai → Agentas.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex nepasiūlė GPT-6 Astra, GPT-6.1 Sol ar GPT-6.1 Terra. Patikrinkite savo sąskaitą Nustatymai → Sąskaitos.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex modelio aptikimo laikas baigėsi. Bandykite dar kartą iš Nustatymai → Paskyros.",
   "Codex returned a repeated model catalog page.": "Codex grąžino pasikartojantį modelio katalogo puslapį.",

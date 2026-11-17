@@ -223,6 +223,7 @@
   "Close Project": "Prope Project",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Desktop",
   "Codex account limit read timed out.": "Codex limitum contiorum lectum temporis expiravit.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex hoc exemplar cum ratione tua ChatGPT nunc adhibere non potest. Fortasse usus consilii tui consumptus est, aut consilium exemplar non continet. Consilium tuum in ChatGPT inspice, aut aliud exemplar vel agentem in Optiones → Agens elige.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex neque GPT-6 Astra, GPT-6.1 Sol neque GPT-6.1 Terra obtulit. Rationem tuam in Optionibus → Rationes verifica.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex modelum detectionis temporis expiravit. Reprobate in Configuratio → Conti.",
   "Codex returned a repeated model catalog page.": "Codex est pagina periodica quae periodica paginam continet.",

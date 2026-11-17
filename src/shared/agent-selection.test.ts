@@ -34,6 +34,9 @@ test('episodes inherit the creation model and effort while planning stays indepe
   assert.deepEqual(seriesSelection(creation, 'make', 'codex'), { agent: 'codex', model: 'sol', effort: 'medium' })
   assert.equal(seriesSelection(creation, 'plan', 'codex').model, 'gpt-6-astra')
   assert.equal(seriesSelection(creation, 'make', 'antigravity').effort, 'medium')
+  // Gemini: Argon plans the course; Hydrogen, the default ('' ), makes the lessons and answers in chat.
+  assert.equal(seriesSelection(creation, 'plan', 'antigravity').model, 'gemini-4-argon')
+  assert.equal(seriesSelection(creation, 'make', 'antigravity').model, '')
 })
 
 test('saved episode overrides remain explicit until removed; removing one restores inheritance', () => {

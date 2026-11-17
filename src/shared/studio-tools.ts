@@ -10,18 +10,9 @@ export const sceneTools = {
     description: 'Create a short reusable HTML/SVG/Canvas animation insert only when it materially improves on manim. Uses the current agent and local rendering, not a separate design service. Supply name, self-contained html defining window.renderFrame(seconds), and seconds (0.5–12). Default mode preview returns first/middle/last images to inspect. Then mode render (name only) queues a 1080p 30fps MP4; poll mode status until ready and use the exact returned VideoClip media name. Sources and successful output persist; identical work is cached. No network/imports/audio/Node or app access; timers and uncontrolled animation loops are unsupported. Keep narration and the lesson in StudioScene. Do not use for ordinary equations or decoration.',
     shape: motionInput,
   },
-  report_progress: {
-    description: 'Report authoring progress after saving work. Count complete sections, not tokens or guessed time. Call after outlining all sections and after finishing each section in script.md or scene.py. Use the same total as the approved script. This is an estimate; Studio checks and completes each phase itself.',
-    shape: {
-      phase: z.enum(['script', 'scene']),
-      completed: z.number().int().min(0).max(1000),
-      total: z.number().int().min(1).max(1000),
-      detail: z.string().max(180).optional().describe('The section just completed'),
-    },
-  },
   render_preview: {
     description:
-      'Render the low-resolution preview of scene.py and report what happened: duration, sections, layout warnings (things off screen, overlapping text), voice problems, or the error with its scene.py line. Call it after every change to scene.py.',
+      'Render the low-resolution preview of scene.py and report what happened: duration, sections, layout warnings (things off screen, overlapping text), voice problems, or the error with its scene.py line. It waits for the render to finish (if it says it is still rendering, call it again). Call it once after each batch of changes to scene.py, not after every small edit.',
     shape: {},
   },
   get_timeline: {

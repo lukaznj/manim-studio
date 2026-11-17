@@ -22,6 +22,10 @@ Separate question and follow-up buttons obscured the difference between a text a
 - Attached screenshot thumbnails open a large native modal preview with the original question below the image. The image remains in the saved episode conversation and can be inspected later, including while the assistant is docked in fullscreen. Keyboard activation, close button, backdrop and Escape are supported.
 - Chat and note previews use the existing bundled KaTeX renderer for `$…$`, `$$…$$`, `\(…\)` and `\[…\]`. No new runtime dependency. UI product copy ships in all supported offline catalogs; user/agent content retains its own language.
 
+## Update (0.22.0)
+
+Since 0.22.0 the tutor reads at most 16,000 characters of course evidence per question, picked by a small model from a course outline and search snippets ([[0067-usage-diet]]).
+
 ## Consequences
 
 This supersedes the follow-up modal and two-button shortcut in [[0041-focused-study-workspace]], and refines follow-up navigation in [[0028-watching-a-series]] and manual playback in [[0042-study-playback-preferences]]. Video creation still uses the existing background generation/check/export flow, and exercises use the course's existing checked-solution pipeline. Text recommendations and notes refinement consume account usage; requesting a video anyway starts the more expensive creation work only after explicit user intent.

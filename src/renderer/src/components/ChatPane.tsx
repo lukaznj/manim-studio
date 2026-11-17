@@ -84,8 +84,8 @@ export function ChatPane({ head, embedded = false }: { head?: React.ReactNode; e
             onLoadCapture={scrollToLatest}
           >
             {chat.length === 0 && (exercise ? <StudyIntro /> : <Intro />)}
-            {chat.map((m) => (
-              <Message key={m.id} message={m} streaming={streaming[m.id]} busy={busy} onPreview={(image, question) => setPreview({ image, question })} onReference={async (id) => {
+            {chat.map((m, i) => (
+              <Message key={m.id} message={m} streaming={streaming[m.id]} busy={busy && i === chat.length - 1} onPreview={(image, question) => setPreview({ image, question })} onReference={async (id) => {
                 try {
                   const target = await followStudyReference(m.id, id)
                   if (target?.kind === 'pdf') setPreview({ image: target.image, question: '', title: format('{0} · page {1}', [target.title, target.page]) })
@@ -351,7 +351,7 @@ function Message({ message: m, streaming, busy, onPreview, onReference }: { mess
   if (m.role === 'error')
     return (
       <div className="msg error">
-        <CircleAlert /> {m.parts[0]?.kind === 'text' && m.parts[0].text}
+        <CircleAlert /> {m.parts[0]?.kind === 'text' && uiText(m.parts[0].text)}
       </div>
     )
 
@@ -361,6 +361,8 @@ function Message({ message: m, streaming, busy, onPreview, onReference }: { mess
   }
   const last = m.parts.at(-1)
   const working = busy && !streaming && (!last || last.kind === 'tool')
+  // A reply that failed before saying anything (saved by an older version) shows nothing.
+  if (!last && !streaming && !working && !m.videoOffer && !m.exerciseFolder && !m.memoryProposal) return null
   return (
     <div className="msg assistant">
       {m.parts.map((p, i) => (
