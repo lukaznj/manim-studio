@@ -223,6 +223,7 @@
   "Close Project": "Жобаны жабу",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Жұмыс үстелі",
   "Codex account limit read timed out.": "Codex тіркелгіге оқу уақыты бітті.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex қазір бұл модельді ChatGPT аккаунтыңмен пайдалана алмайды. Жоспарыңның лимиті таусылған болуы мүмкін немесе жоспарда бұл модель жоқ. Жоспарыңды ChatGPT-да тексер немесе Баптаулар → Агент бөлімінде басқа модель не агент таңда.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex GPT-6 Astra, GPT-6.1 Sol не GPT-6.1 Terra ұсынбады. Тіркелгіңізді Баптау → Тіркелгілері дегеннен тексеріңіз.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex үлгіні табу уақыты бітті. Баптау → Тіркелгілер дегеннен қайталап көріңіз.",
   "Codex returned a repeated model catalog page.": "Codex үлгі каталогының қайталанған бетін қайтарды.",

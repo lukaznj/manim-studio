@@ -17,6 +17,10 @@ Quick video still used the foreground chat, and course production showed percent
 - Creation agents may research public web material. Claude keeps WebSearch/WebFetch; Codex explicitly enables hosted live search while command networking remains disabled; Antigravity permits `read_url(*)` while leaving shell execution and browser actuation unapproved. Existing project file boundaries remain. Web pages are untrusted evidence, user PDFs take precedence where appropriate, and queries must not contain private document contents or credentials. Cite useful URLs in the script; report unavailable research instead of inventing it.
 - Series planning can be dismissed without cancellation. Its mounted controller preserves progress and the eventual plan; a title-bar button reopens it, and a ready notification invites review without stealing focus. Stop planning is separate. Starting the actual series remains a short guarded operation. Existing draft persistence survives application restart.
 
+## Update (0.22.0)
+
+The `report_progress` tool was removed in 0.22.0 ([[0067-usage-diet]]): each call was a full agent turn. Progress comes from script.md and scene.py, as it already did for agents that skipped the tool.
+
 ## Consequences
 
 Authoring percentages communicate section coverage, not exact code completion, quality or time remaining. Agent estimates may change when the outline changes. No additional runtime dependency or external search account is required. Provider outages and account/organization restrictions can still prevent research.

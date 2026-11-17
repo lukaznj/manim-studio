@@ -223,6 +223,7 @@
   "Close Project": "Sulje projekti",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT pöytäkone",
   "Codex account limit read timed out.": "Codex tilin rajan lukeminen aikakatkaistiin.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex ei voi nyt käyttää tätä mallia ChatGPT-tililläsi. Tilauksesi käyttöraja on ehkä täynnä, tai tilaus ei sisällä mallia. Tarkista tilauksesi ChatGPT:ssä tai valitse toinen malli tai agentti kohdassa Asetukset → Agentti.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex ei tarjonnut GPT-6 Astra, GPT-6.1 Sola tai GPT-6.1 Terraia. Tarkista tilisi kohdassa Asetukset → Tilit.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex mallin löytö aikakatkaistiin. Yritä uudelleen kohdasta Asetukset → Tilit.",
   "Codex returned a repeated model catalog page.": "Codex palautti toistuvan malliluettelon sivun.",

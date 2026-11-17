@@ -17,7 +17,7 @@ import { languageName, mediaNote } from './claude'
 import { createProject, listProjects, project, readScene, readScript, requireProject, saveScene, saveScript } from './projects'
 import { agentProjects } from './agent-projects'
 import { getSettings } from './settings'
-import { calculate, getTimeline, readSource, renderMotion, renderPreview, reportAuthoringProgress, textResult, viewFrames, viewSourcePages } from './scene-tools'
+import { calculate, getTimeline, readSource, renderMotion, renderPreview, textResult, viewFrames, viewSourcePages } from './scene-tools'
 import { slugify } from './slug'
 import { sourcesNote } from './sources'
 import { scriptBrief, scriptStatus } from '../shared/script'
@@ -59,6 +59,16 @@ const endpointFile = () => join(app.getPath('userData'), 'mcp-endpoint.json')
  * and Antigravity's runs), if it's open or an agent is working in it; otherwise the open project
  * (Claude Desktop).
  */
+/**
+ * How long render_preview waits before answering "still rendering": 45 s for Claude Desktop, whose
+ * calls time out soon after; longer for Studio's own agents that ask for it (x-studio-wait), so they
+ * get the result in one call instead of polling. Below 300 s, where Node's fetch stops waiting.
+ */
+function waitFor(req: IncomingMessage): number {
+  const asked = Number(req.headers['x-studio-wait'])
+  return Number.isFinite(asked) && asked > MAX_WAIT_MS ? Math.min(asked, 270_000) : MAX_WAIT_MS
+}
+
 function projectFor(req: IncomingMessage): string {
   const named = req.headers['x-studio-project']
   if (typeof named !== 'string' || !named) return requireProject().path
@@ -280,9 +290,7 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
     case 'render_motion':
       return renderMotion(projectFor(req), args as Parameters<typeof renderMotion>[1])
     case 'render_preview':
-      return renderPreview(projectFor(req), MAX_WAIT_MS)
-    case 'report_progress':
-      return reportAuthoringProgress(projectFor(req), args.phase as 'script' | 'scene', Number(args.completed), Number(args.total), args.detail as string | undefined)
+      return renderPreview(projectFor(req), waitFor(req))
     case 'get_timeline':
       return getTimeline(projectFor(req))
     case 'view_frames':

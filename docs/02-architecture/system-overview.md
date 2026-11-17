@@ -88,7 +88,7 @@ The Claude extension and Codex/compatible ChatGPT desktop plugin share the stdio
 
 ## Background quick videos and creation progress
 
-Quick videos now run the same project-bound agent factory as series episodes, with separate scripting, implementation, check and export checkpoints. The foreground project can change freely. `production-progress.ts` persists authoring estimates from the shared `report_progress` scene tool and derives fallback section coverage from saved files. A read-only IPC method supplies the shared production stages; preview/export counters keep their own measured phases. Native provider web tools are enabled for research without expanding file-write permissions. See [[../04-decisions/0057-creation-progress-and-research|ADR 0057]].
+Quick videos now run the same project-bound agent factory as series episodes, with separate scripting, implementation, check and export checkpoints. The foreground project can change freely. `production-progress.ts` derives section coverage from the saved script.md and scene.py (ADR 0067) and persists the phases Studio completes. A read-only IPC method supplies the shared production stages; preview/export counters keep their own measured phases. Native provider web tools are enabled for research without expanding file-write permissions. See [[../04-decisions/0057-creation-progress-and-research|ADR 0057]].
 
 ## Independent production
 

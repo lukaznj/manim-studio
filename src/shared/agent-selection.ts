@@ -28,7 +28,7 @@ export function seriesAgentSelection(
 export const SERIES_PLANNERS: Record<Agent, string> = {
   claude: 'opus',
   codex: CODEX_PLANNER,
-  antigravity: '', // Gemini 4 Argon
+  antigravity: 'gemini-4-argon', // chat and creation default to Gemini 4 Hydrogen
 }
 
 export function seriesSelection(settings: ModelSettings & Pick<Settings, 'seriesModels'>, role: SeriesRole, agent: Agent = settings.agent): AgentSelection {

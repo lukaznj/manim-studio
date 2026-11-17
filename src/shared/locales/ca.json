@@ -223,6 +223,7 @@
   "Close Project": "Tanca projecte",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Escriptori",
   "Codex account limit read timed out.": "Codex ha expirat el límit de lectura del compte.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Ara mateix Codex no pot fer servir aquest model amb el teu compte de ChatGPT. Potser s’ha esgotat l’ús del teu pla o el pla no inclou el model. Revisa el pla a ChatGPT o tria un altre model o agent a Configuració → Agent.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex no ofereix GPT- 6 Astra o GPT- 6. 1 Sol. Comproveu el vostre compte a Arranjament → Comptes.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex ha expirat el temps de descobriment del model. Torneu- ho a provar des de Arranjament → Comptes.",
   "Codex returned a repeated model catalog page.": "Codex ha retornat una pàgina de catàleg de model repetida.",

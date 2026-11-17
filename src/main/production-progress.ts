@@ -21,7 +21,11 @@ const read = (name: string) => { try { return readFileSync(name, 'utf8') } catch
 export function productionProgress(dir: string): ProductionProgress {
   readMeta(dir)
   const inferred = artifactProgress(read(join(dir, 'script.md')), read(join(dir, 'scene.py')))
-  return { ...inferred, ...(readAtomicJson(file(dir), valid) ?? {}), preview: previews.get(dir) }
+  const saved = readAtomicJson(file(dir), valid) ?? {}
+  const progress: ProductionProgress = { ...inferred, ...saved, preview: previews.get(dir) }
+  // Agents no longer report sections (ADR 0067): the files say how far they are, until Studio marks a phase done.
+  for (const phase of ['script', 'scene'] as const) if (inferred[phase] && !saved[phase]?.done) progress[phase] = { ...saved[phase], ...inferred[phase] }
+  return progress
 }
 
 export function reportProgress(dir: string, phase: ProductionPhase, completed: number, total: number, detail?: string): void {

@@ -38,6 +38,8 @@ function readEndpoint(): Endpoint | null {
 const auth = (e: Endpoint) => ({
   authorization: `Bearer ${e.token}`,
   ...(process.env.STUDIO_PROJECT ? { 'x-studio-project': encodeURIComponent(process.env.STUDIO_PROJECT) } : {}),
+  // How long a render check may wait: an agent that can wait for the render needn't poll it.
+  ...(process.env.STUDIO_TOOL_WAIT_MS ? { 'x-studio-wait': process.env.STUDIO_TOOL_WAIT_MS } : {}),
 })
 
 async function healthy(e: Endpoint): Promise<boolean> {

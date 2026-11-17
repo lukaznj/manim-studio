@@ -20,6 +20,7 @@ import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, Set
 import { recoverModelCapacity, type CapacityResult } from '../shared/codex-recovery'
 import { studioCodexModels } from '../shared/codex-selection'
 import { listCodexModels, readCodexRateLimits } from './codex-models'
+import { CODEX_PLAN_MESSAGE, readableAgentError } from '../shared/usage-limit'
 import { cleanEnv } from './env'
 import { paths } from './paths'
 import { getSecret, getSettings } from './settings'
@@ -222,7 +223,7 @@ async function client(dir: string, instructions: string, withTools = true, auth?
   const bin = installed()?.bin
   if (!bin) throw new Error('Install Codex first (Settings → Accounts).')
   // The bridge's calls name this project: it may be one a background agent is making, not the open one.
-  const bridgeEnv: Record<string, string> = { ELECTRON_RUN_AS_NODE: '1', STUDIO_PROJECT: dir }
+  const bridgeEnv: Record<string, string> = { ELECTRON_RUN_AS_NODE: '1', STUDIO_PROJECT: dir, STUDIO_TOOL_WAIT_MS: '270000' }
   if (process.env.STUDIO_USER_DATA) bridgeEnv.STUDIO_USER_DATA = process.env.STUDIO_USER_DATA
   return new Codex({
     codexPathOverride: bin,
@@ -245,7 +246,7 @@ async function client(dir: string, instructions: string, withTools = true, auth?
                 enabled_tools: Object.keys(sceneTools),
                 default_tools_approval_mode: 'approve',
                 startup_timeout_sec: 30,
-                tool_timeout_sec: 120,
+                tool_timeout_sec: 300, // render_preview waits up to 270 s (mcp.ts waitFor)
               },
             }
           : {}),
@@ -470,7 +471,6 @@ function toPart(item: ThreadItem, done: boolean): ChatPart | null {
 
 const TOOL_SUMMARY: Record<string, string> = {
   render_motion: 'Making the scenes',
-  report_progress: 'Production',
   render_preview: 'Rendering the preview',
   get_timeline: 'Reading the timeline',
   view_frames: 'Looking at frames',
@@ -481,7 +481,7 @@ const TOOL_SUMMARY: Record<string, string> = {
 
 function friendly(message: string): string {
   if (/not logged in|unauthorized|401|login/i.test(message)) return 'Codex isn’t signed in. Sign in in Settings → Accounts.'
-  return message
+  return readableAgentError(message)
 }
 
 /** A one-off request with no tools (translation, series planning, reading exercises from pictures), in an empty folder. */
@@ -510,7 +510,8 @@ export async function askCodex(
     options.onUsage?.(cliUsageEntry('codex', options.auth ?? (codexUsesKey() ? 'api-key' : 'account'), options.model || getSettings().codexModel, { ...turn.usage }, what, Date.now() - started))
     return turn.finalResponse
   } catch (e) {
-    throw new Error(`Codex couldn’t ${what}: ${friendly((e as Error).message)}`)
+    const reason = friendly((e as Error).message)
+    throw new Error(reason === CODEX_PLAN_MESSAGE ? reason : `Codex couldn’t ${what}: ${reason}`) // the plan message stands alone, so it can be translated
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

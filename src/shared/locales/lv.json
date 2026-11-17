@@ -223,6 +223,7 @@
   "Close Project": "Aizvērt projektu",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT galddators",
   "Codex account limit read timed out.": "Codex konta ierobežojuma lasīšanas laiks beidzās.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex pašlaik nevar izmantot šo modeli ar tavu ChatGPT kontu. Iespējams, tava plāna limits ir izsmelts vai plāns neietver šo modeli. Pārbaudi plānu ChatGPT vai izvēlies citu modeli vai aģentu sadaļā Iestatījumi → Aģents.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex nepiedāvāja GPT-6 Astra, GPT-6.1 Sol vai GPT-6.1 Terra. Pārbaudiet savu kontu sadaļā Iestatījumi → Konti.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex modeļa atklāšanas laiks beidzies. Mēģiniet vēlreiz no Iestatījumi → Konti.",
   "Codex returned a repeated model catalog page.": "Codex atgrieza atkārtotu modeļa kataloga lapu.",

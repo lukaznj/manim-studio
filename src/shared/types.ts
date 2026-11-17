@@ -755,7 +755,7 @@ export interface Settings {
   agent: Agent // who writes the scenes (ADR 0022)
   codexModel: string // GPT-6.1 Sol by default; GPT-6 Astra and GPT-6.1 Terra are the other choices
   codexEffort: Effort | ''
-  antigravityModel: string // '' = Gemini 4 Argon
+  antigravityModel: string // '' = Gemini 4 Hydrogen; courses are planned on Argon
   antigravityEffort: Effort | ''
   exerciseSets?: string[] // exercise set folders (Home lists them; search looks in them)
   seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed

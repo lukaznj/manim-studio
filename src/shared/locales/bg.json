@@ -223,6 +223,7 @@
   "Close Project": "Затваряне на проекта",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Настолен компютър",
   "Codex account limit read timed out.": "Codex четенето на лимита на сметката изтече.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex не може да използва този модел с твоя акаунт в ChatGPT в момента. Възможно е лимитът на плана ти да е изчерпан или планът да не включва модела. Провери плана си в ChatGPT или избери друг модел или агент в Настройки → агент.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex не предлага Проверете акаунта си в Настройки → Профили.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex Изтекъл е срокът за откриване на модела. Опитайте отново от Настройки → Профили.",
   "Codex returned a repeated model catalog page.": "Codex върна повтаряща се страница с каталог на модела.",

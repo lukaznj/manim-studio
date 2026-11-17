@@ -223,6 +223,7 @@
   "Close Project": "Lahiyə bağlandı",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Masaüstü",
   "Codex account limit read timed out.": "Codex hesab oxuma limiti vaxtı keçdi.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex hazırda bu modeli ChatGPT hesabınla istifadə edə bilmir. Planının istifadə limiti bitmiş ola bilər və ya plan bu modeli əhatə etmir. Planını ChatGPT-də yoxla və ya Parametrlər → Agent bölməsində başqa model və ya agent seç.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex GPT-6 Astra, GPT-6.1 Sol və ya GPT-6.1 Terra təklif etmir. Hesabınızı Qurğular → Hesablar bölməsində yoxlayın.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex model kəşfi vaxtı keçdi. Qurğular → Hesablar-dan yenidən sınayın.",
   "Codex returned a repeated model catalog page.": "Codex təkrarlanan model katalog səhifəsini geri qaytardı.",

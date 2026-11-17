@@ -223,6 +223,7 @@
   "Close Project": "Zoumaachen Projet",
   "Codex / ChatGPT Desktop": "Codex / ChatGPT Desktop",
   "Codex account limit read timed out.": "Codex Kontolimit fir Liesen ass ausgefall.",
+  "Codex can’t use this model with your ChatGPT account right now. Your plan’s usage may have run out, or the plan may not include the model. Check your plan in ChatGPT, or choose another model or agent in Settings → Agent.": "Codex kann dëse Modell mat dengem ChatGPT-Kont grad net benotzen. Vläicht ass de Kontingent vun dengem Plang opgebraucht, oder de Plang enthält de Modell net. Kuck däi Plang an ChatGPT no oder wiel en anere Modell oder Agent ënner Astellungen → Agent.",
   "Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.": "Codex bitt keng GPT-6 Astra, GPT-6.1 Sol oder GPT-6.1 Terra un. Kontrolléiert Äre Kont an den Astellungen → Kont.",
   "Codex model discovery timed out. Try again from Settings → Accounts.": "Codex Modellerkennung ass ausgefall. Probéiert et nach eng Kéier ënner Einstellungen → Kont.",
   "Codex returned a repeated model catalog page.": "Codex huet eng duplikativ Modellkatalogsäit zréckginn.",

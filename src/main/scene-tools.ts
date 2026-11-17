@@ -9,13 +9,8 @@ import { cleanEnv, pythonExe } from './env'
 import { readTimeline } from './projects'
 import { currentOrNewRender, framesBase64, type RenderOutcome } from './render'
 import { requireSource, sourcePageCount, sourcePages, sourceText } from './sources'
-import { reportProgress } from './production-progress'
 export { renderMotion } from './motion'
 
-export function reportAuthoringProgress(dir: string, phase: 'script' | 'scene', completed: number, total: number, detail?: string): CallToolResult {
-  try { reportProgress(dir, phase, completed, total, detail); return textResult(`Recorded ${completed}/${total} sections (${phase}).`) }
-  catch (error) { return textResult((error as Error).message, true) }
-}
 
 export const textResult = (text: string, isError = false): CallToolResult => ({ content: [{ type: 'text', text }], ...(isError ? { isError } : {}) })
 
@@ -101,7 +96,22 @@ function describeOutcome(o: RenderOutcome): string {
     const tb = o.error.traceback.split('\n').slice(-25).join('\n')
     return `Render FAILED${o.error.line ? ` (scene.py line ${o.error.line})` : ''}: ${o.error.message}\n\n${tb}`
   }
-  return 'Render succeeded.\n' + describeTimeline(o.timeline)
+  return 'Render succeeded.\n' + renderSummary(o.timeline)
+}
+
+/**
+ * What a render check needs: the result, the sections and every warning. The full clip and voice
+ * list (about 8,000 tokens for a ten-minute lesson) is get_timeline's, asked for when needed.
+ */
+export function renderSummary(t: Timeline): string {
+  const f = (n: number) => n.toFixed(2)
+  const out = [`Duration ${f(t.duration)} s, ${t.width}×${t.height}, ${t.clips.length} clips, ${t.voice.length} voiceover blocks, render ${t.renderSeconds} s.`]
+  if (t.sections.length) out.push('Sections: ' + t.sections.map((s) => `"${s.name || '—'}" ${f(s.start)}–${f(s.end)}`).join(', '))
+  for (const w of t.warnings) out.push(`WARNING ${f(w.start)}–${f(w.end)} line ${w.line ?? '?'}: ${w.message}`)
+  for (const w of t.voiceWarnings) out.push(`WARNING voice: ${w}`)
+  if (!t.warnings.length && !t.voiceWarnings.length) out.push('No layout or voice warnings.')
+  out.push('get_timeline lists every clip and voiceover block with its scene.py line and times.')
+  return out.join('\n')
 }
 
 export function describeTimeline(t: Timeline): string {
