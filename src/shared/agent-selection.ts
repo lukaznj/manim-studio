@@ -1,13 +1,15 @@
 import type { Agent, AgentRoute, AgentSelection, EpisodeRun, SeriesRole, SeriesRun, Settings } from './types'
-import { CODEX_PLANNER } from './codex-selection.ts'
+import { MAKER_DEFAULTS, SERIES_PLANNERS } from './model-defaults.ts'
+export { MAKER_DEFAULTS, SERIES_PLANNERS }
 import { normalizeModelOrder } from './model-fallback.ts'
 
 type ModelSettings = Pick<Settings, 'agent' | 'claudeModel' | 'claudeEffort' | 'codexModel' | 'codexEffort' | 'antigravityModel' | 'antigravityEffort'>
 
+/** Video creation: `agent` and its model. An unset model is Studio's default, resolved here so every caller gets a real one. */
 export function defaultAgentSelection(settings: ModelSettings, agent: Agent = settings.agent): AgentSelection {
   return {
     agent,
-    model: agent === 'claude' ? settings.claudeModel : agent === 'codex' ? settings.codexModel : settings.antigravityModel,
+    model: (agent === 'claude' ? settings.claudeModel : agent === 'codex' ? settings.codexModel : settings.antigravityModel) || MAKER_DEFAULTS[agent],
     effort:
       (agent === 'claude' ? settings.claudeEffort : agent === 'codex' ? settings.codexEffort : settings.antigravityEffort) ||
       (agent === 'antigravity' ? 'medium' : 'high'),
@@ -24,17 +26,15 @@ export function seriesAgentSelection(
   return { agent: run.agent ?? defaults.agent, model: run.model ?? defaults.model, effort: run.effort ?? defaults.effort }
 }
 
-/** Planning has its own default; episode creation inherits the normal creation model. */
-export const SERIES_PLANNERS: Record<Agent, string> = {
-  claude: 'opus',
-  codex: CODEX_PLANNER,
-  antigravity: 'gemini-4-neon', // chat and creation default to Gemini 4 Hydrogen
-}
-
-export function seriesSelection(settings: ModelSettings & Pick<Settings, 'seriesModels'>, role: SeriesRole, agent: Agent = settings.agent): AgentSelection {
-  const saved = settings.seriesModels?.[agent]?.[role]
-  if (saved) return { agent, model: saved.model, effort: saved.effort }
-  return role === 'make' ? defaultAgentSelection(settings, agent) : { agent, model: SERIES_PLANNERS[agent], effort: 'high' }
+/**
+ * A course role's provider and model. Each role picks its own provider (planAgent, lessonAgent),
+ * remembering a model per provider; `agent` asks for one provider's choice instead.
+ */
+export function seriesSelection(settings: ModelSettings & Pick<Settings, 'seriesModels' | 'planAgent' | 'lessonAgent'>, role: SeriesRole, agent?: Agent): AgentSelection {
+  const chosen = agent ?? (role === 'plan' ? settings.planAgent : settings.lessonAgent) ?? settings.agent
+  const saved = settings.seriesModels?.[chosen]?.[role]
+  if (saved) return { agent: chosen, model: saved.model || (role === 'plan' ? SERIES_PLANNERS : MAKER_DEFAULTS)[chosen], effort: saved.effort }
+  return role === 'make' ? defaultAgentSelection(settings, agent ?? settings.agent) : { agent: chosen, model: SERIES_PLANNERS[chosen], effort: 'high' }
 }
 
 export function seriesMakerChanged(before: Settings, after: Settings): boolean {

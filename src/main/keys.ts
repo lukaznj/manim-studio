@@ -2,6 +2,7 @@
 // an Anthropic key for Claude, an OpenAI key for Codex, a Gemini key for Antigravity. Each check lists what the key may do and,
 // when something else stops it (an invalid key, no credit left), says what.
 import Anthropic from '@anthropic-ai/sdk'
+import { MAKER_DEFAULTS } from '../shared/model-defaults'
 import type { KeyCheck } from '../shared/types'
 import { getSecret, getSettings } from './settings'
 
@@ -23,7 +24,7 @@ export async function checkAnthropicKey(key = getSecret('anthropic'), again = fa
   if (hit) return hit
   if (!key) return { items: [], problem: 'No Anthropic API key is saved.', rejected: true }
   const client = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 20_000 })
-  const model = getSettings().claudeModel || 'claude-sonnet-5-5'
+  const model = getSettings().claudeModel || MAKER_DEFAULTS.claude
   const result: KeyCheck = { items: [] }
   try {
     const ids: string[] = []

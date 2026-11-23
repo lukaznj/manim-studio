@@ -1,7 +1,6 @@
 // What making a video cost: one entry per agent turn, kept per project in .studio/usage.json
 // (src/main/usage.ts). The SDK reports per-model totals that add up over a session, and a resumed
 // session starts from its saved total, so an entry is the difference from the session's last one.
-import { CODEX_MODELS } from './codex-selection.ts'
 
 export interface ModelTokens {
   input: number
@@ -71,11 +70,14 @@ export const costOf = (models: Record<string, ModelTokens>): number => Object.va
 export const apiEstimateOf = (entries: UsageEntry[]): number | null => entries.length && entries.every((entry) => entry.auth === 'api-key' && entry.costKnown !== false)
   ? entries.reduce((total, entry) => total + costOf(entry.models), 0) : null
 
-/** "claude-sonnet-5-5" → "Sonnet 5.5"; "claude-opus-5-5-20261001" → "Opus 5.5". */
+const capital = (word: string) => word[0].toUpperCase() + word.slice(1)
+
+/** "claude-sonnet-5-5" → "Sonnet 5.5"; "claude-opus-5-5-20261001" → "Opus 5.5"; "gpt-6.2-sol" → "GPT-6.2 Sol"; "gemini-3.8-flash" → "Gemini 3.8 Flash". */
 export function modelName(id: string): string {
-  if (Object.hasOwn(CODEX_MODELS, id)) return CODEX_MODELS[id]
-  const gemini = /^gemini-4-(argon|carbon|hydrogen|neon)\b/.exec(id)
-  if (gemini) return `Gemini 4 ${gemini[1][0].toUpperCase()}${gemini[1].slice(1)}`
+  const gpt = /^gpt-(\d+(?:\.\d+)?)-([a-z]+)$/.exec(id)
+  if (gpt) return `GPT-${gpt[1]} ${capital(gpt[2])}`
+  const gemini = /^gemini-(\d+(?:\.\d+)?)-([a-z]+)$/.exec(id)
+  if (gemini) return `Gemini ${gemini[1]} ${capital(gemini[2])}`
   const m = /claude-(opus|sonnet|haiku|fable)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?/.exec(id)
   if (!m) return id
   return `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ''}`

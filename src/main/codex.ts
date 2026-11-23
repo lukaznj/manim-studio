@@ -18,14 +18,15 @@ import { cliUsageEntry, type UsageEntry } from '../shared/usage'
 import { sceneTools } from '../shared/studio-tools'
 import type { ChatPart, ClaudeLoginEvent, ClaudeStatus, Effort, ModelOption, SetupEvent, ClaudeAuth } from '../shared/types'
 import { recoverModelCapacity, type CapacityResult } from '../shared/codex-recovery'
-import { studioCodexModels } from '../shared/codex-selection'
+import { MAKER_DEFAULTS, sortModels } from '../shared/model-defaults'
+import { modelName } from '../shared/usage'
 import { listCodexModels, readCodexRateLimits } from './codex-models'
 import { CODEX_PLAN_MESSAGE, readableAgentError } from '../shared/usage-limit'
 import { cleanEnv } from './env'
 import { paths } from './paths'
 import { getSecret, getSettings } from './settings'
 
-export const CODEX_VERSION = '0.162.1'
+export const CODEX_VERSION = '0.171.0'
 const NPM_PLATFORM: Record<string, string> = {
   'darwin-arm64': 'darwin-arm64',
   'darwin-x64': 'darwin-x64',
@@ -178,15 +179,16 @@ export async function codexLogout(): Promise<ClaudeStatus> {
   return codexStatus()
 }
 
-/** Discover availability and efforts for Studio's two supported Codex models. */
+/** Every model the account offers, with its efforts, newest first. */
 let knownModels: ModelOption[] = []
 export async function codexModels(auth?: ClaudeAuth): Promise<ModelOption[]> {
   const bin = installed()?.bin
   if (!bin) throw new Error('Install Codex first (Settings → Accounts).')
   const env = codexEnv()
   if (apiKey(auth)) env.OPENAI_API_KEY = apiKey(auth)
-  knownModels = studioCodexModels(await listCodexModels(bin, env))
-  if (!knownModels.length) throw new Error('Codex did not offer GPT-6 Astra, GPT-6.1 Sol or GPT-6.1 Terra. Check your account in Settings → Accounts.')
+  // "gpt-6.2-sol" reads "GPT-6.2 Sol", like the other providers' names; Codex itself says "GPT-6.2-Sol".
+  knownModels = sortModels((await listCodexModels(bin, env)).map((m) => ({ ...m, label: modelName(m.value) !== m.value ? modelName(m.value) : m.label })))
+  if (!knownModels.length) throw new Error('Codex offered no models. Check your account in Settings → Accounts.')
   return knownModels
 }
 
@@ -362,7 +364,7 @@ async function runRecovering(
   replace: (thread: Thread) => void,
 ): Promise<CapacityResult> {
   let active = t
-  let model = threadModels.get(t) ?? options.model ?? getSettings().codexModel
+  let model = threadModels.get(t) ?? (options.model || getSettings().codexModel || MAKER_DEFAULTS.codex)
   return recoverModelCapacity({
     model,
     fallback: options.allowFallback === false ? undefined : getSettings().codexFallbackModel,
@@ -507,7 +509,7 @@ export async function askCodex(
       images.length ? [{ type: 'text' as const, text: named }, ...files.map((path) => ({ type: 'local_image' as const, path }))] : named,
       { signal: options.signal },
     )
-    options.onUsage?.(cliUsageEntry('codex', options.auth ?? (codexUsesKey() ? 'api-key' : 'account'), options.model || getSettings().codexModel, { ...turn.usage }, what, Date.now() - started))
+    options.onUsage?.(cliUsageEntry('codex', options.auth ?? (codexUsesKey() ? 'api-key' : 'account'), options.model || getSettings().codexModel || MAKER_DEFAULTS.codex, { ...turn.usage }, what, Date.now() - started))
     return turn.finalResponse
   } catch (e) {
     const reason = friendly((e as Error).message)

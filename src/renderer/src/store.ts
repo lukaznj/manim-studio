@@ -18,6 +18,7 @@ import type {
   ExportJob,
   MenuAction,
   ModelOption,
+  Agent,
   PlanUsage,
   OpenProject,
   ProjectMeta,
@@ -104,6 +105,7 @@ export interface State {
   setupProgress: Partial<Record<Component, number>>
   claude: ClaudeStatus | null
   models: ModelOption[] // what the signed-in account (or API key) can use
+  catalog: Partial<Record<Agent, ModelOption[]>> | null // every signed-in provider's models, for pickers that choose the provider too; null until loaded
   usage: PlanUsage | null // the Claude plan's limits, when signed in with an account
   historyOpen: boolean
   chatDraft: string | null // text put into the chat box from elsewhere (the Media and Sources panels)
@@ -167,6 +169,7 @@ export const useStore = create<State>(() => ({
   setupProgress: {},
   claude: null,
   models: [],
+  catalog: null,
   usage: null,
   historyOpen: false,
   chatDraft: null,
@@ -511,6 +514,21 @@ export async function refreshClaude(): Promise<void> {
     modelsFor = who
     set({ models })
   }
+}
+
+let catalogAt = 0
+let catalogRequest = 0
+
+/** Every signed-in provider's models (Settings → Agent: each role picks its own). At most once a minute unless forced. */
+export async function refreshCatalog(force = false): Promise<void> {
+  if (!force && Date.now() - catalogAt < 60_000) return
+  catalogAt = Date.now()
+  const request = ++catalogRequest
+  const lists = await Promise.all((['claude', 'codex', 'antigravity'] as const).map(async (agent) => {
+    const status = await api.claudeStatus(agent).catch(() => null)
+    return [agent, status?.loggedIn ? await api.chatModels(agent).catch(() => []) : []] as const
+  }))
+  if (request === catalogRequest) set({ catalog: Object.fromEntries(lists.filter(([, models]) => models.length)) })
 }
 
 let usageAt = 0

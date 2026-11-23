@@ -1,5 +1,5 @@
 import type { AgentSelection, AgentRoute, Effort, ModelRoute, PlanUsage } from './types'
-import { isCodexModel } from './codex-selection.ts'
+import { MAKER_DEFAULTS } from './model-defaults.ts'
 
 export const modelFamily = ({ agent, model }: AgentSelection): string => {
   if (agent === 'claude') return /opus/i.test(model) ? 'opus' : /haiku/i.test(model) ? 'haiku' : /fable/i.test(model) ? 'fable' : 'sonnet'
@@ -14,9 +14,8 @@ export function normalizeModelOrder(value: unknown): ModelRoute[] {
   for (const item of value.slice(0, 24)) {
     const route = item as ModelRoute | null
     if (!route || !['claude', 'codex', 'antigravity'].includes(route.agent) || !['account', 'api-key'].includes(route.auth)
-      || typeof route.model !== 'string' || route.model.length > 200 || /[\r\n\0]/.test(route.model)
-      || (route.agent === 'codex' && !isCodexModel(route.model))) continue
-    const model = route.agent === 'claude' ? !route.model || route.model === 'sonnet' ? 'claude-sonnet-5-5' : route.model === 'opus' ? 'claude-opus-5-5' : route.model === 'haiku' ? 'claude-haiku-5-5' : route.model === 'fable' ? 'claude-fable-5-2' : route.model : route.model || 'gemini-4-hydrogen'
+      || typeof route.model !== 'string' || route.model.length > 200 || /[\r\n\0]/.test(route.model)) continue
+    const model = route.agent === 'claude' ? route.model === 'sonnet' ? 'claude-sonnet-5-5' : route.model === 'opus' ? 'claude-opus-5-5' : route.model === 'haiku' ? 'claude-haiku-5-5' : route.model === 'fable' ? 'claude-fable-5-2' : route.model || MAKER_DEFAULTS.claude : route.model || MAKER_DEFAULTS[route.agent]
     const effort = ['low', 'medium', 'high', 'xhigh', 'max'].includes(route.effort ?? '') ? route.effort : 'high' as Effort
     const normalized = { agent: route.agent, auth: route.auth, model, effort }
     if (!out.some((existing) => modelRouteKey(existing) === modelRouteKey(normalized))) out.push(normalized)

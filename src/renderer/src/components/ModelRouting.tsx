@@ -17,9 +17,11 @@ export function useChatRoute(): ModelRoute {
   const settings = useStore((s) => s.settings)!
   const selected = useStore((s) => s.chatRoute)
   const studying = useStore((s) => s.screen === 'study')
-  const agent = settings?.agent ?? 'claude'
+  // The lesson chat may run on another provider than video creation (ADR 0068).
+  const chosen = studying ? studyModel(settings) : defaultAgentSelection(settings)
+  const agent = chosen.agent
   const auth = agent === 'claude' ? settings?.claudeAuth ?? 'account' : agent === 'codex' ? settings?.codexAuth ?? (settings?.hasOpenAIKey ? 'api-key' : 'account') : settings?.antigravityAuth ?? (settings?.hasGeminiKey ? 'api-key' : 'account')
-  return normalizeModelOrder([selected ?? { ...defaultAgentSelection(settings, agent), ...(studying ? studyModel(settings) : {}), auth }])[0]
+  return normalizeModelOrder([selected ?? { ...chosen, auth }])[0]
 }
 
 function place(event: React.MouseEvent<HTMLButtonElement>, ref: RefObject<HTMLDivElement | null>, width = 330) {

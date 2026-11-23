@@ -1,41 +1,59 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeCodexSettings, studioCodexModels } from './codex-selection.ts'
-import { seriesSelection } from './agent-selection.ts'
+import { MAKER_DEFAULTS, migrateModelDefaults, sortModels } from './model-defaults.ts'
+import { defaultAgentSelection, seriesSelection } from './agent-selection.ts'
+import { studyModel } from './study-assistant.ts'
 import type { Settings } from './types.ts'
 
-test('Codex offers GPT-6 Astra and the GPT-6.1 models, with the account’s efforts', () => {
-  const catalog = ['', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra'].map((value) => ({
-    value, label: value, description: 'From account', efforts: ['high' as const],
-  }))
-  const offered = studioCodexModels(catalog)
-  assert.deepEqual(offered.map((m) => [m.value, m.label]), [['gpt-6-astra', 'GPT-6 Astra'], ['gpt-6.1-sol', 'GPT-6.1 Sol'], ['gpt-6.1-terra', 'GPT-6.1 Terra']])
-  assert.deepEqual(offered[0].efforts, ['high'])
-  assert.deepEqual(studioCodexModels(catalog.slice(0, 3)), [])
+test('lists are sorted newest first, keeping the provider’s order within a version', () => {
+  const labels = ['GPT-6 Luna', 'GPT-6.1 Sol', 'GPT-5.6 Terra', 'GPT-6.2 Sol', 'GPT-6.1 Terra', 'Opus 5.5', 'Gemini 3.8 Flash', 'GPT-6.10 Sol']
+  assert.deepEqual(sortModels(labels.map((label) => ({ label }))).map((m) => m.label),
+    ['GPT-6.10 Sol', 'GPT-6.2 Sol', 'GPT-6.1 Sol', 'GPT-6.1 Terra', 'GPT-6 Luna', 'GPT-5.6 Terra', 'Opus 5.5', 'Gemini 3.8 Flash'])
 })
 
-test('old and retired Codex settings migrate to Astra planning and Sol creation without changing other providers', () => {
+test('defaults saved by older versions become unset once; explicit choices stay', () => {
   const old = {
-    codexModel: '', codexFallbackModel: 'gpt-6-luna',
+    claudeModel: 'claude-sonnet-5-5', codexModel: 'gpt-6.1-sol',
     seriesModels: {
-      codex: { plan: { model: 'gpt-6-sol', effort: 'high' as const }, make: { model: '', effort: 'medium' as const } },
-      claude: { plan: { model: 'opus', effort: 'high' as const } },
+      codex: { plan: { model: 'gpt-6-astra', effort: 'high' as const }, make: { model: 'gpt-6.1-sol', effort: 'medium' as const } },
+      claude: { plan: { model: 'claude-fable-5-2', effort: 'high' as const } },
+      antigravity: { plan: { model: 'gemini-4-neon', effort: 'high' as const } },
     },
   }
-  const migrated = normalizeCodexSettings(old)
-  assert.equal(migrated.codexModel, 'gpt-6.1-sol')
-  assert.equal(migrated.codexFallbackModel, undefined)
-  assert.equal(migrated.seriesModels.codex.plan.model, 'gpt-6-astra')
-  assert.equal(migrated.seriesModels.codex.make.model, 'gpt-6.1-sol')
-  assert.equal(migrated.seriesModels.codex.make.effort, 'medium')
+  const migrated = migrateModelDefaults(old)
+  assert.equal(migrated.claudeModel, '')
+  assert.equal(migrated.codexModel, '')
+  assert.deepEqual(migrated.seriesModels.codex, {})
   assert.deepEqual(migrated.seriesModels.claude, old.seriesModels.claude)
-  assert.equal(old.codexModel, '')
+  assert.deepEqual(migrated.seriesModels.antigravity, {})
+  assert.equal(migrated.defaultsVersion, 2)
+  // Once only: picking GPT-6.1 Sol afterwards sticks.
+  assert.equal(migrateModelDefaults({ ...migrated, codexModel: 'gpt-6.1-sol' }).codexModel, 'gpt-6.1-sol')
 })
 
-test('supported explicit selections survive migration; new installs use role defaults', () => {
-  const explicit = { codexModel: 'gpt-6.1-terra', codexFallbackModel: 'gpt-6.1-sol', seriesModels: { codex: { plan: { model: 'gpt-6.1-terra', effort: 'high' as const } } } }
-  assert.deepEqual(normalizeCodexSettings(explicit), explicit)
-  const defaults = normalizeCodexSettings({ codexModel: '', agent: 'codex', codexEffort: 'high' } as Settings)
-  assert.equal(seriesSelection(defaults, 'plan').model, 'gpt-6-astra')
-  assert.equal(seriesSelection(defaults, 'make').model, 'gpt-6.1-sol')
+const base = { agent: 'claude', claudeModel: '', claudeEffort: 'high', codexModel: '', codexEffort: 'high', antigravityModel: '', antigravityEffort: 'medium' } as Settings
+
+test('unset models resolve to Studio’s defaults; GPT-6.2 Sol for every Codex role', () => {
+  const codex = { ...base, agent: 'codex' } as Settings
+  assert.equal(defaultAgentSelection(codex).model, 'gpt-6.2-sol')
+  assert.equal(seriesSelection(codex, 'plan').model, 'gpt-6.2-sol')
+  assert.equal(seriesSelection(codex, 'make').model, 'gpt-6.2-sol')
+  assert.equal(studyModel(codex).model, 'gpt-6.2-sol')
+  assert.equal(defaultAgentSelection(base).model, MAKER_DEFAULTS.claude)
+  assert.equal(seriesSelection(base, 'plan').model, 'opus')
+})
+
+test('each role can use its own provider', () => {
+  const mixed = {
+    ...base,
+    studyAgent: 'codex', planAgent: 'antigravity',
+    seriesModels: { antigravity: { plan: { model: 'gemini-4-argon', effort: 'high' } } },
+  } as Settings
+  assert.deepEqual(defaultAgentSelection(mixed), { agent: 'claude', model: 'claude-sonnet-5-5', effort: 'high' })
+  assert.deepEqual(studyModel(mixed), { agent: 'codex', model: 'gpt-6.2-sol', effort: 'high' })
+  assert.deepEqual(seriesSelection(mixed, 'plan'), { agent: 'antigravity', model: 'gemini-4-argon', effort: 'high' })
+  // Without a lesson override, lessons follow video creation.
+  assert.equal(seriesSelection(mixed, 'make').agent, 'claude')
+  const override = { ...mixed, lessonAgent: 'codex', seriesModels: { codex: { make: { model: 'gpt-6.1-terra', effort: 'xhigh' } } } } as Settings
+  assert.deepEqual(seriesSelection(override, 'make'), { agent: 'codex', model: 'gpt-6.1-terra', effort: 'xhigh' })
 })

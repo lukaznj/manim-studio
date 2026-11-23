@@ -104,6 +104,7 @@ export async function planSeries(
     const planner = seriesSelection(getSettings(), 'plan')
     const answer = await askClaude(['You plan educational maths and engineering video series. You answer with JSON only.', aboutYouBrief()].filter(Boolean).join('\n\n'), prompt, 'plan the series', {
       signal,
+      agent: planner.agent,
       model: planner.model,
       effort: planner.effort,
       onUsage: (e) => (usage = { ...e, step: 'Planning the course' }),

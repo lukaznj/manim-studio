@@ -2,9 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { nearbyFollowUps, studyModel, validFrameRegion, videoAdvice } from './study-assistant.ts'
 
-test('study defaults stay separate from the creation model and only use supported Codex models', () => {
-  assert.deepEqual(studyModel({ agent: 'claude' }), { model: 'claude-sonnet-5-5', effort: 'high' })
-  assert.equal(studyModel({ agent: 'codex', studyModels: { codex: { model: 'retired', effort: 'high' } } }).model, 'gpt-6.1-sol')
+test('study defaults stay separate from the creation model; any offered model can be chosen', () => {
+  assert.deepEqual(studyModel({ agent: 'claude' }), { agent: 'claude', model: 'claude-sonnet-5-5', effort: 'high' })
+  assert.equal(studyModel({ agent: 'codex' }).model, 'gpt-6.2-sol')
+  assert.equal(studyModel({ agent: 'codex', studyModels: { codex: { model: 'gpt-5.6-terra', effort: 'high' } } }).model, 'gpt-5.6-terra')
 })
 test('a text recommendation preserves a concise title and explanation; malformed advice cannot create videos', () => {
   assert.deepEqual(videoAdvice('```json\n{"medium":"text","title":"Current splitting","answer":"Use $I=V/R$."}\n```'), {

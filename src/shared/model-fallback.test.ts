@@ -9,7 +9,9 @@ const sol: ModelRoute = { ...terra, model: 'gpt-6.1-sol' }
 
 test('fallback order preserves priority, canonicalizes defaults and rejects invalid or duplicate routes', () => {
   const order = normalizeModelOrder([null, {}, { ...opus, model: 'opus' }, opus, { ...terra, model: 'gpt-6-luna' }, sol, { ...sonnet, auth: 'secret' }, { ...sonnet, model: 'bad\nmodel' }, { ...sonnet, effort: 'ultra' }])
-  assert.deepEqual(order, [opus, sol, sonnet])
+  // Any model a provider offers is a valid route (ADR 0068); an empty one is Studio's default.
+  assert.deepEqual(order, [opus, { ...terra, model: 'gpt-6-luna' }, sol, sonnet])
+  assert.equal(normalizeModelOrder([{ ...terra, model: '' }])[0].model, 'gpt-6.2-sol')
   assert.equal(normalizeModelOrder(null).length, 0)
   assert.equal(normalizeModelOrder([{ ...opus, model: 'fable' }])[0].model, 'claude-fable-5-2')
   assert.equal(normalizeModelOrder([{ ...terra, model: 'gpt-6-astra' }])[0].model, 'gpt-6-astra')

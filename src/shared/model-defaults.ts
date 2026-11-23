@@ -1,33 +1,48 @@
-import type { ModelOption, Settings } from './types'
+// Studio's model defaults, one place to update by hand when providers release models. The lists
+// themselves aren't filtered: any model an account offers can be picked (ADR 0068).
+import type { Agent, Settings } from './types'
 
-/** The Codex models Studio offers: OpenAI's most capable ones (ADR 0039). */
-export const CODEX_MODELS: Readonly<Record<string, string>> = { 'gpt-6-astra': 'GPT-6 Astra', 'gpt-6.1-sol': 'GPT-6.1 Sol', 'gpt-6.1-terra': 'GPT-6.1 Terra' }
-export const CODEX_EXECUTOR = 'gpt-6.1-sol'
-export const CODEX_PLANNER = 'gpt-6-astra'
+const CODEX_DEFAULT = 'gpt-6.2-sol'
 
-export function isCodexModel(model: string | undefined): boolean {
-  return !!model && Object.hasOwn(CODEX_MODELS, model)
-}
+/** What video creation (and the editor's chat) and the lesson chat run when nothing is chosen. */
+export const MAKER_DEFAULTS: Record<Agent, string> = { claude: 'claude-sonnet-5-5', codex: CODEX_DEFAULT, antigravity: 'gemini-4-hydrogen' }
 
-/** Keep account-provided availability and effort levels, within Studio's supported choices. */
-export function studioCodexModels(models: ModelOption[]): ModelOption[] {
-  return models.filter((m) => isCodexModel(m.value)).map((m) => ({
-    ...m,
-    label: CODEX_MODELS[m.value],
+/** Course planning's defaults; course lessons inherit video creation's model. */
+export const SERIES_PLANNERS: Record<Agent, string> = { claude: 'opus', codex: CODEX_DEFAULT, antigravity: 'gemini-4-neon' }
+
+/** Defaults that earlier versions saved as explicit choices; unset now means Studio's current default. */
+const OLD_DEFAULTS = { claude: ['claude-sonnet-5-5'], codex: ['gpt-6.1-sol', 'gpt-6-astra'], plan: { claude: 'opus', codex: 'gpt-6-astra', antigravity: 'gemini-4-neon' } } as const
+
+/**
+ * Once (defaultsVersion 2): models that were only ever Studio's defaults become unset, so a later
+ * default reaches everyone who never picked one. Explicit choices stay.
+ */
+export function migrateModelDefaults<T extends Pick<Settings, 'claudeModel' | 'codexModel' | 'seriesModels' | 'defaultsVersion'>>(settings: T): T & { defaultsVersion: number } {
+  if ((settings.defaultsVersion ?? 0) >= 2) return { ...settings, defaultsVersion: settings.defaultsVersion! }
+  const seriesModels = settings.seriesModels && Object.fromEntries(Object.entries(settings.seriesModels).map(([agent, roles]) => {
+    const plan = roles?.plan && roles.plan.model === OLD_DEFAULTS.plan[agent as keyof typeof OLD_DEFAULTS.plan] ? undefined : roles?.plan
+    const make = roles?.make && agent === 'codex' && (OLD_DEFAULTS.codex as readonly string[]).includes(roles.make.model) ? undefined : roles?.make
+    return [agent, { ...(plan ? { plan } : {}), ...(make ? { make } : {}) }]
   }))
-}
-
-/** Migrate old account defaults and retired models, including saved planner/maker overrides. */
-export function normalizeCodexSettings<T extends Pick<Settings, 'codexModel' | 'codexFallbackModel' | 'seriesModels'>>(settings: T): T {
-  const roles = settings.seriesModels?.codex
   return {
     ...settings,
-    codexModel: isCodexModel(settings.codexModel) ? settings.codexModel : CODEX_EXECUTOR,
-    codexFallbackModel: isCodexModel(settings.codexFallbackModel) ? settings.codexFallbackModel : undefined,
-    ...(roles ? { seriesModels: { ...settings.seriesModels, codex: {
-      ...roles,
-      ...(roles.plan ? { plan: { ...roles.plan, model: isCodexModel(roles.plan.model) ? roles.plan.model : CODEX_PLANNER } } : {}),
-      ...(roles.make ? { make: { ...roles.make, model: isCodexModel(roles.make.model) ? roles.make.model : CODEX_EXECUTOR } } : {}),
-    } } } : {}),
+    claudeModel: (OLD_DEFAULTS.claude as readonly string[]).includes(settings.claudeModel) ? '' : settings.claudeModel,
+    codexModel: (OLD_DEFAULTS.codex as readonly string[]).includes(settings.codexModel) ? '' : settings.codexModel,
+    ...(seriesModels ? { seriesModels } : {}),
+    defaultsVersion: 2,
   }
+}
+
+const version = (label: string) => (/\d+(?:\.\d+)*/.exec(label)?.[0] ?? '0').split('.').map(Number)
+
+/**
+ * Newest first: providers don't report release dates, so the version in the name stands in for
+ * one ("GPT-6.2 Sol" before "GPT-6.1 Sol"). Within a version the provider's own order stays.
+ */
+export function sortModels<T extends { label: string }>(models: T[]): T[] {
+  return [...models].sort((a, b) => {
+    const [x, y] = [version(a.label), version(b.label)]
+    for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (y[i] ?? 0) - (x[i] ?? 0)
+    return 0
+  })
 }

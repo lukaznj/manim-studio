@@ -1,11 +1,11 @@
-import type { Agent, FrameRegion, Settings } from './types'
-import { CODEX_EXECUTOR, isCodexModel } from './codex-selection.ts'
+import type { Agent, AgentSelection, Effort, FrameRegion, Settings } from './types'
+import { MAKER_DEFAULTS } from './model-defaults.ts'
 
-export function studyModel(settings: Pick<Settings, 'agent' | 'studyModels'>) {
-  const agent: Agent = settings.agent
+/** The lesson chat's provider (studyAgent, unset: video creation's) and its model there. */
+export function studyModel(settings: Pick<Settings, 'agent' | 'studyAgent' | 'studyModels'>): AgentSelection & { effort: Effort } {
+  const agent: Agent = settings.studyAgent ?? settings.agent
   const saved = settings.studyModels?.[agent]
-  const model = agent === 'claude' ? 'claude-sonnet-5-5' : agent === 'codex' ? CODEX_EXECUTOR : ''
-  return { model: saved && (agent !== 'codex' || isCodexModel(saved.model)) ? saved.model : model, effort: saved?.effort ?? 'high' as const }
+  return { agent, model: saved?.model || MAKER_DEFAULTS[agent], effort: saved?.effort ?? 'high' }
 }
 
 export function validFrameRegion(value: FrameRegion): boolean {

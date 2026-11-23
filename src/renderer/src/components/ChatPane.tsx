@@ -3,10 +3,11 @@ import { t as uiText, format } from '../lib/i18n'
 import { ArrowDown, ArrowUp, BookmarkPlus, Camera, Check, ChevronDown, CircleAlert, Clock3, Download, FileText, Film, Gauge, ListChecks, Loader, Plus, ScanLine, Settings2, Sparkles, Square, Video, X, ZoomIn } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { pageRanges } from '../../../shared/pages'
-import type { StudyReference, ChatMessage, ChatPart, Effort, ModelOption, SourceRef } from '../../../shared/types'
+import type { Agent, StudyReference, ChatMessage, ChatPart, Effort, ModelOption, SourceRef } from '../../../shared/types'
 import { modelName } from '../../../shared/usage'
+import { MAKER_DEFAULTS } from '../../../shared/agent-selection'
 import { api } from '../lib/api'
-import { errorText, followStudyReference, installComponent, openDialog, prepareStudyAction, refreshClaude, refreshUsage, selectClips, selectStudied, sendChat, toast, updateSettings, useStore, watchAdditionalVideo } from '../store'
+import { errorText, followStudyReference, installComponent, openDialog, prepareStudyAction, refreshCatalog, refreshClaude, refreshUsage, selectClips, selectStudied, sendChat, toast, updateSettings, useStore, watchAdditionalVideo } from '../store'
 import { addSources, attachSource } from './SourcesPane'
 import { useStudyFullscreen } from '../lib/study-fullscreen'
 import { Modal } from './ui'
@@ -597,74 +598,111 @@ function StudyTools() {
 
 const effortLabel = (effort: Effort) => ({ low: uiText('Low effort'), medium: uiText('Medium effort'), high: uiText('High effort'), xhigh: uiText('Extra high effort'), max: uiText('Maximum effort') })[effort]
 
+/** The agents' names in pickers, as under Settings → Accounts. */
+export const PROVIDERS: Record<Agent, string> = { claude: 'Claude', codex: 'Codex', antigravity: 'Antigravity' }
+const MODEL_FIELDS = {
+  claude: ['claudeModel', 'claudeEffort'],
+  codex: ['codexModel', 'codexEffort'],
+  antigravity: ['antigravityModel', 'antigravityEffort'],
+} as const
+
 /**
- * Which model Claude runs and how hard it thinks; a change applies to the current conversation.
- * Effort is always a real level: medium unless chosen, which is what Claude Code ran at by default.
+ * Video creation's provider, model and effort: the editor's chat runs on it too, and a change applies
+ * to the current conversation. Effort is always a real level.
  */
 export function ModelControls() {
   const settings = useStore((s) => s.settings)
+  const catalog = useStore((s) => s.catalog)
+  useEffect(() => void refreshCatalog(), [])
   if (!settings) return null
-  // The chosen agent's own model and effort (Settings → Agent).
   const agent = settings.agent
-  if (agent === 'antigravity')
-    return (
-      <ModelPicker
-        model={settings.antigravityModel}
-        effort={settings.antigravityEffort || 'medium'}
-        onChange={(m, e) => void updateSettings({ antigravityModel: m, ...(e ? { antigravityEffort: e } : {}) })}
-      />
-    )
-  const codex = agent === 'codex'
+  const [modelKey, effortKey] = MODEL_FIELDS[agent]
   return (
     <ModelPicker
-      model={codex ? settings.codexModel : settings.claudeModel}
-      effort={(codex ? settings.codexEffort : settings.claudeEffort) || 'high'}
-      onChange={(m, e) =>
-        void updateSettings(codex ? { codexModel: m, ...(e ? { codexEffort: e } : {}) } : { claudeModel: m, ...(e ? { claudeEffort: e } : {}) })
-      }
+      agent={agent}
+      catalog={catalog ?? undefined}
+      model={settings[modelKey]}
+      defaultModel={(a) => MAKER_DEFAULTS[a]}
+      effort={settings[effortKey] || (agent === 'antigravity' ? 'medium' : 'high')}
+      onChange={async (m, e, a = agent) => {
+        const [mk, ek] = MODEL_FIELDS[a]
+        await updateSettings({ agent: a, [mk]: m, ...(e ? { [ek]: e } : {}) })
+        if (a !== agent) await refreshClaude()
+      }}
     />
   )
 }
 
-/** A model and an effort from what the account can use (the chat's, and a series' own). */
+type ModelGroup = { agent?: Agent; offered: ModelOption[]; list: ModelOption[] }
+
+/**
+ * A model and an effort from what the account can use (the chat's, and a series' own). With a
+ * `catalog`, the models of every signed-in provider in one list, so choosing one picks its provider too.
+ */
 export function ModelPicker({
   model,
   effort: savedEffort,
   onChange: save,
   models: offeredModels,
+  defaultModel,
+  agent,
+  catalog,
 }: {
   model: string
   effort: Effort
-  onChange: (model: string, effort: Effort | null) => void
+  onChange: (model: string, effort: Effort | null, agent?: Agent) => void
   models?: ModelOption[]
+  /** What this setting runs when nothing is chosen (per provider, with a catalog); its option reads "Sonnet 5.5 (default)". */
+  defaultModel?: string | ((agent: Agent) => string)
+  /** The provider `model` belongs to. */
+  agent?: Agent
+  catalog?: Partial<Record<Agent, ModelOption[]>>
 }) {
   const activeModels = useStore((s) => s.models)
-  const models = offeredModels ?? activeModels
-  const list: ModelOption[] = models.length ? [...models] : [{ value: model, label: modelName(model) || 'Default model', description: '', efforts: [] }]
+  const defaultFor = (a?: Agent) => (typeof defaultModel === 'function' ? (a ? defaultModel(a) : undefined) : defaultModel)
   // A saved full id ("claude-sonnet-5-5") is the listed alias of the same name ("sonnet"): same model, same efforts.
-  const listed = list.find((m) => m.value === model) ?? list.find((m) => m.value && m.label === modelName(model))
-  // A model picked under another account still shows, so the picker never claims the wrong one; its saved effort stays.
-  if (!listed) list.push({ value: model, label: modelName(model), description: '', efforts: models.length ? [savedEffort] : [] })
-  const current = listed ?? list.at(-1)!
+  const same = (m: ModelOption, id: string) => m.value === id || (!!m.value && m.label === modelName(id))
+  const groups: ModelGroup[] = (catalog
+    ? (['claude', 'codex', 'antigravity'] as const).filter((a) => catalog[a]?.length || a === agent).map((a) => ({ agent: a, offered: catalog[a] ?? [] }))
+    : [{ agent, offered: offeredModels ?? activeModels }]
+  ).map((g) => ({ ...g, list: [...g.offered] }))
+  const loaded = groups.some((g) => g.offered.length)
+  const home = groups.find((g) => g.agent === agent) ?? groups[0]
+  // Nothing chosen ('') runs the default.
+  const fallback = defaultFor(home.agent)
+  const listed = home.list.find((m) => same(m, model)) ?? (model === '' && fallback !== undefined ? home.list.find((m) => same(m, fallback)) : undefined)
+  // A model picked under another account (or a provider since signed out) still shows, so the picker never claims the wrong one; its saved effort stays.
+  if (!listed) home.list.push({ value: model, label: modelName(model || fallback || '') || uiText('Default model'), description: '', efforts: home.offered.length ? [savedEffort] : [] })
+  const current = listed ?? home.list.at(-1)!
   const effortFor = (efforts: Effort[]): Effort | null =>
     efforts.includes(savedEffort) ? savedEffort : efforts.includes('medium') ? 'medium' : (efforts[0] ?? null)
   // Until the account's models load, show the saved level rather than "no effort setting".
-  const efforts: Effort[] = models.length ? current.efforts : [savedEffort]
+  const efforts: Effort[] = home.offered.length ? current.efforts : [savedEffort]
   const effort = effortFor(efforts)
+  const key = (g: ModelGroup, value: string) => `${g.agent ?? ''}|${value}`
 
   // The agent would quietly lower an effort the new model doesn't offer; pick one it does.
-  const pickModel = (value: string) => save(value, effortFor(list.find((m) => m.value === value)?.efforts ?? []))
+  const pickModel = (picked: string) => {
+    const g = groups.find((g) => picked.startsWith(`${g.agent ?? ''}|`))!
+    const value = picked.slice((g.agent ?? '').length + 1)
+    save(value, effortFor(g.list.find((m) => m.value === value)?.efforts ?? []), g.agent)
+  }
+  const options = (g: ModelGroup) =>
+    g.list.map((m) => {
+      const fallback = defaultFor(g.agent)
+      return (
+        <option key={m.value} value={key(g, m.value)} title={m.description} disabled={!g.offered.some((offered) => offered.value === m.value)}>
+          {fallback !== undefined && same(m, fallback) ? format('{0} (default)', [m.label]) : m.label}
+        </option>
+      )
+    })
 
   return (
     <div className="model-controls">
       <label className="chip-select" title={current.description || uiText('Model')}>
         <Sparkles />
-        <select aria-label={uiText('Model')} value={current.value} disabled={!models.length} onChange={(e) => pickModel(e.target.value)}>
-          {list.map((m) => (
-            <option key={m.value} value={m.value} title={m.description} disabled={!models.some((offered) => offered.value === m.value)}>
-              {m.label}
-            </option>
-          ))}
+        <select aria-label={uiText('Model')} value={key(home, current.value)} disabled={!loaded} onChange={(e) => pickModel(e.target.value)}>
+          {catalog ? groups.map((g) => <optgroup key={g.agent} label={PROVIDERS[g.agent!]}>{options(g)}</optgroup>) : options(home)}
         </select>
         <ChevronDown className="chev" />
       </label>
@@ -675,7 +713,7 @@ export function ModelPicker({
         }
       >
         <Gauge />
-        <select aria-label={uiText('Effort')} value={effort ?? ''} disabled={!effort} onChange={(e) => save(model, e.target.value as Effort)}>
+        <select aria-label={uiText('Effort')} value={effort ?? ''} disabled={!effort} onChange={(e) => save(model, e.target.value as Effort, home.agent)}>
           {effort ? (
             efforts.map((e) => (
               <option key={e} value={e}>
