@@ -13,6 +13,15 @@ class Plain(unittest.TestCase):
         self.assertEqual(plain("$\\frac{T}{2} = 0{,}5\\,\\mathrm{ms}$"), "T/2 = 0,5 ms")
         self.assertEqual(plain("$\\sqrt{a+b}$ i $V_{CC}$"), "√(a+b) i V_(CC)")
 
+    def test_degrees_primes_and_command_superscripts(self):
+        # 0.22.0 crashed on these: the character after ^ was only the backslash, and exports failed.
+        self.assertEqual(plain("kut $\\theta = 45^\\circ$"), "kut θ = 45°")
+        self.assertEqual(plain("za $\\theta = \\pm 90^\\circ$."), "za θ = ± 90°.")
+        self.assertEqual(plain("$30^\\circ$, $45^{\\circ}$ i $60^\\circ$."), "30°, 45° i 60°.")
+        self.assertEqual(plain("os $z''$ i $x^\\prime$"), "os z'' i x′")
+        self.assertEqual(plain("$R_\\psi$ i $e^\\alpha$"), "R_ψ i e^α")
+        self.assertEqual(plain("kraj $x \\$"), "kraj x")
+
     def test_leaves_text_without_maths_alone(self):
         self.assertEqual(plain("Cijena je 5 $ ili 4 €."), "Cijena je 5 $ ili 4 €.")
         self.assertEqual(plain("te pe, gotovo cijeli spektar"), "te pe, gotovo cijeli spektar")
