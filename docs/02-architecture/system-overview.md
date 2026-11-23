@@ -80,7 +80,7 @@
 
 ## Video jobs from desktop conversations
 
-The Claude extension and Codex/compatible ChatGPT desktop plugin share the stdio bridge. `create_video` starts a project-bound background agent using Studio’s configured account, then checks and exports its video. `get_video` reports progress and returns readable media resources. Learn stays in the background, Create opens the editor, and Both defaults to Learn unless the caller explicitly requests production. These agents do not replace the editor’s open chat; the library receives project-change events. The endpoint only serves media belonging to completed jobs. See [[../04-decisions/0037-desktop-conversation-videos|ADR 0037]].
+The Claude extension and Codex/compatible ChatGPT desktop plugin share the stdio bridge. `create_video` starts a project-bound background agent using Studio’s configured account, then checks and exports its video. `get_video` reports progress and returns readable media resources; `wait_for_video` waits up to 45 s per call for the same result. Learn stays in the background, Create opens the editor, and Both defaults to Learn unless the caller explicitly requests production. These agents do not replace the editor’s open chat; the library receives project-change events. The endpoint only serves media belonging to completed jobs. See [[../04-decisions/0037-desktop-conversation-videos|ADR 0037]].
 
 ## Course evidence in study chat
 

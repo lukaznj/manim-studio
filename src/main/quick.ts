@@ -43,6 +43,12 @@ export function setupQuick(host: { send: typeof send; openInWindow: typeof openI
   }
   for (const controller of controllers.values()) controller.update({})
 }
+const watchers = new Set<(run: QuickRun) => void>()
+/** Called on every change of any quick video (wait_for_video); returns the unsubscribe. */
+export function watchQuick(fn: (run: QuickRun) => void): () => void {
+  watchers.add(fn)
+  return () => void watchers.delete(fn)
+}
 export const quickRuns = (): QuickRun[] => [...controllers.values()].map(c => structuredClone(c.run))
 export const quickRun = (project?: string): QuickRun | null => project ? structuredClone(controllers.get(project)?.run ?? null) : quickRuns().at(-1) ?? null
 export function desktopQuickRun(id: string): QuickRun | undefined {
@@ -78,6 +84,7 @@ class QuickController {
     Object.assign(this.run, patch)
     writeAtomicJson(this.checkpoint(), { run: this.run, task: this.task })
     send(structuredClone(this.run))
+    for (const watch of watchers) watch(this.run)
   }
   launch = (): Promise<ExportResult> => {
     this.stopping = false
