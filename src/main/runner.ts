@@ -26,6 +26,9 @@ let stopping = false
 const renderSlots = new WorkSlots(1)
 const shutdown = new AbortController()
 
+/** Renders and exports waiting for the drawing slot. */
+export const drawingQueue = (): number => renderSlots.queued
+
 /** Browser inserts and manim share the same local drawing queue. */
 export function acquireDrawingSlot(signal?: AbortSignal): Promise<() => void> {
   return renderSlots.acquire(signal ? AbortSignal.any([signal, shutdown.signal]) : shutdown.signal)
