@@ -12,7 +12,7 @@ New series asked for a title, required PDFs and asked for a model each time. Pla
 ## Decision
 
 - **Two normal model choices in Settings → Agent:** the creation model/effort (editor chat, videos and series episodes) and "Course planning". [[0051-study-assistant-and-notes]] adds an independent study-chat model/effort in Settings; its questions and notes do not change the creation selection.
-  - Planning defaults: Claude Opus 5.5, Codex GPT-6 Astra, Antigravity Gemini 4 Argon; high effort.
+  - Planning defaults: Claude Opus 5.5, Codex GPT-6 Astra, Antigravity Gemini 4 Neon; high effort.
   - Episode creation inherits the selected provider's normal creation model and effort. Codex creation defaults to GPT-6.1 Sol; GPT-6 Astra and GPT-6.1 Terra are the other choices ([[0039-codex-model-discovery-and-capacity-recovery]]). Old blank or retired Codex planner and maker overrides migrate to Astra and Sol respectively.
   - **Advanced** offers an optional "Override model for series episodes". Existing saved maker selections remain explicit overrides; disabling one restores inheritance. Saved planner selections stay independent (`settings.seriesModels`, planner defaults in `shared/agent-selection.ts` `SERIES_PLANNERS`).
   - New series has no model picker. A run captures its maker at the start. Changing the effective maker in Settings asks before updating running or paused courses. Confirming preserves completed episodes and exports. Running courses resume unfinished authoring from disk using the selected maker. Paused courses save the selected maker and use it when the user resumes them.

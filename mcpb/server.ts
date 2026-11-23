@@ -33,6 +33,8 @@ function readEndpoint(): Endpoint | null {
   }
 }
 
+const internal = !!process.env.STUDIO_PROJECT
+
 // Codex and Antigravity run this bridge with STUDIO_PROJECT: their tool calls are for that project,
 // which may be one a background agent is making rather than the open one.
 const auth = (e: Endpoint) => ({
@@ -42,11 +44,13 @@ const auth = (e: Endpoint) => ({
   ...(process.env.STUDIO_TOOL_WAIT_MS ? { 'x-studio-wait': process.env.STUDIO_TOOL_WAIT_MS } : {}),
 })
 
-async function healthy(e: Endpoint): Promise<boolean> {
+/** 'down' only when nothing answers on the port; a busy app (a render running) is just slow. */
+async function health(e: Endpoint): Promise<'ok' | 'slow' | 'down'> {
   try {
-    return (await fetch(`http://127.0.0.1:${e.port}/health`, { headers: auth(e), signal: AbortSignal.timeout(2000) })).ok
-  } catch {
-    return false
+    return (await fetch(`http://127.0.0.1:${e.port}/health`, { headers: auth(e), signal: AbortSignal.timeout(10_000) })).ok ? 'ok' : 'slow'
+  } catch (error) {
+    const code = (error as { cause?: { code?: string } }).cause?.code
+    return code === 'ECONNREFUSED' || code === 'ECONNRESET' ? 'down' : 'slow'
   }
 }
 
@@ -64,10 +68,14 @@ function launch(): void {
 
 async function endpoint(): Promise<Endpoint> {
   let launched = false
-  for (let i = 0; i < 120; i++) {
+  for (const deadline = Date.now() + 90_000; Date.now() < deadline; ) {
     const e = readEndpoint()
-    if (e && (await healthy(e))) return e
-    if (!launched) {
+    const state = e ? await health(e) : 'down'
+    // Busy is fine: the tool call itself waits for the app (a render can hold it up for a while).
+    if (e && state !== 'down') return e
+    // Launching a running app re-opens it, and macOS then brings its window forward, even with
+    // `open -g`. So only when nothing is there, and never for Studio's own agents, which it started.
+    if (!launched && state === 'down' && !internal) {
       launch()
       launched = true
     }
@@ -92,7 +100,6 @@ async function call(name: DesktopToolName, args: Record<string, unknown>): Promi
   }
 }
 
-const internal = !!process.env.STUDIO_PROJECT
 const server = new McpServer(
   { name: 'manim-studio', version: VERSION },
   { instructions: internal ? 'Use these scene tools for the project in your authoring instructions. Render and inspect your changes.' : desktopInstructions },
