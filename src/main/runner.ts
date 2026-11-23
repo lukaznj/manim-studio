@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { reportDependencyFailure, spawnPython, type EnvName } from './env'
 import { dependencyFailure, REPAIR_MESSAGE } from './dependency-health'
 import { WorkSlots } from '../shared/work-slots'
+import { pythonCrashMessage } from '../shared/python-crash'
 
 const PREFIX = '@@studio '
 const RUNNER_EXIT_GRACE_MS = 5000
@@ -164,7 +165,7 @@ export async function runRunner<T = RunnerEvent>(
       if (event?.type === 'done') resolve(event as T)
       else if (event?.type === 'error') reject(Object.assign(new Error(String(event.message)), { event, log: log.join('\n') }))
       else if (signal || opts.signal?.aborted) reject(Object.assign(new Error('cancelled'), { cancelled: true })) // Windows reports a kill as an exit code
-      else reject(Object.assign(new Error(`Python exited with code ${code}`), { log: log.join('\n') }))
+      else reject(Object.assign(new Error(pythonCrashMessage(log, code)), { log: log.join('\n') }))
     })
   })
   children.set(child, done)

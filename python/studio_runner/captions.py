@@ -18,6 +18,7 @@ SYMBOLS = {
     "Rightarrow": "⇒", "Leftrightarrow": "⇔", "in": "∈", "notin": "∉", "subset": "⊂", "cup": "∪", "cap": "∩",
     "forall": "∀", "exists": "∃", "degree": "°", "circ": "°", "angle": "∠", "perp": "⊥", "parallel": "∥",
     "propto": "∝", "equiv": "≡", "ldots": "…", "dots": "…", "cdots": "⋯", "%": "%", "{": "{", "}": "}",
+    "prime": "′",
     "sin": "sin", "cos": "cos", "tan": "tan", "log": "log", "ln": "ln", "exp": "exp", "lim": "lim",
     "max": "max", "min": "min",
 }
@@ -27,7 +28,10 @@ MATH = re.compile(r"\$([^$\n]+)\$")
 
 
 def _group(s: str, i: int) -> tuple[str, int]:
-    """The argument at s[i]: a {…} group (nested) or one character. Returns it and the index after."""
+    """The argument at s[i]: a {…} group (nested), a command (`^\\circ`) or one character. Returns it and the index after."""
+    if i < len(s) and s[i] == "\\":
+        m = re.match(r"\\([A-Za-z]+|.)", s[i:])
+        return (m.group(0), i + len(m.group(0))) if m else ("", i + 1)
     if i < len(s) and s[i] == "{":
         depth = 0
         for j in range(i, len(s)):
@@ -39,6 +43,8 @@ def _group(s: str, i: int) -> tuple[str, int]:
 
 
 def _script(text: str, table: dict[str, str], mark: str) -> str:
+    if mark == "^" and text in ("°", "′", "″"):
+        return text  # 45^\circ is 45°, x^\prime is x′
     # All of it as Unicode scripts when they exist; capital subscripts don't, so lower case stands in.
     flat = text if mark == "^" else text.lower()
     return "".join(table[c] for c in flat) if all(c in table for c in flat) else f"{mark}{text}" if len(text) == 1 else f"{mark}({text})"
@@ -51,6 +57,9 @@ def tex(s: str) -> str:
         c = s[i]
         if c == "\\":
             m = re.match(r"\\([A-Za-z]+|.)", s[i:])
+            if not m:  # a backslash at the very end
+                i += 1
+                continue
             name = m.group(1)
             i += len(m.group(0))
             if name == "frac":
