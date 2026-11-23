@@ -60,8 +60,9 @@ const ASSETS: Record<string, [string, string]> = {
   'win32-x64': ['agy_cli_windows_x64.zip', 'c9383bae8c377a9a12e9543d45904ac46cc234ec85caa4c61c57ed9405ff7634'],
   'win32-arm64': ['agy_cli_windows_arm64.zip', '266d130637a37d046547af27bac99a42cf3ad50cb3047e82ec926bd3983d98bc'],
 }
-// Chat and video creation; courses are planned on Argon (shared/agent-selection.ts). Confirmed with `agy models`:
-// gemini-4-hydrogen-{low,medium,high,xhigh}, gemini-4-argon-{low,medium,high}, gemini-3.8-flash-{low,medium,high}.
+// Chat and video creation; courses are planned on Neon (shared/agent-selection.ts). Confirmed with `agy models`:
+// gemini-4-hydrogen-{low,medium,high,xhigh}, gemini-4-neon-{low,medium,high,xhigh}, gemini-4-argon-{low,medium,high},
+// gemini-3.8-flash-{low,medium,high}.
 const DEFAULT_MODEL = 'gemini-4-hydrogen'
 
 const root = () => join(app.getPath('userData'), 'antigravity')
@@ -437,7 +438,8 @@ async function forgetOnWindows(): Promise<void> {
 export async function antigravityModels(): Promise<ModelOption[]> {
   const fallback: ModelOption[] = [
     { value: '', label: 'Gemini 4 Hydrogen', description: 'Fast; Studio’s default for chat and videos', efforts: ['low', 'medium', 'high', 'xhigh'] },
-    { value: 'gemini-4-argon', label: 'Gemini 4 Argon', description: 'Google’s frontier model; plans courses', efforts: ['low', 'medium', 'high'] },
+    { value: 'gemini-4-neon', label: 'Gemini 4 Neon', description: 'Plans courses', efforts: ['low', 'medium', 'high', 'xhigh'] },
+    { value: 'gemini-4-argon', label: 'Gemini 4 Argon', description: 'Google’s frontier model', efforts: ['low', 'medium', 'high'] },
   ]
   const bin = installed()
   if (!bin) return fallback

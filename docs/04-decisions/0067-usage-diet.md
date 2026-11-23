@@ -30,7 +30,7 @@ Video agents had the same pattern at a larger scale. A Codex lesson took 30–78
 
 **Errors.** Codex's `model_not_found` reply for a ChatGPT account says the plan's usage may have run out, in the user's language, and counts as a limit for automatic switching.
 
-**Gemini defaults.** Gemini 4 Hydrogen is Antigravity's default for chat and video creation; Gemini 4 Argon plans courses. One-off Antigravity questions start no tool server and get no tool or web permissions.
+**Gemini defaults.** Gemini 4 Hydrogen is Antigravity's default for chat and video creation; Gemini 4 Neon plans courses (Argon until 0.22.1). One-off Antigravity questions start no tool server and get no tool or web permissions.
 
 ## Consequences
 
