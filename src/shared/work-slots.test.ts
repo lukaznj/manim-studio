@@ -29,3 +29,14 @@ test('cancelled waiting jobs do not run, and changing capacity wakes pending wor
   assert.equal(agentConcurrency(2.8), 3)
   assert.equal(agentConcurrency(100), 100)
 })
+
+test('the queue count is what waits for a slot, not what runs', async () => {
+  const slots = new WorkSlots(1)
+  const release = await slots.acquire()
+  const second = slots.acquire()
+  void slots.acquire()
+  assert.equal(slots.queued, 2)
+  release()
+  ;(await second)()
+  assert.equal(slots.queued, 0)
+})

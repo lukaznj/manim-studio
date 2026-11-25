@@ -5,6 +5,8 @@ date: 2026-10-17
 
 # 0039 — Discover Codex models and opt into capacity fallback
 
+> The fixed model list here is superseded by [[0068-every-model-any-provider-per-job|ADR 0068]]: every model the account offers is listed, with GPT-6.2 Sol as the default. The capacity fallback stands.
+
 ## Context
 
 The Codex picker exposed only the account default. A model that is temporarily at capacity could stop a chat or an unattended episode, with no Studio setting for a substitute.

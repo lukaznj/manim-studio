@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Settings } from '../shared/types'
 import { migrateVoice } from '../shared/voice'
-import { CODEX_EXECUTOR, normalizeCodexSettings } from '../shared/codex-selection'
+import { migrateModelDefaults } from '../shared/model-defaults'
 import { resolveUiLanguage } from '../shared/ui-languages'
 import { narrationLanguageForUi } from '../shared/narration-languages'
 import { interfaceSize, chatTextSize } from '../shared/text-size'
@@ -24,14 +24,14 @@ const defaults = (): Settings => {
     projectsDir: paths.defaultProjectsDir(),
     recentProjects: [],
     claudeAuth: 'account',
-    previewSize: 1080,
+    previewSize: 720, // previews are for checking the layout; 1080 made every agent's render several times slower
     studySize: 1080,
     previewFps: 15,
     tutorialDone: false,
-    claudeModel: 'claude-sonnet-5-5', // Sonnet 5.5 at high effort writes scenes well enough, faster and cheaper than Opus
+    claudeModel: '', // Studio's default (MAKER_DEFAULTS): Sonnet 5.5 at high effort writes scenes well, faster and cheaper than Opus
     claudeEffort: 'high',
     agent: 'claude',
-    codexModel: CODEX_EXECUTOR,
+    codexModel: '',
     codexEffort: 'high',
     antigravityModel: '',
     antigravityEffort: 'medium', // Antigravity's own default for Argon
@@ -65,8 +65,10 @@ export function getSettings(): Settings {
       if (!process.env.STUDIO_PROJECTS_DIR && existsSync(legacy) && readdirSync(legacy).some((n) => !n.startsWith('.'))) stored.projectsDir = legacy
     }
     if (stored.defaultVoice) stored.defaultVoice = migrateVoice(stored.defaultVoice)
+    // Once, with the model defaults: previews on the old 1080 default move to 720.
+    if ((stored.defaultsVersion ?? 0) < 2 && stored.previewSize === 1080) stored.previewSize = 720
     const base = defaults()
-    cache = normalizeCodexSettings({ ...base, ...stored, uiLanguage: resolveUiLanguage(stored.uiLanguage ?? base.uiLanguage), ...secretFlags() })
+    cache = migrateModelDefaults({ ...base, ...stored, uiLanguage: resolveUiLanguage(stored.uiLanguage ?? base.uiLanguage), ...secretFlags() })
   }
   if (cache.modelFallback) cache.modelFallback = { enabled: cache.modelFallback.enabled === true, order: normalizeModelOrder(cache.modelFallback.order) }
   delete cache.seriesAgents // legacy setting: production no longer caps the number of agents
@@ -78,7 +80,7 @@ export function getSettings(): Settings {
 }
 
 export function setSettings(patch: Partial<Settings>): Settings {
-  cache = normalizeCodexSettings({ ...getSettings(), ...patch, ...secretFlags() })
+  cache = { ...getSettings(), ...patch, ...secretFlags() }
   delete cache.seriesAgents
   cache.agentConcurrency = agentConcurrency(cache.agentConcurrency)
   if (cache.modelFallback) cache.modelFallback = { enabled: cache.modelFallback.enabled === true, order: normalizeModelOrder(cache.modelFallback.order) }

@@ -103,7 +103,6 @@ import { motionsBusy, stopMotions } from './motion'
 import { saveSeriesDraft, saveSeriesPlan, savedSeriesPlans, seriesDraft } from './series-draft'
 import { translateUi } from '../shared/i18n'
 import { seriesMakerChanged } from '../shared/agent-selection'
-import { normalizeCodexSettings } from '../shared/codex-selection'
 import { getSettings, setSecret, setSettings } from './settings'
 import { checkForUpdates, downloadUpdate, installUpdate, RELEASES_URL, setupUpdater } from './updater'
 import {
@@ -300,7 +299,7 @@ function registerIpc(): void {
   handle('getSettings', () => getSettings())
   handle('setSettings', async (patch: Parameters<typeof setSettings>[0]) => {
     const before = getSettings()
-    const affected = seriesMakerChanged(before, normalizeCodexSettings({ ...before, ...patch })) ? coursesUsingMaker() : []
+    const affected = seriesMakerChanged(before, { ...before, ...patch }) ? coursesUsingMaker() : []
     if (affected.length) {
       if (!win || confirmingMaker) return getSettings()
       confirmingMaker = true

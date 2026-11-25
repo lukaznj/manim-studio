@@ -17,6 +17,7 @@
 // writing in the project only, reading the project and the studio and manim sources, and the six
 // scene tools; shell commands, other paths and symlinks out of the project are refused.
 import { cliUsageEntry, type UsageEntry } from '../shared/usage'
+import { MAKER_DEFAULTS, sortModels } from '../shared/model-defaults'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import {
@@ -63,7 +64,7 @@ const ASSETS: Record<string, [string, string]> = {
 // Chat and video creation; courses are planned on Neon (shared/agent-selection.ts). Confirmed with `agy models`:
 // gemini-4-hydrogen-{low,medium,high,xhigh}, gemini-4-neon-{low,medium,high,xhigh}, gemini-4-argon-{low,medium,high},
 // gemini-3.8-flash-{low,medium,high}.
-const DEFAULT_MODEL = 'gemini-4-hydrogen'
+const DEFAULT_MODEL = MAKER_DEFAULTS.antigravity
 
 const root = () => join(app.getPath('userData'), 'antigravity')
 const binDir = () => join(root(), AGY_VERSION)
@@ -437,7 +438,7 @@ async function forgetOnWindows(): Promise<void> {
 /** The account's models (`agy models`), one per family with its efforts: gemini-4-hydrogen-high → Gemini 4 Hydrogen, high. */
 export async function antigravityModels(): Promise<ModelOption[]> {
   const fallback: ModelOption[] = [
-    { value: '', label: 'Gemini 4 Hydrogen', description: 'Fast; Studio’s default for chat and videos', efforts: ['low', 'medium', 'high', 'xhigh'] },
+    { value: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen', description: 'Fast; Studio’s default for chat and videos', efforts: ['low', 'medium', 'high', 'xhigh'] },
     { value: 'gemini-4-neon', label: 'Gemini 4 Neon', description: 'Plans courses', efforts: ['low', 'medium', 'high', 'xhigh'] },
     { value: 'gemini-4-argon', label: 'Gemini 4 Argon', description: 'Google’s frontier model', efforts: ['low', 'medium', 'high'] },
   ]
@@ -451,8 +452,8 @@ export async function antigravityModels(): Promise<ModelOption[]> {
     if (!m) continue
     const [, value, effort, label] = m
     const family = families.get(value) ?? {
-      value: value === DEFAULT_MODEL ? '' : value,
-      label: value === DEFAULT_MODEL ? `Default (${label})` : label,
+      value,
+      label,
       description: '',
       efforts: [],
     }
@@ -461,7 +462,7 @@ export async function antigravityModels(): Promise<ModelOption[]> {
   }
   const order = ['low', 'medium', 'high', 'xhigh', 'max']
   for (const f of families.values()) f.efforts.sort((a, b) => order.indexOf(a) - order.indexOf(b))
-  return families.size ? [...families.values()] : fallback
+  return families.size ? sortModels([...families.values()]) : fallback
 }
 
 /** The CLI's model slug for the chosen model and effort: gemini-4-hydrogen-medium. */

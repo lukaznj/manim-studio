@@ -277,6 +277,7 @@
   "Dark": "Тёмная",
   "Decrease interface size": "Уменьшить размер интерфейса",
   "Default microphone": "Микрофон по умолчанию",
+  "{0} (default)": "{0} (по умолчанию)",
   "Default model": "Модель по умолчанию",
   "Default voice for new projects": "Голос по умолчанию для новых проектов",
   "Delete recording": "Удалить запись",

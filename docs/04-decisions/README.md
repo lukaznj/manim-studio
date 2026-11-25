@@ -42,7 +42,7 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0036-settings-onboarding-and-languages]] | Guided onboarding, offline national-language UI across Europe with English macOS menus, connected agents and shared Voice/Video defaults; simplified theme/background controls | accepted |
 | [[0037-desktop-conversation-videos]] | Desktop chat starts quick-video production in Studio and checks jobs on request through a shared local bridge | accepted |
 | [[0038-developer-episode-model-comparison]] | Hidden Develop settings and persistent provider/model assignments per Learn episode | accepted |
-| [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI availability for GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra, with opt-in OpenAI capacity fallback | accepted |
+| [[0039-codex-model-discovery-and-capacity-recovery]] | Managed CLI availability for GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra, with opt-in OpenAI capacity fallback; the fixed list is superseded by 0068 | accepted |
 | [[0040-developer-episode-measurements]] | Local usage, timing and hardware reports; measured episodes run serially; a separate render check counter leaves scheduling alone | accepted |
 | [[0041-focused-study-workspace]] | Focused study page with navigation only when needed for standalone videos, collapsible sidebars and resizable assistant, compact video controls and expandable courses | accepted |
 | [[0042-study-playback-preferences]] | Per-video resume and sidebar progress, per-course selected view, continuous playback preserving fullscreen with the assistant, and remembered playback preferences | accepted |
@@ -71,3 +71,4 @@ One note per non-obvious decision, from [[_template]]. Keep this index in sync: 
 | [[0065-what-studio-knows-about-you]] | Off-by-default local note (≤20 lines) the user edits in Settings; study chat, course planning and the video agent read it; the study chat proposes lines and only an explicit Remember saves them | accepted |
 | [[0066-three-d-scenes]] | 3D through `class Video(StudioScene, ThreeDScene)`: a shared 3D brief for every agent, layout checks measured through the 3D camera, camera moves as one timeline clip | accepted |
 | [[0067-usage-diet]] | Study questions read ≤16k characters picked by a small model, no hidden Claude Code side calls, short render reports, longer Codex render waits, no progress tool; Gemini 4 Hydrogen default with Neon planning | accepted |
+| [[0068-every-model-any-provider-per-job]] | Pickers list every model an account offers, newest version first; defaults kept by hand in `model-defaults.ts` and left unset in settings; video creation, lesson chat and course planning each pick their own provider | accepted |

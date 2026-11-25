@@ -7,7 +7,8 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { Timeline } from '../shared/types'
 import { cleanEnv, pythonExe } from './env'
 import { readTimeline } from './projects'
-import { currentOrNewRender, framesBase64, type RenderOutcome } from './render'
+import { currentOrNewRender, framesBase64, previewQueued, type RenderOutcome } from './render'
+import { drawingQueue } from './runner'
 import { requireSource, sourcePageCount, sourcePages, sourceText } from './sources'
 export { renderMotion } from './motion'
 
@@ -18,8 +19,11 @@ export const textResult = (text: string, isError = false): CallToolResult => ({ 
 export async function renderPreview(dir: string, maxWaitMs?: number): Promise<CallToolResult> {
   const render = currentOrNewRender(dir)
   const outcome = maxWaitMs ? await Promise.race([render, new Promise<null>((r) => setTimeout(() => r(null), maxWaitMs))]) : await render
+  // Agents used to search Studio's files for why a queued render was "slow": say it's waiting.
+  if (!outcome && previewQueued(dir))
+    return textResult(`Waiting in line: Studio draws one video at a time, and other lessons' renders or exports go first (${drawingQueue()} in line, this one included). Nothing is wrong. Keep working or call render_preview again for the result.`)
   if (!outcome)
-    return textResult('Still rendering (the first render after an install or update takes up to a minute). Call render_preview again for the result.')
+    return textResult('Still rendering; a long video takes a few minutes. Call render_preview again for the result.')
   return textResult(describeOutcome(outcome))
 }
 

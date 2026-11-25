@@ -23,7 +23,8 @@ import { sourcesNote } from './sources'
 import { scriptBrief, scriptStatus } from '../shared/script'
 import { styleBrief } from '../shared/tone'
 import { seriesBrief } from './series'
-import { desktopQuickRun, recentDesktopQuickRuns, startQuick } from './quick'
+import { desktopQuickRun, recentDesktopQuickRuns, startQuick, watchQuick } from './quick'
+import { waitUntil } from '../shared/wait-until'
 import { setupStatus } from './env'
 import { videoIntent } from '../shared/video-intent'
 import { threeDBrief } from '../shared/three-d'
@@ -147,6 +148,40 @@ function body(req: IncomingMessage): Promise<string> {
   })
 }
 
+/** A video job's state for get_video and wait_for_video; `working` is what to tell the caller while it runs. */
+function videoStatus(id: string, working: string): CallToolResult {
+  const job = desktopQuickRun(id)
+  if (!job) return textResult('Unknown video job. Check the job ID or open the project in Manim Studio.', true)
+  if (job.state === 'failed' || job.state === 'stopped') {
+    return {
+      ...textResult(job.error ? `Video failed: ${job.error}` : 'Video stopped. Continue it from its project in Manim Studio.', true),
+      structuredContent: { job: id, state: job.state },
+    }
+  }
+  if (!job.result) {
+    const activity = job.activity ?? 'Starting'
+    return {
+      content: [{ type: 'text', text: `Video in progress. ${activity}. ${working}` }],
+      structuredContent: { job: id, state: 'working', stage: job.step, activity },
+    }
+  }
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Video complete and saved in the Studio library.${job.warnings.length ? ` Warnings: ${job.warnings.join('; ')}` : ''}`,
+      },
+      ...job.result.files.map((file, index) => ({
+        type: 'resource_link' as const,
+        uri: `studio-video://${id}/${index}`,
+        name: basename(file),
+        mimeType: /\.mp4$/i.test(file) ? 'video/mp4' : /\.vtt$/i.test(file) ? 'text/vtt' : /\.srt$/i.test(file) ? 'text/plain' : 'image/jpeg',
+      })),
+    ],
+    structuredContent: { job: id, state: 'done', project: job.project, files: job.result.files, warnings: job.warnings },
+  }
+}
+
 async function run(host: DesktopHost, name: DesktopToolName, args: Record<string, unknown>, req: IncomingMessage): Promise<CallToolResult> {
   switch (name) {
     case 'create_video': {
@@ -176,38 +211,14 @@ async function run(host: DesktopHost, name: DesktopToolName, args: Record<string
         structuredContent: { job: run.id, state: run.state, intent },
       }
     }
-    case 'get_video': {
+    case 'get_video':
+      return videoStatus(String(args.job), 'Share this update and end the reply. Check again when the user asks.')
+    case 'wait_for_video': {
       const id = String(args.job)
-      const job = desktopQuickRun(id)
-      if (!job) return textResult('Unknown video job. Check the job ID or open the project in Manim Studio.', true)
-      if (job.state === 'failed' || job.state === 'stopped') {
-        return {
-          ...textResult(job.error ? `Video failed: ${job.error}` : 'Video stopped. Continue it from its project in Manim Studio.', true),
-          structuredContent: { job: id, state: job.state },
-        }
-      }
-      if (!job.result) {
-        const activity = job.activity ?? 'Starting'
-        return {
-          content: [{ type: 'text', text: `Video in progress. ${activity}. Share this update and end the reply. Check again when the user asks.` }],
-          structuredContent: { job: id, state: 'working', stage: job.step, activity },
-        }
-      }
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Video complete and saved in the Studio library.${job.warnings.length ? ` Warnings: ${job.warnings.join('; ')}` : ''}`,
-          },
-          ...job.result.files.map((file, index) => ({
-            type: 'resource_link' as const,
-            uri: `studio-video://${id}/${index}`,
-            name: basename(file),
-            mimeType: /\.mp4$/i.test(file) ? 'video/mp4' : /\.vtt$/i.test(file) ? 'text/vtt' : /\.srt$/i.test(file) ? 'text/plain' : 'image/jpeg',
-          })),
-        ],
-        structuredContent: { job: id, state: 'done', project: job.project, files: job.result.files, warnings: job.warnings },
-      }
+      const limit = waitFor(req)
+      const ms = Math.min(limit, Math.max(1, Number(args.timeout_seconds ?? limit / 1000)) * 1000)
+      await waitUntil(() => desktopQuickRun(id), (job) => !job || job.state !== 'working' || !!job.result, (changed) => watchQuick(changed), ms)
+      return videoStatus(id, 'Call wait_for_video again to keep waiting, or end the reply if the user would rather keep chatting.')
     }
     case 'list_video_jobs': {
       const jobs = recentDesktopQuickRuns(Number(args.limit ?? 10)).map((run) => ({

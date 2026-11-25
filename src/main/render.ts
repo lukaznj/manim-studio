@@ -21,6 +21,7 @@ interface Running {
   cancel: () => void
   outcome: Promise<RenderOutcome>
   tag?: string
+  drawing?: boolean // past the drawing queue (one render at a time, app-wide)
 }
 
 const running = new Map<string, Running>() // by project folder and quality
@@ -68,6 +69,7 @@ export function render(quality: Quality, variant: RenderVariant = {}, dir = requ
   const abort = new AbortController()
   let child: ChildProcess | null = null
   const entry: Running = {
+    drawing: false,
     tag: quality === 'preview' && open ? 'preview' : undefined,
     cancel: () => {
       cancelled = true
@@ -103,6 +105,7 @@ export function render(quality: Quality, variant: RenderVariant = {}, dir = requ
         },
       })
       child = job.child
+      entry.drawing = true
       if (cancelled) killJob(child)
       const { result } = await job.done.finally(() => (log = job.log()))
       send({ id, quality, type: 'done', timeline: result })
@@ -174,6 +177,9 @@ export function cancel(quality: Quality = 'preview', dir = project()?.path): voi
 }
 
 /** The project's preview render in flight, or a fresh one. */
+/** Whether the project's preview is still waiting for its turn to draw. */
+export const previewQueued = (dir: string): boolean => running.get(key(dir, 'preview'))?.drawing === false
+
 export function currentOrNewRender(dir = requireProject().path): Promise<RenderOutcome> {
   return running.get(key(dir, 'preview'))?.outcome ?? render('preview', {}, dir)
 }

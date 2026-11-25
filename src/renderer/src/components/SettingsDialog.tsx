@@ -28,11 +28,13 @@ import { DEFAULT_SUBTITLE_STYLE, subtitleStyle, subtitleVariables } from '../../
 import type { SubtitleStyle } from '../../../shared/types'
 import type {
   Agent,
+  AgentSelection,
   ClaudeAuth,
   ClaudeDesktopStatus,
   ClaudeStatus,
   Component,
   ComponentState,
+  Effort,
   ElevenLabsCheck,
   ElevenLabsUsage,
   KeyCheck,
@@ -55,6 +57,7 @@ import {
   errorText,
   installComponent,
   openDialog,
+  refreshCatalog,
   refreshClaude,
   refreshProjects,
   refreshSetup,
@@ -67,9 +70,9 @@ import {
   updateSettings,
   useStore,
 } from '../store'
-import { ModelControls, ModelPicker } from './ChatPane'
+import { ModelControls, ModelPicker, PROVIDERS as AGENT_NAMES } from './ChatPane'
 import { AccountPlanUsage } from './AccountPlanUsage'
-import { seriesSelection } from '../../../shared/agent-selection'
+import { MAKER_DEFAULTS, SERIES_PLANNERS, seriesSelection } from '../../../shared/agent-selection'
 import { playSound } from '../lib/sounds'
 import { LanguagePicker } from './LanguagePicker'
 import { RevoiceButton, useOutdatedVoice, voiceLabel } from './Revoice'
@@ -206,94 +209,70 @@ function KeyField(props: { saved: boolean; placeholder: string; onSave: (key: st
 
 const planName = (plan?: string) => (plan ? plan[0].toUpperCase() + plan.slice(1) : '')
 
-/** Settings → Agent: who writes the scenes, Claude, Codex (ADR 0022) or Antigravity (ADR 0031), and its model. Sign-ins are under Accounts. */
+/**
+ * Settings → Agent: the model for each job, from any signed-in provider: Claude, Codex (ADR 0022)
+ * or Antigravity (ADR 0031), mixed freely (ADR 0068). Sign-ins are under Accounts.
+ */
 function AgentTab() {
   const agent = useStore((s) => s.settings!.agent)
   const settings = useStore((s) => s.settings)!
-  const models = useStore((s) => s.models)
-  const status = useStore((s) => s.claude)
-  const signedIn = !!status?.loggedIn
-  const [available, setAvailable] = useState<Partial<Record<Agent, boolean>>>({})
+  const catalog = useStore((s) => s.catalog)
   useEffect(() => {
-    let active = true
-    const check = () => {
-      for (const provider of ['claude', 'codex', 'antigravity'] as const) {
-        void api.claudeStatus(provider).then(
-          (st) => active && setAvailable((before) => ({ ...before, [provider]: st.loggedIn })),
-          () => active && setAvailable((before) => ({ ...before, [provider]: false })),
-        )
-      }
-    }
+    const check = () => void refreshCatalog(true)
     check()
     window.addEventListener('focus', check)
-    return () => { active = false; window.removeEventListener('focus', check) }
+    return () => window.removeEventListener('focus', check)
   }, [])
-  const pick = async (next: Agent) => {
-    try {
-      if (!(await api.claudeStatus(next)).loggedIn) {
-        setAvailable((before) => ({ ...before, [next]: false }))
-        toast('Connect this agent under Accounts first.', 'error')
-        return
-      }
-      await updateSettings({ agent: next })
-      await refreshClaude()
-    } catch (e) {
-      setAvailable((before) => ({ ...before, [next]: false }))
-      toast(uiText(errorText(e)), 'error')
-    }
-  }
+  const signedIn = !!catalog && Object.keys(catalog).length > 0
+  const study = studyModel(settings)
   const planner = seriesSelection(settings, 'plan')
   const maker = seriesSelection(settings, 'make')
-  const override = settings.seriesModels?.[agent]?.make
-  const setMaker = (value: typeof override) => updateSettings({
-    seriesModels: { ...settings.seriesModels, [agent]: { ...settings.seriesModels?.[agent], make: value } },
+  const lessonAgent = settings.lessonAgent ?? agent
+  const override = settings.seriesModels?.[lessonAgent]?.make
+  const setMaker = (to: Agent, value: typeof override) => updateSettings({
+    lessonAgent: value ? to : undefined,
+    seriesModels: {
+      ...settings.seriesModels,
+      [lessonAgent]: { ...settings.seriesModels?.[lessonAgent], make: undefined },
+      ...(value ? { [to]: { ...settings.seriesModels?.[to], make: value } } : {}),
+    },
   })
+  const picker = (selection: AgentSelection, defaults: Record<Agent, string>, save: (agent: Agent, value: { model: string; effort: Effort }) => void) => (
+    <ModelPicker agent={selection.agent} catalog={catalog ?? undefined} model={selection.model} effort={selection.effort ?? 'high'} defaultModel={(a) => defaults[a]}
+      onChange={(model, effort, to = selection.agent) => save(to, { model, effort: effort ?? 'high' })} />
+  )
   return (
     <div className="set-group">
-      <Row
-        title={uiText('Agent')}
-      >
-        <Tabs
-          radio="Agent"
-          value={agent}
-          onChange={(v) => void pick(v)}
-          items={(['claude', 'codex', 'antigravity'] as const).map((provider) => ({
-            value: provider, label: AGENT_NAMES[provider], disabled: !available[provider],
-            title: uiText(available[provider] === undefined ? 'Checking account…' : !available[provider] ? 'Connect this agent under Accounts first.' : 'Signed in'),
-          }))}
-        />
-      </Row>
-      {!status ? (
+      {!catalog ? (
         <Row title={uiText('Checking account…')} />
-      ) : signedIn ? (
-        <Row title={uiText('Video creation model')}>
-          <ModelControls />
-        </Row>
-      ) : (
+      ) : !signedIn ? (
         <Row title={format('{0} isn’t signed in', [AGENT_NAMES[agent]])} note={uiText('Sign in, or add an API key, under Accounts.')}>
           <button className="btn small primary" onClick={() => openDialog({ kind: 'settings', tab: 'accounts' })}>
             <KeyRound /> {uiText(' Accounts')}
           </button>
         </Row>
-      )}
-      {signedIn && <>
+      ) : <>
+        <Row title={uiText('Video creation model')}>
+          <ModelControls />
+        </Row>
         <Row title={uiText('Lesson chat model')}>
-          <ModelPicker model={studyModel(settings).model} effort={studyModel(settings).effort} models={models} onChange={(model, effort) => void updateSettings({ studyModels: { ...settings.studyModels, [agent]: { model, effort: effort ?? 'high' } } })} />
+          {picker(study, MAKER_DEFAULTS, (to, value) => void updateSettings({ studyAgent: to, studyModels: { ...settings.studyModels, [to]: value } }))}
         </Row>
         <Row title={uiText('Course planning')}>
-          <ModelPicker model={planner.model} effort={planner.effort ?? 'high'} models={models} onChange={(model, effort) => void updateSettings({
-            seriesModels: { ...settings.seriesModels, [agent]: { ...settings.seriesModels?.[agent], plan: { model, effort: effort ?? 'high' } } },
-          })} />
+          {picker(planner, SERIES_PLANNERS, (to, value) => void updateSettings({
+            planAgent: to,
+            seriesModels: { ...settings.seriesModels, [to]: { ...settings.seriesModels?.[to], plan: value } },
+          }))}
         </Row>
       </>}
       <details className="set-advanced">
       <summary>{uiText(override ? 'Advanced · course lesson override enabled' : 'Advanced')}</summary>
       {signedIn && <>
-        <label className="hint"><input type="checkbox" checked={!!override} onChange={(e) => void setMaker(e.target.checked ? { model: maker.model, effort: maker.effort ?? 'high' } : undefined)} />{' '}
+        <label className="hint"><input type="checkbox" checked={!!override} onChange={(e) => void setMaker(maker.agent, e.target.checked ? { model: maker.model, effort: maker.effort ?? 'high' } : undefined)} />{' '}
           {uiText('Override model for course lessons')}
           </label>
           {override ? <Row title={uiText('Course: making the lessons')}>
-            <ModelPicker model={maker.model} effort={maker.effort ?? 'high'} models={models} onChange={(model, effort) => void setMaker({ model, effort: effort ?? 'high' })} />
+            {picker(maker, MAKER_DEFAULTS, (to, value) => void setMaker(to, value))}
           </Row> : null}
       </>}
       <FallbackSettings />
@@ -301,7 +280,7 @@ function AgentTab() {
         <label className="agent-capacity-toggle"><input type="checkbox" checked={!settings.agentConcurrency} onChange={(e) => void updateSettings({ agentConcurrency: e.target.checked ? 0 : 3 })} />{uiText('Unlimited')}</label>
         {!!settings.agentConcurrency && <input className="input agent-capacity-input" type="number" min={1} step={1} value={settings.agentConcurrency} aria-label={uiText('Agents at once')} onChange={(e) => { if (e.currentTarget.value && e.currentTarget.validity.valid) void updateSettings({ agentConcurrency: Number(e.currentTarget.value) }) }} />}
       </Row>
-      {agent === 'codex' && signedIn && (
+      {!!catalog?.codex?.length && (
         <Row
           title={uiText('When an OpenAI model is busy')}
         >
@@ -312,14 +291,14 @@ function AgentTab() {
             onChange={(e) => void updateSettings({ codexFallbackModel: e.target.value })}
           >
             <option value="">{uiText('No automatic fallback')}</option>
-            {models
+            {catalog.codex
               .filter((m) => m.value && m.value !== settings.codexModel)
               .map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
                 </option>
               ))}
-            {settings.codexFallbackModel && !models.some((m) => m.value === settings.codexFallbackModel && m.value !== settings.codexModel) && (
+            {settings.codexFallbackModel && !catalog.codex.some((m) => m.value === settings.codexFallbackModel && m.value !== settings.codexModel) && (
               <option value={settings.codexFallbackModel}>{settings.codexFallbackModel}</option>
             )}
           </select>
@@ -330,7 +309,6 @@ function AgentTab() {
   )
 }
 
-const AGENT_NAMES: Record<Agent, string> = { claude: 'Claude', codex: 'Codex', antigravity: 'Antigravity' }
 const accountStatus = new Map<string, ClaudeStatus>()
 
 /**
@@ -353,6 +331,8 @@ function AccountsTab() {
 /** One agent's account: whether it writes the scenes now, and its sign-in, read for that agent. */
 export function AgentAccount({ agent }: { agent: Agent }) {
   const chosen = useStore((s) => s.settings!.agent === agent)
+  // Some job under Agent runs on this provider.
+  const used = useStore((s) => [s.settings!.agent, studyModel(s.settings!).agent, seriesSelection(s.settings!, 'plan').agent, seriesSelection(s.settings!, 'make').agent].includes(agent))
   const keys = useStore((s) =>
     [
       s.settings!.hasAnthropicKey,
@@ -376,6 +356,7 @@ export function AgentAccount({ agent }: { agent: Agent }) {
   }
   const refresh = async () => {
     accept(await api.claudeStatus(agent))
+    void refreshCatalog(true)
     if (chosen) await refreshClaude()
   }
   useEffect(() => {
@@ -401,7 +382,7 @@ export function AgentAccount({ agent }: { agent: Agent }) {
         ) : (
           <span className="badge">{uiText('Checking…')}</span>
         )}
-        <span className="account-head-end">{chosen && <span className="badge">{uiText('Selected in Agent')}</span>}</span>
+        <span className="account-head-end">{used && <span className="badge">{uiText('Selected in Agent')}</span>}</span>
       </header>
       {!status ? (
         <div className="account-loading hint" role="status">

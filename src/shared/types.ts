@@ -716,7 +716,11 @@ export interface SubtitleStyle {
 }
 
 export interface Settings {
-  studyModels?: Partial<Record<Agent, { model: string; effort: Effort }>> // tutor chat and notes, independent of video creation
+  studyModels?: Partial<Record<Agent, { model: string; effort: Effort }>> // tutor chat and notes, per provider; '' or unset: MAKER_DEFAULTS
+  studyAgent?: Agent // the lesson chat's provider; unset: video creation's (`agent`)
+  planAgent?: Agent // course planning's provider; unset: video creation's
+  lessonAgent?: Agent // with a lesson override, the provider making course lessons; unset: video creation's
+  defaultsVersion?: number // 2: defaults saved by older versions were cleared once (migrateModelDefaults; 1080 previews became 720)
   studyAutoplay?: boolean // advance to the next ready course lesson; unset: off
   aboutYou?: boolean // agents read "What Studio knows about you" and the study chat may propose lines (ADR 0065); unset: off
   studyPlaybackRate?: number // preferred study player speed; unset: 1
@@ -750,12 +754,12 @@ export interface Settings {
   previewFps: 15 | 24 | 30
   tutorialDone: boolean // the first-run tour of the editor was finished or skipped
   toursSeen?: ('home' | 'study')[] // the app's guided tours already shown (ADR 0047)
-  claudeModel: string // '' = Claude Code's default for the account
+  claudeModel: string // '' = Studio's default (MAKER_DEFAULTS)
   claudeEffort: Effort | '' // '' (older settings) reads as 'medium'
-  agent: Agent // who writes the scenes (ADR 0022)
-  codexModel: string // GPT-6.1 Sol by default; GPT-6 Astra and GPT-6.1 Terra are the other choices
+  agent: Agent // who makes videos and runs the editor's chat (ADR 0022); other roles pick their own provider
+  codexModel: string // '' = Studio's default (MAKER_DEFAULTS); any model the account offers
   codexEffort: Effort | ''
-  antigravityModel: string // '' = Gemini 4 Hydrogen; courses are planned on Neon
+  antigravityModel: string // '' = Studio's default (MAKER_DEFAULTS)
   antigravityEffort: Effort | ''
   exerciseSets?: string[] // exercise set folders (Home lists them; search looks in them)
   seriesRun?: string // the series folder whose run Home shows (and can continue) until it's dismissed

@@ -31,6 +31,7 @@ import { agentBusy, configuredAuth, episodeAgent, type EpisodeAgent } from './ag
 import { availableFallback, fallbackBlocked, fallbackEnabled, fallbackModels, rejectFallback } from './model-fallback'
 import { modelRouteKey, normalizeModelOrder } from '../shared/model-fallback'
 import { defaultAgentSelection } from '../shared/agent-selection'
+import { MAKER_DEFAULTS, sortModels } from '../shared/model-defaults'
 import { reportAgentOutcome } from './agent-limit-notifications'
 import {
   antigravityLogin,
@@ -498,7 +499,7 @@ export async function chatInterrupt(): Promise<void> {
 export async function applyChatSettings(): Promise<void> {
   const { claudeModel, claudeEffort } = getSettings()
   // A session that already ended picks the settings up when the next one starts.
-  await session?.query.setModel(claudeModel || 'claude-sonnet-5-5').catch(() => undefined)
+  await session?.query.setModel(claudeModel || MAKER_DEFAULTS.claude).catch(() => undefined)
   await session?.query.applyFlagSettings({ effortLevel: claudeEffort || 'high' }).catch(() => undefined)
 }
 
@@ -511,13 +512,13 @@ export async function chatModels(agent?: Agent, auth?: ClaudeAuth): Promise<Mode
   const q = query({ prompt: inbox, options: { env: claudeEnv(auth), pathToClaudeCodeExecutable: paths.claude(), settingSources: [] } })
   try {
     // The current generation only (5.5, and Fable 5.2): older models wrote noticeably worse scenes.
-    const list = (await q.supportedModels()).filter((m) => m.value === 'default' || /\b5\.5\b/.test(m.displayName) || /fable[ -]5[.-]2\b/i.test(`${m.value} ${m.displayName}`))
-    return list.map((m) => ({
-      value: m.value === 'default' ? '' : m.value,
-      // Claude Code's "Default" is its own (Opus on some plans); in Studio no model means Sonnet 5.5.
-      label: m.value === 'default' ? 'Studio default (Sonnet 5.5)' : m.displayName,
-      description: m.value === 'default' ? 'Sonnet 5.5: writes scenes well, faster and cheaper than Opus.' : m.description,
-      efforts: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [],
+    // Claude Code names them "Opus", "Sonnet"…; the version leads the description ("Opus 5.5 · Best for…").
+    // Every model the account offers, newest first. Claude Code's "Default" is its own (Opus on some
+    // plans) and is left out: Studio's defaults (MAKER_DEFAULTS) are marked in the pickers instead.
+    const list = (await q.supportedModels()).filter((m) => m.value !== 'default')
+    return sortModels(list.map((m) => {
+      const [name, about] = m.description.includes(' · ') ? m.description.split(' · ', 2) : [m.displayName, m.description]
+      return { value: m.value, label: name, description: about, efforts: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [] }
     }))
   } finally {
     inbox.close()
@@ -619,7 +620,7 @@ async function askWithAgent(
       settingSources: [],
       tools: [],
       maxTurns: 1,
-      model: opts.model || getSettings().claudeModel || 'claude-sonnet-5-5',
+      model: opts.model || getSettings().claudeModel || MAKER_DEFAULTS.claude,
       ...(opts.effort ? { effort: opts.effort } : {}),
       systemPrompt: system,
     },
@@ -802,7 +803,7 @@ export async function studioOptions(dir: string, opts: { autopilot: boolean; mod
     cwd: dir,
     env: claudeEnv(opts.auth),
     pathToClaudeCodeExecutable: paths.claude(),
-    model: opts.model || getSettings().claudeModel || 'claude-sonnet-5-5',
+    model: opts.model || getSettings().claudeModel || MAKER_DEFAULTS.claude,
     ...(opts.effort === null ? {} : { effort: opts.effort || getSettings().claudeEffort || 'high' }),
     resume: resumable ? meta.claudeSessionId : undefined,
     includePartialMessages: true,

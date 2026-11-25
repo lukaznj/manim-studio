@@ -52,7 +52,7 @@ export const sceneTools = {
 export const desktopTools = {
   create_video: {
     description:
-      'Start a narrated video using Studio’s configured agent and voice. Return the job ID to the user and end the reply so they can keep chatting. Studio shows progress and saves the video in its library. Create opens the progress screen. Learn runs in the background. Both defaults to Learn unless intent is create.',
+      'Start a narrated video using Studio’s configured agent and voice. It takes several minutes. If the user wants the finished video in this conversation, call wait_for_video(job) next and again while it says working; never poll get_video or sleep. Otherwise give the user the job ID and end the reply so they can keep chatting. Studio shows progress and saves the video in its library. Create opens the progress screen. Learn runs in the background. Both defaults to Learn unless intent is create.',
     shape: {
       prompt: z
         .string()
@@ -66,6 +66,11 @@ export const desktopTools = {
     description:
       'Check a create_video job once when the user asks for an update or the finished video. Return the current status or share the completed video resource, subtitles and any warnings. Finish the reply after this check, without waiting or polling.',
     shape: { job: z.string().min(1) },
+  },
+  wait_for_video: {
+    description:
+      'Wait for a create_video job to finish, without polling. Returns the completed video resource, subtitles and warnings, or the failure. Each call waits up to timeout_seconds (at most about 45 s, or longer where the client allows it); if it returns state working, call it again.',
+    shape: { job: z.string().min(1), timeout_seconds: z.number().int().min(1).max(600).optional() },
   },
   list_video_jobs: {
     description: 'Find recent videos started from desktop chat by title and get their job IDs and status. Use this if the user asks about a video and the job ID is missing.',
@@ -136,7 +141,7 @@ export type DesktopToolName = keyof typeof desktopTools
 
 /** Instructions shared by the external desktop clients. */
 export const desktopInstructions = [
-  'For a complete video from a discussion, use create_video with the explanation and audience. Give the user the job ID, tell them that Studio shows progress and saves the result to their library, and end the turn. Do not sleep, call get_video automatically or keep the turn open. If the user later asks for the status or video, call get_video once and share its result. Learn stays in the background. Create opens the production screen. Both defaults to Learn unless the user asks for production or editing.',
+  'For a complete video from a discussion, use create_video with the explanation and audience. If the user wants the finished video in this conversation, call wait_for_video(job) instead of polling get_video, and call it again while it returns state working. Otherwise give the user the job ID, tell them that Studio shows progress and saves the result to their library, and end the turn. Never sleep or poll get_video. If the user later asks for the status or video, call get_video once and share its result. Learn stays in the background. Create opens the production screen. Both defaults to Learn unless the user asks for production or editing.',
   'If the job ID is missing, use list_video_jobs to match the user’s video by title. Ask which one they mean if several fit. Use open_video when they ask to see the video or its progress in Studio.',
   'Manim Studio is a desktop app that makes short maths explainer videos from manim code, with narration, subtitles and a timeline.',
   'When the user explicitly asks you to edit a scene directly, use create_project or open_project. Read the guide, write scene.py, then use render_preview and view_frames. Fix render errors and layout warnings before calling the edit done.',
